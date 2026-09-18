@@ -72,6 +72,21 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ## 4. Session log
 
+### 2026-09-18 — CRITICAL FIX: v1 split had dead classes; rebuilt & stratified
+- **Bug found via audit:** the on-disk v1 dataset did **not** match its manifest — a stale/partial
+  build had **zero `pipe_cylinder` and zero `structural_fragment` boxes in val AND test** (2 of 4
+  classes unmeasurable), and `pipe_cylinder` was nearly gone overall (105 boxes). Any mAP would
+  have silently excluded two classes. v0 source verified intact (all 4 classes healthy).
+- **Fix:** rewrote the split to stratify by **(source, dominant-class)** at the recording/clip
+  level — guarantees every source and every class is represented ~80/10/10 in val/test while
+  staying leakage-free. Rebuilt from source. New counts: **train=27,380 / val=1,220 / test=957**,
+  leakage **0/0/0**, **all 4 classes now present in every split** (val pipe=100/struct=479,
+  test pipe=105/struct=551).
+- **Residual (honest):** optical-sensor share still skews val 13% / test 30% (only a few optical
+  video clips; whole clips can't be subdivided). Options for later: make val/test sonar-only, or
+  accept + report the mix. Not a blocker for EXP-001 but note it when reading metrics.
+- **Next:** eyeball QA renders → `pip install -r requirements.txt` → EXP-001 baseline.
+
 ### 2026-09-18 — Split refinement + Stage 2 trainer
 - **Dataset v1 split hardened.** Replaced the base-frame split key with a source-aware
   `seq_group` (video-clip id for icra/vid, recording+channel for crabpot, wreck/object for

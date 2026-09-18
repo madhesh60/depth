@@ -171,10 +171,13 @@ def main():
 
     print(f"indexed {len(img_of)} images, {len(groups)} recording/clip groups")
 
-    # ---- 2. balanced, leakage-free split at the GROUP (recording/clip) level ----
-    # Greedy assignment: place whole groups (no frame ever crosses splits) while keeping
-    # each split's per-class box share AND image count close to the target ratio.
-    grp_vec, grp_imgs = {}, {}
+    # ---- 2. leakage-free split stratified by (source, dominant class) ----
+    # Split whole recording/clip groups so no frame crosses splits, while forcing BOTH the
+    # sensor domain (via source) AND the class mix to be proportional across train/val/test.
+    # Assigning each (source, dominant-class) bucket 80/10/10 guarantees every source and every
+    # class is represented in val/test (a global greedy could — and did — zero out minority
+    # classes and skew the optical/sonar ratio between val and test).
+    grp_vec = {}
     for gk, stems in groups.items():
         vec = [0] * NC
         for stem in stems:
@@ -188,31 +191,29 @@ def main():
                     if 0 <= c < NC:
                         vec[c] += 1
         grp_vec[gk] = vec
-        grp_imgs[gk] = len(stems)
 
-    G = [sum(grp_vec[gk][k] for gk in groups) for k in range(NC)]
-    total_imgs = sum(grp_imgs.values())
-    tgt = {s: [SPLIT_RATIO[i] * G[k] for k in range(NC)] for i, s in enumerate(SPLITS)}
-    tgt_imgs = {s: SPLIT_RATIO[i] * total_imgs for i, s in enumerate(SPLITS)}
-    cur = {s: [0] * NC for s in SPLITS}
-    cur_imgs = {s: 0 for s in SPLITS}
+    def dom_class(gk):
+        v = grp_vec[gk]
+        return max(range(NC), key=lambda k: v[k]) if sum(v) else -1   # -1 = background-only
 
-    # largest groups first for stable balancing; tie-break random via seeded shuffle
-    order = sorted(groups, key=lambda g: (sum(grp_vec[g]), grp_imgs[g]), reverse=True)
+    buckets = defaultdict(list)
+    for gk, stems in groups.items():
+        buckets[(source_of(stems[0]), dom_class(gk))].append(gk)
+
     split_of_group = {}
-    for gk in order:
-        vec, w = grp_vec[gk], grp_imgs[gk]
-        best_s, best_cost = None, None
-        for s in SPLITS:
-            cost = sum(max(0.0, cur[s][k] + vec[k] - tgt[s][k]) / (tgt[s][k] + 1.0)
-                       for k in range(NC))
-            cost += max(0.0, cur_imgs[s] + w - tgt_imgs[s]) / (tgt_imgs[s] + 1.0)
-            if best_cost is None or cost < best_cost:
-                best_cost, best_s = cost, s
-        split_of_group[gk] = best_s
-        for k in range(NC):
-            cur[best_s][k] += vec[k]
-        cur_imgs[best_s] += w
+    for _, gks in sorted(buckets.items(), key=lambda kv: str(kv[0])):
+        gks = sorted(gks)              # deterministic order before the seeded shuffle
+        random.shuffle(gks)
+        n = len(gks)
+        n_tr = int(round(n * SPLIT_RATIO[0]))
+        n_va = int(round(n * SPLIT_RATIO[1]))
+        # for buckets big enough to span all three, guarantee val+test are non-empty
+        if n >= 3:
+            n_tr = min(n_tr, n - 2)
+            n_va = max(n_va, 1)
+        for i, gk in enumerate(gks):
+            split_of_group[gk] = ("train" if i < n_tr
+                                  else "val" if i < n_tr + n_va else "test")
 
     # ---- 3. prepare output tree (fresh) ----
     if DST.exists():
@@ -272,6 +273,7 @@ def main():
         "seed": SEED,
         "split_ratio_on_groups": SPLIT_RATIO,
         "split_group_key": "recording/clip (source-aware seq_group)",
+        "split_stratified_by": "(source, dominant_class) — balances sensor domain + class mix",
         "num_groups": len(groups),
         "classes": {i: n for i, n in enumerate(CLASS_NAMES)},
         "images": {s: stats[s]["images"] for s in SPLITS},
