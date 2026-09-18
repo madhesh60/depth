@@ -1,0 +1,33 @@
+# Dataset: the data (raw archives + generated splits) is huge — keep out of git, push to S3.
+# BUT track the processing/tooling code so the pipeline is reproducible.
+DATASET/*
+!DATASET/scripts/
+DATASET/scripts/*
+!DATASET/scripts/audit_dataset.py
+!DATASET/scripts/build_dataset_v1.py
+!DATASET/scripts/visualize_labels.py
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+
+# Model artifacts
+*.pt
+*.onnx
+*.engine
+runs/
+wandb/
+
+# Env / secrets
+.env
+.env.*
+*.pem
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

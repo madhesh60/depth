@@ -1,0 +1,17 @@
+# Core CV / DL
+opencv-python>=4.10
+ultralytics>=8.3        # YOLOv8/YOLO11 train + export
+torch>=2.9
+torchvision>=0.24
+numpy>=1.26
+Pillow>=11.0
+PyYAML>=6.0
+onnxruntime>=1.19       # cv2.dnn.readNetFromONNX-compatible inference/export checks
+
+# AWS
+boto3>=1.35
+
+# Dashboard / API
+fastapi>=0.115
+uvicorn>=0.32
+python-multipart>=0.0.9
