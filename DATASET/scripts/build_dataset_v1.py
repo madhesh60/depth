@@ -45,6 +45,7 @@ NC = len(CLASS_NAMES)
 
 FULLFRAME_WH = 0.95     # drop box if w > this AND h > this
 MIN_AREA = 1e-5         # drop box if normalized area below this (degenerate)
+SLIVER = 0.01           # drop box if width OR height below this (~6px @640; degenerate sliver)
 
 PREFIXES = ["crabpot", "uatd", "icra", "mpulse", "seabed", "shipwreck", "vid"]
 SENSOR = {  # source -> sensor modality (for later domain-split experiments)
@@ -57,6 +58,29 @@ def base_key(stem: str) -> str:
     stem = re.sub(r"_aug\d+$", "", stem)
     stem = re.sub(r"\.rf\.[0-9a-f]+$", "", stem)
     return stem
+
+
+def seq_group(stem: str) -> str:
+    """Source-aware split key. Keeps a whole recording / video clip in ONE split so that
+    consecutive near-identical frames never leak across train/val/test.
+      icra/vid  -> video-clip id (frames of a clip are near-identical)
+      crabpot   -> recording+channel (strip trailing frame index)
+      shipwreck -> wreck/object (strip trailing view index)
+      mpulse    -> survey site (strip trailing _pNN)
+      uatd/seabed/other -> per frame (independent index images, no sequence)
+    """
+    core = re.sub(r"(_png)?(_jpe?g|_bmp)$", "", base_key(stem), flags=re.I)
+    s = source_of(core)
+    if s in ("icra", "vid"):
+        return re.sub(r"_frame\d+.*$", "", core)          # video clip id
+    if s == "crabpot":
+        core = re.sub(r"_\d+$", "", core)                  # drop frame index
+        return re.sub(r"_ss_(port|star)$", "_ss", core)   # merge port/star channels of a run
+    if s == "shipwreck":
+        return re.sub(r"_\d+$", "", core)                 # wreck/object
+    if s == "mpulse":
+        return re.sub(r"_p\d+$", "", core)                # survey site
+    return core                                            # uatd/seabed/other: per frame
 
 
 def is_aug(stem: str) -> bool:
@@ -72,8 +96,8 @@ def source_of(stem: str) -> str:
 
 
 def clean_label(text: str):
-    """Return (cleaned_lines, stats). Drops full-frame / degenerate boxes, clamps coords."""
-    kept, dropped_ff, dropped_tiny, dropped_bad = [], 0, 0, 0
+    """Return (cleaned_lines, stats). Drops full-frame / sliver / degenerate boxes, clamps coords."""
+    kept, dropped_ff, dropped_tiny, dropped_sliver, dropped_bad = [], 0, 0, 0, 0
     for ln in text.splitlines():
         ln = ln.strip()
         if not ln:
@@ -97,11 +121,14 @@ def clean_label(text: str):
         if w > FULLFRAME_WH and h > FULLFRAME_WH:
             dropped_ff += 1
             continue
+        if w < SLIVER or h < SLIVER:
+            dropped_sliver += 1
+            continue
         if w * h < MIN_AREA:
             dropped_tiny += 1
             continue
         kept.append(f"{cid} {x:.6f} {y:.6f} {w:.6f} {h:.6f}")
-    return kept, (dropped_ff, dropped_tiny, dropped_bad)
+    return kept, (dropped_ff, dropped_tiny, dropped_sliver, dropped_bad)
 
 
 def dominant_class(label_text: str) -> int:
@@ -132,38 +159,60 @@ def main():
         for img in (SRC / s / "images").glob("*.*"):
             img_of[img.stem] = img
 
-    groups = defaultdict(list)      # base_key -> list of stems
+    groups = defaultdict(list)      # seq_group (recording/clip) -> list of stems
     label_text = {}                 # stem -> raw label text
     for s in SPLITS:
         for lf in (SRC / s / "labels").glob("*.txt"):
             stem = lf.stem
             if stem not in img_of:
                 continue            # orphan label; skip
-            groups[base_key(stem)].append(stem)
+            groups[seq_group(stem)].append(stem)
             label_text[stem] = lf.read_text()
 
-    print(f"indexed {len(img_of)} images, {len(groups)} source-frame groups")
+    print(f"indexed {len(img_of)} images, {len(groups)} recording/clip groups")
 
-    # ---- 2. stratified split at the GROUP level (by source + dominant class) ----
-    # pick a representative original per group for stratification
-    rep = {}
+    # ---- 2. balanced, leakage-free split at the GROUP (recording/clip) level ----
+    # Greedy assignment: place whole groups (no frame ever crosses splits) while keeping
+    # each split's per-class box share AND image count close to the target ratio.
+    grp_vec, grp_imgs = {}, {}
     for gk, stems in groups.items():
-        originals = [s for s in stems if not is_aug(s)]
-        rep[gk] = (originals or stems)[0]
+        vec = [0] * NC
+        for stem in stems:
+            for ln in label_text[stem].splitlines():
+                t = ln.split()
+                if len(t) == 5:
+                    try:
+                        c = int(float(t[0]))
+                    except ValueError:
+                        continue
+                    if 0 <= c < NC:
+                        vec[c] += 1
+        grp_vec[gk] = vec
+        grp_imgs[gk] = len(stems)
 
-    buckets = defaultdict(list)
-    for gk in groups:
-        r = rep[gk]
-        buckets[(source_of(r), dominant_class(label_text[r]))].append(gk)
+    G = [sum(grp_vec[gk][k] for gk in groups) for k in range(NC)]
+    total_imgs = sum(grp_imgs.values())
+    tgt = {s: [SPLIT_RATIO[i] * G[k] for k in range(NC)] for i, s in enumerate(SPLITS)}
+    tgt_imgs = {s: SPLIT_RATIO[i] * total_imgs for i, s in enumerate(SPLITS)}
+    cur = {s: [0] * NC for s in SPLITS}
+    cur_imgs = {s: 0 for s in SPLITS}
 
+    # largest groups first for stable balancing; tie-break random via seeded shuffle
+    order = sorted(groups, key=lambda g: (sum(grp_vec[g]), grp_imgs[g]), reverse=True)
     split_of_group = {}
-    for _, gks in buckets.items():
-        random.shuffle(gks)
-        n = len(gks)
-        n_tr = int(round(n * SPLIT_RATIO[0]))
-        n_va = int(round(n * SPLIT_RATIO[1]))
-        for i, gk in enumerate(gks):
-            split_of_group[gk] = "train" if i < n_tr else "val" if i < n_tr + n_va else "test"
+    for gk in order:
+        vec, w = grp_vec[gk], grp_imgs[gk]
+        best_s, best_cost = None, None
+        for s in SPLITS:
+            cost = sum(max(0.0, cur[s][k] + vec[k] - tgt[s][k]) / (tgt[s][k] + 1.0)
+                       for k in range(NC))
+            cost += max(0.0, cur_imgs[s] + w - tgt_imgs[s]) / (tgt_imgs[s] + 1.0)
+            if best_cost is None or cost < best_cost:
+                best_cost, best_s = cost, s
+        split_of_group[gk] = best_s
+        for k in range(NC):
+            cur[best_s][k] += vec[k]
+        cur_imgs[best_s] += w
 
     # ---- 3. prepare output tree (fresh) ----
     if DST.exists():
@@ -174,7 +223,7 @@ def main():
 
     # ---- 4. write files ----
     stats = {s: {"images": 0, "background": 0, "boxes": Counter()} for s in SPLITS}
-    tot_ff = tot_tiny = tot_bad = corrupt = 0
+    tot_ff = tot_tiny = tot_sliver = tot_bad = corrupt = 0
     sensor_counts = {s: Counter() for s in SPLITS}
     from PIL import Image  # local import; Pillow is available
 
@@ -192,8 +241,8 @@ def main():
             except Exception:
                 corrupt += 1
                 continue
-            kept, (d_ff, d_tiny, d_bad) = clean_label(label_text[stem])
-            tot_ff += d_ff; tot_tiny += d_tiny; tot_bad += d_bad
+            kept, (d_ff, d_tiny, d_sliver, d_bad) = clean_label(label_text[stem])
+            tot_ff += d_ff; tot_tiny += d_tiny; tot_sliver += d_sliver; tot_bad += d_bad
             link_or_copy(img, DST / split / "images" / img.name)
             (DST / split / "labels" / f"{stem}.txt").write_text("\n".join(kept))
             stats[split]["images"] += 1
@@ -222,6 +271,8 @@ def main():
         "built_from": SRC.name,
         "seed": SEED,
         "split_ratio_on_groups": SPLIT_RATIO,
+        "split_group_key": "recording/clip (source-aware seq_group)",
+        "num_groups": len(groups),
         "classes": {i: n for i, n in enumerate(CLASS_NAMES)},
         "images": {s: stats[s]["images"] for s in SPLITS},
         "background_images": {s: stats[s]["background"] for s in SPLITS},
@@ -229,10 +280,12 @@ def main():
         "sensor_images": {s: dict(sensor_counts[s]) for s in SPLITS},
         "cleaning": {
             "dropped_fullframe_boxes": tot_ff,
+            "dropped_sliver_boxes": tot_sliver,
             "dropped_tiny_boxes": tot_tiny,
             "dropped_malformed_boxes": tot_bad,
             "corrupt_images_skipped": corrupt,
             "fullframe_threshold": FULLFRAME_WH,
+            "sliver_threshold": SLIVER,
             "min_area": MIN_AREA,
         },
         "leakage_shared_frames": leakage,
@@ -244,10 +297,11 @@ def main():
     print("\n" + "=" * 68)
     print("DATASET v1 BUILD COMPLETE")
     print("=" * 68)
+    print(f"split by recording/clip: {len(groups)} groups")
     for s in SPLITS:
         print(f"[{s:5}] images={stats[s]['images']:>6}  background={stats[s]['background']:>5}  "
               f"boxes={dict(sorted(stats[s]['boxes'].items()))}")
-    print(f"\ncleaned boxes: fullframe={tot_ff}  tiny/degenerate={tot_tiny}  "
+    print(f"\ncleaned boxes: fullframe={tot_ff}  sliver={tot_sliver}  tiny/degenerate={tot_tiny}  "
           f"malformed={tot_bad}  corrupt_images_skipped={corrupt}")
     print(f"LEAKAGE (shared source frames across splits): {leakage}  "
           f"{'[CLEAN]' if sum(leakage.values()) == 0 else '[STILL LEAKING]'}")

@@ -34,10 +34,12 @@ SageMaker for training. Details/diagram in [AGENT.md](AGENT.md#4-planned-aws-arc
 - `02_intermediate_processing/unified/` — remapped/unified intermediate (`class_counts.json`).
 - `03_yolo_ready_dataset/` — v0 split (superseded; kept for provenance).
 - **`03_yolo_ready_dataset_v1/`** — the **clean, training-ready dataset** (`data.yaml`, `nc=4`):
-  **train=26,485 (incl. 999 background) · val=1,253 · test=1,253**; leakage-free (split by
-  source frame), full-frame boxes removed, corrupt-checked. Counts + cleaning stats in
-  `manifest.json`. Per-class boxes: `fishing_gear`=21,823, `structural_fragment`=11,470,
-  `natural_formation`=5,900, `pipe_cylinder`=1,867.
+  **train=26,389 (incl. 1,003 background) · val=1,172 · test=1,734**; leakage-free (split by
+  **recording/clip**, 5,618 groups — a whole video clip / sonar run stays in one split so
+  near-identical consecutive frames can't leak), full-frame + sliver boxes removed,
+  corrupt-checked. Counts + cleaning stats in `manifest.json`. Per-class boxes:
+  `fishing_gear`=21,659, `structural_fragment`=11,898, `natural_formation`=6,026,
+  `pipe_cylinder`=1,831.
 - `scripts/audit_dataset.py [root]` — ground-truth audit · `scripts/build_dataset_v1.py` —
   the v0→v1 cleaner · `scripts/visualize_labels.py` — box-on-image QA renders.
 - `archive_scripts/run_remaining_steps.py` — frozen v0 build script (idempotent).
