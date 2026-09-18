@@ -62,7 +62,7 @@ Remaining before EXP-001: visual QA pass + class-imbalance training config.
 
 ## Phase 3 — Stage 2 detection + evaluation
 
-- [ ] **(P1)** `src/detection/train.py` reading `DATASET/03_yolo_ready_dataset/data.yaml`.
+- [x] **(P1)** `src/detection/train.py` — reads v1 `data.yaml`; sonar-aware aug (no hue/rotation, along-track flip only); prints inverse-freq class weights; test-split report at end.
 - [ ] **(P1)** Run **EXP-001** baseline (YOLO11s-seg, v1) → log in `experiments.md`.
 - [ ] **(P1)** `src/detection/evaluate.py`: mAP@0.5, mAP@0.5:0.95, P/R/F1, per-class, confusion matrix.
 - [ ] **(P1)** `src/detection/export_onnx.py` → ONNX + verify load via `cv2.dnn.readNetFromONNX()`.

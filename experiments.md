@@ -101,7 +101,10 @@ Promote each into the log below with full results as it runs.
 
 ## Experiment log
 
-_None run yet. Dataset v1 is ready — EXP-001 is next (after the visual-QA pass)._
+_None run yet. Dataset v1 is ready and the trainer is wired
+(`python src/detection/train.py --model yolo11s.pt --name EXP-001`, add `--seg` for
+instance masks). EXP-001 is next, after the visual-QA pass and once `ultralytics` is
+installed (`pip install -r requirements.txt`)._
 
 <!-- ### EXP-001 — Baseline YOLO11s-seg on dataset v1
      (copy the template above) -->

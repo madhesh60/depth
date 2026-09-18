@@ -72,6 +72,19 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ## 4. Session log
 
+### 2026-09-18 — Split refinement + Stage 2 trainer
+- **Dataset v1 split hardened.** Replaced the base-frame split key with a source-aware
+  `seq_group` (video-clip id for icra/vid, recording+channel for crabpot, wreck/object for
+  shipwreck, survey site for mpulse, per-frame otherwise). Whole groups are placed greedily
+  to keep per-class box share + image count near 80/10/10. Also drop degenerate **sliver**
+  boxes (w or h < 0.01). Re-audit: **leakage 0/0/0**, 5,618 groups; counts refreshed
+  (train=26,389 / val=1,172 / test=1,734; sensor split ~80/20 sonar/optical).
+- **Stage 2 trainer added** (`src/detection/train.py`): reads v1 `data.yaml`, sonar-aware
+  augmentation (hue/sat off, no rotation/vflip, along-track hflip only), prints inverse-freq
+  class weights for the imbalance, and reports test-split mAP/P/R at the end. `--seg` switches
+  to instance segmentation. Verified `--help` runs without the training deps installed.
+- **Next:** eyeball QA renders → `pip install -r requirements.txt` → run **EXP-001** baseline.
+
 ### 2026-09-18 — Foundation, docs cleanup & dataset audit
 - Read full context (AGENT.md proposal, competition rules, dataset report, CC playbook).
 - Established peak architecture and winning plan (`architecture.md`).
