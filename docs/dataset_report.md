@@ -17,30 +17,45 @@ re-audited. Location: `DATASET/03_yolo_ready_dataset_v1/` (`data.yaml`, `manifes
 
 | Split | Images | Background | Boxes (per class 0/1/2/3) |
 |---|---:|---:|---|
-| train | 26,485 | 999 | 19,992 / 1,704 / 10,465 / 5,368 |
-| val | 1,253 | 50 | 839 / 83 / 506 / 267 |
-| test | 1,253 | 50 | 992 / 80 / 499 / 265 |
+| train | 26,533 | 1,120 | 19,527 / 1,636 / 10,422 / 5,389 |
+| val | 1,204 | 15 | 1,008 / 120 / 507 / 260 |
+| test | 1,276 | 58 | 952 / 65 / 501 / 269 |
 
 **Classes (`nc=4`):** `0 fishing_gear · 1 pipe_cylinder · 2 structural_fragment · 3 natural_formation`.
 
+**Split is jointly stratified so val AND test mirror train** on both class mix and sensor domain
+(greedy fill-equalisation on original frames). Resulting composition is near-identical across all
+three splits — the earlier test-set distribution inversion is gone:
+
+| Measure | train | val | test |
+|---|---:|---:|---:|
+| `fishing_gear` share | 52.8% | 53.2% | 53.3% |
+| `structural_fragment` share | 28.2% | 26.8% | 28.0% |
+| `natural_formation` share | 14.6% | 13.7% | 15.1% |
+| `pipe_cylinder` share | 4.4% | 6.3% | 3.6% |
+| sonar / optical | 80 / 20 | 79 / 21 | 80 / 20 |
+
 | Problem (v0) | Fix in v1 | Verified result |
 |---|---|---|
-| Cross-split leakage (838 shared frames) | Split at **source-frame** level; val/test = originals only | **0 / 0 / 0** shared frames |
-| Baked augmentation scattered across splits | Train keeps augs; val/test cleaned | honest eval set |
-| 1,258 full-frame boxes | Dropped on write | 1,096 removed → **0 remain** |
-| Degenerate/zero-area boxes | Dropped (`area < 1e-5`) | 3 removed |
-| No background negatives | Emptied-label images kept as negatives | **1,099** background images |
+| Cross-split leakage (838 shared frames) | Split whole **recording/clip** groups (5,618) | **0 / 0 / 0** shared frames |
+| Test-set class + sensor mix diverged from train | **Joint stratification** on class box-mix + sensor (originals) | val ≈ test ≈ train (table above) |
+| Baked augmentation scattered across splits | Train keeps augs; val/test = originals only | honest eval set |
+| Full-frame boxes | Dropped on write (`w&h>0.95`) | 1,166 removed → **0 remain** |
+| Degenerate / sliver boxes | Dropped (`area<1e-5`, side`<0.01`) | 75 slivers removed |
+| No background negatives | Emptied-label images kept as negatives | **1,193** background images |
 | Corrupt images unknown | Every image opened/verified | **0 corrupt** |
 | Polygons / malformed | — | **0 / 0** |
 
-**Deliberately retained (not bugs):** ~1,534 plausibly-small boxes (`area < 5e-4`) kept to
-preserve small-debris recall — flagged for visual QA via `visualize_labels.py`.
+**Deliberately retained (not bugs):** plausibly-small boxes (train 1,469 / val 10 / test 60) kept
+to preserve small-debris recall — flagged for visual QA via `visualize_labels.py`.
 
 **Remaining training-time concerns (not dataset defects):**
-- **Class imbalance** — `fishing_gear` (21,823) ≈ 11.7× `pipe_cylinder` (1,867). Handle with
-  class weights / focal loss / minority augmentation; always report per-class metrics.
-- **Mixed sensors** — ~80% sonar / 20% optical (tagged in `manifest.json`). Track domain-split
-  metrics; consider a sonar-only fine-tune (EXP-006).
+- **Class imbalance** — `fishing_gear` (21,487) ≈ 11.8× `pipe_cylinder` (1,821). Handle with
+  minority oversampling / focal loss / augmentation; always report per-class metrics.
+- **Sparse minority in eval** — `pipe_cylinder` has only 65 (test) / 120 (val) boxes (few clips
+  carry it), so its per-class AP is high-variance — caveat it in results.
+- **Mixed sensors** — ~80% sonar / 20% optical, now balanced across all splits (tagged in
+  `manifest.json`). Consider a sonar-only fine-tune for the mission domain (EXP-006).
 
 ---
 

@@ -171,16 +171,32 @@ def main():
 
     print(f"indexed {len(img_of)} images, {len(groups)} recording/clip groups")
 
-    # ---- 2. leakage-free split stratified by (source, dominant class) ----
-    # Split whole recording/clip groups so no frame crosses splits, while forcing BOTH the
-    # sensor domain (via source) AND the class mix to be proportional across train/val/test.
-    # Assigning each (source, dominant-class) bucket 80/10/10 guarantees every source and every
-    # class is represented in val/test (a global greedy could — and did — zero out minority
-    # classes and skew the optical/sonar ratio between val and test).
-    grp_vec = {}
+    # ---- 2. leakage-free split, jointly stratified by class box-mix AND sensor domain ----
+    # Split whole recording/clip groups (no frame crosses splits) so val AND test each mirror
+    # train's per-class box distribution and its sonar/optical ratio — not just a coarse
+    # "dominant class" bucket, which let large single-class clips land wholesale in one split
+    # and inverted the class mix between train and test.
+    #
+    # Balancing is done on ORIGINAL frames only: val/test receive originals, while train
+    # additionally keeps augmentations. So the proportions target train's real, un-augmented
+    # distribution and the evaluation splits are faithful samples of it.
+    #
+    # Method: greedy fill-equalisation (a lightweight multi-label / iterative stratification).
+    # Every "measure" is a class (counted by boxes) or a sensor (counted by original images).
+    # Groups are placed rarest-class-first, largest-first; each group goes to the split whose
+    # current fill-fraction is *lowest* over the measures the group contributes. Equalising the
+    # fill fraction across splits drives their counts to the 80/10/10 target on every measure at
+    # once, and placing rare classes first guarantees each class (incl. pipe_cylinder) reaches
+    # val AND test.
+    SENSOR_KEYS = ("sonar", "optical")
+    MEASURES = list(range(NC)) + list(SENSOR_KEYS)
+
+    grp_contrib = {}                       # group -> {measure: amount}, ORIGINAL frames only
     for gk, stems in groups.items():
-        vec = [0] * NC
-        for stem in stems:
+        origs = [s for s in stems if not is_aug(s)] or stems
+        vec = {m: 0 for m in MEASURES}
+        vec[SENSOR.get(source_of(stems[0]), "optical")] = len(origs)
+        for stem in origs:
             for ln in label_text[stem].splitlines():
                 t = ln.split()
                 if len(t) == 5:
@@ -190,30 +206,35 @@ def main():
                         continue
                     if 0 <= c < NC:
                         vec[c] += 1
-        grp_vec[gk] = vec
+        grp_contrib[gk] = vec
 
-    def dom_class(gk):
-        v = grp_vec[gk]
-        return max(range(NC), key=lambda k: v[k]) if sum(v) else -1   # -1 = background-only
+    global_total = {m: sum(v[m] for v in grp_contrib.values()) or 1 for m in MEASURES}
+    target = {s: {m: global_total[m] * r for m in MEASURES}
+              for s, r in zip(SPLITS, SPLIT_RATIO)}
+    current = {s: {m: 0.0 for m in MEASURES} for s in SPLITS}
 
-    buckets = defaultdict(list)
-    for gk, stems in groups.items():
-        buckets[(source_of(stems[0]), dom_class(gk))].append(gk)
+    def order_key(gk):
+        v = grp_contrib[gk]
+        present = [global_total[c] for c in range(NC) if v[c] > 0]
+        rarest = min(present) if present else max(global_total.values())
+        return (rarest, -sum(v[c] for c in range(NC)), gk)   # rarest class, then largest, det.
 
     split_of_group = {}
-    for _, gks in sorted(buckets.items(), key=lambda kv: str(kv[0])):
-        gks = sorted(gks)              # deterministic order before the seeded shuffle
-        random.shuffle(gks)
-        n = len(gks)
-        n_tr = int(round(n * SPLIT_RATIO[0]))
-        n_va = int(round(n * SPLIT_RATIO[1]))
-        # for buckets big enough to span all three, guarantee val+test are non-empty
-        if n >= 3:
-            n_tr = min(n_tr, n - 2)
-            n_va = max(n_va, 1)
-        for i, gk in enumerate(gks):
-            split_of_group[gk] = ("train" if i < n_tr
-                                  else "val" if i < n_tr + n_va else "test")
+    for gk in sorted(groups.keys(), key=order_key):
+        v = grp_contrib[gk]
+        vnorm = {m: v[m] / global_total[m] for m in MEASURES if v[m] > 0}
+        best, best_score = None, None
+        for s in SPLITS:
+            wfill = sum(w * (current[s][m] / target[s][m] if target[s][m] else 1.0)
+                        for m, w in vnorm.items())                       # need on this group
+            tie = sum(current[s][m] / target[s][m] if target[s][m] else 1.0
+                      for m in MEASURES)                                 # overall least-loaded
+            score = (wfill, tie)
+            if best_score is None or score < best_score:
+                best, best_score = s, score
+        split_of_group[gk] = best
+        for m in MEASURES:
+            current[best][m] += v[m]
 
     # ---- 3. prepare output tree (fresh) ----
     if DST.exists():
@@ -273,7 +294,8 @@ def main():
         "seed": SEED,
         "split_ratio_on_groups": SPLIT_RATIO,
         "split_group_key": "recording/clip (source-aware seq_group)",
-        "split_stratified_by": "(source, dominant_class) — balances sensor domain + class mix",
+        "split_stratified_by": "greedy fill-equalisation on class box-mix + sensor domain "
+                               "(originals) — val/test mirror train per-class and sonar/optical",
         "num_groups": len(groups),
         "classes": {i: n for i, n in enumerate(CLASS_NAMES)},
         "images": {s: stats[s]["images"] for s in SPLITS},
