@@ -31,8 +31,16 @@ The `.tar` stays git-ignored — do not commit it.
 
 ## 2. Code + deps
 
+> **The repo must be public** for this clone to work. Colab can't answer an
+> interactive credential prompt, so cloning a *private* repo over HTTPS fails with
+> `fatal: could not read Username for 'https://github.com'` — and then every later
+> cell dies with `No such file or directory: .../train.py`. Either make the repo
+> public (GitHub → Settings → Danger Zone → Change visibility), or clone with a
+> read-only token: `!git clone https://<TOKEN>@github.com/madhesh60/depth.git`.
+
 ```python
-!git clone https://github.com/madhesh60/depth.git
+!git clone https://github.com/madhesh60/depth.git /content/depth
+!ls /content/depth/src/detection/train.py    # sanity-check: must print the file
 !pip -q install ultralytics
 ```
 
