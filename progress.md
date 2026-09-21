@@ -37,8 +37,8 @@ what moved, what's blocked, what's next. Newest entries at the top of §4.
 | Project docs (this set) | ✅ Done | README / architecture / progress / experiments / TODO. |
 | Dataset fixes (v1) | ✅ Done | Clean split built: 0 leakage, full-frame boxes removed, 1,099 background negatives, 4-class taxonomy locked. `03_yolo_ready_dataset_v1/`. |
 | Stage 1 classical CV | 🟡 In progress | `src/cv_pipeline/` built + 3-way COOL benchmark harness. Local x86: 29 ms/frame, 30.5 FPS. Needs Graviton+COOL run. |
-| Stage 2 baseline train | 🟡 In progress | EXP-001 training on Kaggle T4 (yolo11s, 40 epochs). |
-| Evaluation + ablation | ⬜ Not started | mAP/P/R, Stage-1 FP-reduction study. |
+| Stage 2 baseline train | ✅ Done | EXP-001 (yolo11s detect, v1, Kaggle T4): test mAP@0.5 **0.822**, P 0.808, R 0.800 — all targets met. |
+| Evaluation + ablation | 🟡 In progress | Baseline logged (EXP-001). Open: `fishing_gear` recall 0.37; aug ablation (EXP-002); Stage-1 FP-reduction study. |
 | Reporting engine | ⬜ Not started | JSON/CSV/GeoJSON + geotagging. |
 | Dashboard | ⬜ Not started | FastAPI + map + transparency view. |
 | AWS deployment | ⬜ Not started | AWS CLI not yet installed. |
@@ -71,6 +71,21 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 ---
 
 ## 4. Session log
+
+### 2026-09-21 — EXP-001 baseline trained (Kaggle T4) — all aggregate targets met
+- **First real training run is in.** YOLO11s (detect, not seg), dataset v1, 640, sonar-aware
+  aug, 100 ep / batch 16 on a Kaggle T4. Logged as **EXP-001** in `experiments.md` with full
+  per-class results.
+- **Test-split result (1,276 imgs / 1,787 inst):** mAP@0.5 **0.822**, mAP@0.5:0.95 **0.514**,
+  precision **0.808**, recall **0.800** — **every aggregate target cleared** (≥0.70 / ≥0.45 /
+  ≥0.80 / ≥0.70). Inference ~11.5 ms/frame on T4.
+- **The one problem: `fishing_gear`.** Recall **0.371** (AP@0.5 0.45) — we miss ~63% of the
+  single most dangerous class (ghost nets / rope). Aggregate metrics pass only because the other
+  three classes are strong (pipe_cylinder AP 0.94 on 65 boxes — high-variance; struct 0.923;
+  natural 0.973). Counter to blocker B4, imbalance hurt the *majority* merged class, not the rare one.
+- **Next:** pull `confusion_matrix.png` + a fishing_gear FN gallery to classify the misses;
+  run **EXP-002** (originals-only vs baked-aug ablation), then attack fishing_gear recall
+  (oversample / focal, EXP-004). Export `best.onnx` for the Stage-1→Stage-2 wiring.
 
 ### 2026-09-21 — Stage 1 CV pipeline + COOL benchmark harness; verified COOL scorecard
 - **Verified what COOL actually is** (was an assumption): Cloud-Optimized OpenCV, a
@@ -182,13 +197,15 @@ Details and fixes tracked in [`TODO.md`](TODO.md) Phase 1 & Phase 4.
 
 | Metric | Target | Current | Δ |
 |---|---|---|---|
-| mAP@0.5 | ≥ 0.70 | — | — |
-| mAP@0.5:0.95 | ≥ 0.45 | — | — |
-| Precision | ≥ 0.80 | — | — |
-| Recall | ≥ 0.70 | — | — |
+| mAP@0.5 | ≥ 0.70 | **0.822** (EXP-001) | +0.122 ✅ |
+| mAP@0.5:0.95 | ≥ 0.45 | **0.514** (EXP-001) | +0.064 ✅ |
+| Precision | ≥ 0.80 | **0.808** (EXP-001) | +0.008 ✅ |
+| Recall | ≥ 0.70 | **0.800** (EXP-001) | +0.100 ✅ |
+| `fishing_gear` recall (watch) | ≥ 0.70 | **0.371** (EXP-001) | −0.329 ❌ |
 | FP reduction (Stage 1) | ≥ 60% | — | — |
-| Latency / frame | < 300 ms | — | — |
-| Throughput | ≥ 5 FPS | — | — |
+| Latency / frame (Stage 2, T4) | < 300 ms | ~11.5 ms (EXP-001) | ✅ |
+| Throughput (Stage 2, T4) | ≥ 5 FPS | ~87 FPS (EXP-001) | ✅ |
 | COOL: Graviton vs x86 latency | measured | — | — |
 
-_Link each filled row to the `EXP-NNN` that produced it._
+_Link each filled row to the `EXP-NNN` that produced it. Note: aggregate targets met, but
+`fishing_gear` (mission-critical) recall is the open gap._

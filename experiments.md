@@ -88,7 +88,7 @@ These are queued, not run:
 
 | ID | Hypothesis | Key change |
 |---|---|---|
-| EXP-001 | Establish a baseline | YOLO11s-seg, dataset v1, 640, default aug, 100 ep |
+| ✅ EXP-001 | Establish a baseline (**done** — see log) | YOLO11s detect, v1, 640, sonar aug, 100 ep → mAP@0.5 0.822 |
 | EXP-002 | Bigger input helps small sonar targets | input 768/896 vs EXP-001 |
 | EXP-003 | Arch comparison | YOLOv8s-seg vs YOLO11s-seg, else identical |
 | EXP-004 | Class weighting lifts `pipe_cylinder` (minority) recall | focal / inverse-freq weighting |
@@ -101,10 +101,63 @@ Promote each into the log below with full results as it runs.
 
 ## Experiment log
 
-_None run yet. Dataset v1 is ready and the trainer is wired
-(`python src/detection/train.py --model yolo11s.pt --name EXP-001`, add `--seg` for
-instance masks). EXP-001 is next, after the visual-QA pass and once `ultralytics` is
-installed (`pip install -r requirements.txt`)._
+### EXP-001 — Baseline YOLO11s (detect) on dataset v1
+- Date:              2026-09-21
+- Status:            done
+- Hypothesis:        Establish an honest first baseline on the clean v1 split — where do we
+                     stand against the targets (mAP@0.5 ≥ 0.70, P ≥ 0.80, R ≥ 0.70) with a
+                     stock YOLO11s and no per-class tricks, and which class is the weak link?
+- Baseline compared: none (this is the reference point for EXP-002+)
 
-<!-- ### EXP-001 — Baseline YOLO11s-seg on dataset v1
-     (copy the template above) -->
+Config
+- Model:            yolo11s.pt (detect — **not** seg; 9.41 M params, 21.4 GFLOPs, fused)
+- Task:             detect
+- Dataset version:  v1  (`03_yolo_ready_dataset_v1`, leakage-free, 4-class, split by clip)
+- Input size:       640
+- Epochs / Batch:   100 (early-stopping patience 20) / 16
+- Optimizer / LR:   Ultralytics defaults (auto optimizer + auto lr0)
+- Augmentation:     sonar-aware — hsv_h=0, hsv_s=0, hsv_v=0.2; degrees=0, flipud=0,
+                    fliplr=0.5; translate=0.1, scale=0.5; mosaic=1.0, close_mosaic=10
+- Class weighting:  none (inverse-freq weights printed for reference only, not applied)
+- Hardware:         Kaggle T4 (16 GB), GPU
+- Command / config: `python src/detection/train.py --model yolo11s.pt --epochs 100 --batch 16 --name EXP-001`
+
+Results  (test split — 1,276 images / 1,787 instances; all 4 targets met in aggregate ✅)
+- Precision:        0.808   (≥ 0.80 ✅)
+- Recall:           0.800   (≥ 0.70 ✅)
+- mAP@0.5:          0.822   (≥ 0.70 ✅)
+- mAP@0.5:0.95:     0.514   (≥ 0.45 ✅)
+- Per-class (imgs / inst — P / R / AP@0.5 / AP@0.5:0.95):
+    fishing_gear:         537 / 952 — 0.535 / 0.371 / 0.450 / 0.194   ⬅ worst; mission-critical
+    pipe_cylinder:         65 /  65 — 0.909 / 0.954 / 0.940 / 0.523   (high-variance, 65 boxes)
+    structural_fragment:  402 / 501 — 0.951 / 0.897 / 0.923 / 0.554
+    natural_formation:    214 / 269 — 0.835 / 0.978 / 0.973 / 0.784
+- Confusion matrix:  runs/EXP-001/confusion_matrix.png (in MyDrive/EXP-001_results)
+- Inference latency:  T4 — 1.1 ms preprocess + 9.8 ms inference + 0.6 ms postprocess ≈ 11.5 ms/frame (~87 FPS)
+- FP reduction (Stage 1): n/a — full-frame detector only; Stage-1→Stage-2 ROI study is EXP-later
+
+Error analysis
+- **`fishing_gear` is the failure mode, not the minority class.** Recall 0.371 means we miss
+  ~63% of ghost-net/rope instances — the single most dangerous class (per experiments.md §Conventions).
+  Its AP@0.5 (0.45) is the only class below the 0.70 target; aggregate metrics pass *only because*
+  the other three classes are strong. This is the headline problem to fix.
+- **Imbalance did NOT hurt the rare class.** Counter to blocker B4's worry, `pipe_cylinder`
+  (rarest, 4% of boxes) scored AP@0.5 0.94 — but on just 65 test boxes, so treat as high-variance.
+  The imbalance lever should target `fishing_gear` *recall*, not `pipe_cylinder`.
+- **Why fishing_gear is hard (hypotheses):** it is the merged/heterogeneous class (`rope_line`
+  folded in), objects are thin/diffuse/low-contrast against seafloor, and it dominates the box
+  count so localisation errors show up most. Needs the confusion matrix + FN gallery to confirm
+  whether misses are missed detections vs. low-IoU localisation vs. confusion with clutter.
+- False positives: not yet inspected per-class — pull `runs/EXP-001/confusion_matrix.png` and a
+  low-score FP gallery before EXP-002.
+
+Decision & next
+- **Keep** as the reference baseline. It clears every aggregate target, so v1 + the sonar-aware
+  aug recipe is sound; the open problem is `fishing_gear` recall, not overall capacity.
+- Next experiment (**EXP-002**): before touching the class problem, isolate whether the ~62%
+  baked-in augmentation is helping or just doubling the online aug — originals-only train vs. this
+  run (per `docs/colab_baseline.md` §7). Then attack `fishing_gear` recall via oversampling /
+  focal (EXP-004) once the FN cause is confirmed from the confusion matrix.
+
+<!-- template retained below for the next run:
+### EXP-NNN — <short title>  (copy from the template section above) -->
