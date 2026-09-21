@@ -36,8 +36,8 @@ what moved, what's blocked, what's next. Newest entries at the top of §4.
 | Dataset audit | ✅ Done | Issues catalogued in `docs/dataset_report.md`. |
 | Project docs (this set) | ✅ Done | README / architecture / progress / experiments / TODO. |
 | Dataset fixes (v1) | ✅ Done | Clean split built: 0 leakage, full-frame boxes removed, 1,099 background negatives, 4-class taxonomy locked. `03_yolo_ready_dataset_v1/`. |
-| Stage 1 classical CV | ⬜ Not started | `src/cv_pipeline/`. |
-| Stage 2 baseline train | ⬜ Not started | Needs v1 dataset. |
+| Stage 1 classical CV | 🟡 In progress | `src/cv_pipeline/` built + 3-way COOL benchmark harness. Local x86: 29 ms/frame, 30.5 FPS. Needs Graviton+COOL run. |
+| Stage 2 baseline train | 🟡 In progress | EXP-001 training on Kaggle T4 (yolo11s, 40 epochs). |
 | Evaluation + ablation | ⬜ Not started | mAP/P/R, Stage-1 FP-reduction study. |
 | Reporting engine | ⬜ Not started | JSON/CSV/GeoJSON + geotagging. |
 | Dashboard | ⬜ Not started | FastAPI + map + transparency view. |
@@ -71,6 +71,31 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 ---
 
 ## 4. Session log
+
+### 2026-09-21 — Stage 1 CV pipeline + COOL benchmark harness; verified COOL scorecard
+- **Verified what COOL actually is** (was an assumption): Cloud-Optimized OpenCV, a
+  KleidiCV-accelerated Arm/Graviton build that speeds up **resize, adaptive-gaussian
+  threshold, contour detection** (~1.5× avg). Proposal's expansion was correct.
+- **Got the "Best Use of COOL" scorecard:** verified COOL integration on Graviton **30%** +
+  measured performance vs baseline **20%** + architecture **25%** + innovation **15%** +
+  reproducibility **10%**. ⇒ **half the award is a reproducible Graviton-vs-x86 benchmark of
+  the core workload**, not a fancier model.
+- **Built Stage 1** (`src/cv_pipeline/`): `config.py` (all tunables, COOL-friendly defaults),
+  `pipeline.py` (`Stage1Pipeline.process()`, per-op timed, + `draw_candidates()`),
+  `benchmark.py` (3-way harness), `README.md`. Deliberately composed of COOL-accelerated ops.
+- **Tested on real sonar frames** (v1 test set): local x86 stock OpenCV 4.12, 400 frames →
+  **29.2 ms/frame, 30.5 FPS**, avg 10 ROIs/frame. Per-op: **threshold+contours+resize = ~76%
+  of compute** — i.e. the compute concentrates in exactly the ops COOL accelerates, so the
+  Graviton+COOL speedup will be attributable. Well under 300 ms / above 5 FPS.
+- **Key design calls:** `fastNlMeansDenoising` OFF by default (slow + NOT KleidiCV-accelerated,
+  would dilute COOL's measured gain) — median denoise default, NLMeans kept in `QUALITY_PRESET`
+  for the ablation. Benchmark is **three-way** (x86-stock / Graviton-stock / Graviton-COOL) so
+  the Graviton-stock→Graviton-COOL delta isolates COOL on identical hardware.
+- **Architecture guidance:** AWS footprint for the COOL award is small — EC2 Graviton (c7g/c8g)
+  + COOL running Stage 1, EC2 x86 baseline, S3 for frames/results, CloudWatch/CSV for metrics.
+  Lambda/DynamoDB/Amplify/SageMaker are overall-award/demo polish, built only after COOL locked.
+- **Next:** run the benchmark on a Graviton instance with COOL vs stock (needs AWS CLI + EC2);
+  wire Stage 1 → Stage 2 (ROI crop → `cv2.dnn.readNetFromONNX`) once EXP-001 weights land.
 
 ### 2026-09-18 — CRITICAL FIX: v1 split had dead classes; rebuilt & stratified
 - **Bug found via audit:** the on-disk v1 dataset did **not** match its manifest — a stale/partial
