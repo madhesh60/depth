@@ -36,9 +36,10 @@ what moved, what's blocked, what's next. Newest entries at the top of §4.
 | Dataset audit | ✅ Done | Issues catalogued in `docs/dataset_report.md`. |
 | Project docs (this set) | ✅ Done | README / architecture / progress / experiments / TODO. |
 | Dataset fixes (v1) | ✅ Done | Clean split built: 0 leakage, full-frame boxes removed, 1,099 background negatives, 4-class taxonomy locked. `03_yolo_ready_dataset_v1/`. |
-| Stage 1 classical CV | 🟡 In progress | `src/cv_pipeline/` built + 3-way COOL benchmark harness. Local x86: 29 ms/frame, 30.5 FPS. Needs Graviton+COOL run. |
+| Stage 1 classical CV | 🟡 In progress | **Reframed** (STUDY-01): not a Stage-2 ROI gate (no discriminative power on this sonar) — now the CPU **sonar-preprocessing workload** for the COOL benchmark. `src/cv_pipeline/` + 3-way harness. Local x86: 29 ms/frame, 30.5 FPS. Needs Graviton+COOL run. |
+| Stage 1→2 wiring (cv2.dnn) | ✅ Done | `infer.py` (ONNX via `cv2.dnn`, full_frame + roi_guided) + `ablation_fp.py` + `tune_coverage.py`. ONNX verified loading/forward. |
 | Stage 2 baseline train | ✅ Done | EXP-001 (yolo11s detect, v1, Kaggle T4): test mAP@0.5 **0.822**, P 0.808, R 0.800 — all targets met. |
-| Evaluation + ablation | 🟡 In progress | Baseline logged (EXP-001). Open: `fishing_gear` recall 0.37; aug ablation (EXP-002); Stage-1 FP-reduction study. |
+| Evaluation + ablation | 🟡 In progress | Baseline (EXP-001) + STUDY-01 (ROI-gating negative result) logged. Open: `fishing_gear` recall 0.37 (EXP-002/004). FP-reduction target **retired**. |
 | Reporting engine | ⬜ Not started | JSON/CSV/GeoJSON + geotagging. |
 | Dashboard | ⬜ Not started | FastAPI + map + transparency view. |
 | AWS deployment | ⬜ Not started | AWS CLI not yet installed. |
@@ -71,6 +72,26 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 ---
 
 ## 4. Session log
+
+### 2026-09-22 — Stage 1→2 wired via cv2.dnn; ROI-gating is a NEGATIVE result → Stage 1 reframed
+- **Wired Stage 2 for the Lambda path:** extracted EXP-001 artifacts locally, verified
+  `best.onnx` loads + runs through `cv2.dnn.readNetFromONNX` (output `(1,8,8400)`; 4 box + 4 cls).
+  Built `src/detection/infer.py` (`YoloOnnxDetector`, full_frame + roi_guided modes, letterbox
+  + NMS, CLI) and `src/detection/ablation_fp.py` (full vs ROI-gated TP/FP/recall + Stage-1 GT
+  coverage), plus `src/cv_pipeline/tune_coverage.py` (geometry-filter sweep).
+- **The two-stage FP premise fails on this data (STUDY-01).** On a 300-frame strided test
+  sample: Stage-1 **GT coverage 24.7%**; ROI-gating drops recall **0.708→0.147** for a fake
+  52% "FP reduction" (it just discards true detections). Sweeping geometry filters, coverage
+  **caps at 72.4% with ALL filters off — at 141 ROIs/frame** (~28% of debris never segments).
+  Killer probe: on **empty-seafloor** frames Stage 1 emits **60 ROIs/frame** vs **8** on frames
+  with objects — it fires *more* on clutter than on debris. It thresholds brightness/geometry
+  and ignores the real sonar cue (highlight + acoustic shadow).
+- **Decision (locked):** retire the ROI-gating / ≥60% FP-reduction target; **YOLO is the
+  detector**; **reframe Stage 1 as the CPU sonar-preprocessing workload for the COOL benchmark**
+  (its resize/threshold/contour ops are still the COOL sweet-spot — it just no longer gates
+  Stage 2). Negative result + evidence kept as a submission asset. Shadow-aware Stage 1 deferred.
+- **Next:** attack `fishing_gear` recall (0.371) — pull confusion matrix + FN gallery, prep
+  EXP-002 (aug ablation) / EXP-004 (oversample/focal) retrain configs for Kaggle.
 
 ### 2026-09-21 — EXP-001 baseline trained (Kaggle T4) — all aggregate targets met
 - **First real training run is in.** YOLO11s (detect, not seg), dataset v1, 640, sonar-aware
@@ -202,7 +223,7 @@ Details and fixes tracked in [`TODO.md`](TODO.md) Phase 1 & Phase 4.
 | Precision | ≥ 0.80 | **0.808** (EXP-001) | +0.008 ✅ |
 | Recall | ≥ 0.70 | **0.800** (EXP-001) | +0.100 ✅ |
 | `fishing_gear` recall (watch) | ≥ 0.70 | **0.371** (EXP-001) | −0.329 ❌ |
-| FP reduction (Stage 1) | ≥ 60% | — | — |
+| ~~FP reduction (Stage 1)~~ | ~~≥ 60%~~ | **retired** (STUDY-01: gating costs recall) | — |
 | Latency / frame (Stage 2, T4) | < 300 ms | ~11.5 ms (EXP-001) | ✅ |
 | Throughput (Stage 2, T4) | ≥ 5 FPS | ~87 FPS (EXP-001) | ✅ |
 | COOL: Graviton vs x86 latency | measured | — | — |

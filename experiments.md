@@ -30,7 +30,7 @@ dataset version, model, augmentation, and hyperparameters that produced it.
 | Recall | TP / (TP+FN) — how much debris we catch | ≥ 0.70 |
 | mAP@0.5 | mean AP at IoU 0.5 | ≥ 0.70 |
 | mAP@0.5:0.95 | mean AP over IoU 0.5→0.95 | ≥ 0.45 |
-| FP reduction | FP(full-frame) → FP(ROI-guided), relative | ≥ 60% |
+| ~~FP reduction~~ | ~~FP(full-frame) → FP(ROI-guided)~~ — **retired**, see STUDY-01 (Stage-1 gating costs recall) | ~~≥ 60%~~ |
 
 ---
 
@@ -100,6 +100,44 @@ Promote each into the log below with full results as it runs.
 ---
 
 ## Experiment log
+
+### STUDY-01 — Stage-1 classical-CV ROI-gating (NEGATIVE RESULT)
+- Date:              2026-09-22
+- Status:            done
+- Hypothesis:        Stage-1 classical CV (denoise → adaptive threshold → contours → geometry
+                     filter) proposes ROIs that (a) cover real debris and (b) suppress background,
+                     so gating the YOLO detector to Stage-1 ROIs should cut false positives ≥60%
+                     while keeping recall.
+- Baseline compared: EXP-001 full-frame detector
+- Method:           `src/detection/ablation_fp.py` (full_frame vs roi_guided, gate IoU 0.10,
+                    match IoU 0.5) + `src/cv_pipeline/tune_coverage.py` (geometry-filter sweep),
+                    300-frame strided test sample; background-ROI probe on 80 empty-label frames.
+
+Results — **the premise fails on this data:**
+- Stage-1 **GT coverage 24.7%** with default config (104/421 GT boxes fall in any ROI) →
+  hard recall ceiling for roi_guided.
+- roi_guided vs full_frame: recall **0.708 → 0.147** (only 20.8% of TPs kept) for FP 124 → 59
+  (52.4% "reduction"). The FP drop is an artefact of discarding true detections.
+- Geometry-filter sweep: even with **all filters off** ("ceiling" config) coverage tops out at
+  **72.4%** — at **141 ROIs/frame**. ~28% of debris does not segment at all (low-contrast,
+  blends into seafloor). `min_area_frac` was the dominant lever (0.30 → 0.63 coverage).
+- **Discriminative-power probe:** on background (empty-seafloor) frames Stage 1 emits **60.2
+  ROIs/frame** vs **8.0** on frames with objects; only **1%** of background frames emit zero.
+  Stage 1 fires *more* on clutter than on debris.
+
+Error analysis
+- Stage 1 thresholds on **brightness + blob geometry**; the real side-scan-sonar debris cue is
+  the **highlight + acoustic-shadow pair**, which this pipeline ignores. Rippled seafloor / sand
+  waves / speckle generate abundant bright blobs → clutter dominates.
+- Classical contour CV therefore works neither as a per-box recall gate (72% ceiling, huge ROI
+  counts) nor as a frame-level triage (louder on empty background).
+
+Decision & next
+- **Retire the ROI-gating / ≥60% FP-reduction target.** YOLO (EXP-001) is the detector.
+- **Reframe Stage 1** as the CPU **sonar-preprocessing workload** benchmarked for the COOL award
+  (Graviton vs x86) — its ops (resize, adaptive threshold, contours) are still the COOL sweet-spot;
+  it just no longer feeds ROIs to Stage 2. This negative result + evidence is a submission asset.
+- Shadow-aware Stage 1 (highlight+shadow detection) is a possible future upgrade, deferred.
 
 ### EXP-001 — Baseline YOLO11s (detect) on dataset v1
 - Date:              2026-09-21

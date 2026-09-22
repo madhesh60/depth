@@ -65,10 +65,10 @@ Remaining before EXP-001: visual QA pass + class-imbalance training config.
 - [x] **(P1)** `src/detection/train.py` — reads v1 `data.yaml`; sonar-aware aug (no hue/rotation, along-track flip only); prints inverse-freq class weights; test-split report at end.
 - [ ] **(P1)** Run **EXP-001** baseline (YOLO11s-seg, v1) → log in `experiments.md`.
 - [ ] **(P1)** `src/detection/evaluate.py`: mAP@0.5, mAP@0.5:0.95, P/R/F1, per-class, confusion matrix.
-- [ ] **(P1)** `src/detection/export_onnx.py` → ONNX + verify load via `cv2.dnn.readNetFromONNX()`.
-- [ ] **(P1)** `src/detection/infer.py` with `full_frame` **and** `roi_guided` modes.
-- [ ] **(P0 for award)** **Ablation:** measure FP reduction (full-frame vs ROI-guided) → target ≥60%.
-- [ ] **(P1)** Error analysis on false negatives (esp. `fishing_gear` — ghost nets/rope) → feed next experiments.
+- [~] **(P1)** `src/detection/export_onnx.py` → ONNX + verify load via `cv2.dnn.readNetFromONNX()`. *(best.onnx from EXP-001 verified loading+forward via cv2.dnn; standalone export script still TODO.)*
+- [x] **(P1)** `src/detection/infer.py` with `full_frame` **and** `roi_guided` modes.
+- [x] ~~**(P0 for award)** Ablation: FP reduction (full-frame vs ROI-guided) → ≥60%.~~ **RETIRED — STUDY-01 negative result:** classical Stage 1 has no discriminative power on this sonar (GT coverage caps 72% @ 141 ROIs/frame; fires more on empty background than on debris). Gating costs recall (0.71→0.15). Stage 1 reframed as the COOL preprocessing workload; YOLO is the detector. Evidence: `ablation_fp.py`, `tune_coverage.py`.
+- [ ] **(P0)** Error analysis on `fishing_gear` false negatives (recall 0.37) → feed EXP-002/004. **← next**
 - [ ] **(P2)** Experiment ladder EXP-002..006 as time allows.
 
 **Exit gate:** a model meeting (or credibly approaching) mAP@0.5 ≥ 0.70 / P ≥ 0.80 / R ≥ 0.70, with ablation.

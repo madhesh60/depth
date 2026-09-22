@@ -1,10 +1,18 @@
 # Architecture — Marine Debris Detection System
 
-**Status:** Design baseline · **Owner:** Madhesh (Team Syndicate) · **Last updated:** 2026-09-18
+**Status:** Design baseline · **Owner:** Madhesh (Team Syndicate) · **Last updated:** 2026-09-22
 
 This document is the single source of truth for system design. It records *what* we are
 building, *how* the pieces fit, *where* each runs, and *why* those choices win the
 competition. Update it whenever a structural decision changes — not the code comments.
+
+> **⚠️ 2026-09-22 architecture change (see `experiments.md` STUDY-01).** Empirically, classical
+> Stage 1 has **no discriminative power** on this sonar data, so the original **two-stage
+> ROI-gating** model below is **retired**: Stage 1 no longer feeds candidate ROIs to Stage 2,
+> the **`roi_guided` mode and the ≥60% FP-reduction target are dropped**, and **YOLO runs
+> full-frame** as the detector (EXP-001, mAP@0.5 0.822). Stage 1 is repurposed as the CPU
+> **sonar-preprocessing workload** benchmarked for the COOL award. Sections §3–§4 below still
+> describe the old gating design and are pending rewrite; read them with this banner in mind.
 
 **Related:** [`README.md`](README.md) · [`AGENT.md`](AGENT.md) (proposal) ·
 [`progress.md`](progress.md) · [`experiments.md`](experiments.md) · [`TODO.md`](TODO.md)
@@ -23,7 +31,8 @@ competition. Update it whenever a structural decision changes — not the code c
 | **Modular, config-driven** | No dataset-specific constants in code; behaviour is set by config files and versioned. |
 
 **Non-negotiable acceptance metrics:** mAP@0.5 ≥ 0.70 · mAP@0.5:0.95 ≥ 0.45 ·
-precision ≥ 0.80 · recall ≥ 0.70 · FP reduction ≥ 60% · latency < 300 ms · throughput ≥ 5 FPS.
+precision ≥ 0.80 · recall ≥ 0.70 · ~~FP reduction ≥ 60%~~ *(retired — STUDY-01)* ·
+latency < 300 ms · throughput ≥ 5 FPS.
 
 ---
 

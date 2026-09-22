@@ -9,11 +9,15 @@ End-to-end pipeline that ingests side-scan sonar imagery and detects man-made ma
 (ghost nets, pipes, structural fragments, rope) against natural seafloor clutter, then emits
 geotagged JSON/CSV hazard reports via a web dashboard.
 
-Two-stage detection:
-1. **Classical OpenCV** (CPU, runs on AWS Graviton via COOL) — denoise, adaptive threshold,
-   morphological filtering, contour geometry — produces candidate ROIs.
-2. **YOLOv8/YOLO11-seg** (loaded via `cv2.dnn.readNetFromONNX`) — verifies/classifies ROIs,
-   outputs instance masks + confidence scores.
+Pipeline (roles updated 2026-09-22, see `experiments.md` STUDY-01):
+1. **Classical OpenCV** (CPU, runs on AWS Graviton via COOL) — denoise, resize, adaptive
+   threshold, morphology, contours — the **CPU sonar-preprocessing workload benchmarked for
+   the COOL award** (Graviton vs x86). It is **not** a Stage-2 ROI gate: on this sonar data
+   classical CV has no discriminative power (STUDY-01 — GT coverage caps ~72% at 141 ROIs/frame;
+   fires more on empty seafloor than on debris), so ROI-gating the detector was retired.
+2. **YOLO11 detector** (loaded via `cv2.dnn.readNetFromONNX`, `src/detection/infer.py`) — the
+   actual detector, run **full-frame**; outputs boxes + class + confidence. EXP-001 baseline
+   mAP@0.5 0.822. (`-seg` masks are an option, not yet trained.)
 
 Classes — the **live dataset is 4-class** (`data.yaml`, `nc=4`):
 `0 fishing_gear, 1 pipe_cylinder, 2 structural_fragment, 3 natural_formation`
@@ -22,8 +26,9 @@ it is an open decision — see [docs/dataset_report.md](docs/dataset_report.md) 
 
 ## Planned AWS architecture
 
-S3 (raw/processed/models/reports) → Lambda+API Gateway (Stage 1 on Graviton/COOL → Stage 2
-YOLO inference) → DynamoDB (detections) → Amplify (dashboard) + CloudWatch (benchmarks).
+S3 (raw/processed/models/reports) → Lambda+API Gateway (Stage 1 preprocessing on Graviton/COOL
+→ Stage 2 YOLO full-frame inference) → DynamoDB (detections) → Amplify (dashboard) + CloudWatch
+(benchmarks).
 SageMaker for training. Details/diagram in [AGENT.md](AGENT.md#4-planned-aws-architecture-and-services).
 
 ## Dataset state
