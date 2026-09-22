@@ -29,6 +29,17 @@ REPO = Path(__file__).resolve().parents[2]
 DEFAULT_ONNX = REPO / "runs" / "EXP-001" / "weights" / "best.onnx"
 DEFAULT_NAMES = ["fishing_gear", "pipe_cylinder", "structural_fragment", "natural_formation"]
 
+# Per-class confidence thresholds (EXP-001 error analysis, src/detection/error_analysis.py).
+# fishing_gear is the mission-critical, small-object class: at conf 0.25 recall is 0.46, at 0.10
+# it is 0.69 (sonar) — for a human-review hazard triage recall >> precision, so it runs lower.
+# The others are already high-confidence and stay at the standard 0.25.
+PER_CLASS_CONF = {
+    "fishing_gear": 0.10,
+    "pipe_cylinder": 0.25,
+    "structural_fragment": 0.25,
+    "natural_formation": 0.25,
+}
+
 
 @dataclass
 class Detection:
@@ -64,7 +75,7 @@ class YoloOnnxDetector:
         onnx_path: str | Path = DEFAULT_ONNX,
         names: Sequence[str] = DEFAULT_NAMES,
         imgsz: int = 640,
-        conf_thres: float = 0.25,
+        conf_thres: "float | dict[str, float] | Sequence[float]" = 0.25,
         iou_thres: float = 0.45,
     ):
         onnx_path = Path(onnx_path)
@@ -76,8 +87,17 @@ class YoloOnnxDetector:
         self.net = cv2.dnn.readNetFromONNX(str(onnx_path))
         self.names = list(names)
         self.imgsz = imgsz
-        self.conf_thres = conf_thres
         self.iou_thres = iou_thres
+        # per-class confidence thresholds → array aligned to `names`; `conf_floor` is the min
+        # used for the initial keep + NMS, then each detection is filtered by its class threshold.
+        if isinstance(conf_thres, dict):
+            self.conf_by_class = np.array([conf_thres.get(n, 0.25) for n in self.names], float)
+        elif isinstance(conf_thres, (list, tuple, np.ndarray)):
+            self.conf_by_class = np.asarray(conf_thres, float)
+        else:
+            self.conf_by_class = np.full(len(self.names), float(conf_thres))
+        self.conf_floor = float(self.conf_by_class.min())
+        self.conf_thres = self.conf_floor  # back-compat alias
 
     # -- core detector ------------------------------------------------------------------
     def detect(self, img: np.ndarray) -> list[Detection]:
@@ -94,7 +114,7 @@ class YoloOnnxDetector:
         scores = preds[:, 4:]
         cls_ids = np.argmax(scores, axis=1)
         confs = scores[np.arange(scores.shape[0]), cls_ids]
-        keep = confs >= self.conf_thres
+        keep = confs >= self.conf_floor
         if not np.any(keep):
             return []
         cxcywh, cls_ids, confs = cxcywh[keep], cls_ids[keep], confs[keep]
@@ -108,7 +128,7 @@ class YoloOnnxDetector:
         boxes = np.stack([x, y, w, h], axis=1)
 
         idxs = cv2.dnn.NMSBoxes(
-            boxes.tolist(), confs.tolist(), self.conf_thres, self.iou_thres
+            boxes.tolist(), confs.tolist(), self.conf_floor, self.iou_thres
         )
         if len(idxs) == 0:
             return []
@@ -117,13 +137,15 @@ class YoloOnnxDetector:
         H, W = img.shape[:2]
         dets: list[Detection] = []
         for i in idxs:
+            cid = int(cls_ids[i])
+            if confs[i] < self.conf_by_class[cid]:      # per-class confidence gate
+                continue
             x1 = int(max(0, boxes[i, 0]))
             y1 = int(max(0, boxes[i, 1]))
             x2 = int(min(W, boxes[i, 0] + boxes[i, 2]))
             y2 = int(min(H, boxes[i, 1] + boxes[i, 3]))
             if x2 <= x1 or y2 <= y1:
                 continue
-            cid = int(cls_ids[i])
             dets.append(Detection((x1, y1, x2, y2), cid, self.names[cid], float(confs[i])))
         return dets
 
@@ -192,14 +214,16 @@ def main():
     p.add_argument("source", help="image file or directory")
     p.add_argument("--onnx", default=str(DEFAULT_ONNX))
     p.add_argument("--mode", choices=["full_frame", "roi_guided"], default="full_frame")
-    p.add_argument("--conf", type=float, default=0.25)
+    p.add_argument("--conf", type=float, default=None,
+                   help="global conf override; default uses per-class thresholds (PER_CLASS_CONF)")
     p.add_argument("--iou", type=float, default=0.45)
     p.add_argument("--out", default=str(REPO / "runs" / "infer_out"),
                    help="directory for annotated overlays")
     p.add_argument("--limit", type=int, default=0, help="max images (0 = all)")
     args = p.parse_args()
 
-    det = YoloOnnxDetector(args.onnx, conf_thres=args.conf, iou_thres=args.iou)
+    conf = args.conf if args.conf is not None else PER_CLASS_CONF
+    det = YoloOnnxDetector(args.onnx, conf_thres=conf, iou_thres=args.iou)
     stage1 = None
     if args.mode == "roi_guided":
         from src.cv_pipeline.pipeline import Stage1Pipeline

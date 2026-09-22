@@ -68,7 +68,10 @@ Remaining before EXP-001: visual QA pass + class-imbalance training config.
 - [~] **(P1)** `src/detection/export_onnx.py` → ONNX + verify load via `cv2.dnn.readNetFromONNX()`. *(best.onnx from EXP-001 verified loading+forward via cv2.dnn; standalone export script still TODO.)*
 - [x] **(P1)** `src/detection/infer.py` with `full_frame` **and** `roi_guided` modes.
 - [x] ~~**(P0 for award)** Ablation: FP reduction (full-frame vs ROI-guided) → ≥60%.~~ **RETIRED — STUDY-01 negative result:** classical Stage 1 has no discriminative power on this sonar (GT coverage caps 72% @ 141 ROIs/frame; fires more on empty background than on debris). Gating costs recall (0.71→0.15). Stage 1 reframed as the COOL preprocessing workload; YOLO is the detector. Evidence: `ablation_fp.py`, `tune_coverage.py`.
-- [ ] **(P0)** Error analysis on `fishing_gear` false negatives (recall 0.37) → feed EXP-002/004. **← next**
+- [x] **(P0)** Error analysis on `fishing_gear` (recall 0.37) → `src/detection/{fn_gallery,error_analysis}.py`. **Findings:** small-object sonar problem (91% of misses <10% frame); aggregate mAP inflated by domain segregation (natural_formation optical-only); optical debris = total miss (off-product); per-source `shipwreck` struct weak (0.25).
+- [x] **(P1)** Per-class confidence thresholds (`infer.py PER_CLASS_CONF`) — fishing_gear recall 0.47→0.69 @conf0.10, no retrain.
+- [ ] **(P1)** `evaluate.py`: report metrics **split sonar vs optical** (aggregate hides the product-domain truth).
+- [ ] **(P1)** EXP-002 `--imgsz 1280` on Kaggle (small-object ceiling ~0.78); then EXP-003 sonar-only. **← next**
 - [ ] **(P2)** Experiment ladder EXP-002..006 as time allows.
 
 **Exit gate:** a model meeting (or credibly approaching) mAP@0.5 ≥ 0.70 / P ≥ 0.80 / R ≥ 0.70, with ablation.

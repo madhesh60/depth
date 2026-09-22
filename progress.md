@@ -73,6 +73,21 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ## 4. Session log
 
+### 2026-09-22 (cont.) — deep error analysis of EXP-001; per-class conf lever banked
+- Built `src/detection/error_analysis.py` and mined every EXP-001 artifact (`results.csv`,
+  args, P/R/F1 curves, confusion matrix, val batches). Findings:
+  - **Run was 40 epochs, not 100** (docs corrected). Val mAP50 **peaked ~epoch 16** (0.704)
+    then declined to 0.663 by ep40 while train loss fell → **overfit after ~ep20**; `best.pt` ≈ ep25.
+  - **Aggregate mAP 0.822 is inflated by domain segregation:** `natural_formation` (R 0.99)
+    is optical-only and trivially separable. `fishing_gear`/`pipe`/`structural` are ~all sonar.
+  - **Optical debris = total miss** (fishing_gear 0/19, structural 0/25); model maps optical→
+    natural_formation. Product is **sonar** — report sonar metrics separately.
+  - **fishing_gear is crab-pot sonar** (R 0.47); `uatd` pipe/struct 0.95/0.97; `shipwreck`
+    struct weak 0.25; misses are small (91% <10% frame).
+  - **Free lever banked:** per-class confidence thresholds in `infer.py` (`PER_CLASS_CONF`,
+    fishing_gear 0.10) → fishing_gear recall **0.47→0.69**, no retrain, others unchanged.
+- **Next:** EXP-002 (`--imgsz 1280`) on Kaggle for the small-object ceiling; EXP-003 sonar-only.
+
 ### 2026-09-22 — Stage 1→2 wired via cv2.dnn; ROI-gating is a NEGATIVE result → Stage 1 reframed
 - **Wired Stage 2 for the Lambda path:** extracted EXP-001 artifacts locally, verified
   `best.onnx` loads + runs through `cv2.dnn.readNetFromONNX` (output `(1,8,8400)`; 4 box + 4 cls).
@@ -100,7 +115,7 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ### 2026-09-21 — EXP-001 baseline trained (Kaggle T4) — all aggregate targets met
 - **First real training run is in.** YOLO11s (detect, not seg), dataset v1, 640, sonar-aware
-  aug, 100 ep / batch 16 on a Kaggle T4. Logged as **EXP-001** in `experiments.md` with full
+  aug, 40 ep / batch 16 on a Kaggle T4. Logged as **EXP-001** in `experiments.md` with full
   per-class results.
 - **Test-split result (1,276 imgs / 1,787 inst):** mAP@0.5 **0.822**, mAP@0.5:0.95 **0.514**,
   precision **0.808**, recall **0.800** — **every aggregate target cleared** (≥0.70 / ≥0.45 /
@@ -227,7 +242,7 @@ Details and fixes tracked in [`TODO.md`](TODO.md) Phase 1 & Phase 4.
 | mAP@0.5:0.95 | ≥ 0.45 | **0.514** (EXP-001) | +0.064 ✅ |
 | Precision | ≥ 0.80 | **0.808** (EXP-001) | +0.008 ✅ |
 | Recall | ≥ 0.70 | **0.800** (EXP-001) | +0.100 ✅ |
-| `fishing_gear` recall (watch) | ≥ 0.70 | **0.371** (EXP-001) | −0.329 ❌ |
+| `fishing_gear` recall (watch) | ≥ 0.70 | **0.47** sonar @conf0.25 → **0.69** @conf0.10 (per-class thr) | −0.01 🟡 |
 | ~~FP reduction (Stage 1)~~ | ~~≥ 60%~~ | **retired** (STUDY-01: gating costs recall) | — |
 | Latency / frame (Stage 2, T4) | < 300 ms | ~11.5 ms (EXP-001) | ✅ |
 | Throughput (Stage 2, T4) | ≥ 5 FPS | ~87 FPS (EXP-001) | ✅ |

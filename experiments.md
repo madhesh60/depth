@@ -86,17 +86,21 @@ Decision & next
 **Dataset v1 is ready** (`DATASET/03_yolo_ready_dataset_v1/data.yaml`, leakage-free, 4-class).
 These are queued, not run:
 
-Reprioritised 2026-09-22 after the `fishing_gear` FN analysis (small-object problem — see EXP-001
-error analysis). Resolution/tiling first; aug-ablation demoted.
+Reprioritised 2026-09-22 after the deep error analysis (EXP-001 log): fishing_gear is a
+small-object sonar problem; optical debris is a total miss but off-domain; resolution + sonar
+focus first, aug-ablation demoted.
 
 | ID | Hypothesis | Key change |
 |---|---|---|
-| ✅ EXP-001 | Establish a baseline (**done** — see log) | YOLO11s detect, v1, 640, sonar aug → mAP@0.5 0.822, fishing_gear R 0.371 |
-| **EXP-002** (next) | **Higher resolution recovers small fishing_gear** (91% of misses <10% frame) | `--imgsz 1280` (else = EXP-001). Cheapest, highest-expected-value lever. |
-| EXP-003 | **Tiled train+infer** (SAHI-style slicing) beats a single large frame for tiny targets — and doubles as Stage-1's reframed "tiling preprocessing" role | slice frames → detect per tile → merge |
-| EXP-004 | Oversampling fishing_gear + small-object aug (copy-paste, scale-up mosaic) lifts recall | minority oversample + aug |
-| EXP-005 | Sonar-only training beats mixed-sensor for the target domain | filter optical sources |
+| ✅ EXP-001 | Baseline (**done** — 40 ep) | YOLO11s detect, v1, 640, sonar aug → mAP@0.5 0.822 (aggregate), sonar fishing_gear R 0.47 |
+| **EXP-002** (next) | **Higher resolution recovers small fishing_gear** (91% of misses <10% frame; ceiling ~0.78) | `--imgsz 1280 --batch 8` (else = EXP-001). Cheapest, highest-EV lever. |
+| EXP-003 | **Sonar-only** training raises the target-domain numbers + removes the optical→natural_formation shortcut (optical debris is 0% and off-product) | filter to crabpot/uatd/mpulse/seabed/shipwreck |
+| EXP-004 | **Tiled train+infer** (SAHI-style slicing) beats one large frame for tiny targets — doubles as Stage-1's reframed tiling role | slice → detect per tile → merge |
+| EXP-005 | Oversampling fishing_gear + small-object aug (copy_paste>0, scale-up mosaic) lifts recall | minority oversample + aug |
 | EXP-006 | Aug ablation: are the ~62% baked-in v0 augs helping or just doubling online aug? | originals-only vs baked-aug (demoted) |
+
+**Already banked (no retrain):** per-class confidence thresholds in `infer.py` — fishing_gear
+recall 0.47→0.69 at conf 0.10. Report metrics **split sonar vs optical**, not just aggregate.
 
 Promote each into the log below with full results as it runs.
 
@@ -155,8 +159,10 @@ Config
 - Task:             detect
 - Dataset version:  v1  (`03_yolo_ready_dataset_v1`, leakage-free, 4-class, split by clip)
 - Input size:       640
-- Epochs / Batch:   100 (early-stopping patience 20) / 16
-- Optimizer / LR:   Ultralytics defaults (auto optimizer + auto lr0)
+- Epochs / Batch:   **40** (`args.yaml` — not 100; patience 20 not triggered, LR schedule
+                    completed at 40) / 16
+- Optimizer / LR:   auto optimizer, lr0 0.01 → lrf 0.01 (linear), momentum 0.937, wd 5e-4
+- Extra aug (args): copy_paste 0.0, mixup 0.0, erasing 0.4, auto_augment randaugment
 - Augmentation:     sonar-aware — hsv_h=0, hsv_s=0, hsv_v=0.2; degrees=0, flipud=0,
                     fliplr=0.5; translate=0.1, scale=0.5; mosaic=1.0, close_mosaic=10
 - Class weighting:  none (inverse-freq weights printed for reference only, not applied)
@@ -198,6 +204,28 @@ Error analysis
 - **Implication for next experiments:** the lever is **effective resolution** (higher `imgsz`
   and/or tiling so small targets are larger to the detector) + small-object augmentation, NOT
   the aug-on/off ablation. Reprioritised the ladder accordingly.
+
+- **DEEP ANALYSIS (2026-09-22, `src/detection/error_analysis.py`, full 1,276-img test set).**
+  Four findings the aggregate mAP 0.822 hides:
+  1. **Aggregate is inflated by domain segregation.** `natural_formation` (R 0.993) lives *only*
+     in optical (267 optical vs 2 sonar GT boxes) — trivially separable, it pads the mean.
+     `fishing_gear`/`pipe`/`structural` are ~all sonar. Honest per-class @conf 0.25:
+     fishing_gear P0.50/R0.46, pipe P0.91/R0.95, structural P0.96/R0.89, natural P0.84/R0.99.
+  2. **Optical debris is a total miss** (not the product domain): fishing_gear **0/19**,
+     structural **0/25** on optical frames — the model maps "optical → natural_formation".
+     Product is side-scan **sonar**; sonar-only recall is the number that matters.
+  3. **Per-source:** fishing_gear in test = essentially all **crab-pot sonar** (R 0.466);
+     `uatd` pipe/structural excellent (0.95/0.97); `shipwreck` structural weak (0.25 — large,
+     ambiguous fragments); optical `vid`/JAMSTEC rope = 0.0.
+  4. **Free recall lever — lower the fishing_gear threshold.** Recall vs conf (sonar):
+     **@0.25 0.466 → @0.10 0.689 → @0.05 0.781**; other classes flat. Implemented as
+     **per-class confidence thresholds** in `infer.py` (`PER_CLASS_CONF`: fishing_gear 0.10,
+     rest 0.25) — nearly doubles fishing_gear recall at inference, no retrain. Precision falls
+     (acceptable for human-review hazard triage). The ~0.78 ceiling still needs EXP-002 resolution.
+  5. **Training dynamics (`results.csv`):** val mAP50 peaked **epoch 16 (0.704)** then declined to
+     0.663 by ep40 while train loss kept falling — **overfitting after ~ep20**, and precision was
+     traded up for recall down late. So `best.pt` ≈ ep25; extra epochs won't help without more
+     regularisation/data. (Also: val is optical-heavy → val 0.70 < test 0.82; not a real gain.)
 
 Decision & next
 - **Keep** as the reference baseline. It clears every aggregate target, so v1 + the sonar-aware
