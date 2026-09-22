@@ -90,8 +90,13 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
   detector**; **reframe Stage 1 as the CPU sonar-preprocessing workload for the COOL benchmark**
   (its resize/threshold/contour ops are still the COOL sweet-spot — it just no longer gates
   Stage 2). Negative result + evidence kept as a submission asset. Shadow-aware Stage 1 deferred.
-- **Next:** attack `fishing_gear` recall (0.371) — pull confusion matrix + FN gallery, prep
-  EXP-002 (aug ablation) / EXP-004 (oversample/focal) retrain configs for Kaggle.
+- **`fishing_gear` diagnosis done (`fn_gallery.py`):** the 0.371 recall is a **small-object**
+  problem, not confusion. Confusion matrix: misses → *background* 0.63 (not other classes) and
+  background → fishing_gear 0.79 (top FP sink). FN gallery: 54% of boxes missed, **91% of misses
+  <10% of frame width** (median 6%) — small low-contrast returns in speckle clutter.
+- **Next (Kaggle GPU):** EXP-002 = higher resolution, the clear lever:
+  `python src/detection/train.py --model yolo11s.pt --imgsz 1280 --batch 8 --epochs 100 --name EXP-002`.
+  Then EXP-003 tiled train/infer (also fills Stage-1's reframed tiling role), EXP-004 oversample.
 
 ### 2026-09-21 — EXP-001 baseline trained (Kaggle T4) — all aggregate targets met
 - **First real training run is in.** YOLO11s (detect, not seg), dataset v1, 640, sonar-aware

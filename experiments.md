@@ -86,14 +86,17 @@ Decision & next
 **Dataset v1 is ready** (`DATASET/03_yolo_ready_dataset_v1/data.yaml`, leakage-free, 4-class).
 These are queued, not run:
 
+Reprioritised 2026-09-22 after the `fishing_gear` FN analysis (small-object problem — see EXP-001
+error analysis). Resolution/tiling first; aug-ablation demoted.
+
 | ID | Hypothesis | Key change |
 |---|---|---|
-| ✅ EXP-001 | Establish a baseline (**done** — see log) | YOLO11s detect, v1, 640, sonar aug, 100 ep → mAP@0.5 0.822 |
-| EXP-002 | Bigger input helps small sonar targets | input 768/896 vs EXP-001 |
-| EXP-003 | Arch comparison | YOLOv8s-seg vs YOLO11s-seg, else identical |
-| EXP-004 | Class weighting lifts `pipe_cylinder` (minority) recall | focal / inverse-freq weighting |
-| EXP-005 | Sonar-domain augmentation reduces FP on natural_formation | speckle/gain/shadow aug |
-| EXP-006 | Sonar-only training beats mixed-sensor for the target domain | filter optical sources |
+| ✅ EXP-001 | Establish a baseline (**done** — see log) | YOLO11s detect, v1, 640, sonar aug → mAP@0.5 0.822, fishing_gear R 0.371 |
+| **EXP-002** (next) | **Higher resolution recovers small fishing_gear** (91% of misses <10% frame) | `--imgsz 1280` (else = EXP-001). Cheapest, highest-expected-value lever. |
+| EXP-003 | **Tiled train+infer** (SAHI-style slicing) beats a single large frame for tiny targets — and doubles as Stage-1's reframed "tiling preprocessing" role | slice frames → detect per tile → merge |
+| EXP-004 | Oversampling fishing_gear + small-object aug (copy-paste, scale-up mosaic) lifts recall | minority oversample + aug |
+| EXP-005 | Sonar-only training beats mixed-sensor for the target domain | filter optical sources |
+| EXP-006 | Aug ablation: are the ~62% baked-in v0 augs helping or just doubling online aug? | originals-only vs baked-aug (demoted) |
 
 Promote each into the log below with full results as it runs.
 
@@ -182,12 +185,19 @@ Error analysis
 - **Imbalance did NOT hurt the rare class.** Counter to blocker B4's worry, `pipe_cylinder`
   (rarest, 4% of boxes) scored AP@0.5 0.94 — but on just 65 test boxes, so treat as high-variance.
   The imbalance lever should target `fishing_gear` *recall*, not `pipe_cylinder`.
-- **Why fishing_gear is hard (hypotheses):** it is the merged/heterogeneous class (`rope_line`
-  folded in), objects are thin/diffuse/low-contrast against seafloor, and it dominates the box
-  count so localisation errors show up most. Needs the confusion matrix + FN gallery to confirm
-  whether misses are missed detections vs. low-IoU localisation vs. confusion with clutter.
-- False positives: not yet inspected per-class — pull `runs/EXP-001/confusion_matrix.png` and a
-  low-score FP gallery before EXP-002.
+- **Why fishing_gear is hard — CONFIRMED (2026-09-22, `src/detection/fn_gallery.py`):** it's a
+  **small-object detectability** problem, not confusion or the merged taxonomy.
+    - Normalised confusion matrix: true fishing_gear → predicted **background 0.63** (missed
+      outright), ~0.00 into any other class. And true **background → fishing_gear 0.79** — it is
+      also the dominant false-positive sink (matches P 0.535). Hard both ways.
+    - FN gallery (test split, conf 0.25): **517/952 (54%)** GT boxes missed; **91% of the misses
+      are < 0.10 of frame width** (median long side **0.059**, 31% < 0.05). Eyeballed frames:
+      small low-contrast bright returns embedded in heavy speckle/sand-wave clutter.
+    - Note: some crabpot samples carry **baked-in rotation borders** from v0 augmentation
+      (black triangular corners) — a possible extra confound; flag for a data spot-check.
+- **Implication for next experiments:** the lever is **effective resolution** (higher `imgsz`
+  and/or tiling so small targets are larger to the detector) + small-object augmentation, NOT
+  the aug-on/off ablation. Reprioritised the ladder accordingly.
 
 Decision & next
 - **Keep** as the reference baseline. It clears every aggregate target, so v1 + the sonar-aware
