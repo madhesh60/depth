@@ -73,6 +73,20 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ## 4. Session log
 
+### 2026-09-22 (cont.2) — tiled inference (modest); EXP-002 ready; AWS infra scaffolded
+- **Tiled inference** (`src/detection/tiled_infer.py`, SAHI-style slice→detect→NMS-merge):
+  sonar sample, fishing_gear recall **0.565→0.645** (+8pts, small crab-pots) but precision
+  drops (structural 0.96→0.69 — big objects fragment across tiles). **Secondary lever, not
+  default;** EXP-002 retrain remains the real fix. Kept as a tool + a legit COOL workload.
+- **EXP-002 ready:** `docs/exp002_kaggle.md` — exact "Save & Run All" steps, `--imgsz 1024
+  --batch 8 --epochs 40` (fits Kaggle's 12h cap; survives low internet). `train.py` aug left
+  untouched (proven) so the unattended run can't fail on a new arg.
+- **AWS infra scaffolded** (`infra/`, deploy-ready, not deployed — credits pending):
+  `lambda_handler.py` (cv2.dnn ONNX → geotagged JSON, no torch, arm64-ready, locally
+  smoke-tested), `benchmark_graviton.sh` (3-way COOL runner + input-manifest sha256 + S3
+  upload), `README.md` (architecture, instance types, deploy checklist, COOL scorecard).
+- **Next:** EXP-002 on Kaggle tomorrow → send zip → I re-run `error_analysis.py` per-domain.
+
 ### 2026-09-22 (cont.) — deep error analysis of EXP-001; per-class conf lever banked
 - Built `src/detection/error_analysis.py` and mined every EXP-001 artifact (`results.csv`,
   args, P/R/F1 curves, confusion matrix, val batches). Findings:

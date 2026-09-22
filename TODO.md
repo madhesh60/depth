@@ -82,10 +82,10 @@ Remaining before EXP-001: visual QA pass + class-imbalance training config.
 
 - [ ] **(P0)** S3 buckets/prefixes: `raw/ processed/ models/ reports/ benchmarks/`.
 - [ ] **(P0)** Validate **COOL** on a small Stage-1 workload on Graviton before scaling.
-- [ ] **(P0)** `infra/benchmarks/`: run Stage 1 over ≥1,000 fixed frames on **Graviton+COOL** and **x86 baseline**.
-- [ ] **(P0)** Capture latency (p50/p95), throughput (FPS), CPU util, cost/1,000 frames → CSV + charts.
-- [ ] **(P0)** Reproduction package: COOL version, instance type, deploy config, input manifest hash, one-command rerun.
-- [ ] **(P1)** Lambda + API Gateway inference endpoint (Stage 1→2 → JSON).
+- [~] **(P0)** Benchmark runner ready: `infra/benchmark_graviton.sh` (3-way, input-manifest sha256, S3 upload) + `src/cv_pipeline/benchmark.py`. Needs EC2 Graviton+COOL / x86 to execute.
+- [ ] **(P0)** Capture latency (p50/p95), throughput (FPS), CPU util, cost/1,000 frames → CSV + charts. *(harness emits p50/p95 + fingerprint; run on EC2)*
+- [~] **(P0)** Reproduction package: input-manifest hash + one-command rerun **done** in `benchmark_graviton.sh`; COOL version/instance-type captured at run time.
+- [~] **(P1)** Lambda + API Gateway inference endpoint: `infra/lambda_handler.py` written (cv2.dnn ONNX → geotagged JSON, arm64-ready, locally smoke-tested). Needs deploy. See `infra/README.md`.
 - [ ] **(P1)** DynamoDB detections table (+ geo/temporal GSIs).
 - [ ] **(P1)** SageMaker training job config + Model Registry versioning.
 - [ ] **(P2)** CloudWatch dashboard for latency/throughput.

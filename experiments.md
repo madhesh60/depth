@@ -108,6 +108,17 @@ Promote each into the log below with full results as it runs.
 
 ## Experiment log
 
+### STUDY-02 — Tiled (SAHI-style) inference for small objects (MODEST, no retrain)
+- Date: 2026-09-22 · Status: done · Tool: `src/detection/tiled_infer.py`
+- Hypothesis: slicing 640² frames into an overlapping 2×2 grid (each tile upscaled to 640 by
+  the detector) makes small crab-pots ~2× larger to `best.onnx`, lifting recall without retrain.
+- Result (60 sonar frames, conf 0.25, IoU 0.5): fishing_gear recall **0.565 → 0.645** (+8pts);
+  but precision falls (fishing 0.52→0.48, pipe 1.0→0.8, **structural 0.96→0.69** — large frags
+  split across tile seams and double-count). Recall for the larger classes unchanged.
+- Decision: **keep as a secondary tool, not the default.** Net gain is real but small and costs
+  precision on big objects; the retrain (EXP-002 imgsz 1024) is the better fix. Tiling is also a
+  legitimate COOL workload (slice/resize on Graviton). Revisit selective/large-object-aware tiling.
+
 ### STUDY-01 — Stage-1 classical-CV ROI-gating (NEGATIVE RESULT)
 - Date:              2026-09-22
 - Status:            done
