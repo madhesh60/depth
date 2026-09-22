@@ -82,7 +82,9 @@ latency < 300 ms · throughput ≥ 5 FPS.
 ## 3. Stage 1 — Classical OpenCV (the COOL core workload)
 
 Runs CPU-only so it is deployable at the edge and, critically, on **AWS Graviton via
-COOL**. Produces candidate ROIs that shrink Stage 2's search space.
+COOL**. ~~Produces candidate ROIs that shrink Stage 2's search space.~~ *(RETIRED as an ROI
+gate — STUDY-01; this is now the **sonar-preprocessing / benchmark workload**. The op table
+and COOL relevance below still stand — those ops are exactly what we benchmark.)*
 
 | # | Step | OpenCV 5 op | Rationale |
 |---|---|---|---|
@@ -105,17 +107,19 @@ Graviton — this is the workload we benchmark Arm-vs-x86.
 
 | Component | Implementation | Notes |
 |---|---|---|
-| Architecture | YOLOv8-seg / YOLO11-seg (fine-tuned) | Instance segmentation + 4-class classification (live taxonomy). Model choice decided by experiments — see [`experiments.md`](experiments.md). |
-| Inference path | `cv2.dnn.readNetFromONNX()` | Model exported to ONNX; loaded through OpenCV 5 DNN so the *demo* path is pure OpenCV. `onnxruntime` used for parity checks. |
-| ROI cropping | `cv2.boundingRect()` | Targeted inference on Stage-1 candidates only. |
+| Architecture | **YOLO11s detect** (EXP-001; `-seg` is an option, not yet trained) | 4-class detection. mAP@0.5 0.822 baseline — see [`experiments.md`](experiments.md). |
+| Inference path | `cv2.dnn.readNetFromONNX()` | Model exported to ONNX; loaded through OpenCV 5 DNN so the demo + Lambda path is pure OpenCV (no torch). `onnxruntime` for parity checks. |
+| ~~ROI cropping~~ | ~~`cv2.boundingRect()`~~ | **Retired (STUDY-01)** — full-frame detection instead. |
 | Post-process | NMS + confidence filter (τ, default 0.5) | Detections below τ discarded (noise-filtering requirement). |
 | Compositing | `cv2.addWeighted`, `cv2.polylines`, `cv2.putText`, `cv2.rectangle` | Overlays for dashboard + transparency view. |
 
-**Two inference modes** (config flag):
-- `full_frame` — YOLO on the whole frame (baseline for the ablation).
-- `roi_guided` — YOLO only on Stage-1 ROIs (production; source of the ≥60% cost reduction).
+**Two inference modes** (in `src/detection/infer.py`):
+- `full_frame` — YOLO on the whole frame. **This is production** (EXP-001, mAP@0.5 0.822).
+- `roi_guided` — YOLO gated to Stage-1 ROIs. **RETIRED (STUDY-01):** it cut recall 0.71→0.15
+  for a fake FP "reduction"; kept only as the evidence harness (`ablation_fp.py`).
 
-Reporting both modes side-by-side *is* the ablation study that quantifies Stage 1's value.
+The ROI-gating ablation is documented as a **negative result** (STUDY-01) — the honest outcome,
+not a ≥60% win. Stage 1's real value is the COOL benchmark workload, not FP gating.
 
 ---
 

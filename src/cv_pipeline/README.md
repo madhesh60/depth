@@ -1,8 +1,16 @@
-# Stage 1 — Classical OpenCV pipeline (the COOL core workload)
+# Stage 1 — Classical OpenCV pipeline (the COOL CPU workload)
 
-CPU-only classical CV that turns a side-scan sonar frame into geometry-filtered candidate
-ROIs for the Stage 2 YOLO verifier. This is the **workload we run on AWS Graviton via COOL**
+CPU-only classical CV over a side-scan sonar frame (denoise → resize → adaptive threshold →
+morphology → contours → geometry). This is the **workload we run on AWS Graviton via COOL**
 and benchmark against x86 — the primary "Best Use of COOL" deliverable.
+
+> **Role note (2026-09-22, see `experiments.md` STUDY-01).** This pipeline is **not** a
+> Stage-2 ROI gate — classical CV has no discriminative power on this sonar (GT coverage caps
+> ~72% at 141 ROIs/frame; it fires more on empty seafloor than on debris), so ROI-gating was
+> retired. It stays as the **sonar-preprocessing / benchmark workload**: its ops are the COOL
+> sweet-spot, so it gives a real, attributable Graviton-vs-x86 speedup. YOLO
+> (`src/detection/infer.py`) does the detection, full-frame. The `candidates` it emits are
+> still useful for the transparency/demo view and as a benchmarkable tiling/region pass.
 
 ## Why this is the COOL workload
 
@@ -54,7 +62,7 @@ python -m src.cv_pipeline.benchmark --images <frames> --label graviton_cool     
 from src.cv_pipeline import Stage1Pipeline, draw_candidates
 import cv2
 res = Stage1Pipeline().process(cv2.imread("frame.jpg"))
-for c in res.candidates:          # -> Stage 2
+for c in res.candidates:          # transparency/demo view (not a Stage-2 gate — see role note)
     print(c.bbox, c.solidity, c.area_frac)
 cv2.imwrite("vis.jpg", draw_candidates(cv2.imread("frame.jpg"), res))
 ```

@@ -1,8 +1,14 @@
 # EXP-001 Baseline Training on Google Colab (free T4 GPU)
 
-The local machine (MX330 / 2 GB, CPU-only torch) can't train this dataset. Run the baseline on
-a Colab **T4 (16 GB)** instead. This reuses the tracked trainer `src/detection/train.py` — only
-the *data* is uploaded separately (the `DATASET/` tree is git-ignored).
+> **⚠️ Historical / superseded (2026-09-22).** EXP-001 was ultimately run on **Kaggle T4 for
+> 40 epochs** (not Colab/100 — the args below are the original template). For the **next run
+> (EXP-002) use [`exp002_kaggle.md`](exp002_kaggle.md)** — it has the correct settings
+> (`imgsz 1024 / batch 8 / 40 ep`) and the unattended "Save & Run All" flow. This file is kept
+> for provenance of how the baseline was set up.
+
+The local machine (MX330 / 2 GB, CPU-only torch) can't train this dataset. Run on a cloud
+**T4 (16 GB)** instead. This reuses the tracked trainer `src/detection/train.py` — only the
+*data* is uploaded separately (the `DATASET/` tree is git-ignored).
 
 **Target (from CLAUDE.md):** mAP@0.5 ≥ 0.70, precision ≥ 0.80, recall ≥ 0.70 — reported
 **per-class** (pipe_cylinder AP is high-variance; see dataset report).
@@ -68,7 +74,7 @@ d['path'] = str(root)
 print(d)
 ```
 
-## 5. Train (yolo11s, detect, 100 epochs)
+## 5. Train (yolo11s, detect) — EXP-001 used 40 epochs on Kaggle
 
 `train.py` auto-detects the GPU and applies the sonar-aware augmentation
 (no hue/sat, no rotation/vflip, along-track flip on) and prints per-class metrics.
@@ -78,8 +84,9 @@ print(d)
     --model yolo11s.pt --epochs 100 --batch 16 --name EXP-001
 ```
 
-T4 fits `yolo11s @ 640, batch 16`. Expect **~2-4 h** for 100 epochs (early-stopping patience 20).
-If you OOM, drop `--batch` to 8. The final block prints test mAP/precision/recall.
+T4 fits `yolo11s @ 640, batch 16`. EXP-001 actually ran **40 epochs (~4 h)** and overfit after
+~epoch 20 (see `experiments.md`). If you OOM, drop `--batch` to 8. The final block prints test
+mAP/precision/recall.
 
 ## 6. Export ONNX + save results back to Drive
 
@@ -97,10 +104,10 @@ Download `best.pt`, `best.onnx`, `results.png`, and the per-class table from
 
 ## 7. After the run — record it
 
-Log EXP-001 in `experiments.md` with the **per-class** mAP/precision/recall (not just aggregate),
-note pipe_cylinder AP as high-variance (65 test boxes), then commit + push. Next experiments:
+EXP-001 is logged in `experiments.md` (done). The ladder was **reprioritised** after the deep
+error analysis (fishing_gear is a small-object sonar problem):
 
-- **EXP-002** — originals-only train (drop baked augs) vs this run: is the 62% baked augmentation
-  helping or just doubling online augmentation? (See dataset report / CLAUDE.md.)
-- **EXP-006** — sonar-only fine-tune for the mission domain.
-- Minority handling (oversample / focal) only if pipe/rope recall is poor here.
+- **EXP-002** — higher resolution (`imgsz 1024`) for small fishing_gear. **← next**, see
+  [`exp002_kaggle.md`](exp002_kaggle.md).
+- **EXP-003** — sonar-only training (optical debris is a total miss and off-product).
+- Aug-ablation (originals-only) demoted to EXP-006.

@@ -1,3 +1,11 @@
+> **📌 This is the original grant proposal / competition brief — a historical record, not the
+> current design.** Some choices here have since evolved with the evidence: the taxonomy is now
+> **4 classes** (`rope_line` merged into `fishing_gear`), and the two-stage plan where classical
+> CV gates Stage 2 to cut false positives was **retired** (STUDY-01 — it has no discriminative
+> power on this sonar; YOLO runs full-frame, Stage 1 is the COOL preprocessing workload). For the
+> current state read [`README.md`](README.md), [`architecture.md`](architecture.md),
+> [`experiments.md`](experiments.md), and [`progress.md`](progress.md).
+
 **PS**
 
 Background The accumulation of anthropogenic (man-made) debris in marine ecosystems poses a critical threat to global biodiversity. Among the most destructive types of pollution are â€˜ghost netsâ€™â€”abandoned, lost, or discarded fishing gear. These nets continuously trap and kill marine life,destroy coral reefs, and damage commercial vessel propellers.  

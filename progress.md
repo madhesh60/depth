@@ -219,10 +219,11 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 Keep it concrete and honest:
 1. **Problem & impact** — ghost-net detection from side-scan sonar; 4–8h manual review → minutes.
-2. **Dataset** — 32,981 images / 47,881 boxes from 7 sources, unified to a 4-class taxonomy;
-   audited with a documented, regenerable quality report.
-3. **Architecture** — two-stage OpenCV 5 pipeline; Stage 1 classical CV is the **COOL core
-   workload** on Graviton, benchmarked vs x86.
+2. **Dataset** — 7 sources → cleaned, leakage-free **v1: ~29k images** (26,533 train incl.
+   1,120 background / 1,204 val / 1,276 test), 4-class, audited with a regenerable report.
+3. **Architecture** — OpenCV 5 pipeline; Stage 1 classical CV is the **COOL benchmark workload**
+   on Graviton (vs x86); YOLO11 does full-frame detection (EXP-001 mAP@0.5 0.822). Classical
+   ROI-gating was tested and retired as a documented negative result (STUDY-01).
 4. **Plan to deadline** — phased execution in `TODO.md`; primary path is Best Use of COOL.
 5. **Evidence of active development** — this documentation set + dataset audit + committed repo.
 
