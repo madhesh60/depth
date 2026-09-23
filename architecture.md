@@ -199,23 +199,30 @@ input manifest hash, and a one-command reproduction script. See [`TODO.md`](TODO
 
 ---
 
-## 8. Agentic Vision loop (stretch)
+## 8. Agentic Vision loop — **BUILT** (`src/agentic/`, live in the dashboard, 30/30 tests)
 
-Qualifies only if *visual evidence changes the next action*. Design:
+The **See → Prove → Decide → Act** loop is implemented and exposed in the web app. Full writeup +
+rubric mapping: [`docs/agentic_vision.md`](docs/agentic_vision.md).
 
 ```
-perceive (Stage 1+2 on frame) → assess confidence
-   ├─ c ≥ τ            → accept detection, write report
-   ├─ τ_low ≤ c < τ    → DECIDE: request re-scan  → ACTION: emit re-scan/gain-adjust
-   │                      task (higher gain, overlapping pass) → re-perceive
-   └─ c < τ_low        → discard as clutter
+SEE     detect full-frame (YOLO11 · cv2.dnn, fishing_gear hot @0.10)
+PROVE   per candidate, gather physical + consistency evidence
+DECIDE  an adaptive escalation controller selects tools by evidence, then triages
+ACT     confirmed hazards → human-approved recovery route + geotagged reports
 ```
 
-- OpenCV/COOL operations are exposed as **MCP tools** (`src/agentic/tools.py`), so an agent
-  can invoke `stage1_preprocess`, `run_inference`, `adjust_gain`, `request_rescan` and
-  choose the next call based on the visual result.
-- Deliverable: an agent workflow diagram + a **trace** showing a low-confidence detection
-  triggering a re-scan that changes the outcome, plus task-success / failure-handling eval.
+- **Qualifies for the award** — the *perception result changes the next step*: a candidate that
+  re-fires on a zoom (or that the detector is already highly confident about) is auto-confirmed and
+  the agent **stops early**; an uncertain one triggers an **enhanced CLAHE re-look** ("try harder");
+  a survey candidate is checked for a **corroborating second pass**. Every step is a logged tool call.
+- **6-tool toolbox** (`tools.py`): `detect · zoom_relook · enhance_relook · shadow_check ·
+  estimate_height · match_other_pass`. The rule core (`policy.py`) is the sole decision authority —
+  deterministic, reproducible, human-gated — so an LLM narrator could sit on top without touching it.
+- **Calibrated + honest** (STUDY-03/04, `calibrate.py`): CONFIRMED precision **0.737 @ 30% recall**
+  via two paths (re-look persistence ⋃ high detector confidence); the acoustic shadow is
+  non-discriminative here (14.5% TP vs 14.6% FP) so it is **shown as evidence + height, never a gate**.
+- **Human control:** REJECTED is deprioritised-but-retained (recall-safe, ~91% of true pots kept in
+  CONFIRMED+REVIEW); the mission plan is never auto-dispatched (`human_approval_required=True`).
 
 ---
 
