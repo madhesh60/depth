@@ -44,7 +44,7 @@ what moved, what's blocked, what's next. Newest entries at the top of §4.
 | Dashboard | ⬜ Not started | FastAPI + map + transparency view. |
 | AWS deployment | ⬜ Not started | AWS CLI not yet installed. |
 | **COOL benchmark (Arm vs x86)** | ⬜ Not started | **Bonus-prize deliverable (Best Use of COOL).** |
-| Agentic loop (stretch) | ⬜ Not started | Only if ahead of schedule. |
+| Agentic loop (See→Prove→Decide→Act) | 🟡 In progress | **Primary Agentic-Vision entry.** Prove foundation done + calibrated (STUDY-03: raw prec 0.60→0.77 CONFIRMED tier). `src/agentic/`; 9/9 tests. Next: Decide agent → Act → dashboard. |
 | Submission package (report + video) | ⬜ Not started | Due 2026-10-26. |
 
 Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
@@ -72,6 +72,26 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 ---
 
 ## 4. Session log
+
+### 2026-09-23 — Agentic loop begins: See→Prove→Decide foundation (Prove is multi-evidence, honest)
+- **Started the See→Prove→Decide→Act agentic layer** (`src/agentic/`) — the Agentic-Vision entry.
+  This session delivered the **Prove foundation** + its honest calibration (STUDY-03).
+- **Key finding (STUDY-03), reached by empirical de-risking BEFORE building the headline claim:** the
+  acoustic **shadow does NOT gate** detections on this data — YOLO's TP and FP have identical echo
+  brightness and neither shows a systematic dark shadow (shadow-gating *lowers* precision 0.59→0.31).
+  A clear shadow exists only on a minority of larger objects. **Re-look persistence** (zoom 2.5×,
+  re-detect) is the real discriminator: raw hot precision **0.60 → 0.77** at the auto-CONFIRMED tier.
+- **Built & tested:** `types.py` (serialisable Verdict/ShadowProof/Evidence/Candidate/FrameResult),
+  `perception.py` (Perceptor: detect + `zoom_relook` [validated params] + CLAHE), `shadow.py`
+  (ShadowProver: nadir auto-calibration + shadow measure *where present* + height + overlay),
+  `evidence.py` (EvidenceGatherer: re-look⊕shadow⊕echo → evidence_score), `policy.py` (pre-registered
+  triage rules), `calibrate.py` (the STUDY-03 table on the real test split). 9/9 unit tests pass
+  (`tests/test_shadow.py`, `tests/test_evidence.py`), incl. shadow geometry for all 4 nadir edges.
+- **Design decision (user-confirmed):** Prove = multi-evidence; Decide = **recall-safe** 3-tier triage
+  (REJECTED is retained-for-audit + deprioritised, never deleted). Shadow kept as *evidence shown where
+  it exists* + height, never a silent gate — honest, and avoids the "misrepresenting capabilities"
+  rejection risk. Dashboard target: DepthWizard-style web app (FastAPI + React).
+- **Next:** DECIDE agent (`agent.py`, tool-call trace) → ACT (`mission.py`/`geo.py`) → FastAPI + dashboard.
 
 ### 2026-09-22 (cont.2) — tiled inference (modest); EXP-002 ready; AWS infra scaffolded
 - **Tiled inference** (`src/detection/tiled_infer.py`, SAHI-style slice→detect→NMS-merge):

@@ -108,6 +108,47 @@ Promote each into the log below with full results as it runs.
 
 ## Experiment log
 
+### STUDY-03 — See→Prove→Decide: shadow is NOT a gate; re-look persistence IS (agentic triage)
+- Date: 2026-09-23 · Status: done · Code: `src/agentic/` (`shadow.py`, `perception.py`,
+  `evidence.py`, `policy.py`, `calibrate.py`); reproduce: `python -m src.agentic.calibrate --frames 110`
+- Hypothesis: the acoustic **shadow** (bright echo + dark far-range shadow — the side-scan debris
+  cue STUDY-01 said Stage 1 ignores) proves a detection is a real object, so shadow-gating the hot
+  detector (fishing_gear conf 0.10) kills its false positives while keeping recall.
+
+Results — **the shadow premise fails on this data; re-look persistence is the real discriminator:**
+- **Shadow does NOT separate the detector's TP from FP.** On 120 crab-pot test frames, YOLO's true
+  and false fishing_gear detections have **identical echo brightness** (TP echo 2.08× bg vs FP 2.19×)
+  and the region below the echo is on average **no darker than the flanks for either** (median shadow
+  contrast ≈ 0, negative for both). A shadow gate *lowers* precision (0.59 → 0.31–0.50). A clear,
+  measurable shadow exists only on a **minority of larger / higher-relief objects** (e.g. the pipe-like
+  return in `runs/prove/`); most small low-relief crab-pots in heavy speckle cast none. Same class of
+  finding as STUDY-01: the intuitive physical cue has no per-object discriminative power *here*.
+- **Re-look persistence works.** Zooming 2.5× around a candidate and re-detecting, then keeping only
+  detections that re-fire strongly, lifts precision **0.59 → 0.77**; raising raw confidence barely
+  moves it (0.59 → 0.63). The agent's "squint and look again" is the discriminator, not the shadow.
+- **Calibration on 110 frames / 309 detections** (`calibrate.py`, triage in `policy.py`):
+  raw hot precision **0.602** → **CONFIRMED** tier (`relook ≥ 0.40`) precision **0.774** (22% of true
+  pots), **REVIEW** 0.570 (68%, the ranked human queue), **REJECTED** 0.545 (10%, deprioritised).
+  Deprioritising REJECTED retains **90% of true pots** and removes 15 false alarms.
+
+Error analysis
+- FPs are bright speckle patches indistinguishable from small pots by brightness → echo-based cues
+  (incl. the detector's own confidence) can't separate them. Multi-scale *consistency* (re-look) can:
+  a physical object re-fires at higher effective resolution, a speckle artefact often does not.
+- Shadow is real and visible on a minority; kept as **evidence shown where it exists** (+ a height
+  estimate `h = altitude·Ls/(range+Ls)`, pixel scale cancels) — compelling for the card/video — but
+  **never a silent gate**.
+
+Decision & next
+- **Prove = multi-evidence** (re-look persistence [primary] + acoustic shadow where present + echo +
+  height), fused into an `evidence_score` for ranking. **Decide = 3-tier triage**
+  CONFIRMED / REVIEW / REJECTED, **recall-safe** (REJECTED is retained-for-audit + deprioritised,
+  never deleted — no potential hazard is hidden from the human). Deterministic, logged, human-gated —
+  the Agentic-Vision substance. Thresholds pre-registered in `policy.TriageConfig`, tuned on this
+  split once (not per-frame).
+- Next: **DECIDE** agent (`agent.py`, tool-call trace incl. a re-look that flips a decision) → **ACT**
+  (`mission.py` cleanup route + `geo.py` honest geotag) → FastAPI + dashboard.
+
 ### STUDY-02 — Tiled (SAHI-style) inference for small objects (MODEST, no retrain)
 - Date: 2026-09-22 · Status: done · Tool: `src/detection/tiled_infer.py`
 - Hypothesis: slicing 640² frames into an overlapping 2×2 grid (each tile upscaled to 640 by
