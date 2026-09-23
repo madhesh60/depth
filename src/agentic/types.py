@@ -169,3 +169,55 @@ class FrameResult:
             "stage_ms": {k: round(v, 2) for k, v in self.stage_ms.items()},
             "candidates": [c.to_dict() for c in self.candidates],
         }
+
+
+@dataclass
+class TrackedObject:
+    """A survey-level hazard: one candidate promoted to the map/route, with geo + evidence summary."""
+    oid: str
+    cls_name: str
+    verdict: Verdict
+    conf: float
+    evidence_score: float
+    frame_id: str
+    bbox: tuple[int, int, int, int]
+    lat: Optional[float] = None
+    lon: Optional[float] = None
+    geo_error_m: Optional[float] = None
+    height_m: Optional[float] = None
+    shadow_quality: str = "none"
+
+    def to_dict(self) -> dict:
+        return _json(asdict(self))
+
+
+@dataclass
+class MissionPlan:
+    """The **Act** output: a human-approved cleanup route + resurvey list over a survey's hazards."""
+    recovery_route: list[str]                        # ordered TrackedObject ids (nearest-neighbour)
+    resurvey: list[str]                              # REVIEW object ids a human should revisit
+    route_length_m: Optional[float]                 # None when no GPS
+    gps_available: bool
+    gps_synthetic: bool = False                     # True ⇒ demo track, NOT real coordinates
+    human_approval_required: bool = True            # nothing is ever auto-dispatched
+    counts: dict[str, int] = field(default_factory=dict)
+
+    def to_dict(self) -> dict:
+        return _json(asdict(self))
+
+
+@dataclass
+class SurveyResult:
+    """Everything produced for a multi-frame survey (frames + hazards + the mission plan)."""
+    survey_id: str
+    frames: list[FrameResult]
+    tracked: list[TrackedObject]
+    mission: MissionPlan
+
+    def to_dict(self) -> dict:
+        return {
+            "survey_id": self.survey_id,
+            "frames": [f.to_dict() for f in self.frames],
+            "tracked": [t.to_dict() for t in self.tracked],
+            "mission": self.mission.to_dict(),
+        }

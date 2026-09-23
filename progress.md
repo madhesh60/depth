@@ -73,6 +73,22 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ## 4. Session log
 
+### 2026-09-23 (cont.2) — ACT: honest geotag + cleanup route + orchestrator (loop complete)
+- **Built the Act stage + orchestrator** (`src/agentic/geo.py`, `mission.py`, `pipeline.py`):
+  `AgenticPipeline.run_survey()` runs See→Prove→Decide per frame, geotags candidates, promotes
+  CONFIRMED/REVIEW to survey-level `TrackedObject`s, and builds a human-approved `MissionPlan`
+  (nearest-neighbour recovery route + resurvey list + GPX/GeoJSON/KML/CSV exports).
+- **Honest geotagging:** real per-ping GPS → detection lat/lon via across-track range + heading±90°
+  (with a coarse error estimate); **no GPS → no coordinates + a `gps_available=False` flag** (never
+  the "one fake lat/lon on every object" bug from WINNING_REPORT). A clearly-labelled **synthetic**
+  demo track (`SYNTHETIC DEMO GPS - not real coordinates`) makes the map/route demonstrable.
+- **End-to-end run** (8 demo frames): 23 hazards (5 confirmed / 18 review) → 5-stop 22.8 m recovery
+  route; exports validated; `human_approval_required=True` throughout (nothing auto-dispatched).
+- **Tests: 23/23 pass** (added `test_geo.py` 5 + `test_mission.py` 4 — geodesy, side parsing, NN
+  route, no-GPS honesty, all exporters).
+- **The agentic brain (See→Prove→Decide→Act) is complete.** Next: FastAPI backend → React dashboard
+  (DepthWizard-style stepper) to make it a judge-usable live demo.
+
 ### 2026-09-23 (cont.) — DECIDE agent: triage + tool-call trace (Agentic-Vision substance)
 - **Built the Decide stage** (`src/agentic/agent.py` + `tools.py`): `ReLookAgent.run_frame()` runs
   See→Prove→Decide per frame and, for each candidate, calls tools in sequence
