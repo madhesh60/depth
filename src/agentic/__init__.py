@@ -16,8 +16,9 @@ A trustworthy agentic layer on top of the EXP-001 YOLO detector:
 
 Design note (honesty first): on this side-scan crab-pot data the acoustic shadow is only
 measurable on a minority of larger/high-relief objects and does **not** separate the detector's
-true positives from its false positives (see ``experiments.md`` STUDY-03). The discriminator that
-*does* work is re-look persistence (raw precision 0.61 → 0.79 at the CONFIRMED tier). The shadow is
-therefore used as **evidence shown where present**, never as a silent gate — and no candidate is
-ever discarded without a human seeing it.
+true positives from its false positives (STUDY-03/04: its CLEAR-rate is ~14.5% on both TP and FP).
+The discriminators that *do* work are re-look persistence and high detector confidence — the two
+independently-calibrated CONFIRMED paths whose union lifts precision from ~0.60 (raw) to ~0.74 at
+~30% recall. The shadow is therefore used as **evidence shown where present** (plus a height
+estimate), never as a silent gate — and no candidate is ever discarded without a human seeing it.
 """

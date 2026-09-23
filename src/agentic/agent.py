@@ -10,7 +10,8 @@ step). The rule core is the sole decision authority (reproducible + safe); an LL
 sit on top later without touching this logic.
 
 Recall-safe by design: REJECTED means "low evidence — deprioritised, retained for audit", never
-deleted; the only auto-*trusted* tier is CONFIRMED (precision ~0.77 vs ~0.60 raw, STUDY-03).
+deleted; the only auto-*trusted* tier is CONFIRMED — two independently-calibrated paths (re-look
+persistence and high detector confidence), union precision ~0.74 vs ~0.60 raw (STUDY-03/04).
 
 CLI:  python -m src.agentic.agent <image|dir> --out runs/agent [--limit N]
 """
@@ -30,7 +31,7 @@ from .perception import Perceptor
 from .shadow import ShadowProver
 from .tools import Toolbox
 from .evidence import fuse_score, evidence_notes
-from .policy import TriageConfig, triage
+from .policy import TriageConfig, decide
 from .types import AgentStep, Candidate, Evidence, FrameResult, Verdict
 
 REPO = Path(__file__).resolve().parents[2]
@@ -88,21 +89,36 @@ class ReLookAgent:
             stage_ms={"see": see_ms, "prove_decide": prove_decide_ms}, nadir=nadir,
         )
 
-    # -- per-candidate decision procedure ----------------------------------------------------
+    # -- per-candidate decision procedure (an adaptive escalation controller) ----------------
     def _decide_candidate(self, frame, gray, det: Detection, nadir: str) -> Candidate:
+        """Gather evidence by *adaptively* selecting tools — a cheap→expensive escalation ladder
+        that stops as soon as the decision is confident. Different candidates take different tool
+        paths and terminate at different depths; the trace records the whole route (Agentic-Vision:
+        the perception result drives the agent's next step)."""
         cfg = self.cfg
+        tri = cfg.triage
         trace: list[AgentStep] = []
 
-        proof, s_shadow = self.tools.shadow_check(gray, det.bbox, nadir)
-        trace.append(s_shadow)
+        # 1) re-look — the agent's first probe (the primary discriminator, STUDY-03).
+        relook, s = self.tools.zoom_relook(frame, det.bbox, det.cls_name, det.conf)
+        trace.append(s)
+        confident = relook.conf >= tri.confirm_relook or det.conf >= tri.confirm_conf
 
-        relook, s_relook = self.tools.zoom_relook(frame, det.bbox, det.cls_name, det.conf)
-        trace.append(s_relook)
+        # 2) physical evidence for the human/card: acoustic shadow + height (shown, never a gate).
+        proof, s = self.tools.shadow_check(gray, det.bbox, nadir)
+        trace.append(s)
+        if proof.has_shadow:
+            _, s = self.tools.estimate_height(proof)
+            trace.append(s)
 
-        # try harder once, only when genuinely uncertain
-        if relook.conf < cfg.enhance_when_relook_below and det.conf < cfg.enhance_when_conf_below:
-            relook2, s_enh = self.tools.zoom_relook(frame, det.bbox, det.cls_name, det.conf, enhance=True)
-            trace.append(s_enh)
+        # 3) escalate ONLY when still uncertain — an enhanced (CLAHE) "try harder" re-look.
+        #    Skipped once confident: the agent doesn't waste a second inference on a settled call.
+        escalated = False
+        if (not confident and relook.conf < cfg.enhance_when_relook_below
+                and det.conf < cfg.enhance_when_conf_below):
+            relook2, s = self.tools.zoom_relook(frame, det.bbox, det.cls_name, det.conf, enhance=True)
+            trace.append(s)
+            escalated = True
             if relook2.conf > relook.conf:
                 relook = relook2
 
@@ -111,24 +127,35 @@ class ReLookAgent:
             evidence_score=round(fuse_score(det.conf, relook, proof), 3),
             notes=evidence_notes(det.conf, det.cls_name, relook, proof),
         )
-        verdict = triage(det.conf, evidence, cfg.triage)
+        verdict, path = decide(det.conf, evidence, tri)
         trace.append(AgentStep(
-            tool="decide", rationale=self._why(verdict, det.conf, relook),
+            tool="decide", rationale=self._why(verdict, path, det.conf, relook, escalated),
             latency_ms=0.0, conf_before=round(det.conf, 4), conf_after=round(relook.conf, 4),
-            detail={"verdict": verdict.value, "evidence_score": evidence.evidence_score},
+            detail={"verdict": verdict.value, "confirm_path": path,
+                    "evidence_score": evidence.evidence_score, "escalated": escalated},
         ))
         return Candidate(bbox=det.bbox, cls_id=det.cls_id, cls_name=det.cls_name,
                          conf=det.conf, evidence=evidence, verdict=verdict, trace=trace)
 
-    def _why(self, verdict: Verdict, conf: float, relook) -> str:
+    def _why(self, verdict: Verdict, path: str, conf: float, relook, escalated: bool) -> str:
         t = self.cfg.triage
         if verdict is Verdict.CONFIRMED:
-            return (f"re-look persisted ({relook.conf:.2f} >= {t.confirm_relook:.2f}) -> auto-confirmed "
-                    f"(precision ~0.77 at this tier)")
+            if path == "high_confidence":
+                return (f"detector already highly confident ({conf:.2f} >= {t.confirm_conf:.2f}) -> "
+                        f"auto-confirmed (precision ~0.83 at this tier); escalation skipped")
+            if path == "both":
+                return (f"detector confident ({conf:.2f}) and re-look persisted ({relook.conf:.2f}) -> "
+                        f"confirmed on two independent signals")
+            return (f"re-look persisted ({relook.conf:.2f} >= {t.confirm_relook:.2f}) -> confirmed "
+                    f"(precision ~0.71 at this tier)"
+                    + (" after an enhanced try-harder pass" if escalated else ""))
         if verdict is Verdict.REJECTED:
-            return (f"low confidence ({conf:.2f}) and no re-look ({relook.conf:.2f}) -> deprioritised, "
-                    f"kept for audit (not deleted)")
-        return f"uncertain (re-look {relook.conf:.2f}) -> routed to human review, ranked by evidence"
+            return (f"low confidence ({conf:.2f}) and no re-look ({relook.conf:.2f})"
+                    + (" even after enhancement" if escalated else "")
+                    + " -> deprioritised, kept for audit (not deleted)")
+        return (f"uncertain (conf {conf:.2f}, re-look {relook.conf:.2f})"
+                + (" even after an enhanced pass" if escalated else "")
+                + " -> routed to human review, ranked by evidence")
 
 
 def _counts(cands: list[Candidate]) -> dict:

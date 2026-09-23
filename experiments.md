@@ -108,6 +108,56 @@ Promote each into the log below with full results as it runs.
 
 ## Experiment log
 
+### STUDY-04 — Adaptive triage controller + a second CONFIRMED path (high detector confidence)
+- Date: 2026-09-23 · Status: done · Code: `src/agentic/` (`policy.py`, `agent.py`, `tools.py`,
+  `pipeline.py`, `calibrate.py`); reproduce: `python -m src.agentic.calibrate --frames 160 --out runs/prove`
+- Hypothesis: STUDY-03 auto-confirms via **one** signal (re-look ≥ 0.40). Two ideas could safely
+  confirm *more* true pots (→ a non-empty recovery route in the demo, higher task success): (a) a
+  **corroboration** rule "high detector conf **and** a CLEAR acoustic shadow at a plausible height",
+  and (b) plain **high detector confidence**. Mine the real test split to see which — if either —
+  holds precision, then bake only the honest one into the policy.
+
+Results — **(a) is rejected, (b) is a clean win; the controller is made genuinely adaptive:**
+- **Shadow-corroboration fails (hypothesis overturned).** On 160 crab-pot test frames / 461
+  fishing_gear detections (raw precision 0.599), requiring a CLEAR shadow *lowers* precision:
+  `conf≥0.55 & CLEAR` → **0.40** vs `conf≥0.55` alone → **0.69**. The committed run confirms the
+  mechanism: **CLEAR-shadow rate is 14.5% on TP vs 14.6% on FP** — statistically identical, i.e.
+  non-discriminative (reconfirms STUDY-03 with a cleaner statistic). Shadow stays **evidence-shown +
+  height**, never a gate.
+- **High detector confidence is a strong, independent CONFIRMED path.** `conf ≥ 0.60` → precision
+  **0.826** (n=23). The **union** used by the new policy — `relook ≥ 0.40` **OR** `conf ≥ 0.60` —
+  gives CONFIRMED precision **0.737 at 30% recall-share**, beating the STUDY-03 re-look-only tier
+  (**0.713 / 26%**) on *both* axes. By path (committed calibrate): re-look **0.71** (n=91),
+  high-confidence-only **0.92** (n=13), both **0.70** (n=10). REJECT stays recall-safe: **91% of true
+  pots retained** in CONFIRMED+REVIEW after deprioritising (never deleting) REJECTED.
+- **Decide is now an adaptive escalation controller** (`agent.py`), not a fixed 3-call sequence:
+  re-look first → shadow + `estimate_height` (evidence for the card) → **escalate to an enhanced
+  CLAHE re-look only when still uncertain** (skipped once confident — no wasted second inference) →
+  triage. Different candidates take different tool paths and stop at different depths; the trace
+  records the whole route **and which CONFIRMED path won** (`confirm_path` ∈ relook / high_confidence
+  / both). Two tools added: `estimate_height` (named, traced) and `match_other_pass`.
+- **Cross-pass corroboration** (`match_other_pass`, survey-level, `pipeline._corroborate`): a
+  candidate that re-appears in an overlapping pass (same recording+channel, adjacent ping, same
+  across-track position) gets a trace step + evidence note + a review-ranking boost. Deliberately
+  **non-gating** — it never changes a verdict, so the CONFIRMED tier stays exactly the calibrated set.
+- **Effect on the live demo:** the bundled 5-sample survey went **0 confirmed / 3 review → 1 confirmed
+  / 2 review** (a conf-0.68 pot with a clear h~0.7 m shadow, previously stuck in REVIEW, now
+  auto-confirmed via the high-confidence path), producing a real recovery route.
+
+Error analysis
+- The two confirm paths are complementary: re-look rescues *low-confidence* true pots that persist on
+  zoom; the confidence path trusts the detector when it is already decisive. Their overlap ("both",
+  n=10) is small, so the union genuinely adds recall.
+- `match_other_pass` is a filename/geometry heuristic (no per-frame slant model here), hence kept
+  non-gating and off the calibrated metric; it aids the human review queue and demonstrates the agent
+  *considering* a second pass. A physically-rigorous version needs the slant-range geometry from 5.5.
+
+Decision & next
+- **Ship the union policy** (`TriageConfig.confirm_conf=0.60`) + the adaptive controller + the two
+  tools + non-gating cross-pass. 12/12 agent tests, full suite green.
+- Next: deploy on Graviton + COOL (the live link); EXP-002 (imgsz retrain) to raise the underlying
+  recall the agent triages; a physically-grounded `match_other_pass` once slant-range Stage 1 lands.
+
 ### STUDY-03 — See→Prove→Decide: shadow is NOT a gate; re-look persistence IS (agentic triage)
 - Date: 2026-09-23 · Status: done · Code: `src/agentic/` (`shadow.py`, `perception.py`,
   `evidence.py`, `policy.py`, `calibrate.py`); reproduce: `python -m src.agentic.calibrate --frames 110`

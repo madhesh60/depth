@@ -26,7 +26,7 @@ import cv2
 from src.detection.infer import Detection
 from .perception import Perceptor
 from .evidence import EvidenceGatherer
-from .policy import TriageConfig, triage
+from .policy import TriageConfig, triage, confirm_path
 from .types import Verdict
 
 REPO = Path(__file__).resolve().parents[2]
@@ -69,6 +69,8 @@ def run(frames_root: Path, n_frames: int, out_dir: Path, seed: int = 0) -> dict:
     imgs = imgs[:n_frames]
 
     tiers = {v: {"tp": 0, "fp": 0} for v in Verdict}
+    paths = {p: {"tp": 0, "fp": 0} for p in ("relook", "high_confidence", "both")}
+    shadow_clear = {"tp": 0, "fp": 0}     # to show the shadow is non-discriminative (STUDY-04)
     tp_total = fp_total = 0
     saved = 0
     flip_saved = 0
@@ -84,7 +86,12 @@ def run(frames_root: Path, n_frames: int, out_dir: Path, seed: int = 0) -> dict:
             ev = gatherer.gather(im, det)
             verdict = triage(det.conf, ev, cfg)
             is_tp = any(_iou(det.bbox, g) > 0.3 for g in gts)
-            tiers[verdict]["tp" if is_tp else "fp"] += 1
+            kk = "tp" if is_tp else "fp"
+            tiers[verdict][kk] += 1
+            if verdict is Verdict.CONFIRMED:
+                paths[confirm_path(det.conf, ev, cfg)][kk] += 1
+            if ev.shadow.quality.value == "clear":
+                shadow_clear[kk] += 1
             tp_total += int(is_tp)
             fp_total += int(not is_tp)
             # save a few evidence overlays for the record / demo
@@ -110,6 +117,16 @@ def run(frames_root: Path, n_frames: int, out_dir: Path, seed: int = 0) -> dict:
                 "precision": round(tiers[v]["tp"] / max(1, tiers[v]["tp"] + tiers[v]["fp"]), 3),
                 "share_of_true": round(tiers[v]["tp"] / max(1, tp_total), 3),
             } for v in Verdict
+        },
+        "confirm_paths": {
+            p: {"n": d["tp"] + d["fp"], "tp": d["tp"], "fp": d["fp"],
+                "precision": round(d["tp"] / max(1, d["tp"] + d["fp"]), 3)}
+            for p, d in paths.items()
+        },
+        "shadow_non_discriminative": {
+            "clear_rate_tp": round(shadow_clear["tp"] / max(1, tp_total), 3),
+            "clear_rate_fp": round(shadow_clear["fp"] / max(1, fp_total), 3),
+            "note": "near-equal CLEAR rates on TP vs FP ⇒ shadow does not separate them (never gated)",
         },
         "kept_after_reject": {
             "recall_of_true": round(kept_tp / max(1, tp_total), 3),
@@ -139,6 +156,14 @@ def _print(s: dict, out_dir: Path):
     for v in ("confirmed", "review", "rejected"):
         t = s["tiers"][v]
         print(f"  {v:10s} {t['n']:>4} {t['tp']:>4} {t['fp']:>4} {t['precision']:>10.3f} {t['share_of_true']:>8.0%}")
+    print(f"  {'CONFIRMED by path':10s}", end="")
+    for p in ("relook", "high_confidence", "both"):
+        d = s["confirm_paths"][p]
+        print(f"  {p} n={d['n']} prec={d['precision']:.2f}", end="")
+    print()
+    sd = s["shadow_non_discriminative"]
+    print(f"  shadow CLEAR-rate TP {sd['clear_rate_tp']:.1%} vs FP {sd['clear_rate_fp']:.1%} "
+          f"-> non-discriminative (shown as evidence, never gated)")
     k = s["kept_after_reject"]
     print(f"  after deprioritising REJECTED: recall {k['recall_of_true']:.0%} of true pots retained, "
           f"precision {s['raw_precision']:.2f} -> {k['precision']:.2f}, {k['fp_removed']} false alarms removed")

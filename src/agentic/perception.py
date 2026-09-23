@@ -7,9 +7,10 @@ operations the Prove/Decide stages need:
 * :meth:`Perceptor.perceive`    — full-frame detection (per-class thresholds, hot for fishing_gear).
 * :meth:`Perceptor.zoom_relook` — crop a padded window around a candidate, upscale it, and re-detect.
   A real object re-fires strongly at higher effective resolution; a speckle false-positive does
-  not. This *re-look persistence* is the discriminator that lifts precision 0.61 → 0.79 at the
-  CONFIRMED tier (``experiments.md`` STUDY-03) — the parameters below were tuned on the real test
-  split and must stay in lockstep with ``calibrate.py``.
+  not. This *re-look persistence* lifts precision from 0.60 (raw) to 0.71 at its CONFIRMED tier;
+  combined with the high-confidence path the CONFIRMED tier is ~0.74 at ~30% recall (``experiments.md``
+  STUDY-03/04) — the parameters below were tuned on the real test split and stay in lockstep with
+  ``calibrate.py``.
 * :meth:`Perceptor.enhance_contrast` — CLAHE, offered to the agent as a secondary re-look aid.
 """
 from __future__ import annotations

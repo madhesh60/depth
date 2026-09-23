@@ -52,6 +52,18 @@ def parse_side(frame_id: str) -> Optional[str]:
     return "port" if m.group(1) == "port" else "starboard"
 
 
+def parse_recording(frame_id: str) -> Optional[str]:
+    """Read the recording id (e.g. 'rec6') from a PINGMapper-style filename. None if unknown."""
+    m = re.search(r"(rec\d+)", frame_id.lower())
+    return m.group(1) if m else None
+
+
+def parse_ping(frame_id: str) -> Optional[int]:
+    """Read the trailing ping/chunk index from a PINGMapper-style filename. None if unknown."""
+    m = re.search(r"_(\d{3,6})(?:_png)?", frame_id.lower())
+    return int(m.group(1)) if m else None
+
+
 def range_px_from_nadir(bbox, nadir: str, w: int, h: int) -> float:
     """Across-track distance (pixels) of the box centre from the nadir edge."""
     cx, cy = 0.5 * (bbox[0] + bbox[2]), 0.5 * (bbox[1] + bbox[3])
@@ -75,11 +87,7 @@ def synthetic_track(frame_ids: list[str], start=(37.9800, -76.0000),
                     heading_deg: float = 20.0, ping_spacing_m: float = 4.0) -> dict[str, PingFix]:
     """Build a plausible straight boat track for a demo. **All fixes are ``synthetic=True``** and must
     be surfaced as demo-only. Frames are ordered by the trailing ping index in their name when present."""
-    def ping_index(fid: str) -> int:
-        m = re.search(r"_(\d{3,6})(?:_png)?", fid)
-        return int(m.group(1)) if m else 0
-
-    ordered = sorted(frame_ids, key=ping_index)
+    ordered = sorted(frame_ids, key=lambda fid: parse_ping(fid) or 0)
     lat, lon = start
     track: dict[str, PingFix] = {}
     for i, fid in enumerate(ordered):

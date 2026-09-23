@@ -54,23 +54,52 @@ class AgenticPipeline:
         gps_synthetic = gps_available and any(f.synthetic for f in track.values())
 
         frame_results: list[FrameResult] = []
-        tracked: list[TrackedObject] = []
-        n = 0
         for frame_id, image in frames:
             fix = track.get(frame_id) if track else None
             fr = self.run_frame(image, frame_id=frame_id, fix=fix)
             frame_results.append(fr)
+            if progress_cb:
+                progress_cb("frame_done", {"frame_id": frame_id, "counts": fr.counts})
+
+        # cross-pass corroboration (survey-level, non-gating): does each candidate re-appear in an
+        # overlapping pass? Adds a match_other_pass trace step + evidence note + a review-ranking
+        # boost. Never changes a verdict, so the CONFIRMED tier stays exactly the calibrated set.
+        self._corroborate(frame_results)
+
+        tracked: list[TrackedObject] = []
+        n = 0
+        for fr in frame_results:
             for c in fr.candidates:
                 if c.verdict in _TRACKED_VERDICTS:
                     n += 1
-                    tracked.append(_to_tracked(f"H{n:03d}", frame_id, c))
-            if progress_cb:
-                progress_cb("frame_done", {"frame_id": frame_id, "counts": fr.counts})
+                    tracked.append(_to_tracked(f"H{n:03d}", fr.frame_id, c))
 
         mission = build_mission(tracked, gps_available, gps_synthetic)
         if progress_cb:
             progress_cb("mission", mission.to_dict())
         return SurveyResult(survey_id=survey_id, frames=frame_results, tracked=tracked, mission=mission)
+
+
+    # -- cross-pass corroboration (non-gating) -----------------------------------------------
+    def _corroborate(self, frame_results: list[FrameResult]) -> None:
+        """For every candidate, ask ``match_other_pass`` whether the same object appears in an
+        overlapping pass, and record it in the trace + evidence (ranking only — never the verdict)."""
+        sightings = [
+            {"frame_id": fr.frame_id, "cls": c.cls_name,
+             "cx": c.center[0] / max(1, fr.width), "cy": c.center[1] / max(1, fr.height)}
+            for fr in frame_results for c in fr.candidates
+        ]
+        if len(sightings) < 2:
+            return
+        for fr in frame_results:
+            for c in fr.candidates:
+                cx, cy = c.center[0] / max(1, fr.width), c.center[1] / max(1, fr.height)
+                matched, mframe, step = self.agent.tools.match_other_pass(
+                    fr.frame_id, cx, cy, c.cls_name, sightings)
+                c.trace.append(step)   # after 'decide' — a survey-level corroboration pass
+                if matched and c.evidence is not None:
+                    c.evidence.notes.append(f"cross-pass: also seen in an overlapping pass ({mframe})")
+                    c.evidence.evidence_score = round(min(1.0, c.evidence.evidence_score + 0.10), 3)
 
 
 def _to_tracked(oid: str, frame_id: str, c: Candidate) -> TrackedObject:

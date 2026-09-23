@@ -55,9 +55,23 @@ def test_strong_relook_is_confirmed_with_trace():
     c = res.candidates[0]
     assert c.verdict is Verdict.CONFIRMED
     tools = [s.tool for s in c.trace]
-    assert tools[0] == "shadow_check" and "zoom_relook" in tools and tools[-1] == "decide"
+    # adaptive controller: re-look is the agent's first probe, decide is last
+    assert tools[0] == "zoom_relook" and "shadow_check" in tools and tools[-1] == "decide"
     # strong first look ⇒ no enhanced re-look needed
     assert "enhance_relook" not in tools
+    assert c.trace[-1].detail["confirm_path"] == "relook"
+
+
+def test_high_confidence_path_confirms_and_skips_escalation():
+    """A detection the detector is already sure about (conf ≥ 0.60, precision ~0.83 — STUDY-04) is
+    auto-confirmed even if it does not re-fire, and the agent skips the expensive enhanced re-look."""
+    res = _agent([_det(0.68)], relook_normal=0.0, relook_enhanced=0.9).run_frame(_frame())
+    c = res.candidates[0]
+    assert c.verdict is Verdict.CONFIRMED
+    tools = [s.tool for s in c.trace]
+    assert "enhance_relook" not in tools                       # early-stop: no wasted second inference
+    assert c.trace[-1].detail["confirm_path"] == "high_confidence"
+    assert c.trace[-1].detail["escalated"] is False
 
 
 def test_enhanced_relook_can_upgrade_decision():
@@ -91,6 +105,45 @@ def test_render_returns_image():
     r = _agent([_det(0.55)], relook_normal=0.55).run_frame(_frame())
     vis = render(_frame(), r)
     assert vis.shape == (200, 200, 3) and vis.dtype == np.uint8
+
+
+def test_toolbox_estimate_height_and_cross_pass():
+    """The two new tools are pure/deterministic — test them directly."""
+    from src.agentic.tools import Toolbox
+    from src.agentic.types import ShadowProof, ShadowQuality
+    tb = Toolbox(_StubPerceptor([], 0.0), ShadowProver(ShadowConfig(nadir="top")))
+
+    proof = ShadowProof(ShadowQuality.CLEAR, 0.4, 8, 0.8, 0.7, 0.2, 3.1, (10, 10), (5, 12, 15, 20))
+    h, step = tb.estimate_height(proof)
+    assert h == 0.7 and step.tool == "estimate_height" and "0.7" in step.rationale
+
+    # two overlapping passes (same recording+channel, adjacent ping, same across-track position)
+    others = [
+        {"frame_id": "crabpot_Rec6_ss_port_00010", "cls": "fishing_gear", "cx": 0.5, "cy": 0.4},
+        {"frame_id": "crabpot_Rec6_ss_port_00011", "cls": "fishing_gear", "cx": 0.51, "cy": 0.41},
+    ]
+    matched, mframe, step = tb.match_other_pass("crabpot_Rec6_ss_port_00010", 0.5, 0.4, "fishing_gear", others)
+    assert matched and mframe == "crabpot_Rec6_ss_port_00011" and step.detail["matched"] is True
+    # a different recording does not corroborate
+    solo, _, _ = tb.match_other_pass("crabpot_Rec9_ss_star_00099", 0.5, 0.4, "fishing_gear", others)
+    assert solo is False
+
+
+def test_cross_pass_corroboration_is_noted_never_gated():
+    """Survey-level corroboration adds a match_other_pass step + note + score boost, and NEVER
+    changes a verdict (the CONFIRMED tier stays exactly the calibrated set)."""
+    from src.agentic.pipeline import AgenticPipeline
+    agent = _agent([_det(0.30, (90, 60, 110, 84))], relook_normal=0.0)   # conf 0.30, no re-fire -> REVIEW
+    pipe = AgenticPipeline(agent=agent)
+    frames = [("crabpot_Rec6_ss_port_00010", _frame()), ("crabpot_Rec6_ss_port_00011", _frame())]
+    survey = pipe.run_survey(frames, track=None, survey_id="t")
+    for fr in survey.frames:
+        c = fr.candidates[0]
+        assert c.verdict is Verdict.REVIEW                                # unchanged by corroboration
+        steps = [s.tool for s in c.trace]
+        assert "match_other_pass" in steps and steps.index("decide") < steps.index("match_other_pass")
+        assert any("cross-pass" in n for n in c.evidence.notes)
+    assert survey.mission.human_approval_required is True
 
 
 def _run_all():
