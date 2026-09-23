@@ -18,18 +18,53 @@ S3_BUCKET="${S3_BUCKET:-}"                       # optional: upload results here
 FRAMES="${FRAMES:-frames}"                       # local dir of sonar frames (>=1000 for the report)
 LIMIT="${LIMIT:-1000}"
 REPEATS="${REPEATS:-3}"
-# OPENCV_FLAVOR: "stock" installs opencv-python-headless; "cool" expects a COOL/KleidiCV
-# OpenCV build already on PATH (or pip index) — the benchmark auto-detects KleidiCV in the
-# build info and records it, so a run is self-documenting about which flavor actually ran.
+# OPENCV_FLAVOR: "stock" pip-installs a PINNED OpenCV 5 wheel; "cool" expects the COOL AMI's
+# OpenCV (COOL is an AMI, NOT a pip wheel — do not pip-install it). We prove which build actually
+# ran by PROVENANCE (cv2.__file__ path + version + build info), never by "KleidiCV detected":
+# the stock Arm wheel *already bundles KleidiCV*, so that check proves nothing.
 OPENCV_FLAVOR="${OPENCV_FLAVOR:-stock}"
+OPENCV_PIN="${OPENCV_PIN:-5.0.0.93}"             # OpenCV 5 (rule 1) — pin everything
 
 echo "== [$LABEL] arch=$(uname -m) flavor=$OPENCV_FLAVOR =="
 
 python3 -m pip install -q --upgrade pip
-python3 -m pip install -q numpy pyyaml
+python3 -m pip install -q "numpy>=2" pyyaml       # OpenCV 5 needs numpy>=2
 if [ "$OPENCV_FLAVOR" = "stock" ]; then
-  python3 -m pip install -q opencv-python-headless
-fi   # "cool": install the COOL/KleidiCV-accelerated OpenCV wheel here per AWS COOL docs.
+  python3 -m pip install -q "opencv-python-headless==${OPENCV_PIN}"
+else
+  # COOL AMI (Ubuntu 24.04): OpenCV lives under /opt/cool/venvs/... — activate that interpreter
+  # and run this script with it (e.g. `source /opt/cool/venvs/<env>/bin/activate`). No pip install.
+  echo "cool flavor: using the COOL AMI OpenCV under /opt/cool (not pip-installing)."
+fi
+
+# --- PROVE which OpenCV actually ran (provenance, not KleidiCV) ------------------------------
+PROV=$(python3 - <<'PY'
+import cv2, json
+info = cv2.getBuildInformation()
+print(json.dumps({
+    "cv2_version": cv2.__version__,
+    "cv2_file": cv2.__file__,
+    "is_cool_path": "/opt/cool" in (cv2.__file__ or ""),   # ← the real COOL proof
+    "kleidicv_in_build": ("KleidiCV" in info),             # informational only (true on stock Arm too)
+    "ipp_in_build": ("Intel IPP" in info),
+}))
+PY
+)
+echo "opencv_provenance=$PROV"
+IS_COOL_PATH=$(printf '%s' "$PROV" | python3 -c "import json,sys; print(json.load(sys.stdin)['is_cool_path'])")
+if [ "$OPENCV_FLAVOR" = "cool" ] && [ "$IS_COOL_PATH" != "True" ]; then
+  echo "ERROR: flavor=cool but cv2 is NOT loaded from /opt/cool — refusing to mislabel this run as COOL." >&2
+  exit 2
+fi
+
+# AMI + instance identity (best-effort via IMDSv2) — records exactly where COOL ran
+IMDS_TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" \
+  -H "X-aws-ec2-metadata-token-ttl-seconds: 60" 2>/dev/null || true)
+AMI_ID=$(curl -s -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" \
+  http://169.254.169.254/latest/meta-data/ami-id 2>/dev/null || echo "unknown")
+INSTANCE_TYPE=$(curl -s -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" \
+  http://169.254.169.254/latest/meta-data/instance-type 2>/dev/null || echo "unknown")
+echo "ami_id=$AMI_ID instance_type=$INSTANCE_TYPE"
 
 # pull frames from S3 if a bucket + prefix is given and the local dir is empty
 if [ -n "$S3_BUCKET" ] && [ ! -d "$FRAMES" ]; then
@@ -45,11 +80,15 @@ python3 -m src.cv_pipeline.benchmark \
   --images "$FRAMES" --limit "$LIMIT" --repeats "$REPEATS" \
   --label "$LABEL" --out "$OUT"
 
-# stamp the manifest hash into the JSON so the result is self-describing
-python3 - "$OUT/$LABEL.json" "$MANIFEST_HASH" <<'PY'
+# stamp the manifest hash + OpenCV provenance + AMI/instance so the result PROVES where it ran
+python3 - "$OUT/$LABEL.json" "$MANIFEST_HASH" "$PROV" "$AMI_ID" "$INSTANCE_TYPE" <<'PY'
 import json, sys
-p, h = sys.argv[1], sys.argv[2]
-d = json.load(open(p)); d["input_manifest_sha256"] = h
+p, h, prov, ami, itype = sys.argv[1:6]
+d = json.load(open(p))
+d["input_manifest_sha256"] = h
+d["opencv_provenance"] = json.loads(prov)      # cv2_file / is_cool_path / version — the COOL proof
+d["ami_id"] = ami
+d["instance_type"] = itype
 json.dump(d, open(p, "w"), indent=2)
 PY
 

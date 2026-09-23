@@ -6,11 +6,23 @@ Deploy-ready (not yet deployed — pending AWS credits). Runs the Stage-2 detect
 fast. Works unchanged on x86 and on **Graviton/Arm** Lambda (the COOL-award compute target).
 
 Pipeline per request:
-    frame (S3 key or base64) → optional Stage-1 sonar preprocessing (CPU, COOL-accelerated)
-    → cv2.dnn ONNX detection (per-class thresholds) → geotagged JSON detections.
+    frame (S3 key or base64) → cv2.dnn ONNX detection (per-class thresholds)
+    → **honest** geotag (across-track offset from the boat fix; no coordinates when no GPS) → JSON.
 
-Event shapes accepted:
-    {"s3": {"bucket": "...", "key": "frames/x.png"}, "lat": .., "lon": ..}
+Detection-only by design: STUDY-01 retired classical Stage-1 ROI-gating (it has no discriminative
+power on this sonar), so this endpoint does **not** run Stage 1. The Stage-1 sonar-preprocessing
+pass is a *separate* CPU workload benchmarked for the COOL award
+(``infra/benchmark_graviton.sh``) — it is not a detection gate, so wiring it here would only slow
+inference without changing results.
+
+Geotagging is honest (mirrors ``src/agentic/geo.py``): each detection sits at an across-track
+ground range from the boat track, offset on the port/starboard side — it is **not** the same
+lat/lon stamped onto every object. With no ``lat``/``lon`` in the event we return
+``gps_available=False`` and null coordinates rather than inventing a position.
+
+Event shapes accepted (``lat``/``lon`` optional — the boat fix for this frame):
+    {"s3": {"bucket": "...", "key": "frames/x.png"}, "lat": .., "lon": ..,
+     "heading": deg, "side": "port"|"starboard", "nadir": "top"|.., "m_per_px": ..}
     {"image_b64": "<base64 png/jpg>", "lat": .., "lon": ..}
 
 Env:
@@ -103,6 +115,53 @@ def detect(img: np.ndarray) -> list[dict]:
     return out
 
 
+# --- honest geotag (mirrors src/agentic/geo.py; no fake "one lat/lon on every object") --------
+_EARTH_R = 6_371_000.0
+
+
+def _offset_latlon(lat, lon, dist_m, bearing_deg):
+    import math
+    b = math.radians(bearing_deg)
+    dlat = (dist_m * math.cos(b)) / _EARTH_R
+    dlon = (dist_m * math.sin(b)) / (_EARTH_R * math.cos(math.radians(lat)))
+    return lat + math.degrees(dlat), lon + math.degrees(dlon)
+
+
+def _calibrate_nadir(gray) -> str:
+    """Darkest + flattest edge band = the nadir / water column; range grows away from it."""
+    h, w = gray.shape[:2]
+    bh, bw = max(3, h // 12), max(3, w // 12)
+    bands = {"top": gray[:bh, :], "bottom": gray[-bh:, :], "left": gray[:, :bw], "right": gray[:, -bw:]}
+    return min(bands, key=lambda e: float(bands[e].mean()) + float(bands[e].std()))
+
+
+def _range_px_from_nadir(bbox, nadir, w, h) -> float:
+    cx, cy = 0.5 * (bbox[0] + bbox[2]), 0.5 * (bbox[1] + bbox[3])
+    return {"top": cy, "bottom": h - cy, "left": cx, "right": w - cx}.get(nadir, cy)
+
+
+def geotag(dets, img, event) -> bool:
+    """Fill each detection's lat/lon/geo_error_m from the boat fix. Returns gps_available."""
+    lat, lon = event.get("lat"), event.get("lon")
+    if lat is None or lon is None:
+        for d in dets:
+            d["lat"] = d["lon"] = d["geo_error_m"] = None
+        return False
+    heading = float(event.get("heading", 0.0))
+    side = (event.get("side") or "starboard").lower()
+    m_per_px = float(event.get("m_per_px", 0.05))
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    nadir = event.get("nadir") or _calibrate_nadir(gray)
+    H, W = img.shape[:2]
+    cross = heading + (90.0 if side.startswith("star") else -90.0)
+    for d in dets:
+        rng = _range_px_from_nadir(d["bbox"], nadir, W, H) * m_per_px
+        dlat, dlon = _offset_latlon(lat, lon, rng, cross)
+        d["lat"], d["lon"] = round(dlat, 6), round(dlon, 6)
+        d["geo_error_m"] = round(max(3.0, 0.25 * rng), 1)   # coarse, honest, grows with range
+    return True
+
+
 def _load_image(event) -> np.ndarray:
     if "image_b64" in event:
         buf = np.frombuffer(base64.b64decode(event["image_b64"]), np.uint8)
@@ -124,13 +183,12 @@ def handler(event, context=None):
     if img is None:
         return {"statusCode": 400, "body": json.dumps({"error": "could not decode image"})}
     dets = detect(img)
-    lat, lon = event.get("lat"), event.get("lon")
-    for d in dets:                                   # attach geotag if provided
-        d["lat"], d["lon"] = lat, lon
+    gps_available = geotag(dets, img, event)         # honest per-detection geotag (or nulls)
     import platform as _pf
     body = {
         "detections": dets,
         "count": len(dets),
+        "gps_available": gps_available,              # False ⇒ coordinates are null, not invented
         "latency_ms": round((time.perf_counter() - t0) * 1000, 1),
         "arch": _pf.machine(),          # x86_64 vs aarch64 (Graviton) — for the COOL benchmark
     }
