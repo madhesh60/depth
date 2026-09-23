@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GhostGear Sonar — See · Prove · Decide · Act</title>
+  <meta name="description" content="Agentic marine-debris detection for side-scan sonar: prove every find with acoustic-shadow physics + a re-look, decide with a human-gated agent, act with a cleanup route." />
+  <link rel="preconnect" href="https://unpkg.com" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- ambient sonar sweep backdrop -->
+  <div class="bg-grid" aria-hidden="true"></div>
+
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">
+        <span class="ping"></span><span class="ping p2"></span>
+        <svg viewBox="0 0 24 24" width="22" height="22"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm0 3.5A6.5 6.5 0 0 1 18.5 12H12V5.5Z" fill="currentColor"/></svg>
+      </div>
+      <div class="brand-txt">
+        <h1>GhostGear&nbsp;Sonar</h1>
+        <p>See · Prove · Decide · Act — agentic ghost-gear detection</p>
+      </div>
+    </div>
+    <div class="status-pills" id="healthPills">
+      <span class="pill pill-muted" id="pillCv">OpenCV …</span>
+      <span class="pill pill-muted" id="pillModel">model …</span>
+      <span class="pill pill-live" id="pillLive"><span class="dot"></span>live</span>
+    </div>
+  </header>
+
+  <!-- See → Prove → Decide → Act stepper (the visual spine) -->
+  <nav class="stepper" id="stepper" aria-label="pipeline stages">
+    <div class="step" data-stage="see">
+      <div class="step-ico">👁</div>
+      <div class="step-body"><b>See</b><span>full-frame YOLO11 · cv2.dnn</span></div>
+    </div>
+    <div class="step-link"></div>
+    <div class="step" data-stage="prove">
+      <div class="step-ico">🔬</div>
+      <div class="step-body"><b>Prove</b><span>acoustic shadow + re-look</span></div>
+    </div>
+    <div class="step-link"></div>
+    <div class="step" data-stage="decide">
+      <div class="step-ico">⚖️</div>
+      <div class="step-body"><b>Decide</b><span>triage agent · human-gated</span></div>
+    </div>
+    <div class="step-link"></div>
+    <div class="step" data-stage="act">
+      <div class="step-ico">🧭</div>
+      <div class="step-body"><b>Act</b><span>cleanup route + reports</span></div>
+    </div>
+  </nav>
+
+  <div class="tabs" role="tablist">
+    <button class="tab is-active" data-tab="analyze" role="tab">Analyze a frame</button>
+    <button class="tab" data-tab="survey" role="tab">Run a survey</button>
+    <a class="tab tab-doc" href="#about">How it works</a>
+  </div>
+
+  <main class="wrap">
+    <!-- ============================ ANALYZE ============================ -->
+    <section class="panel-tab is-active" id="tab-analyze">
+      <div class="cols">
+        <!-- input rail -->
+        <aside class="rail">
+          <h2 class="rail-h">1 · Pick a sonar frame</h2>
+          <p class="rail-sub">One click — no sonar files needed. Or drop your own frame.</p>
+          <div class="sample-grid" id="sampleGrid"><div class="skeleton"></div><div class="skeleton"></div></div>
+
+          <label class="dropzone" id="dropzone">
+            <input type="file" id="fileInput" accept="image/*" hidden />
+            <span class="dz-ico">⇪</span>
+            <span>Drop a sonar frame or <u>browse</u></span>
+          </label>
+
+          <button class="btn btn-primary btn-block" id="analyzeBtn" disabled>Run See → Prove → Decide</button>
+          <p class="hint" id="analyzeHint">Choose a sample above to begin.</p>
+        </aside>
+
+        <!-- results -->
+        <div class="result" id="analyzeResult" hidden>
+          <div class="result-head">
+            <div class="verdict-counts" id="verdictCounts"></div>
+            <div class="latency" id="latency"></div>
+            <div class="seg" role="group" aria-label="image view">
+              <button class="seg-btn is-active" data-view="overlay">Agent verdicts</button>
+              <button class="seg-btn" data-view="frame">Raw sonar</button>
+            </div>
+          </div>
+
+          <figure class="stage-figure">
+            <img id="stageImg" alt="analysed sonar frame" />
+            <figcaption id="stageCap"></figcaption>
+          </figure>
+
+          <h3 class="evidence-h">Evidence cards <span class="muted">— every find is proven before it's trusted</span></h3>
+          <div class="evidence-grid" id="evidenceGrid"></div>
+        </div>
+
+        <div class="result placeholder" id="analyzePlaceholder">
+          <div class="ph-ring"></div>
+          <p>Pick a frame and run the loop.<br/>You'll see each detection <b>proven</b> with acoustic-shadow physics and a zoom-in re-look, then <b>triaged</b> by the agent — with the full tool-call trace.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================ SURVEY ============================ -->
+    <section class="panel-tab" id="tab-survey">
+      <div class="survey-controls">
+        <div>
+          <h2 class="rail-h">Run the full loop over a survey</h2>
+          <p class="rail-sub">Every sample frame → proven hazards → a human-approved cleanup route + downloadable reports.</p>
+        </div>
+        <div class="survey-actions">
+          <label class="gps-toggle">
+            <span>GPS</span>
+            <select id="gpsMode">
+              <option value="synthetic">Synthetic demo track</option>
+              <option value="none">None (honest no-GPS)</option>
+            </select>
+          </label>
+          <button class="btn btn-primary" id="surveyBtn">Run survey</button>
+        </div>
+      </div>
+
+      <div id="surveyResult" hidden>
+        <div class="mission-banner" id="missionBanner"></div>
+
+        <div class="survey-cols">
+          <div class="map-wrap">
+            <div id="map"></div>
+            <div class="map-note" id="mapNote"></div>
+          </div>
+          <div class="mission-side">
+            <h3 class="evidence-h">Downloads <span class="muted">— open on any GPS / GIS</span></h3>
+            <div class="dl-grid" id="dlGrid"></div>
+            <h3 class="evidence-h">Frames</h3>
+            <div class="thumb-strip" id="thumbStrip"></div>
+          </div>
+        </div>
+
+        <h3 class="evidence-h">Hazards <span class="muted" id="hazCount"></span></h3>
+        <div class="table-scroll">
+          <table class="haz-table">
+            <thead><tr>
+              <th>ID</th><th>Class</th><th>Verdict</th><th>Conf</th><th>Evidence</th>
+              <th>Height</th><th>Shadow</th><th>Lat, Lon</th><th>±err</th><th>Review</th>
+            </tr></thead>
+            <tbody id="hazBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="result placeholder" id="surveyPlaceholder">
+        <div class="ph-ring"></div>
+        <p>Run a survey to see the <b>Act</b> stage: hazards plotted on a map, a nearest-neighbour recovery route, and GeoJSON / GPX / KML / CSV exports — with a human-approval gate on every dispatch.</p>
+      </div>
+    </section>
+
+    <!-- ============================ ABOUT ============================ -->
+    <section class="about" id="about">
+      <h2>Why this is trustworthy, not just a detector</h2>
+      <div class="about-grid">
+        <div class="about-card"><b>See</b><p>YOLO11 runs full-frame through OpenCV 5 <code>cv2.dnn</code> (no torch at inference). The mission-critical <code>fishing_gear</code> class runs at a hot threshold to catch small crab-pots.</p></div>
+        <div class="about-card"><b>Prove</b><p>A real object on the seabed casts a dark <b>acoustic shadow</b> — like a person under a streetlight. We measure it and estimate object height. The stronger discriminator is a <b>re-look</b>: zoom in and re-detect — real objects persist, speckle doesn't.</p></div>
+        <div class="about-card"><b>Decide</b><p>A deterministic, <b>human-gated</b> agent calls tools in sequence and triages each find into CONFIRMED / REVIEW / REJECTED — recording every tool call. <b>Nothing is ever deleted</b>: REJECTED is kept for audit.</p></div>
+        <div class="about-card"><b>Act</b><p>Confirmed hazards become a nearest-neighbour recovery route and geotagged reports a boat crew can load. GPS is <b>honest</b>: no coordinates are invented when the file has none.</p></div>
+      </div>
+      <p class="about-foot">Design principle: <b>honesty first.</b> On this crab-pot sonar the shadow is only measurable on a minority of objects, so it is shown <i>where it exists</i> and never used as a silent gate — the re-look persistence is what earns a CONFIRMED (precision ≈0.79 vs ≈0.61 raw).</p>
+    </section>
+  </main>
+
+  <footer class="footer" id="footer">
+    <span id="footVer">OpenCV … · model …</span>
+    <span class="foot-sep">·</span>
+    <span>No candidate is ever deleted — REJECTED is retained for audit</span>
+    <span class="foot-sep">·</span>
+    <span>Human approval required before any dispatch</span>
+  </footer>
+
+  <!-- live agent trace overlay (fires during a run) -->
+  <div class="run-toast" id="runToast" hidden><span class="spin"></span><span id="runToastTxt">working…</span></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="app.js"></script>
+</body>
+</html>

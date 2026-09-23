@@ -37,7 +37,9 @@ from src.agentic.types import SurveyResult
 from . import samples as samples_mod
 
 REPO = Path(__file__).resolve().parents[2]
-WEBUI_DIST = REPO / "webui" / "dist"
+# Prefer a real build in webui/dist; fall back to the zero-build static app in webui/.
+_WEBUI = REPO / "webui"
+WEBUI_DIST = _WEBUI / "dist" if (_WEBUI / "dist").exists() else _WEBUI
 
 app = FastAPI(title="Marine Debris — See→Prove→Decide→Act", version="1.0.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -101,6 +103,25 @@ def health():
 @app.get("/api/samples")
 def samples():
     return {"samples": samples_mod.list_samples()}
+
+
+@app.get("/api/sample_thumb/{sample_id}")
+def sample_thumb(sample_id: str, size: int = 220):
+    """Downscaled JPEG of a sample frame — for the gallery cards (real sonar, not a placeholder)."""
+    p = samples_mod.sample_path(sample_id)
+    if not p or not p.exists():
+        raise HTTPException(404, f"sample not found: {sample_id}")
+    img = cv2.imread(str(p))
+    if img is None:
+        raise HTTPException(400, "could not read sample")
+    scale = size / max(1, max(img.shape[:2]))
+    if scale < 1:
+        img = cv2.resize(img, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA)
+    ok, buf = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, 80])
+    if not ok:
+        raise HTTPException(500, "encode failed")
+    return Response(buf.tobytes(), media_type="image/jpeg",
+                    headers={"Cache-Control": "public, max-age=3600"})
 
 
 @app.post("/api/analyze")

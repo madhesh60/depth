@@ -36,15 +36,17 @@ what moved, what's blocked, what's next. Newest entries at the top of §4.
 | Dataset audit | ✅ Done | Issues catalogued in `docs/dataset_report.md`. |
 | Project docs (this set) | ✅ Done | README / architecture / progress / experiments / TODO. |
 | Dataset fixes (v1) | ✅ Done | Clean split built: 0 leakage, full-frame boxes removed, 1,099 background negatives, 4-class taxonomy locked. `03_yolo_ready_dataset_v1/`. |
+| **Dataset v2 (honest, sonar-only)** | ✅ Done | `build_dataset_v2.py`: 2-class (`ghost_gear`+`wreck_debris`), fixes 3 WINNING_REPORT data bugs (mpulse full-frame mislabel dropped, 1,547 empty crab-pot frames recovered, optical dropped, UATD held out). train 6,291 / val 626 / test 469, leakage 0/0/0, official crab-pot 398-test LOCKED. **EXP-002 trains on this.** |
+| OpenCV 5 (rule 1) | ✅ Done | Env on **5.0.0.93** (was 4.12); requirements split + pinned exactly; 27/27 tests pass; `/api/health` reports it. |
 | Stage 1 classical CV | 🟡 In progress | **Reframed** (STUDY-01): not a Stage-2 ROI gate (no discriminative power on this sonar) — now the CPU **sonar-preprocessing workload** for the COOL benchmark. `src/cv_pipeline/` + 3-way harness. Local x86: 29 ms/frame, 30.5 FPS. Needs Graviton+COOL run. |
 | Stage 1→2 wiring (cv2.dnn) | ✅ Done | `infer.py` (ONNX via `cv2.dnn`, full_frame + roi_guided) + `ablation_fp.py` + `tune_coverage.py`. ONNX verified loading/forward. |
 | Stage 2 baseline train | ✅ Done | EXP-001 (yolo11s detect, v1, Kaggle T4): test mAP@0.5 **0.822**, P 0.808, R 0.800 — all targets met. |
 | Evaluation + ablation | 🟡 In progress | Baseline (EXP-001) + STUDY-01 (ROI-gating negative result) logged. Open: `fishing_gear` recall 0.37 (EXP-002/004). FP-reduction target **retired**. |
-| Reporting engine | ⬜ Not started | JSON/CSV/GeoJSON + geotagging. |
-| Dashboard | ⬜ Not started | FastAPI + map + transparency view. |
+| Reporting engine | ✅ Done | `src/agentic/{geo,mission}.py`: honest geotag + GeoJSON/GPX/KML/CSV/JSON exports. |
+| Dashboard | ✅ Done | Zero-build static web app (`webui/`), served by FastAPI. See→Prove→Decide→Act stepper, evidence cards (conf→relook), agent trace, Leaflet hazard map + recovery route, downloads, honesty banners. Verified under uvicorn. |
 | AWS deployment | ⬜ Not started | AWS CLI not yet installed. |
 | **COOL benchmark (Arm vs x86)** | ⬜ Not started | **Bonus-prize deliverable (Best Use of COOL).** |
-| Agentic loop (See→Prove→Decide→Act) | 🟡 In progress | **Primary Agentic-Vision entry.** Prove foundation done + calibrated (STUDY-03: raw prec 0.60→0.77 CONFIRMED tier). `src/agentic/`; 9/9 tests. Next: Decide agent → Act → dashboard. |
+| Agentic loop (See→Prove→Decide→Act) | 🟡 In progress | **Primary Agentic-Vision entry.** See+Prove+Decide+Act all built + calibrated (STUDY-03: raw prec 0.60→0.77 CONFIRMED tier) + live dashboard. `src/agentic/` + `webui/`; 27/27 tests. Next: adaptive controller + cross-pass corroboration (STUDY-04). |
 | Submission package (report + video) | ⬜ Not started | Due 2026-10-26. |
 
 Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
@@ -72,6 +74,68 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 ---
 
 ## 4. Session log
+
+### 2026-09-23 (cont.5) — Live dashboard: the See→Prove→Decide→Act loop becomes a judge-usable demo
+- **Built the web dashboard** (`webui/index.html` + `styles.css` + `app.js`) — the piece that had been
+  "Next" for four sessions and the make-or-break for the Agentic-Vision **user-experience** score and
+  the live demo link. Deliberately a **zero-build static app** (no npm/Vite toolchain to break on the
+  Graviton demo server that must stay live 27 Oct–9 Nov) served directly by FastAPI. Deep-ocean sonar
+  aesthetic; Leaflet via CDN with graceful degradation.
+- **What a judge sees:** a **See→Prove→Decide→Act stepper** that lights up as the loop runs; one-click
+  **sample frames** (real sonar thumbnails via a new `/api/sample_thumb/{id}` endpoint) + drag-drop
+  upload; an **Analyze** view with a verdict overlay/raw toggle, per-candidate **evidence cards**
+  (zoomed crop with the shadow overlay, a **detector-conf → re-look-conf arrow** that visualises "the
+  picture result changed the agent's next step", shadow quality + est. height + echo, evidence notes)
+  and an expandable **agent trace** (every tool call, timed); a **Survey** view with a Leaflet
+  **hazard map** (verdict-coloured markers + the nearest-neighbour recovery route), a **mission banner**
+  ("human approval required — nothing auto-dispatched"), one-click **downloads** (GeoJSON/GPX/KML/CSV/
+  JSON), frame thumbnails, and a **hazards table with per-row approve/reject** (human-in-the-loop).
+- **Honesty surfaced in the UI** (avoids the "misrepresents capabilities" rejection risk): OpenCV
+  version + model status in the footer/pills; a bright **"⚠ SYNTHETIC DEMO GPS — not real coordinates"**
+  banner on the map/exports; "no GPS → table only" when a file has none; "REJECTED retained for audit,
+  not deleted" in the footer.
+- **Backend:** added `/api/sample_thumb/{id}` (downscaled real-sonar gallery cards) and made `app.py`
+  serve the no-build `webui/` directly (prefers `webui/dist` if a real build ever lands).
+- **Verified** end-to-end through both the Starlette TestClient **and real uvicorn**: `/`, `/app.js`,
+  `/styles.css`, `/api/health`, `/api/samples`, `/api/sample_thumb`, `/api/analyze` (0.7 s/frame),
+  `/api/survey` (5 frames, 1.5 s), and all five `/api/report/{fmt}` downloads → 200. `node --check`
+  clean; all 27 JS id-references resolve in the HTML.
+- **Honest demo gap noted → motivates next session:** on the 5 bundled samples the loop currently
+  returns **0 CONFIRMED / 3 REVIEW** (re-look alone confirmed none), so the recovery route is empty.
+  Yet a conf-0.68 candidate with a **clear** acoustic shadow at a plausible crab-pot height (h~0.7 m)
+  is sitting in REVIEW — strong corroborated evidence the single-signal policy ignores. → **STUDY-04**.
+- **Next:** upgrade the Decide agent from a fixed 3-call sequence to an **adaptive controller** +
+  **cross-pass corroboration** + a **multi-signal CONFIRMED path** (recall-safe, must preserve the
+  STUDY-03 CONFIRMED precision), calibrated honestly on the test split (STUDY-04). Then AWS/COOL.
+
+### 2026-09-23 (cont.4) — WINNING_REPORT critical fixes: OpenCV 5 pinned; dataset v2 (honest, sonar-only)
+- **Acted on `docs/WINNING_REPORT.md`** (the full strategic audit). This session cleared the two
+  rule-/model-critical blockers it flagged, before spending any more Kaggle hours on the buggy v1.
+- **OpenCV 5 for real (rule 1).** Local env moved off OpenCV 4.12 → **5.0.0.93** (removed the stale
+  dual `opencv-python`/`-headless` 4.x install; `cv2.dnn` present; Intel IPP here, KleidiCV is the
+  Arm/COOL equivalent). Split & **pinned exactly**: `requirements.txt` (lean torch-free runtime:
+  opencv-python-headless 5.0.0.93 / numpy 2.2.6 [OpenCV 5 needs numpy≥2] / fastapi / uvicorn /
+  python-multipart / boto3), `requirements-train.txt` (Kaggle: ultralytics/torch/onnxruntime),
+  `requirements-dev.txt` (pytest). **Full suite 27/27 passes on OpenCV 5 + numpy 2.2.6.** The
+  dashboard `/api/health` footer now honestly reports `cv2 5.0.0`.
+- **Dataset v2 — `DATASET/scripts/build_dataset_v2.py` (2-class, sonar-only, honest).** Fixes the 3
+  data bugs: (1) Marine PULSE pipeline/platform — **all 1,243 mpulse images were full-frame-boxed**
+  in v0, so v1 dropped them to "background" (955 real objects taught as empty) → **DROPPED**
+  (unlocalised); only mpulse `seabed_surface` kept, as background. (2) **1,547 empty crab-pot frames
+  RECOVERED** from the raw archive as natural-seabed negatives (the cure for the 79% empty-seabed→
+  fishing-gear FP). (3) Optical (ICRA19/TrashCan) **dropped**; **UATD** (forward-looking, placed
+  objects) **excluded from train/val/test** and exported as a separate held-out generalisation eval
+  (`_holdout_uatd_fls/`, 3,927 imgs). Classes renamed to match reality: **`ghost_gear`** (side-scan
+  crab pots) + **`wreck_debris`** (KLSG barges + AI4Shipwrecks sonar).
+- **Built & audited v2:** train **6,291** (1,550 bg) · val 626 (104 bg) · test 469 (65 bg); boxes
+  ghost_gear **9,281** / wreck_debris 615; **leakage 0/0/0**, **0 full-frame boxes**; COCO→YOLO
+  conversion spot-checked exact. The **official crab-pot 398-frame test split is respected + LOCKED**
+  (`official_crabpot_test.txt`) → enables the head-to-head vs GhostVision. Honest residual:
+  `wreck_debris` is low-volume (val 20 / test 70 boxes) → high-variance per-class AP; report it, and
+  it's a secondary class (crab pots are the target).
+- **Next:** point EXP-002 at `03_yolo_ready_dataset_v2/data.yaml` (≈25–30 ep, patience 8 — v1 curve
+  peaked ~ep16); write `evaluate.py` (val-tuned thresholds, per-source tables, GhostVision head-to-head,
+  bootstrap CIs); add `docs/dataset_card.md`; then resume the React dashboard.
 
 ### 2026-09-23 (cont.3) — FastAPI backend: agentic loop exposed as an API
 - **Built the backend** (`src/dashboard/app.py`, `samples.py`): `/api/health` (honest OpenCV version
