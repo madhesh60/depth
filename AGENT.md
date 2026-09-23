@@ -8,7 +8,7 @@
 
 **PS**
 
-Background The accumulation of anthropogenic (man-made) debris in marine ecosystems poses a critical threat to global biodiversity. Among the most destructive types of pollution are â€˜ghost netsâ€™â€”abandoned, lost, or discarded fishing gear. These nets continuously trap and kill marine life,destroy coral reefs, and damage commercial vessel propellers.  
+Background The accumulation of anthropogenic (man-made) debris in marine ecosystems poses a critical threat to global biodiversity. Among the most destructive types of pollution are ‘ghost nets’—abandoned, lost, or discarded fishing gear. These nets continuously trap and kill marine life,destroy coral reefs, and damage commercial vessel propellers.  
   
 Because the ocean is vast and dark, marine conservationists and underwater technologists rely on Side Scan Sonar (SSS) instruments. These sensors are towed behind ships or mounted on Autonomous Underwater Vehicles (AUVs) to create detailed acoustic maps of the seafloor.However, manual inspection of thousands of kilometers of sonar logs is incredibly slow, tedious, and prone to human error. Debris can easily blend into natural geological features like rock formations, sand ripples, and marine ridges. Automating this process via computer vision is essential for efficient ocean cleanup operations.  
   

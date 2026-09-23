@@ -75,6 +75,34 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ## 4. Session log
 
+### 2026-09-23 (cont.7) — NEEDTOFIX/​WINNING_REPORT sweep: honesty + compliance across infra & docs
+- **Cleared the remaining `NEEDTOFIX.md` items that were code/docs (not AWS-run or GPU-train):**
+- **#4 fake geotag → honest** (`infra/lambda_handler.py`): stop stamping one lat/lon on every
+  object; `geotag()` now offsets each detection by its across-track ground range from the boat fix
+  (side + heading), mirroring `src/agentic/geo.py`; **no GPS → `gps_available=False` + null coords**.
+  Verified: 2 detections → 2 distinct coords; null coords without GPS.
+- **#5 Lambda "runs Stage-1" claim → corrected**: it's a detection-only endpoint (STUDY-01 retired
+  ROI-gating); the docstring no longer claims Stage-1, which is the *separate* COOL benchmark workload.
+- **#6/#7/#19 COOL proof** (`infra/benchmark_graviton.sh`): pinned `opencv-python-headless==5.0.0.93`
+  (was unpinned → silently 5.0.0); removed the false "install the COOL wheel" (COOL is an **AMI** —
+  use `/opt/cool` venv); now **proves COOL by provenance** (`cv2.__file__` under `/opt/cool` + version
+  + build info + AMI/instance via IMDSv2), **refusing to mislabel** a run as cool unless cv2 truly
+  loads from `/opt/cool`. "KleidiCV detected" demoted to informational (stock Arm bundles it). `bash -n` clean.
+- **#12/#25 README → judge-facing + honest**: removed "Why this wins" and "AWS CLI not installed";
+  fixed the false **"natural_formation = rock clusters"** claim (it's ICRA19 *optical fish/plants*);
+  reflect the built dashboard + agentic loop; added a live-demo quickstart, an honest per-class
+  results table (aggregate is domain-inflated), the STUDY-04 agent numbers, and a License section.
+- **#9 LICENSE**: added canonical **AGPL-3.0** (Ultralytics YOLO is AGPL; repo is public).
+- **#26 AGENT.md encoding**: fixed the UTF-8 mojibake (`â€˜ghost netsâ€™â€"` → `'ghost nets'—`, 3→0).
+- **#22 export_onnx.py**: created `src/detection/export_onnx.py` (the script `infer.py` tells users to
+  run) — exports `.pt`→ONNX and **verifies the `cv2.dnn` load + forward** (output `(1,8,8400)` on the
+  existing weights). `#28` docs: added `docs/{dataset_card,model_card,responsible_use}.md`.
+- **Left for the AWS/GPU phase (cannot do from here):** #10/#17 EXP-002 retrain on v2 (Kaggle GPU);
+  #12 val-tuned thresholds (needs a val sweep = `evaluate.py`); #8/#18 stand up the c8g COOL EC2.
+  These are *run/train/deploy* actions, not code defects — flagged in TODO.
+- **Full suite still 30/30.** Next: EXP-002 + `evaluate.py` (val-tuned thresholds, GhostVision
+  head-to-head, bootstrap CIs), then the Graviton+COOL deploy.
+
 ### 2026-09-23 (cont.6) — Decide becomes an adaptive controller; a 2nd calibrated CONFIRMED path (STUDY-04)
 - **Made the agent genuinely agentic, not a fixed script** — the substance the Agentic-Vision award
   weights most (orchestration & autonomy 25% + task success 20%). `_decide_candidate` is now an
