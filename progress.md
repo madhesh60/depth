@@ -73,6 +73,22 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ## 4. Session log
 
+### 2026-09-23 (cont.) — DECIDE agent: triage + tool-call trace (Agentic-Vision substance)
+- **Built the Decide stage** (`src/agentic/agent.py` + `tools.py`): `ReLookAgent.run_frame()` runs
+  See→Prove→Decide per frame and, for each candidate, calls tools in sequence
+  (`shadow_check` → `zoom_relook` → an **enhanced CLAHE re-look** when still uncertain) then triages
+  via `policy.py` into CONFIRMED / REVIEW / REJECTED. Every tool call is logged as an `AgentStep`, so
+  each decision carries a full audit trail; `render()` draws verdict-coloured overlays.
+- **Real trace captured** (the award evidence — a perception result changing the next step): a
+  conf-0.18 candidate did *not* re-fire on the first zoom, but the agent's CLAHE "try harder" re-look
+  re-fired at **0.54 → auto-CONFIRMED**; its weak acoustic shadow (contrast 0.36, h~0.2 m) shown as
+  supporting evidence. Nadir auto-calibrated to `bottom` on that starboard channel (orientation-robust).
+- **Refactor:** evidence fusion/notes extracted to module functions in `evidence.py` so the agent and
+  `EvidenceGatherer` share one source of truth. `perception.zoom_relook(enhance=)` added (CLAHE pass).
+- **Tests: 14/14 pass** (`tests/test_agent.py` added — trace shape, enhanced-relook upgrade, all 3
+  tiers, serialisation, render). Deterministic (perceptor stubbed).
+- **Next:** ACT (`mission.py` cleanup route + `geo.py` honest geotag + `pipeline.py` orchestrator) → FastAPI + dashboard.
+
 ### 2026-09-23 — Agentic loop begins: See→Prove→Decide foundation (Prove is multi-evidence, honest)
 - **Started the See→Prove→Decide→Act agentic layer** (`src/agentic/`) — the Agentic-Vision entry.
   This session delivered the **Prove foundation** + its honest calibration (STUDY-03).

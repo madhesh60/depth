@@ -57,9 +57,13 @@ class Perceptor:
         frame: np.ndarray,
         bbox: tuple[int, int, int, int],
         cls_name: str = "fishing_gear",
+        enhance: bool = False,
     ) -> RelookResult:
         """Crop a padded window around ``bbox``, upscale it, re-detect, and report the best
         same-class re-fire that lands on the original object centre.
+
+        ``enhance=True`` first runs CLAHE on the crop — the agent's "try harder" pass for an
+        otherwise uncertain candidate (local-contrast boost before the higher-resolution look).
         """
         x1, y1, x2, y2 = bbox
         bw, bh = x2 - x1, y2 - y1
@@ -70,6 +74,8 @@ class Perceptor:
         crop = frame[cy1:cy2, cx1:cx2]
         if crop.size == 0:
             return RelookResult(found=False, conf=0.0, gain=0.0, scale=1.0)
+        if enhance:
+            crop = self.enhance_contrast(crop)       # CLAHE → single-channel; detector re-colours
 
         long_side = max(1, max(crop.shape[:2]))
         scale = max(1.0, RELOOK_TARGET_PX / long_side)
