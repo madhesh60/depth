@@ -73,6 +73,16 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ## 4. Session log
 
+### 2026-09-23 (cont.3) — FastAPI backend: agentic loop exposed as an API
+- **Built the backend** (`src/dashboard/app.py`, `samples.py`): `/api/health` (honest OpenCV version
+  + model status for the footer), `/api/samples` (one-click demo frames), `/api/analyze` (sample or
+  upload → annotated frame + per-candidate evidence cards + full tool-call trace, base64), `/api/survey`
+  (many frames → hazards + mission plan + thumbnails), `/api/report/{fmt}` (geojson/gpx/kml/csv/json
+  download). Model loads lazily; serves `webui/dist` when built.
+- **Tests: 28/28 pass** (added `test_api.py` — health/samples/validation always; analyze+survey+report
+  path when model+samples present). Verified end-to-end via TestClient (analyze ~1.7s/frame).
+- **Next:** the React dashboard (DepthWizard-style See→Prove→Decide→Act stepper, evidence cards, map).
+
 ### 2026-09-23 (cont.2) — ACT: honest geotag + cleanup route + orchestrator (loop complete)
 - **Built the Act stage + orchestrator** (`src/agentic/geo.py`, `mission.py`, `pipeline.py`):
   `AgenticPipeline.run_survey()` runs See→Prove→Decide per frame, geotags candidates, promotes
