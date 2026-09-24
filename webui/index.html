@@ -29,6 +29,7 @@
       <button class="mode-btn is-active" data-mode="analyze" role="tab">Analyze</button>
       <button class="mode-btn" data-mode="survey" role="tab">Survey</button>
       <button class="mode-btn" data-mode="study" role="tab" title="timed user study: manual review vs DEPTH cards">Study</button>
+      <button class="mode-btn" data-mode="audit" role="tab" title="blinded audit: are the detector's false alarms really false?">Audit</button>
     </nav>
 
     <div class="status-pills" id="healthPills">
@@ -85,6 +86,17 @@
         </label>
         <button class="btn btn-primary btn-block" id="studyStartBtn">Start session</button>
         <p class="panel-note" style="margin-top:10px">Order and frame halves rotate between people (2×2 Latin square), so nobody sees a frame twice and learning effects cancel out.</p>
+      </section>
+
+      <section class="panel" data-when="audit">
+        <div class="panel-head"><span class="panel-title">False-alarm audit</span><span class="panel-meta" id="audMeta"></span></div>
+        <p class="panel-note">Are the detector's "false alarms" really false — or real objects nobody labelled? Judge each crop. It is <b>blind</b>: you never see the model's confidence, and some crops are <b>known labelled pots</b> (catch trials) that check the audit itself.</p>
+        <label class="field">Your name or initials <input type="text" id="audName" maxlength="40" placeholder="e.g. RK" /></label>
+        <button class="btn btn-primary btn-block" id="audStart">Start / resume audit</button>
+        <div class="aud-keys">
+          <span><kbd>1</kbd> real object</span><span><kbd>2</kbd> clutter / natural</span>
+          <span><kbd>3</kbd> noise / artefact</span><span><kbd>4</kbd> unsure</span><span><kbd>←</kbd> back</span>
+        </div>
       </section>
 
       <section class="panel">
@@ -172,6 +184,31 @@
         </div>
       </div>
 
+      <!-- audit -->
+      <div class="study-center" data-when="audit">
+        <div class="study-screen" id="audIntro">
+          <div class="st-card">
+            <h2>Is it really a false alarm?</h2>
+            <p>Each item is a spot the detector flagged on the calibration recordings. Most were <b>not</b> labelled as pots — but labellers miss things. For each crop decide what the bracketed return is:</p>
+            <ol><li><b>Real object</b> — a pot, trap or other man-made thing (bright return, often a thin dark shadow beyond it, away from the top edge).</li>
+              <li><b>Clutter / natural</b> — rock, weed, seabed texture.</li><li><b>Noise / artefact</b> — speckle, stripes, water column.</li><li><b>Unsure</b>.</li></ol>
+            <p class="muted">The result is the <b>audited precision</b> of the model: how many of its "false" alarms are real objects the labels missed. Enter your name on the left to start (you can stop and resume).</p>
+          </div>
+        </div>
+        <div class="study-screen" id="audTask" hidden>
+          <div class="st-bar"><span class="st-arm">Audit</span><span class="mono" id="audProg"></span><span class="tb-spacer"></span><button class="tb-btn" id="audBack">← back</button></div>
+          <div class="aud-view">
+            <figure><img id="audCrop" alt="audit crop" /><figcaption>the flagged return (bracketed)</figcaption></figure>
+            <figure><img id="audCtx" alt="wider context" /><figcaption>wider context</figcaption></figure>
+          </div>
+          <div class="st-answer aud-answer">
+            <button class="btn" data-tag="real">1 · real object</button><button class="btn" data-tag="clutter">2 · clutter / natural</button>
+            <button class="btn" data-tag="noise">3 · noise / artefact</button><button class="btn" data-tag="unsure">4 · unsure</button>
+          </div>
+        </div>
+        <div class="study-screen" id="audDone" hidden><div class="st-card"><h2>Audit complete — thank you</h2><p>Your tags are saved. The summary on the right updates as more people audit.</p></div></div>
+      </div>
+
       <!-- study -->
       <div class="study-center" data-when="study" id="studyCenter">
         <div class="study-screen" id="studyIntro">
@@ -211,6 +248,10 @@
 
     <!-- ---------------- RIGHT INSPECTOR ---------------- -->
     <aside class="rail inspector scrollable">
+      <section class="panel" data-when="audit">
+        <div class="panel-head"><span class="panel-title">Audit result</span><span class="panel-meta" id="audSumMeta"></span></div>
+        <div id="audSummary"><p class="empty-hint">No tags yet.</p></div>
+      </section>
       <section class="panel" data-when="study">
         <div class="panel-head"><span class="panel-title">Study results</span><span class="panel-meta" id="stSumMeta"></span></div>
         <div id="stSummary"><p class="empty-hint">No sessions yet — the first result replaces the assumed timings everywhere.</p></div>

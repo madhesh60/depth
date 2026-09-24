@@ -62,6 +62,7 @@ from .metrics import Metrics
 from src.agentic.feedback import FeedbackStore
 from src.agentic import study as study_mod
 from src.agentic import effort as effort_mod
+from src.detection import fp_audit
 
 log = logging.getLogger("depth.api")
 REPO = Path(__file__).resolve().parents[2]
@@ -392,6 +393,33 @@ def effort(sec_per_frame: Optional[float] = Query(None, gt=0, le=600),
     C = effort_mod.curves(E, **params)
     return {"curves": C, "provenance": prov, "frames": E["frames"], "pots": E["pots"],
             "frames_per_survey_hour": E["frames_per_survey_hour"], "split": E.get("split")}
+
+
+# ---- blinded false-alarm audit (src/detection/fp_audit.py) ------------------------------------
+def _audit_model() -> str:
+    return load_calibration().data.get("model", "EXP-001")
+
+
+@app.get("/api/audit/items")
+def audit_items(annotator: str = Query("", max_length=40)):
+    """Blind item list (ids + image paths only) + which ones this annotator already tagged."""
+    items = fp_audit.public_items(_audit_model())
+    done = fp_audit._latest_tags().get(annotator.strip() or "anon", {}) if annotator else {}
+    return {"items": items, "tagged": done, "tags": list(fp_audit.TAGS)}
+
+
+@app.post("/api/audit/tag")
+def audit_tag(body: dict = Body(...)):
+    try:
+        rec = fp_audit.add_tag(str(body.get("item", "")), str(body.get("tag", "")), str(body.get("annotator", "")))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return {"saved": rec}
+
+
+@app.get("/api/audit/summary")
+def audit_summary():
+    return fp_audit.summary(_audit_model())
 
 
 @app.get("/api/metrics")

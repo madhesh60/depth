@@ -75,6 +75,21 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ## 4. Session log
 
+### 2026-09-25 (review sweep 12) — Blinded false-alarm audit with catch trials (M-4, STUDY-10 set up)
+- **`src/detection/fp_audit.py`**: are EXP-001's "false alarms" really false? **Exact band, not a
+  sample** — every false alarm with conf ≥ 0.176 on the calibration recordings (60 of them; 66 true
+  pots in the band; raw precision 0.52) plus **15 catch trials** (known labelled pots), shuffled,
+  drawn identically (**blind**: no confidence, no label shown). Tags: real object · clutter · noise
+  · unsure. Summary: FP taxonomy (majority across auditors), share of real objects with a Wilson CI,
+  **audited precision** (exact once the band is fully tagged), catch accuracy per auditor (a result
+  only counts if the auditor recognised the known pots), Cohen's κ between auditors.
+- Crops ship in `webui/audit/` (CC-BY-SA); the answer key lives in `models/EXP-001/fp_audit_val.json`
+  — outside `webui/`, verified not served (404).
+- **Audit** tab: keyboard 1–4, back, resume; live result panel. API `/api/audit/items|tag|summary`.
+- QA note (not a result): many of the most confident "false alarms" look like bright returns with a
+  shadow tail — exactly the hypothesis the audit tests; the tagging is for humans, not the AI.
+- Tests +4 (`test_fp_audit.py`). Browser-verified; test tag deleted.
+
 ### 2026-09-25 (review sweep 11) — Physical second look: opposite-side re-survey + repeat-sighting merge (A-1, X-3)
 - **`src/agentic/resurvey.py` → `plan_resurvey`**: for every uncertain (REVIEW) target the agent
   plans the pass that can settle it — a straight line on the **opposite side** with the target at

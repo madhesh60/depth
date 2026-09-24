@@ -29,6 +29,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   Viewer.init();
   wireMissedTool();
   wireStudy();
+  wireAudit();
   await Promise.all([loadHealth(), loadSamples(), loadMetrics(), loadLabelStats()]);
 });
 
@@ -144,6 +145,7 @@ function wireModes() {
     $("#workspace").dataset.mode = b.dataset.mode;
     if (b.dataset.mode === "survey" && state.map) setTimeout(() => state.map.invalidateSize(), 80);
     if (b.dataset.mode === "study") { loadStudySummary(); }
+    if (b.dataset.mode === "audit") { loadAuditSummary(); }
   });
 }
 
@@ -1034,6 +1036,63 @@ async function loadEffort(fromSliders) {
   $("#effStats").innerHTML = `At the promise (≥ ${Math.round(R * 100)}%): manual <b>${mt.manual != null ? mt.manual.toFixed(1) : "—"} min</b>, DEPTH <b>${mt.depth != null ? mt.depth.toFixed(1) : "never"}</b>${mt.depth != null ? ` min (${C.cards_to_promise} cards)` : " — card accuracy too low for the promise"} · per survey-hour ${ph.manual ?? "—"} vs ${ph.depth ?? "—"} min.<br/>
     <b>Break-even: ${C.breakeven_sec_per_card ?? "—"} s per card</b> — faster card review than this and DEPTH wins.<br/>
     Forecast: the agent expected <b>${C.forecast_at_promise ?? "—"}</b> real pots at that point; <b>${C.actual_at_promise ?? "—"}</b> were real.`;
+}
+
+/* ------------------------------------------------------------------ AUDIT: blinded false-alarm review */
+const Aud = { items: [], i: 0, tags: {}, name: "" };
+function wireAudit() {
+  $("#audStart").onclick = audStart;
+  $("#audBack").onclick = () => { if (Aud.i > 0) { Aud.i--; audShow(); } };
+  $$(".aud-answer .btn").forEach(b => b.onclick = () => audTag(b.dataset.tag));
+  window.addEventListener("keydown", e => {
+    if ($("#workspace").dataset.mode !== "audit" || $("#audTask").hidden || (e.target.tagName || "").toLowerCase() === "input") return;
+    const k = { "1": "real", "2": "clutter", "3": "noise", "4": "unsure" }[e.key];
+    if (k) { audTag(k); e.preventDefault(); }
+    else if (e.key === "ArrowLeft" && Aud.i > 0) { Aud.i--; audShow(); e.preventDefault(); }
+  });
+}
+async function audStart() {
+  Aud.name = ($("#audName").value || "anon").trim();
+  const j = await fetch(`${API}/api/audit/items?annotator=${encodeURIComponent(Aud.name)}`).then(r => r.json());
+  Aud.items = j.items || []; Aud.tags = j.tagged || {};
+  if (!Aud.items.length) { toast("no audit set built (python -m src.detection.fp_audit build)"); setTimeout(toastHide, 2000); return; }
+  Aud.i = Math.max(0, Aud.items.findIndex(it => !Aud.tags[it.id]));
+  if (Aud.items.every(it => Aud.tags[it.id])) Aud.i = 0;
+  ["audIntro", "audDone"].forEach(x => $("#" + x).hidden = true); $("#audTask").hidden = false;
+  audShow();
+}
+function audShow() {
+  const it = Aud.items[Aud.i];
+  if (!it) { $("#audTask").hidden = true; $("#audDone").hidden = false; loadAuditSummary(); return; }
+  $("#audCrop").src = it.crop; $("#audCtx").src = it.context;
+  const n = Object.keys(Aud.tags).filter(k => Aud.items.some(x => x.id === k)).length;
+  $("#audProg").textContent = `item ${Aud.i + 1} / ${Aud.items.length} · ${n} tagged`;
+  $("#audMeta").textContent = `${Aud.name}`;
+  $$(".aud-answer .btn").forEach(b => b.classList.toggle("on", Aud.tags[it.id] === b.dataset.tag));
+}
+async function audTag(tag) {
+  const it = Aud.items[Aud.i]; if (!it) return;
+  const r = await fetch(`${API}/api/audit/tag`, { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ item: it.id, tag, annotator: Aud.name }) });
+  if (!r.ok) { toast("tag not saved"); setTimeout(toastHide, 1200); return; }
+  Aud.tags[it.id] = tag; Aud.i++; audShow();
+  if (Aud.i % 10 === 0) loadAuditSummary();
+}
+async function loadAuditSummary() {
+  let s; try { s = await fetch(`${API}/api/audit/summary`).then(r => r.json()); } catch { return; }
+  const box = $("#audSummary");
+  if (!s.built) { box.innerHTML = `<p class="empty-hint">No audit set built for this model.</p>`; return; }
+  const pct = x => x == null ? "—" : Math.round(x * 100) + "%";
+  $("#audSumMeta").textContent = `${(s.annotators || []).length} auditor${(s.annotators || []).length === 1 ? "" : "s"}`;
+  const tax = s.fp_taxonomy || {}, tot = Object.values(tax).reduce((a, b) => a + b, 0) || 1;
+  const bar = (k, lbl) => `<div class="aud-bar"><span>${lbl}</span><span class="track"><span class="fill" style="width:${100 * (tax[k] || 0) / tot}%"></span></span><span class="mono">${tax[k] || 0}</span></div>`;
+  const per = Object.entries(s.per_annotator || {}).map(([a, p]) => `${escapeHtml(a)}: ${p.tagged} tagged · catch ${p.catch_real}/${p.catch_tagged} real`).join("<br/>");
+  box.innerHTML = `<p class="panel-note">Band: every false alarm with confidence ≥ ${s.conf_cut} on the calibration recordings (${s.band_fp} false alarms, ${s.band_tp} true pots). Raw precision <b>${pct(s.band_precision_raw)}</b>.</p>
+    ${bar("real", "real object")}${bar("clutter", "clutter / natural")}${bar("noise", "noise / artefact")}${bar("unsure", "unsure")}
+    <p class="panel-note" style="margin-top:8px">${s.fp_tagged}/${s.band_fp} false alarms tagged · real objects ${pct(s.fp_real_share)}${s.fp_real_share_ci95 && s.fp_real_share_ci95[0] != null ? ` (95% CI ${pct(s.fp_real_share_ci95[0])}–${pct(s.fp_real_share_ci95[1])})` : ""}.<br/>
+    Audited precision: <b>${s.band_precision_audited != null ? pct(s.band_precision_audited) : "after every item is tagged"}</b>${s.kappa_first_two != null ? ` · agreement κ ${s.kappa_first_two}` : ""}.</p>
+    ${per ? `<p class="panel-note">${per}</p>` : ""}
+    <p class="panel-note">A result counts only if the auditor recognised the catch trials (known pots).</p>`;
 }
 
 /* ------------------------------------------------------------------ utils */

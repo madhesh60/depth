@@ -108,6 +108,14 @@ Promote each into the log below with full results as it runs.
 
 ## Experiment log
 
+### STUDY-10 — Label-noise audit: how many "false alarms" are unlabelled real objects? — SET UP
+
+- Tool: `python -m src.detection.fp_audit build` + the **Audit** tab (blind, catch trials).
+- Band: all 60 EXP-001 false alarms with conf ≥ 0.176 on v1 val (Rec19); 66 TPs in the band →
+  raw precision 0.52. 15 catch trials (known pots).
+- Output: audited precision (exact in the band), FP taxonomy, catch accuracy, κ.
+- Result: _pending — needs 2+ human auditors (~15 min each). Report it whatever it shows._
+
 ### STUDY-09 — Analyst effort: does DEPTH save review minutes? (curve + timed study)
 
 **Why.** Review X-2: the impact claim ("minutes per survey-hour") was never measured.
