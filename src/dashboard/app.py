@@ -29,6 +29,7 @@ Run:  uvicorn src.dashboard.app:app --host 0.0.0.0 --port 8000
 from __future__ import annotations
 
 import base64
+import hashlib
 import logging
 import os
 import threading
@@ -40,7 +41,7 @@ from typing import Callable, Optional
 
 import cv2
 import numpy as np
-from fastapi import FastAPI, File, UploadFile, Query, HTTPException
+from fastapi import Body, FastAPI, File, UploadFile, Query, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -57,6 +58,7 @@ from src.detection.infer import configure_runtime, DEFAULT_ONNX
 from . import samples as samples_mod
 from .jobs import JobStore, REPORT_FORMATS
 from .metrics import Metrics
+from src.agentic.feedback import FeedbackStore
 
 log = logging.getLogger("depth.api")
 REPO = Path(__file__).resolve().parents[2]
@@ -79,6 +81,9 @@ _SURVEYS: "OrderedDict[str, SurveyResult]" = OrderedDict()   # bounded LRU (repo
 _JOBS = JobStore(max_jobs=50, workers=1)
 _RUNTIME = configure_runtime()
 _METRICS = Metrics()
+_FEEDBACK = FeedbackStore()
+_UPLOADS: "OrderedDict[str, np.ndarray]" = OrderedDict()     # recent uploaded frames (feedback persists them)
+MAX_UPLOAD_CACHE = 64
 
 
 def get_pipeline() -> AgenticPipeline:
@@ -156,6 +161,19 @@ def _evidence_crop(frame: np.ndarray, cand, target: int = 300) -> str:
     return _b64(crop)
 
 
+def _cache_upload(data: bytes, img: np.ndarray) -> str:
+    """Keep a recently uploaded frame so a later correction can persist it as a training image."""
+    sha = hashlib.sha256(data).hexdigest()[:32]
+    _UPLOADS[sha] = img
+    _UPLOADS.move_to_end(sha)
+    while len(_UPLOADS) > MAX_UPLOAD_CACHE:
+        _UPLOADS.popitem(last=False)
+    return sha
+
+
+_UPLOAD_SHA: dict[str, str] = {}                # frame_id → sha for the most recent uploads
+
+
 def _decode_upload(f: UploadFile) -> tuple[str, np.ndarray]:
     """Validate type + size, then decode. Raises HTTPException with a clear message."""
     if (f.content_type or "").lower() not in _IMAGE_TYPES and not (f.content_type or "").startswith("image/"):
@@ -166,7 +184,18 @@ def _decode_upload(f: UploadFile) -> tuple[str, np.ndarray]:
     img = cv2.imdecode(np.frombuffer(data, np.uint8), cv2.IMREAD_COLOR)
     if img is None:
         raise HTTPException(400, f"{f.filename}: could not decode image")
-    return Path(f.filename or "upload").stem, img
+    stem = Path(f.filename or "upload").stem
+    _UPLOAD_SHA[stem] = _cache_upload(data, img)
+    return stem, img
+
+
+def _frame_ref(frame_id: str) -> dict:
+    """How a correction on this frame finds its image again: a shipped sample or a cached upload."""
+    sid = samples_mod.sample_for_frame(frame_id)
+    if sid:
+        return {"sample": sid}
+    sha = _UPLOAD_SHA.get(frame_id)
+    return {"upload": sha} if sha else {}
 
 
 def _frame_payload(frame: np.ndarray, result) -> dict:
@@ -239,6 +268,7 @@ def _run_survey(frames, gps: str, budget_minutes: Optional[float], nadir: Option
     for fr, fd in zip(result.frames, d["frames"]):          # light thumbnails, not full-res base64
         thumb = cv2.resize(render(frame_map[fr.frame_id], fr), (200, 200), interpolation=cv2.INTER_AREA)
         fd["thumb_png"] = _b64(thumb, 70)
+    d["frame_refs"] = {fid: _frame_ref(fid) for fid, _ in frames}
     reports = {fmt: export(fmt, result) for fmt in REPORT_FORMATS}
     _JOBS.persist(result.survey_id, {k: v for k, v in d.items() if k != "frames"}, reports)
     return d
@@ -260,6 +290,26 @@ def health():
         "samples": len(samples_mod.list_samples()), "calibration": summary, "jobs": _JOBS.counts(),
         "limits": {"max_upload_mb": MAX_UPLOAD_MB, "max_frames": MAX_FRAMES, "max_sync_frames": MAX_SYNC_FRAMES},
     }
+
+
+@app.post("/api/feedback")
+def feedback(rec: dict = Body(...)):
+    """One human decision (confirm / reject / missed) on a box → an append-only training label."""
+    ref = rec.get("frame_ref") or _frame_ref(str(rec.get("frame_id", "")))
+    rec["frame_ref"] = ref
+    img = _UPLOADS.get(ref.get("upload")) if ref.get("upload") else None
+    if ref.get("upload") and img is None and _FEEDBACK.image_path(ref) is None:
+        raise HTTPException(410, "that uploaded frame is no longer cached - re-run analyze, then label it")
+    try:
+        saved = _FEEDBACK.add(rec, img)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return {"saved": saved, "stats": _FEEDBACK.stats()}
+
+
+@app.get("/api/feedback/stats")
+def feedback_stats():
+    return {**_FEEDBACK.stats(), "agreement_with_gt": _FEEDBACK.agreement()}
 
 
 @app.get("/api/metrics")
@@ -318,6 +368,7 @@ def analyze(sample: Optional[str] = Query(None), nadir: Optional[str] = Query(No
     payload = _frame_payload(frame, result)
     payload["wall_ms"] = round((time.perf_counter() - t0) * 1000, 1)
     payload["guarantees"] = pipe.guarantees()
+    payload["frame_ref"] = {"sample": sample} if (sample and file is None) else _frame_ref(frame_id)
     _METRICS.record("analyze", frame_id, result.stage_ms, payload["wall_ms"], result.counts)
     return JSONResponse(payload)
 

@@ -81,3 +81,39 @@ def frame_id(sample_id: str) -> str | None:
     """The frame id the pipeline sees (drives the orientation source rule + chunk stitching)."""
     p = sample_path(sample_id)
     return p.stem if p else None
+
+
+def sample_for_frame(frame_id_: str) -> str | None:
+    """Sample id whose frame is ``frame_id_`` (survey results refer to frames by stem)."""
+    for s in _catalog():
+        if Path(s["path"]).stem == frame_id_:
+            return s["id"]
+    return None
+
+
+@lru_cache(maxsize=64)
+def _gt_cached(sample_id: str) -> tuple | None:
+    p = sample_path(sample_id)
+    if not p or not p.exists():
+        return None
+    lp = p.parent / "labels" / f"{p.stem}.txt"
+    if not lp.exists():
+        return None
+    import cv2
+    im = cv2.imread(str(p))
+    if im is None:
+        return None
+    H, W = im.shape[:2]
+    out = []
+    for line in lp.read_text().splitlines():
+        q = line.split()
+        if len(q) >= 5 and int(float(q[0])) == 0:              # class 0 = pot in every taxonomy we ship
+            cx, cy, bw, bh = map(float, q[1:5])
+            out.append((int((cx - bw / 2) * W), int((cy - bh / 2) * H), int((cx + bw / 2) * W), int((cy + bh / 2) * H)))
+    return tuple(out)
+
+
+def sample_gt(sample_id: str) -> list | None:
+    """Labelled pots of a sample in pixels (None when the sample has no label file)."""
+    g = _gt_cached(sample_id)
+    return None if g is None else list(g)

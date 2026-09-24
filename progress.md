@@ -75,6 +75,21 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ## 4. Session log
 
+### 2026-09-25 (review sweep 9) — Every human decision becomes a training label (A-2)
+- **`src/agentic/feedback.py`**: append-only `runs/feedback/decisions.jsonl` (confirm / reject /
+  **missed**), latest decision wins per object (same frame, IoU ≥ 0.7); uploaded frames persisted
+  only when labelled (sha256); `export` → a YOLO fine-tune set (positives = confirmed + missed) +
+  `hard_negatives.json` (explicit rejections), frames flagged `partial` (only reviewed objects are
+  labelled); `agreement()` scores reviewers against ground truth where it exists (the shipped
+  samples) — reviewer precision is the ceiling on what the human loop can deliver.
+- **API:** `POST /api/feedback`, `GET /api/feedback/stats`; analyze/survey payloads carry a
+  `frame_ref` (sample id or upload sha) so any label can find its image again.
+- **UI:** "✓ real pot / ✕ not a pot" on every evidence card; survey hazard-table ✓/✕ now save real
+  labels; **"＋ missed pot" (M)** — drag a box around a pot the detector never proposed → positive
+  label (fixes *recall*, which is EXP-001's binding limit); live "human labels" counter.
+- `python -m src.agentic.feedback stats | export --out DATASET/feedback_v1`. Tests +4
+  (`test_feedback.py`). Browser-verified (card label, missed-pot box, counter); test labels deleted.
+
 ### 2026-09-25 (review sweep 8) — EXP-002 kit: train on Kaggle, plug in with ONE command
 Review I-3 / C-5 (the recall ceiling is the binding constraint).
 - **Three silent failures found and fixed before they cost a GPU run:** v2b `data.yaml` was cp1252

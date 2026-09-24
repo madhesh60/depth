@@ -27,7 +27,8 @@ window.addEventListener("DOMContentLoaded", async () => {
   wireInputs();
   wireKeyboard();
   Viewer.init();
-  await Promise.all([loadHealth(), loadSamples(), loadMetrics()]);
+  wireMissedTool();
+  await Promise.all([loadHealth(), loadSamples(), loadMetrics(), loadLabelStats()]);
 });
 
 async function loadHealth() {
@@ -178,6 +179,8 @@ function wireKeyboard() {
     else if (e.key === "ArrowRight") { cycleCandidate(1); e.preventDefault(); }
     else if (e.key === "ArrowLeft") { cycleCandidate(-1); e.preventDefault(); }
     else if (e.key.toLowerCase() === "g" && state._cursor >= 0) { gazeTo(state._cursor); e.preventDefault(); }
+    else if (e.key.toLowerCase() === "m") { toggleMissed(); e.preventDefault(); }
+    else if (e.key === "Escape" && state._drawMissed) { toggleMissed(false); e.preventDefault(); }
   });
 }
 
@@ -309,7 +312,11 @@ const Viewer = (() => {
     cv.addEventListener("dblclick", () => { cancelTour(); fit(); });
     window.addEventListener("resize", () => { if (natW) fit(); });
   }
-  return { init, render, fit, zoomBy, focusBox, drawProof, highlight, pulse };
+  function toImage(clientX, clientY) {
+    const r = canvas().getBoundingClientRect();
+    return [Math.max(0, Math.min(natW, (clientX - r.left - tx) / scale)), Math.max(0, Math.min(natH, (clientY - r.top - ty) / scale))];
+  }
+  return { init, render, fit, zoomBy, focusBox, drawProof, highlight, pulse, toImage };
 })();
 
 /* ------------------------------------------------------------------ pipeline dock: stepper + live agent log */
@@ -589,8 +596,23 @@ function evidenceCard(c, id) {
         <div class="fact"><span class="k">P(pot)</span><span class="v">${ev.p_pot != null ? Math.round(ev.p_pot * 100) + "%" : "—"}</span></div>
       </div>
       <ul class="ev-notes">${(ev.notes || []).map(n => `<li>${escapeHtml(n)}</li>`).join("")}</ul>
+      <div class="ev-label"><span class="lbl-k">your label</span>
+        <button class="ok" title="a real pot — saved as a training label">✓ real pot</button>
+        <button class="no" title="not a pot — saved as a hard negative">✕ not a pot</button></div>
       ${traceBlock(c.trace || [])}
     </div>`;
+  card.querySelectorAll(".ev-label button").forEach(b => b.addEventListener("click", async e => {
+    e.stopPropagation();
+    const ok = b.classList.contains("ok");
+    const res = await sendLabel({ bbox: c.bbox, cls_name: c.cls_name, decision: ok ? "confirm" : "reject",
+      verdict_before: c.verdict, conf: c.conf, p_pot: ev.p_pot, source: "analyze" });
+    if (res) {
+      card.querySelectorAll(".ev-label button").forEach(x => x.classList.toggle("on", x === b));
+      let sv = card.querySelector(".ev-label .saved");
+      if (!sv) { sv = document.createElement("span"); sv.className = "saved"; card.querySelector(".ev-label").appendChild(sv); }
+      sv.textContent = "saved ✓";
+    }
+  }));
   card.addEventListener("mouseenter", () => Viewer.highlight(id, true));
   card.addEventListener("mouseleave", () => Viewer.highlight(id, false));
   card.querySelector(".ev-crop").addEventListener("click", () => selectCandidate(id));
@@ -744,7 +766,7 @@ function renderHazards(d) {
   $("#hazCount").textContent = `${rows.length} hazards · REVIEW ordered by P(pot) · LOW-RISK kept for audit`;
   const body = $("#hazBody"); body.innerHTML = "";
   rows.forEach(t => {
-    const tr = document.createElement("tr");
+    const tr = document.createElement("tr"); tr.dataset.oid = t.oid;
     const coords = t.lat != null ? `${t.lat.toFixed(5)}, ${t.lon.toFixed(5)}` : `<span class="muted">no GPS</span>`;
     tr.innerHTML = `<td>${t.oid}</td><td>${t.cls_name}</td>
       <td><span class="v-tag" style="color:${VCOLOR[t.verdict]};background:${VCOLOR[t.verdict]}22">${VLABEL[t.verdict] || t.verdict}</span></td>
@@ -753,14 +775,78 @@ function renderHazards(d) {
       <td>${coords}</td><td>${t.geo_error_m != null ? "±" + t.geo_error_m + " m" : "—"}</td><td>${reviewCell(t)}</td>`;
     body.appendChild(tr);
   });
-  $$("#hazBody .rev-btns button").forEach(b => b.onclick = e => {
-    const tr = e.target.closest("tr"); tr.classList.add("rev-done");
-    e.target.closest("td").innerHTML = `<span class="muted">${b.classList.contains("ok") ? "✓ approved" : "✕ rejected"}</span>`;
+  $$("#hazBody .rev-btns button").forEach(b => b.onclick = async e => {
+    const tr = e.target.closest("tr"), t = rows.find(x => x.oid === tr.dataset.oid);
+    const ok = b.classList.contains("ok");
+    const res = t && await sendLabel({ bbox: t.bbox, cls_name: t.cls_name, decision: ok ? "confirm" : "reject",
+      verdict_before: t.verdict, conf: t.conf, p_pot: t.p_pot, source: "survey",
+      frame_id: t.frame_id, frame_ref: (d.frame_refs || {})[t.frame_id] });
+    tr.classList.add("rev-done");
+    e.target.closest("td").innerHTML = `<span class="muted">${ok ? "✓ approved" : "✕ rejected"}${res ? " · label saved" : ""}</span>`;
   });
 }
 function reviewCell(t) {
   if (t.verdict !== "review") return `<span class="muted">—</span>`;
   return `<span class="rev-btns"><button class="ok" title="approve for recovery">✓</button><button class="no" title="dismiss">✕</button></span>`;
+}
+
+/* ------------------------------------------------------------------ human labels (every decision is a training label) */
+async function sendLabel(rec) {
+  const a = state._analyze || {};
+  const body = Object.assign({ frame_id: a.frame_id, frame_ref: a.frame_ref }, rec);
+  try {
+    const r = await fetch(`${API}/api/feedback`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    if (!r.ok) { toast(`label not saved (${r.status})`); setTimeout(toastHide, 1600); return null; }
+    const j = await r.json(); showLabelStats(j.stats); return j;
+  } catch { return null; }
+}
+function showLabelStats(st) {
+  const el = $("#regLabels"); if (!el || !st) return;
+  el.textContent = `${st.objects} · ✓${st.confirm} ✕${st.reject} ＋${st.missed} · ${st.frames} frames`;
+}
+async function loadLabelStats() { try { showLabelStats(await fetch(`${API}/api/feedback/stats`).then(r => r.json())); } catch { } }
+
+/* "＋ missed pot": draw a box the detector never proposed → a positive label (fixes recall, not just precision) */
+function toggleMissed(on) {
+  state._drawMissed = on ?? !state._drawMissed;
+  $("#missedBtn").classList.toggle("is-on", state._drawMissed);
+  $("#viewer").classList.toggle("draw-missed", state._drawMissed);
+  if (state._drawMissed) { cancelTour(); toast("drag a box around the missed pot"); setTimeout(toastHide, 1400); }
+}
+function wireMissedTool() {
+  const btn = $("#missedBtn"); if (!btn) return;
+  btn.onclick = () => { if (state._ready) toggleMissed(); };
+  const cv = $("#viewerCanvas");
+  let start = null, rect = null;
+  cv.addEventListener("pointerdown", e => {
+    if (!state._drawMissed || e.button !== 0) return;
+    e.stopImmediatePropagation(); e.preventDefault();
+    start = Viewer.toImage(e.clientX, e.clientY);
+    rect = document.createElementNS(SVGNS, "g"); rect.setAttribute("class", "bx-missed");
+    rect.innerHTML = `<rect x="${start[0]}" y="${start[1]}" width="1" height="1"/>`;
+    $("#boxLayer").appendChild(rect); cv.setPointerCapture(e.pointerId);
+  }, true);
+  cv.addEventListener("pointermove", e => {
+    if (!start || !rect) return;
+    const p = Viewer.toImage(e.clientX, e.clientY), r = rect.firstChild;
+    r.setAttribute("x", Math.min(start[0], p[0])); r.setAttribute("y", Math.min(start[1], p[1]));
+    r.setAttribute("width", Math.abs(p[0] - start[0])); r.setAttribute("height", Math.abs(p[1] - start[1]));
+  }, true);
+  cv.addEventListener("pointerup", async e => {
+    if (!start || !rect) return;
+    const p = Viewer.toImage(e.clientX, e.clientY);
+    const bbox = [Math.min(start[0], p[0]), Math.min(start[1], p[1]), Math.max(start[0], p[0]), Math.max(start[1], p[1])].map(Math.round);
+    const g = rect; start = null; rect = null;
+    if (bbox[2] - bbox[0] < 3 || bbox[3] - bbox[1] < 3) { g.remove(); return; }
+    const cal = state.calibration || {};
+    const res = await sendLabel({ bbox, cls_name: cal.guaranteed_class || "", decision: "missed", verdict_before: null, source: "analyze" });
+    if (res) {
+      const t = document.createElementNS(SVGNS, "text"); t.setAttribute("x", bbox[0] + 2); t.setAttribute("y", bbox[1] - 3);
+      t.textContent = "missed pot · label saved"; g.appendChild(t);
+      Log.push([{ tool: "human_label", msg: `missed pot marked at [${bbox.join(", ")}] → positive training label`, t: "" }]);
+    } else g.remove();
+    toggleMissed(false);
+  }, true);
 }
 
 /* ------------------------------------------------------------------ utils */

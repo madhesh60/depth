@@ -90,6 +90,7 @@
           <div class="reg-row"><span class="reg-k">runtime</span><span class="reg-v" id="regModel">…</span></div>
           <div class="reg-row"><span class="reg-k">host</span><span class="reg-v" id="regHost">…</span></div>
           <div class="reg-row"><span class="reg-k">p50 · this server</span><span class="reg-v" id="regLat">run a frame</span></div>
+          <div class="reg-row" title="every approve / reject / missed-pot mark is saved as a training label (python -m src.agentic.feedback export)"><span class="reg-k">human labels</span><span class="reg-v" id="regLabels">0</span></div>
         </div>
       </section>
     </aside>
@@ -104,6 +105,7 @@
         </div>
         <div class="class-legend" id="classLegend" title="show / cut a detected class"></div>
         <div class="tb-spacer"></div>
+        <button class="tb-btn" id="missedBtn" title="draw a box around a pot the detector missed — it becomes a training label (M)">＋ missed pot</button>
         <div class="latency mono" id="latency"></div>
       </div>
 
