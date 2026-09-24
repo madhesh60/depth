@@ -35,7 +35,7 @@ from typing import Callable, Optional
 import cv2
 import numpy as np
 
-from src.cv_pipeline.orientation import resolve_orientation
+from src.cv_pipeline.canonical import Canonicaliser, CanonicalFrame
 from src.detection.calibration import load_calibration
 from src.detection.infer import Detection
 from .perception import Perceptor
@@ -78,6 +78,8 @@ class ReLookAgent:
         self.shadow = shadow_prover or ShadowProver()
         self.tools = Toolbox(self.perceptor, self.shadow)
         self.cfg = cfg if cfg is not None else AgentConfig.from_calibration()
+        self.stage1 = Canonicaliser()                       # Stage 1: measured sonar geometry
+        self.detector_input = load_calibration().detector_input
 
     @property
     def mode(self) -> str:
@@ -87,37 +89,51 @@ class ReLookAgent:
                   nadir: str | None = None,
                   progress_cb: Optional[Callable[[str, dict], None]] = None) -> FrameResult:
         """``nadir`` is an explicit override; otherwise orientation comes from the source rule in
-        ``src.cv_pipeline.orientation`` (or the prover's configured default) — never guessed."""
+        ``src.cv_pipeline.orientation`` (or the prover's configured default) - never guessed.
+
+        Stage 1 (``src.cv_pipeline.canonical``) runs first: palette -> luminance, orientation,
+        bottom tracking (sonar altitude in px), and the detector input ``calibration.json`` selects."""
         H, W = frame.shape[:2]
-        gray = frame if frame.ndim == 2 else cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        orient = resolve_orientation(frame_id, override=nadir or self.shadow.cfg.nadir, gray=gray)
+        t0 = time.perf_counter()
+        cf = self.stage1.process(frame, frame_id=frame_id, nadir=nadir or self.shadow.cfg.nadir)
+        det_in = self.stage1.detector_input(frame, cf, self.detector_input)
+        stage1_ms = (time.perf_counter() - t0) * 1000
+        orient, gray = cf.orientation, cf.gray
+        if progress_cb:
+            progress_cb("stage1", {"altitude_px": cf.altitude_px, "nadir": orient.label})
 
         t0 = time.perf_counter()
-        dets, _see = self.tools.detect(frame)
+        dets, _see = self.tools.detect(det_in)
         see_ms = (time.perf_counter() - t0) * 1000
         if progress_cb:
             progress_cb("see", {"candidates": len(dets), "nadir": orient.label})
 
         t0 = time.perf_counter()
         if self.cfg.tiers is not None:
-            candidates, n_inf = self._decide_calibrated(frame, gray, dets, orient.nadir)
+            candidates, n_inf = self._decide_calibrated(det_in, gray, dets, cf)
         else:
-            candidates = [self._decide_legacy(frame, gray, d, orient.nadir) for d in dets]
+            candidates = [self._decide_legacy(det_in, gray, d, cf) for d in dets]
             n_inf = 1 + sum(sum(s.tool in ("zoom_relook", "enhance_relook") for s in c.trace)
                             for c in candidates)
+        for c in candidates:                                     # Stage-1 geometry for Act (geotag)
+            _attach_geometry(c, cf)
         prove_decide_ms = (time.perf_counter() - t0) * 1000
         if progress_cb:
             progress_cb("decide", {"counts": _counts(candidates)})
 
+        s1 = cf.to_dict()
+        s1["detector_input"] = self.detector_input
         return FrameResult(
             frame_id=frame_id, width=W, height=H, candidates=candidates,
-            stage_ms={"see": see_ms, "prove_decide": prove_decide_ms, "inferences": float(n_inf)},
-            nadir=orient.label, orientation=orient.to_dict(),
+            stage_ms={"stage1": stage1_ms, "see": see_ms, "prove_decide": prove_decide_ms,
+                      "inferences": float(n_inf)},
+            nadir=orient.label, orientation=orient.to_dict(), stage1=s1,
         )
 
     # ======================================================================= calibrated mode
-    def _decide_calibrated(self, frame, gray, dets: list[Detection], nadir: Optional[str]):
+    def _decide_calibrated(self, frame, gray, dets: list[Detection], cf: CanonicalFrame):
         tiers = self.cfg.tiers
+        nadir = cf.orientation.nadir
         traces: list[list[AgentStep]] = [[] for _ in dets]
         relooks: list[Optional[RelookResult]] = [None] * len(dets)
         scores = [d.conf for d in dets]
@@ -152,8 +168,12 @@ class ReLookAgent:
             rl = relooks[i] or RelookResult(found=False, conf=0.0, gain=0.0, scale=1.0)
             if relooks[i] is not None:
                 rl.gain = round(rl.conf - det.conf, 4)
-            # physical evidence for the card (cheap, no inference): shadow + relative height
-            proof, s = self.tools.shadow_check(gray, det.bbox, nadir)
+            # physical evidence for the card (cheap, no inference): Stage-1 water column, shadow +
+            # relative height against the TRACKED altitude
+            wc, s = self.tools.water_column_check(cf, det.bbox)
+            if s is not None:
+                trace.append(s)
+            proof, s = self.tools.shadow_check(gray, det.bbox, nadir, altitude_px=_altitude_for(cf, det.bbox))
             trace.append(s)
             if proof.has_shadow and proof.orientation_known:
                 _, s = self.tools.estimate_height(proof)
@@ -161,6 +181,9 @@ class ReLookAgent:
 
             verdict, why, p = self._tier(det, scores[i], relooks[i] is not None)
             notes = evidence_notes(det.conf, det.cls_name, rl, proof)
+            if wc:
+                notes.append("sits in the water column above the tracked seabed (fish / bubbles / surface "
+                             "return?) - not on the seabed; a human should check it")
             if relooks[i] is None and det.cls_name == tiers.guaranteed_class:
                 notes[0] = "re-look: not needed - it could not change this tier (value of information 0)"
             evidence = Evidence(relook=rl, shadow=proof, echo_ratio=proof.echo_ratio,
@@ -213,9 +236,10 @@ class ReLookAgent:
         return v, why, p
 
     # ======================================================================= legacy mode
-    def _decide_legacy(self, frame, gray, det: Detection, nadir: Optional[str]) -> Candidate:
+    def _decide_legacy(self, frame, gray, det: Detection, cf: CanonicalFrame) -> Candidate:
         """The old adaptive ladder with the test-tuned thresholds (fallback + unit tests)."""
         cfg = self.cfg
+        nadir = cf.orientation.nadir
         tri = cfg.triage
         trace: list[AgentStep] = []
 
@@ -223,7 +247,7 @@ class ReLookAgent:
         trace.append(s)
         confident = relook.conf >= tri.confirm_relook or det.conf >= tri.confirm_conf
 
-        proof, s = self.tools.shadow_check(gray, det.bbox, nadir)
+        proof, s = self.tools.shadow_check(gray, det.bbox, nadir, altitude_px=_altitude_for(cf, det.bbox))
         trace.append(s)
         if proof.has_shadow and proof.orientation_known:
             _, s = self.tools.estimate_height(proof)
@@ -271,6 +295,27 @@ class ReLookAgent:
         return (f"uncertain (conf {conf:.2f}, re-look {relook.conf:.2f})"
                 + (" even after an enhanced pass" if escalated else "")
                 + " -> routed to human review")
+
+
+def _altitude_for(cf: CanonicalFrame, bbox) -> Optional[float]:
+    """Tracked sonar altitude (px) at the ping under the box centre; None if not measured."""
+    if not cf.measured:
+        return None
+    c = cf.to_canonical(0.5 * (bbox[0] + bbox[2]), 0.5 * (bbox[1] + bbox[3]))
+    return cf.altitude_at(c[0]) if c else cf.altitude_px
+
+
+def _attach_geometry(c: Candidate, cf: CanonicalFrame) -> None:
+    """Ping index + across-track GROUND range of the object centre + water-column flag - what the
+    Act stage geotags from. Nothing is attached when the orientation is unknown."""
+    x1, y1, x2, y2 = c.bbox
+    cc = cf.to_canonical(0.5 * (x1 + x2), 0.5 * (y1 + y2))
+    if cc is None:
+        return
+    c.ping_px = float(cc[0])
+    c.n_pings = cf.width if cf.orientation.nadir in ("top", "bottom") else cf.height
+    c.ground_range_px = cf.ground_range_px(0.5 * (x1 + x2), 0.5 * (y1 + y2))
+    c.in_water_column = cf.in_water_column(c.bbox)
 
 
 def _counts(cands: list[Candidate]) -> dict:

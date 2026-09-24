@@ -1,4 +1,15 @@
-# Stage 1 — Classical OpenCV pipeline (the COOL CPU workload)
+# Stage 1 — Classical OpenCV (the COOL CPU workload)
+
+> **Current role (2026-09-24, `experiments.md` STUDY-08).** Stage 1 in the product path is
+> **`canonical.py` — sonar canonicalisation**: palette → luminance, orientation by source rule,
+> **bottom tracking** (sonar altitude in px per ping; validated port-vs-starboard to a median
+> 1.6 px on un-augmented frames), slant → ground range (`cv2.remap`), range-gain normalisation and
+> a water-column mask (~5 ms/frame). Its outputs feed the shadow's relative height, the geotag's
+> ground range + per-ping position, and a traced `water_column_check`. The detector keeps `raw`
+> input (range gain measured: no gain for EXP-001). Report: `docs/stage1_canonical.md`
+> (`python -m src.cv_pipeline.study_canonical`). The contour pipeline below (`pipeline.py`) is kept
+> as the documented STUDY-01 negative result and a benchmark op-mix.
+
 
 CPU-only classical CV over a side-scan sonar frame (denoise → resize → adaptive threshold →
 morphology → contours → geometry). This is the **workload we run on AWS Graviton via COOL**

@@ -132,6 +132,12 @@ class Candidate:
     # chunk-boundary stitching (survey-level): the same object split across two adjacent chunks
     continues_in: Optional[str] = None   # frame id where this object continues (kept as primary)
     continuation_of: Optional[str] = None  # frame id of the primary sighting (this one is merged)
+    # Stage-1 geometry (canonical view: nadir at top): which ping the object is on, its across-track
+    # GROUND range (slant corrected with the tracked altitude) and whether it floats in the water column
+    ping_px: Optional[float] = None
+    n_pings: Optional[int] = None
+    ground_range_px: Optional[float] = None
+    in_water_column: Optional[bool] = None
 
     @property
     def center(self) -> tuple[float, float]:
@@ -152,6 +158,8 @@ class Candidate:
             "geo_error_m": self.geo_error_m,
             "continues_in": self.continues_in,
             "continuation_of": self.continuation_of,
+            "ground_range_px": None if self.ground_range_px is None else round(self.ground_range_px, 1),
+            "in_water_column": self.in_water_column,
         }
 
 
@@ -165,6 +173,7 @@ class FrameResult:
     stage_ms: dict[str, float] = field(default_factory=dict)   # see/prove/decide latency
     nadir: str = "unknown"                                     # resolved nadir edge (or "unknown")
     orientation: dict = field(default_factory=dict)            # {nadir, rule, source} provenance
+    stage1: dict = field(default_factory=dict)                 # Stage-1 canonicalisation record
 
     def by_verdict(self, v: Verdict) -> list[Candidate]:
         return [c for c in self.candidates if c.verdict is v]
@@ -180,6 +189,7 @@ class FrameResult:
             "height": self.height,
             "nadir": self.nadir,
             "orientation": dict(self.orientation),
+            "stage1": dict(self.stage1),
             "counts": self.counts,
             "stage_ms": {k: round(v, 2) for k, v in self.stage_ms.items()},
             "candidates": [c.to_dict() for c in self.candidates],

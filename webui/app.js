@@ -36,13 +36,16 @@ async function loadHealth() {
     const cv = $("#pillCv"), md = $("#pillModel");
     cv.textContent = `OpenCV ${h.opencv}`;
     cv.className = "pill " + (String(h.opencv).startsWith("5") ? "pill-ok" : "pill");
-    md.textContent = h.model_loaded ? "model ready" : "model lazy";
-    md.className = "pill " + (h.model_loaded ? "pill-ok" : "pill");
+    md.textContent = h.model_loaded ? "model ready" : h.model_error ? "model error" : "model warming up…";
+    md.className = "pill " + (h.model_loaded ? "pill-ok" : h.model_error ? "pill-bad" : "pill");
+    md.title = h.model_error || (h.warmup_ms != null ? `warm-up ${h.warmup_ms} ms` : "");
+    if (h.is_cool_path) { cv.textContent += " · COOL"; cv.title = h.cv2_file; }
     const rc = $("#regCv"), rm = $("#regModel");
-    if (rc) rc.textContent = h.opencv;
+    if (rc) rc.textContent = h.opencv + (h.is_cool_path ? " (COOL /opt/cool)" : "");
     if (rm) rm.textContent = h.model_loaded ? "loaded + warm" : "loading…";
     state.calibration = h.calibration || null;
     renderGuarantees(h.calibration);
+    if (!h.model_loaded && !h.model_error) setTimeout(loadHealth, 1500);   // re-poll until warm
   } catch (e) {
     $("#pillCv").textContent = "backend offline";
     $("#pillCv").className = "pill pill-bad";
@@ -213,13 +216,24 @@ const Viewer = (() => {
     s.setAttribute("viewBox", `0 0 ${natW} ${natH}`);
     s.style.width = natW + "px"; s.style.height = natH + "px";
     stage().style.width = natW + "px"; stage().style.height = natH + "px";
-    drawBoxes(boxes);
+    drawBoxes(boxes, (d.stage1 || {}).bottom_line_native, (d.stage1 || {}).altitude_px);
     im.onload = () => fit();
     im.src = d.frame_png;
     if (im.complete && im.naturalWidth) fit();
   }
-  function drawBoxes(boxes) {
+  function drawBoxes(boxes, seabed, alt) {
     const s = svg(); s.innerHTML = "";
+    if (Array.isArray(seabed) && seabed.length > 1) {         // Stage 1: tracked first seabed return
+      const g = document.createElementNS(SVGNS, "g"); g.setAttribute("class", "seabed");
+      const pl = document.createElementNS(SVGNS, "polyline");
+      pl.setAttribute("points", seabed.map(p => p.join(",")).join(" "));
+      g.appendChild(pl);
+      const [lx, ly] = seabed[Math.min(seabed.length - 1, 2)];
+      const t = document.createElementNS(SVGNS, "text");
+      t.setAttribute("x", lx + 4); t.setAttribute("y", ly - 4); t.setAttribute("class", "seabed-label");
+      t.textContent = `seabed · altitude ${alt != null ? alt.toFixed(0) : "?"} px (stage 1)`;
+      g.appendChild(t); s.appendChild(g);
+    }
     const proof = document.createElementNS(SVGNS, "g"); proof.id = "proofLayer"; s.appendChild(proof);
     boxes.forEach(b => {
       const [x1, y1, x2, y2] = b.bbox;
@@ -351,10 +365,12 @@ function renderAnalyze(d) {
   $("#analyzePlaceholder").hidden = true;
   $$(".seg-btn").forEach(x => x.classList.toggle("is-active", x.dataset.view === "overlay"));
   $("#viewer").classList.remove("boxes-off");
-  $("#stageCap").textContent = `${d.frame_id} · ${d.width}×${d.height}px · nadir=${d.nadir}${d.orientation && d.orientation.source ? ` (${d.orientation.source})` : ""} · ${d.candidates.length} candidate(s)`;
+  const s1 = d.stage1 || {};
+  $("#stageCap").textContent = `${d.frame_id} · ${d.width}×${d.height}px · nadir=${d.nadir}${d.orientation && d.orientation.source ? ` (${d.orientation.source})` : ""}`
+    + ` · seabed ${s1.measured ? `tracked @ ${s1.altitude_px} px` : "not measured"} · ${d.candidates.length} candidate(s)`;
   $("#verdictCounts").innerHTML = VERDICTS.map(v => `<span class="vc vc-${v}"><span class="n">${d.counts[v] || 0}</span>${v}</span>`).join("");
   const sm = d.stage_ms || {};
-  $("#latency").textContent = `⏱ ${d.wall_ms}ms · see ${fmt(sm.see)} · prove+decide ${fmt(sm.prove_decide)}`;
+  $("#latency").textContent = `⏱ ${d.wall_ms}ms · stage1 ${fmt(sm.stage1)} · see ${fmt(sm.see)} · prove+decide ${fmt(sm.prove_decide)}`;
   const dl = $("#dockLatency"); if (dl) dl.textContent = `wall ${d.wall_ms}ms`;
 
   state._boxes = d.candidates.map((c, i) => ({ id: i, bbox: c.bbox, verdict: c.verdict, conf: c.conf, cand: c }));
@@ -414,7 +430,12 @@ function applyFilters() {
 /* stream the trace into the dock agent log */
 function streamLog(d, ordered) {
   const sm = d.stage_ms || {};
-  const entries = [{ stage: true, tool: "SEE", msg: `perceive → ${d.candidates.length} candidate(s)`, t: fmt(sm.see) + "ms" }];
+  const s1 = d.stage1 || {}, o = s1.orientation || d.orientation || {};
+  const entries = [
+    { stage: true, tool: "STAGE 1", msg: `canonicalise → ${s1.palette || "gray"} palette · nadir ${o.nadir || d.nadir} (${o.source || "?"})`
+        + ` · ${s1.measured ? `seabed tracked at ${s1.altitude_px} px slant (${Math.round((s1.track_conf || 0) * 100)}% of pings)` : "seabed not measured (no water-column step / unknown orientation)"}`
+        + ` · detector input ${s1.detector_input || "raw"}`, t: fmt(sm.stage1) + "ms" },
+    { stage: true, tool: "SEE", msg: `perceive → ${d.candidates.length} candidate(s)`, t: fmt(sm.see) + "ms" }];
   ordered.forEach(b => {
     const c = b.cand;
     entries.push({ stage: true, tool: `cand #${b.id}`, msg: `${c.cls_name} · det ${c.conf.toFixed(2)}`, t: "" });
@@ -547,6 +568,7 @@ function evidenceCard(c, id) {
         <div class="fact"><span class="k">shadow</span><span class="v ${shCls}">${sh.quality || "none"}${sh.contrast ? ` · c${sh.contrast}` : ""}</span></div>
         <div class="fact"><span class="k">rel. height</span><span class="v">${height}</span></div>
         <div class="fact"><span class="k">echo × bg</span><span class="v">${(sh.echo_ratio ?? ev.echo_ratio ?? 0).toFixed(1)}×</span></div>
+        <div class="fact"><span class="k">position</span><span class="v ${c.in_water_column ? "chip-weak" : ""}">${c.in_water_column == null ? "—" : c.in_water_column ? "water column" : "on seabed"}${c.ground_range_px != null ? ` · ${Math.round(c.ground_range_px)} px gnd` : ""}</span></div>
         <div class="fact"><span class="k">P(pot)</span><span class="v">${ev.p_pot != null ? Math.round(ev.p_pot * 100) + "%" : "—"}</span></div>
       </div>
       <ul class="ev-notes">${(ev.notes || []).map(n => `<li>${escapeHtml(n)}</li>`).join("")}</ul>

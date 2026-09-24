@@ -7,6 +7,16 @@ sits at an across-track ground range from the boat track, on the port or starboa
 
     detection_latlon = offset(boat_latlon, ground_range_m, heading ± 90°)
 
+Stage 1 (``src.cv_pipeline.canonical``) supplies the two measured inputs:
+
+* **across-track ground range** — slant range corrected with the bottom-tracked altitude,
+  ``ground = sqrt(slant^2 - altitude^2)`` (``Candidate.ground_range_px``), instead of the raw
+  distance from the nadir edge;
+* **along-track position** — the object's ping index within the frame (``Candidate.ping_px``). A
+  frame's fix is its centre ping; each object is moved along the heading by its ping offset, so two
+  objects in one frame no longer share one boat position (PINGMapper convention: ping order = time
+  order, left to right in a sonogram).
+
 Honesty (report §5.9): the Hugging Face crab-pot frames carry **no GPS**. In that case we attach no
 coordinates and flag ``gps_available = False`` — we never stamp one fake lat/lon onto every object
 (the exact bug called out in ``docs/WINNING_REPORT.md``). For demos a clearly-labelled *synthetic*
@@ -77,15 +87,20 @@ def geotag(cand: Candidate, fix: PingFix, nadir: str, w: int, h: int,
 
     Unknown orientation ⇒ the range can't be measured, so the object is placed at the boat fix with
     an error radius covering the whole swath (an honest "somewhere in this frame")."""
-    range_px = range_px_from_nadir(cand.bbox, nadir, w, h)
+    range_px = cand.ground_range_px if cand.ground_range_px is not None \
+        else range_px_from_nadir(cand.bbox, nadir, w, h)
     if range_px is None:
         cand.lat, cand.lon = round(fix.lat, 6), round(fix.lon, 6)
         cand.geo_error_m = round(max(3.0, max(w, h) * m_per_px), 1)
         return cand
+    lat0, lon0 = fix.lat, fix.lon
+    if cand.ping_px is not None and cand.n_pings:                 # along-track: this object's ping
+        along_m = (cand.ping_px - 0.5 * cand.n_pings) * m_per_px
+        lat0, lon0 = offset_latlon(lat0, lon0, along_m, fix.heading_deg)
     ground_range_m = range_px * m_per_px
     side = parse_side(frame_id) or "starboard"
     cross_bearing = fix.heading_deg + (90.0 if side == "starboard" else -90.0)
-    lat, lon = offset_latlon(fix.lat, fix.lon, ground_range_m, cross_bearing)
+    lat, lon = offset_latlon(lat0, lon0, ground_range_m, cross_bearing)
     cand.lat, cand.lon = round(lat, 6), round(lon, 6)
     # honest, coarse error: at least 3 m, growing with range (slant/heading/scale uncertainty)
     cand.geo_error_m = round(max(3.0, 0.25 * ground_range_m), 1)
@@ -93,14 +108,20 @@ def geotag(cand: Candidate, fix: PingFix, nadir: str, w: int, h: int,
 
 
 def synthetic_track(frame_ids: list[str], start=(37.8000, -76.1500),   # open Chesapeake Bay water
-                    heading_deg: float = 20.0, ping_spacing_m: float = 4.0) -> dict[str, PingFix]:
+                    heading_deg: float = 20.0,
+                    frame_len_m: float = 640 * DEFAULT_M_PER_PX) -> dict[str, PingFix]:
     """Build a plausible straight boat track for a demo. **All fixes are ``synthetic=True``** and must
-    be surfaced as demo-only. Frames are ordered by the trailing ping index in their name when present."""
+    be surfaced as demo-only. Frames are ordered by the trailing chunk index in their name; the fix
+    of chunk ``k`` is its centre ping, ``k * frame_len_m`` along the track, so consecutive chunks
+    tile the track (a stitched object lands in one place from both chunks)."""
     ordered = sorted(frame_ids, key=lambda fid: parse_ping(fid) or 0)
     lat, lon = start
+    k0 = parse_ping(ordered[0]) or 0 if ordered else 0
     track: dict[str, PingFix] = {}
     for i, fid in enumerate(ordered):
-        la, lo = offset_latlon(lat, lon, i * ping_spacing_m, heading_deg)
+        k = parse_ping(fid)
+        pos = (k - k0) if k is not None else i
+        la, lo = offset_latlon(lat, lon, pos * frame_len_m, heading_deg)
         track[fid] = PingFix(lat=round(la, 6), lon=round(lo, 6), heading_deg=heading_deg, synthetic=True)
     return track
 

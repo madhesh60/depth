@@ -38,6 +38,20 @@ class Toolbox:
             latency_ms=round(ms, 1), detail={"n": len(dets)},
         )
 
+    # -- Prove: Stage-1 water column (geometry, no inference) -------------------------------
+    def water_column_check(self, cf, bbox) -> tuple[Optional[bool], Optional[AgentStep]]:
+        """Is the box above the tracked seabed? Returns (flag, step); (None, None) when the bottom
+        was not tracked - nothing to say, so no trace line."""
+        t0 = time.perf_counter()
+        wc = cf.in_water_column(bbox)
+        if wc is None:
+            return None, None
+        ms = (time.perf_counter() - t0) * 1000
+        why = ("box lies above the tracked seabed -> suspended in the water column (flagged for the human)"
+               if wc else f"on the seabed (below the first bottom return at ~{cf.altitude_px:.0f} px slant range)")
+        return wc, AgentStep(tool="water_column_check", rationale=why, latency_ms=round(ms, 2),
+                             detail={"in_water_column": wc, "altitude_px": round(cf.altitude_px, 1)})
+
     # -- Prove: physical shadow ------------------------------------------------------------
     def shadow_check(self, gray: np.ndarray, bbox, nadir: str | None,
                      altitude_px: Optional[float] = None) -> tuple[ShadowProof, AgentStep]:

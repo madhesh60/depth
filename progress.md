@@ -38,7 +38,7 @@ what moved, what's blocked, what's next. Newest entries at the top of §4.
 | Dataset fixes (v1) | ✅ Done | Clean split built: 0 leakage, full-frame boxes removed, 1,099 background negatives, 4-class taxonomy locked. `03_yolo_ready_dataset_v1/`. |
 | **Dataset v2 (honest, sonar-only)** | ✅ Done | `build_dataset_v2.py`: 2-class (`ghost_gear`+`wreck_debris`), fixes 3 WINNING_REPORT data bugs (mpulse full-frame mislabel dropped, 1,547 empty crab-pot frames recovered, optical dropped, UATD held out). train 6,291 / val 626 / test 469, leakage 0/0/0, official crab-pot 398-test LOCKED. **EXP-002 trains on this.** |
 | OpenCV 5 (rule 1) | ✅ Done | Env on **5.0.0.93** (was 4.12); requirements split + pinned exactly; 27/27 tests pass; `/api/health` reports it. |
-| Stage 1 classical CV | 🟡 In progress | **Reframed** (STUDY-01): not a Stage-2 ROI gate (no discriminative power on this sonar) — now the CPU **sonar-preprocessing workload** for the COOL benchmark. `src/cv_pipeline/` + 3-way harness. Local x86: 29 ms/frame, 30.5 FPS. Needs Graviton+COOL run. |
+| Stage 1 classical CV | ✅ Done (reframed twice) | **2026-09-24: in the product path as sonar canonicalisation** (`canonical.py`, STUDY-08: bottom-tracked altitude validated port-vs-starboard 1.6 px; ground range → geotag; ~5 ms/frame). Earlier: **Reframed** (STUDY-01): not a Stage-2 ROI gate (no discriminative power on this sonar) — now the CPU **sonar-preprocessing workload** for the COOL benchmark. `src/cv_pipeline/` + 3-way harness. Local x86: 29 ms/frame, 30.5 FPS. Needs Graviton+COOL run. |
 | Stage 1→2 wiring (cv2.dnn) | ✅ Done | `infer.py` (ONNX via `cv2.dnn`, full_frame + roi_guided) + `ablation_fp.py` + `tune_coverage.py`. ONNX verified loading/forward. |
 | Stage 2 baseline train | ✅ Done | EXP-001 (yolo11s detect, v1, Kaggle T4): test mAP@0.5 **0.822**, P 0.808, R 0.800 — all targets met. |
 | Evaluation + ablation | ✅ Done (EXP-001) | `evaluate.py` (deploy-faithful cv2.dnn): val-tuned thresholds/test-once, per-sensor & per-source tables, bootstrap CIs → `docs/eval_exp001.md` (STUDY-05). Aggregate 0.827 reproduces 0.822; honest sonar `fishing_gear` AP 0.473. GhostVision head-to-head pending EXP-002. |
@@ -74,6 +74,25 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 ---
 
 ## 4. Session log
+
+### 2026-09-24 (review sweep 6) — Stage 1 in the product path: sonar canonicalisation (STUDY-08)
+Review I-4 / X-1 / part of X-3.
+- **`src/cv_pipeline/canonical.py`** — palette → luminance, orientation by rule, **bottom tracking**
+  (sonar altitude in px, per ping), slant → ground `cv2.remap`, range-gain normalisation,
+  water-column mask; every op timed for the COOL benchmark. ~5 ms/frame.
+- **Validated without labels** on 107 un-augmented originals: port vs starboard on the same pings
+  agree to a median **1.6 px** (null 5.3 px); consecutive chunks 1.2 px; 97% tracked.
+- **Measured, not assumed:** range-gain input does not help EXP-001 (Δ AP −0.006, CI spans 0) →
+  detector stays on `raw` (`calibration.json detector.input`); no pot/candidate in the water column.
+- **Agent:** Stage 1 runs first in `ReLookAgent.run_frame`; shadow relative height uses the tracked
+  altitude at the object's ping; new traced tool `water_column_check`; `FrameResult.stage1` record.
+- **Act:** geotag uses the Stage-1 **ground range** and each object's **own ping** (along-track
+  offset from the frame-centre fix) — objects in one frame no longer share a boat position; the
+  synthetic track now tiles chunks (`frame_len_m` = 640 px × 0.05 m).
+- **UI:** tracked seabed drawn on the sonar viewer, Stage-1 line first in the agent log, card fact
+  "on seabed / water column · ground px"; model pill re-polls until warm (was stuck at "lazy") and
+  shows "· COOL" when `cv2` loads from `/opt/cool`.
+- Tests: +8 (`tests/test_canonical.py`, synthetic sonograms with known altitude).
 
 ### 2026-09-24 (review sweep 5) — Backend hardening: job queue, limits, shipped samples, offline-safe map
 Review C-7 / I-9 + failure scenarios 10–13.

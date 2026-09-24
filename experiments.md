@@ -108,6 +108,46 @@ Promote each into the log below with full results as it runs.
 
 ## Experiment log
 
+### STUDY-08 — Stage-1 sonar canonicalisation: measured geometry, and does it help the detector?
+
+**Why.** Review I-4/X-1: after STUDY-01, Stage 1 existed only to be timed for COOL. Give it a real
+job in the product path — turn a frame into **measured sonar geometry** — and test, not assume,
+whether its image normalisation helps the deployed detector.
+
+**Setup.** `src/cv_pipeline/canonical.py` (pure CPU OpenCV/NumPy): palette → luminance; canonical
+orientation by source rule; **bottom tracking** (first dip-then-rise after the transducer ring-down
+in a robust row profile, then per ping in a window, median + mean along track); slant → ground
+range (`cv2.remap`); range-gain normalisation; water-column mask. `python -m
+src.cv_pipeline.study_canonical` → `docs/stage1_canonical.md`.
+Part A (no labels): **un-augmented originals only** — frame keys with exactly one copy in the raw
+HF archive (107 of 1,214; Roboflow crop/zoom copies change the pixel scale, so an altitude in px is
+only meaningful on originals — found when the first run on "unique" v1 frames gave port/starboard
+gaps of ~10 px driven by augmented train copies). Part B: EXP-001 on its 158 unseen unique sonograms.
+
+**Result.**
+| check | value |
+|---|--:|
+| bottom tracked | 104 / 107 originals (97%); 3 with no water-column step → *not measured* |
+| altitude | median 29.6 px of 640 (5–95%: 11.5–33.7) |
+| **port vs starboard, same pings (20 pairs)** | **median 1.6 px apart, 70% within 2 px** (null, different recordings: 5.3 px / 24%) |
+| consecutive chunks, one channel (34) | median 1.2 px change |
+| synthetic sonograms, known altitude (unit tests) | within 1.5 px; follows a sloping seabed |
+| Stage-1 cost | ~1.3 ms luminance + ~4 ms bottom track per 640² frame (laptop, under load) |
+| detector input `gain` vs `raw` (AP@0.3) | 0.514 vs 0.521, Δ −0.006 (95% CI −0.033..+0.019) — **no gain** |
+| detector input `gain` vs `raw` (recall ceiling) | 0.790 vs 0.794, Δ −0.003 (CI −0.026..+0.020) |
+| water column (150 tracked frames) | 0 of 259 pots, 0 of 534 candidates lie in it |
+
+**Decision.** Stage 1 is now **in the product path as a measurement stage**: the tracked altitude
+feeds the shadow's relative height (h/H against a *measured* altitude instead of the slant-range
+proxy), ground range feeds the geotag, the per-ping position gives each object its own along-track
+fix, and a `water_column_check` step is on every card. The detector keeps **`raw`** input
+(`calibration.json` `detector.input`) — range-gain normalisation neither helps nor hurts a model
+trained on raw frames; it stays available (and benchmarked) for EXP-002. The water-column check
+never fired on this data (the column is only ~10–35 px); it is a safety net for deeper/other
+sonars, not a filter. Metres of height still need a range scale (px → m) that these frames don't
+carry — relative height only.
+
+
 ### STUDY-07 — Guaranteed tiers (conformal / LTT) + agent vs "sort by confidence" on unseen data
 
 **Why.** Review C-3/I-5/M-1: the agent's thresholds (0.40/0.60/0.15/0.12) were tuned *and* reported

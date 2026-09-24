@@ -13,7 +13,8 @@ Schema (all keys optional — anything missing falls back to :data:`DEFAULTS`)::
       "model": "EXP-001",
       "names": ["fishing_gear", ...],
       "detector": {"imgsz": 640, "iou_nms": 0.45, "class_aware_nms": true,
-                   "conf": {"fishing_gear": 0.10, ...}, "relook_conf": 0.05},
+                   "conf": {"fishing_gear": 0.10, ...}, "relook_conf": 0.05,
+                   "input": "raw"},
       "tiers": {"method": "...", "score": "...", "tau_review": 0.., "tau_confirm": 0..,
                 "guarantees": {...}},
       "fit": {"split": "...", "frames": .., "created": "..."}
@@ -48,6 +49,7 @@ DEFAULTS: dict[str, Any] = {
         "conf": {"fishing_gear": 0.10, "pipe_cylinder": 0.25,
                  "structural_fragment": 0.25, "natural_formation": 0.25},
         "relook_conf": 0.05,
+        "input": "raw",            # Stage-1 detector input: raw | gray | gain (STUDY-08)
     },
     "tiers": {
         "method": "legacy-rules",
@@ -104,6 +106,11 @@ class Calibration:
     @property
     def relook_conf(self) -> float:
         return float(self.data["detector"]["relook_conf"])
+
+    @property
+    def detector_input(self) -> str:
+        """What Stage 1 hands the detector: ``raw`` (the frame as trained) | ``gray`` | ``gain``."""
+        return str(self.data["detector"].get("input", "raw"))
 
     @property
     def imgsz(self) -> int:

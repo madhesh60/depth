@@ -151,6 +151,9 @@ code { font-family: var(--mono); font-size: .88em; color: #a9ecf8; }
 #viewer.boxes-off .box-layer .bx { display: none; }
 #proofLayer { pointer-events: none; }
 #proofLayer .proof-strip { fill: rgba(31,182,213,.10); stroke: var(--accent); stroke-width: calc(1.5 * var(--inv)); stroke-dasharray: calc(4 * var(--inv)) calc(3 * var(--inv)); }
+#boxLayer .seabed polyline { fill: none; stroke: #6fe3a1; stroke-width: calc(1.2 * var(--inv)); stroke-dasharray: calc(6 * var(--inv)) calc(3 * var(--inv)); opacity: .85; }
+#boxLayer .seabed-label { fill: #6fe3a1; font: 600 calc(10px * var(--inv)) var(--mono, monospace); paint-order: stroke; stroke: #04121a; stroke-width: calc(2.5 * var(--inv)); }
+#viewer.boxes-off #boxLayer .seabed { display: none; }
 #proofLayer .proof-echo { fill: #ffef8b; stroke: #04121a; stroke-width: calc(1 * var(--inv)); }
 #proofLayer.flash { animation: proofflash 2.4s ease-out; }
 @keyframes proofflash { 0% { opacity: 0; } 12%,80% { opacity: 1; } 100% { opacity: 0; } }
