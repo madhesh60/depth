@@ -108,6 +108,36 @@ Promote each into the log below with full results as it runs.
 
 ## Experiment log
 
+### STUDY-07 — Guaranteed tiers (conformal / LTT) + agent vs "sort by confidence" on unseen data
+
+**Why.** Review C-3/I-5/M-1: the agent's thresholds (0.40/0.60/0.15/0.12) were tuned *and* reported
+on the same test frames, and it was never compared with the simple baseline at equal recall/effort.
+
+**Setup.** `python -m src.agentic.calibrate`. EXP-001 via `cv2.dnn`, detector floor 0.05, one-to-one
+matching at IoU ≥ 0.3, **unique frames only**. Calibration = v1 val crab-pot sonograms (66 frames,
+Rec19, 134 pots); verification = v1 test sonograms (92 frames, Rec3/4/6/10, 138 pots) — the only
+sonograms EXP-001 never trained on. Recall promise: Clopper–Pearson UCB on the miss rate ≤ α (LTT,
+fixed sequence); precision promise: CP LCB ≥ 0.85 (n ≥ 15), δ = 0.05. Seven scoring policies
+(confidence; single/mosaic re-look × lift/CLAHE/demote). Full tables: `docs/calibration_exp001.md`.
+
+**Result.**
+| | calibration | verification |
+|---|--:|--:|
+| recall ceiling (any proposal ≥ 0.05) | 0.724 | 0.862 |
+| **recall promise (95%)** | **≥ 65%** (90% not achievable) | **held** — 0.862 (LCB 0.805) |
+| precision promise ≥ 85% | not achievable by any policy (best LCB 0.62–0.66) | — |
+| AUC TP vs FP — confidence | 0.742 | **0.764** |
+| AUC — best re-look variant | 0.756 (single demote, +0.014, CI −0.013..+0.042) | 0.710 |
+| old test-tuned rules, CONFIRMED precision | 0.588 | 0.578 (claimed 0.737) |
+| thin-line shadow AUC TP vs FP | — | 0.599 |
+
+**Decision.** Ship `baseline_conf` tiers: τ_review = 0.05, no τ_confirm (nothing auto-confirmed),
+P(pot) bins for queue order; the value-of-information agent spends **no re-look inference** on
+tiering (1 inference/frame). A first tie-break (AUC at 2 d.p.) picked the demote variant, which then
+lost on verification — the rule now requires a significant paired-bootstrap gain, and the report
+discloses that the rule change followed that test result. **The recall ceiling, not triage, is the
+binding constraint → EXP-002 (1024 px, tiles, v2b) is the lever.**
+
 ### STUDY-06 — Orientation by source rule + thin-line shadow re-measured (honesty fixes)
 
 **Why.** Review §3.4: the auto-nadir guess picked the correct edge on only 26% of real PINGMapper

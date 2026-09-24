@@ -1,14 +1,16 @@
 # Agentic Vision entry — See · Prove · Decide · Act
 
-**Marine-debris (ghost-gear) detection in side-scan sonar · Team Syndicate**
+**Marine-debris (ghost-gear) detection in side-scan sonar · Team Syndicate · DEPTH**
 
-> A chatbot that *explains* results does not qualify. This system qualifies because **the picture
-> result changes the agent's next step**: what the agent measures on a candidate decides which tool
-> it calls next, when it stops, and whether a human is asked. Everything is logged, calibrated, and
-> human-gated.
+> A chatbot that *explains* results does not qualify. DEPTH qualifies because **the picture result
+> changes the agent's next step**, under a **stated objective**: meet two calibrated promises — how
+> many pots reach a human, and how many auto-confirmed finds are real — while spending the least
+> compute and the fewest human minutes. Every decision is logged, every tier is calibrated on held-out
+> data, and a human approves every action.
 
 Code: [`src/agentic/`](../src/agentic) · Live demo: the web app (`webui/`, served by
-`src/dashboard/app.py`) · Evidence: `python -m src.agentic.calibrate` → `runs/prove/`.
+`src/dashboard/app.py`) · Evidence: [`docs/calibration_exp001.md`](calibration_exp001.md)
+(regenerate with `python -m src.agentic.calibrate`).
 
 ---
 
@@ -16,31 +18,30 @@ Code: [`src/agentic/`](../src/agentic) · Live demo: the web app (`webui/`, serv
 
 ```mermaid
 flowchart LR
-  SEE["SEE<br/>YOLO11 full-frame<br/>cv2.dnn · fishing_gear hot @0.10"] --> RL["zoom_relook<br/>re-detect at 2.5x"]
-  RL -->|"re-fire ≥0.40 OR conf ≥0.60"| CONF["CONFIRMED<br/>auto-trusted"]
-  RL -->|uncertain| SH["shadow_check + estimate_height<br/>physical evidence — shown, not gated"]
-  SH -->|"still uncertain & low conf"| EN["enhance_relook<br/>CLAHE 'try harder'"]
-  EN -->|now re-fires| CONF
-  EN -->|no| TRI{triage}
-  SH --> TRI
-  TRI -->|evidence-ranked| REV["REVIEW<br/>human queue"]
-  TRI -->|low evidence| REJ["REJECTED<br/>kept for audit, deprioritised"]
-  CONF --> MP["stitch_boundary<br/>one object cut by a chunk boundary = one hazard"]
-  REV --> MP
-  MP --> ACT["ACT<br/>human-approved recovery route<br/>+ geotagged GeoJSON/GPX/KML/CSV"]
+  SEE["SEE<br/>YOLO11 · OpenCV 5 cv2.dnn<br/>floor 0.05 · class-aware NMS"] --> VOI{"value of information:<br/>can more looking change<br/>this tier or queue slot?"}
+  VOI -->|"conf < τ_review"| LOW["LOW-RISK<br/>no compute · kept for audit"]
+  VOI -->|"no"| TIER
+  VOI -->|"yes"| RL["re-look<br/>(single or 4-crop mosaic)<br/>+ optional CLAHE pass"]
+  RL --> TIER{"guaranteed tiers<br/>(calibration.json)"}
+  TIER -->|"score ≥ τ_confirm"| CONF["CONFIRMED<br/>precision promise"]
+  TIER -->|"else"| REV["REVIEW card<br/>ordered by calibrated P(pot)"]
+  CONF --> ACT
+  REV --> BUD["budget mode<br/>analyst minutes → which cards"]
+  BUD --> ACT["ACT<br/>stitch chunk boundaries · recovery + inspection routes<br/>GeoJSON/GPX/KML/CSV · human approval"]
 ```
 
-- **SEE** — `perception.Perceptor.perceive` runs YOLO11 through OpenCV 5 `cv2.dnn` (no torch). The
-  mission-critical `fishing_gear` class runs at a hot 0.10 threshold to catch small crab-pots (recall
-  0.47→0.69), trading precision that the agent then repairs.
-- **PROVE** — for each candidate the agent gathers *physical + consistency* evidence: re-look
-  persistence (zoom in and re-detect — a real object re-fires, speckle does not), the acoustic
-  **shadow** where it exists (+ a height *relative to sonar altitude*), and echo strength. The frame
-  orientation comes from a **source rule** (`src/cv_pipeline/orientation.py`), never a guess.
-- **DECIDE** — an adaptive controller (below) selects tools by evidence and triages into
-  **CONFIRMED / REVIEW / REJECTED**, recording every tool call.
-- **ACT** — CONFIRMED hazards become a nearest-neighbour **recovery route** + geotagged reports;
-  a human must approve before anything is "dispatched".
+- **SEE** — `perception.Perceptor` runs YOLO11 through OpenCV 5 `cv2.dnn` (no torch), with
+  class-aware NMS. Every threshold comes from one file, `models/<MODEL>/calibration.json`.
+- **PROVE** — per candidate, *only when it can matter*: a zoom-in **re-look** (single crop, or 4 crops
+  packed into one inference), a CLAHE "try harder" pass, the thin-line **acoustic shadow** and a
+  **relative height** (orientation from a source rule — never guessed). Evidence is always shown on
+  the card; the shadow is never a filter.
+- **DECIDE** — **guaranteed tiers** (§4): CONFIRMED / REVIEW / LOW-RISK, with thresholds fit by
+  Clopper–Pearson / Learn-Then-Test on held-out frames. The agent spends re-look compute only where it
+  can change a tier or a REVIEW-queue position, and records the calls it chose *not* to make.
+- **ACT** — chunk-boundary **stitching** (one object cut by a chunk edge = one hazard), a
+  nearest-neighbour **recovery route** (CONFIRMED) and **inspection route** (the budgeted REVIEW
+  cards), honest geotags, exports. Nothing is dispatched without a human.
 
 ---
 
@@ -51,82 +52,87 @@ human-readable trace entry.
 
 | Tool | What it does | Drives the next step by… |
 |---|---|---|
-| `detect` | full-frame YOLO11 (`cv2.dnn`) | producing the candidate set |
-| `zoom_relook` | crop + 2.5× upscale + re-detect | re-fire ⇒ confirm; no re-fire ⇒ escalate |
-| `enhance_relook` | CLAHE contrast boost, then re-look | a "try harder" pass for uncertain candidates |
-| `shadow_check` | measure the acoustic shadow (contrast, run) | physical evidence + quality for the card |
-| `estimate_height` | relative height from shadow geometry `h/H = Ls/(range+Ls)` | plausibility evidence; metres only with a *measured* altitude |
-| `stitch_boundary` | link an object cut by a chunk boundary (same range, adjacent chunks) | counts it once in the route/report; never changes a verdict |
+| `detect` | full-frame YOLO11 (`cv2.dnn`, class-aware NMS) | producing the candidate set |
+| `relook_band` / `zoom_relook` / `mosaic_relook` | crop + upscale + re-detect (1 or 4 crops per inference) | lifting or vetoing the calibrated score, where it can change the outcome |
+| `enhance_relook` | CLAHE contrast boost, then re-look | a "try harder" pass, only if calibration showed it helps |
+| `shadow_check` | darkest 3-px shadow line vs flank-referenced background | physical evidence for the card (never a gate) |
+| `estimate_height` | `h/H = Ls/(R+Ls)` — relative to sonar altitude | plausibility evidence; metres only with a *measured* altitude |
+| `stitch_boundary` | same range, adjacent chunks, touching edges | counts a split object once; never changes a verdict |
 
 The rule core (`policy.py`) is the **sole decision authority** — deterministic, reproducible,
-human-gated. An LLM narrator (e.g. Bedrock) could sit on top to write the mission brief without ever
-touching the safety-critical logic.
+human-gated. An LLM narrator could write the mission brief from the JSON without touching it.
 
 ---
 
-## 3. Autonomy — the perception result changes the next step
+## 3. Autonomy — a stated objective and value-of-information tool use
 
-`agent.ReLookAgent._decide_candidate` is an **adaptive escalation ladder**, not a fixed script.
-Different candidates take different paths and stop at different depths:
+`agent.ReLookAgent._decide_calibrated` asks, for every candidate, *"can more looking change this
+outcome?"* (`policy.GuaranteedTiers.needs_relook`):
 
 ```
-1. zoom_relook                       ← the agent's first probe
-   confident? (re-look ≥0.40 OR detector conf ≥0.60)
-2. shadow_check → estimate_height    ← physical evidence for the card (always, cheap)
-3. IF still uncertain AND low conf:  ← ESCALATE only when it will help
-      enhance_relook (CLAHE)         ← the "try harder" pass; SKIPPED once confident
-4. decide → CONFIRMED / REVIEW / REJECTED   (records which CONFIRMED path won)
-5. (survey) stitch_boundary          ← one object split across adjacent chunks = one hazard
+conf < τ_review                → LOW-RISK, no compute ("a re-look cannot lift it into review")
+conf ≥ τ_confirm (lift mode)   → CONFIRMED, no compute ("already above τ_confirm")
+score depends on the re-look   → re-look (4 crops / inference in mosaic mode) → maybe CLAHE pass
+otherwise                      → REVIEW card, no compute; P(pot) from the calibration
+then: shadow + relative height for the card (cheap, no inference) → decide → trace
+survey: stitch boundaries → REVIEW queue by P(pot) → budget plan → routes → human gate
 ```
 
-Two real traces the award asks for (captured in `runs/`):
+**Budget mode.** Given "the analyst has N minutes", the agent orders the REVIEW queue by calibrated
+P(pot), reports how many cards fit and the expected number of real pots they contain
+(`mission.plan_budget`), and routes an **inspection route** through them. Seconds-per-card is
+*assumed* (8 s) until the timed user study measures it.
 
-- **A re-look *changed* the decision.** A conf-0.18 candidate did not re-fire on the first zoom, but
-  the agent's CLAHE "try harder" pass re-fired it at **0.54 → auto-CONFIRMED**. The perception result
-  drove the escalation and flipped the outcome.
-- **The agent stopped early.** A conf-0.68 candidate is auto-confirmed on the high-confidence path and
-  the expensive enhanced re-look is **skipped** — the agent does not waste a second inference on a
-  settled call.
-
----
-
-## 4. Calibrated, honest decision policy (STUDY-03 / STUDY-04)
-
-Measured on the real crab-pot test split — reproduce with
-`python -m src.agentic.calibrate --frames 160 --out runs/prove`.
-
-| Tier | Rule | Precision | Share of true pots |
-|---|---|---:|---:|
-| raw hot detector | fishing_gear @conf 0.10 | 0.599 | 100% |
-| **CONFIRMED** | `re-look ≥ 0.40` **OR** `conf ≥ 0.60` | **0.737** | 30% |
-| REVIEW | everything else | 0.55 | 61% |
-| REJECTED | `conf < 0.15` **and** `re-look < 0.12` | 0.56 | 9% (kept for audit) |
-
-**By CONFIRMED path:** re-look 0.71 · high-confidence 0.92 · both 0.70. The union beats the
-re-look-only tier (0.713 / 26%) on **both** precision and recall.
-
-**Why the shadow is not a gate (honesty).** On this data a *measurable* shadow exists only on a
-minority of objects, and its CLEAR-rate is **14.5% on true vs 14.6% on false** detections —
-statistically identical, i.e. non-discriminative. Gating on it *lowers* precision (0.69→0.40). So the
-shadow is **shown as evidence + a height estimate** (great for the report/UX, and true where it
-exists), never used to silently accept or reject. This is the same discipline as STUDY-01 (we publish
-the cue that *didn't* work).
+**What the measurements decided (EXP-001).** The calibration compared seven policies — plain detector
+confidence and six re-look variants — at the same recall promise. **None beat plain confidence
+significantly on the calibration split**, and on the verification split confidence ranked best (AUC
+0.764 vs 0.65–0.71 for every re-look variant). So, for this model, the agent's value-of-information
+rule spends **no re-look inference on tiering: 1 inference per frame** (the old ladder spent 4–7).
+The re-look stays as a display-only "agent's eye" view on each card. The same machinery re-decides
+automatically for EXP-002.
 
 ---
 
-## 5. Failure handling & human control (recall-safe by design)
+## 4. Guaranteed tiers — calibrated on validation, verified once on test
 
-- **Nothing is ever deleted.** REJECTED means "low evidence — deprioritised, retained for audit". The
-  CONFIRMED+REVIEW tiers retain **~91%** of true pots; a human can still see the rest.
-- **REVIEW is the human queue,** ranked by `evidence_score`, with per-row **approve/reject** in the
-  dashboard (the correction can later become a training label — closes the loop).
-- **No auto-dispatch.** Every `MissionPlan` carries `human_approval_required = True`.
-- **Honest geotagging.** Coordinates are attached only when real per-ping GPS exists; otherwise
-  `gps_available = False` and the UI says so. Demo tracks are stamped `SYNTHETIC DEMO GPS`.
-- **Known limits:** the model is trained on one bay's crab-pots + one sonar brand; optical debris is
-  out of domain; orientation is only known for PINGMapper sonograms (other sources: shadow not
-  measured). The old "cross-pass corroboration" was removed — adjacent chunks image *different*
-  seabed, so its matches were coincidences. All stated, none hidden.
+Full, regenerable report: [`calibration_exp001.md`](calibration_exp001.md). EXP-001's only unseen
+crab-pot sonograms are v1 val (**66 unique frames**, calibration) and v1 test (**92 unique frames**,
+verification); Roboflow copies are removed.
+
+| Promise (95% confidence) | Requested | What EXP-001 can support | Verified on test |
+|---|---|---|---|
+| **Recall** — pots that reach a human (CONFIRMED+REVIEW) | ≥ 90% | **≥ 65%** — 90% is impossible: the detector never proposes 28% of calibration pots (ceiling 0.72) | **held** — 86.2% (lower bound 80.5%) |
+| **Precision** — CONFIRMED finds that are real | ≥ 85% | **none** — the best any threshold supports is ~62–66% | — (nothing auto-confirmed) |
+
+So with EXP-001 **every find goes to a human**, in P(pot) order. That is the honest consequence of the
+guarantee machinery, and it is the quantitative case for EXP-002: raising the proposal ceiling is the
+only lever that can raise the recall promise, and a better-separated score is the only way to earn an
+auto-confirm tier.
+
+**The old headline, re-scored on unseen data.** The previous rules (re-look ≥ 0.40 OR conf ≥ 0.60,
+tuned on the test frames) claimed CONFIRMED precision 0.737. On the unseen splits they give
+**0.588 (calibration) and 0.578 (verification)** — they are retired.
+
+**Why the shadow is not a gate.** Thin-line shadow AUC, true vs false detection: **0.60** on the
+verification split (random seabed vs real pots: 0.57, STUDY-06). The detector's false positives are
+mostly real 3-D returns too, so a shadow proves "something stands up", not "it's a crab pot". It is
+shown as evidence with a relative height, never used to accept or reject.
+
+---
+
+## 5. Failure handling & human control
+
+- **Nothing is ever deleted.** LOW-RISK = "below τ_review — retained for audit". Its size is bounded
+  by the recall promise.
+- **REVIEW is a budgeted human queue** ordered by calibrated P(pot), with per-row approve/dismiss.
+- **No auto-dispatch.** Every `MissionPlan` carries `human_approval_required = True`; the inspection
+  route is labelled "pending human approval".
+- **Honest geometry.** Orientation comes from a source rule (PINGMapper sonograms: nadir at the top);
+  unknown sources are *not measured* rather than guessed. Geotags need real GPS; demo tracks are
+  stamped `SYNTHETIC DEMO GPS`; unknown orientation ⇒ swath-wide error radius.
+- **Known limits (stated, not hidden):** one bay's crab pots and one sonar brand; calibration is a
+  single recording (hence the separate verification split); labels are incomplete, so precision is a
+  lower estimate; seconds-per-card is assumed until the user study.
 
 ---
 
@@ -134,12 +140,11 @@ the cue that *didn't* work).
 
 | Criterion | Weight | Where it's met |
 |---|---:|---|
-| OpenCV 5 + agent doing real work | 30% | `cv2.dnn` detect + OpenCV shadow/CLAHE/zoom; the agent's tools *are* CV ops |
-| Orchestration & autonomy | 25% | adaptive escalation ladder, early-stop, tool selection by evidence (§3) |
-| Task success | 20% | CONFIRMED precision 0.737 @ 30% recall (§4); a real recovery route in the demo |
-| Failure handling & human control | 15% | recall-safe REJECTED, REVIEW queue, human-approval gate (§5) |
-| User experience | 10% | one-click dashboard: stepper, evidence cards, trace panel, map, downloads |
+| OpenCV 5 + agent doing real work | 30% | `cv2.dnn` detect + OpenCV re-look/mosaic/CLAHE/shadow; the agent's tools *are* CV ops |
+| Orchestration & autonomy | 25% | stated objective; value-of-information tool use; budget mode; stitching; routes (§3) |
+| Task success | 20% | a recall promise that **held on unseen test** (86%); honest "no auto-confirm" where the data can't support one (§4) |
+| Failure handling & human control | 15% | bounded LOW-RISK tier, budgeted REVIEW queue, human-approval gate (§5) |
+| User experience | 10% | studio UI: guarantee badges, evidence cards with the tier promise, effort panel, map + routes, downloads |
 
-**Reproduce the evidence:** `python -m src.agentic.calibrate` (tiers + per-path precision + the
-shadow statistic) · `python -m src.agentic.pipeline --survey <dir>` (full loop → overlays + reports)
-· `pytest -q` (incl. the stitching test that asserts it never changes a verdict).
+**Reproduce:** `python -m src.agentic.calibrate` (fit + verify + report + `calibration.json`) ·
+`python -m src.agentic.pipeline --survey <dir>` · `pytest -q`.

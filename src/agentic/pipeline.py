@@ -22,7 +22,7 @@ import numpy as np
 
 from .agent import ReLookAgent, render
 from .geo import PingFix, geotag, synthetic_track, DEFAULT_M_PER_PX
-from .mission import build_mission, export
+from .mission import build_mission, export, review_queue, plan_budget, plan_inspection, DEFAULT_SEC_PER_CARD
 from .stitch import stitch_boundaries
 from .types import Candidate, FrameResult, MissionPlan, SurveyResult, TrackedObject, Verdict
 
@@ -34,6 +34,16 @@ class AgenticPipeline:
     def __init__(self, agent: Optional[ReLookAgent] = None, m_per_px: float = DEFAULT_M_PER_PX):
         self.agent = agent or ReLookAgent()
         self.m_per_px = m_per_px
+
+    def guarantees(self) -> dict:
+        """The promises this run's tiers carry (shown on every report + in the UI)."""
+        t = getattr(self.agent.cfg, "tiers", None)
+        if t is None:
+            return {"mode": "legacy", "note": "no calibrated guarantee (thresholds are the legacy rules)"}
+        g = dict(t.guarantees)
+        g.update({"mode": "calibrated", "tau_review": t.tau_review, "tau_confirm": t.tau_confirm,
+                  "policy": t.policy})
+        return g
 
     # -- one frame ---------------------------------------------------------------------------
     def run_frame(self, frame: np.ndarray, frame_id: str = "frame",
@@ -51,6 +61,7 @@ class AgenticPipeline:
     def run_survey(self, frames: list[tuple[str, np.ndarray]],
                    track: Optional[dict[str, PingFix]] = None, survey_id: str = "survey",
                    nadir: Optional[str] = None,
+                   budget_minutes: Optional[float] = None, sec_per_card: float = DEFAULT_SEC_PER_CARD,
                    progress_cb: Optional[Callable[[str, dict], None]] = None) -> SurveyResult:
         gps_available = bool(track)
         gps_synthetic = gps_available and any(f.synthetic for f in track.values())
@@ -85,6 +96,13 @@ class AgenticPipeline:
                     tracked.append(t)
 
         mission = build_mission(tracked, gps_available, gps_synthetic)
+        queue = review_queue(tracked)
+        mission.review_queue = [t.oid for t in queue]
+        mission.guarantees = self.guarantees()
+        if budget_minutes is not None:
+            mission.budget = plan_budget(queue, budget_minutes, sec_per_card)
+        plan_inspection(mission, tracked, mission.budget.get("review_ids") if mission.budget
+                        else mission.review_queue)
         if progress_cb:
             progress_cb("mission", mission.to_dict())
         return SurveyResult(survey_id=survey_id, frames=frame_results, tracked=tracked, mission=mission)
@@ -105,6 +123,7 @@ def _to_tracked(oid: str, frame_id: str, c: Candidate) -> TrackedObject:
         lat=c.lat, lon=c.lon, geo_error_m=c.geo_error_m,
         height_m=ev.shadow.height_m if ev else None,
         height_rel=ev.shadow.height_rel if ev else 0.0,
+        p_pot=ev.p_pot if ev else None,
         shadow_quality=ev.shadow.quality.value if ev else "none",
     )
 

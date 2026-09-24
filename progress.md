@@ -75,6 +75,27 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ## 4. Session log
 
+### 2026-09-24 (review sweep 4) — Guaranteed tiers, value-of-information agent, budget mode (STUDY-07)
+Review C-3 / I-5 / I-6 / M-1 / M-2 / X-4.
+- **`src/agentic/guarantees.py`** — exact Clopper–Pearson bounds (pure Python, matches SciPy to 5 d.p.)
+  + Learn-Then-Test threshold fitting for a **recall promise** and a **precision promise**.
+- **`src/agentic/calibrate.py` rewritten** — collect on unique frames (cached), fit on validation,
+  verify once on test, compare 7 policies at the same promise, write `calibration.json` + report.
+  Result: **≥ 65% of pots reach a human, held on test (86.2%)**; no ≥85% precision promise possible
+  → nothing auto-confirmed; confidence alone beats every re-look variant on unseen data; the old
+  0.737 claim is 0.58 on unseen data (retired).
+- **Agent** — calibrated mode: value-of-information tool use (`needs_relook`), batched re-look
+  (`Perceptor.relook_batch`: 4 crops per inference, ~3× cheaper), P(pot) per card, tier promise in
+  every trace; legacy ladder kept as fallback/tests. REJECTED → **LOW-RISK** (alias kept).
+- **Survey** — REVIEW queue by P(pot), **budget mode** (`plan_budget`: cards that fit N minutes +
+  expected real pots; sec/card ASSUMED 8 s until the user study), **inspection route**.
+- **UI** — Guarantees panel (promises + "held on test"), tier promise + P(pot) on cards, "no re-look
+  (VoI 0)" wording, budget input, Analyst-effort panel (expected pots vs minutes). **Fixed a
+  pre-existing bug:** `display:flex` overrode `hidden`, so the placeholder covered the sonar image and
+  the "working…" toast never hid. Static UI now served with `Cache-Control: no-cache`.
+- Found: CARTO dark tiles now return "API KEY REQUIRED" → fixed in the next (backend) component.
+- Tests: 47 (+4 calibrated-agent tests); API tests exercise the calibrated mode with the real model.
+
 ### 2026-09-24 (review sweep 3) — Dataset v2b: dedupe, recording-level val, unique-frame test
 Review I-2 / C-4. `DATASET/scripts/build_dataset_v2b.py` → `03_yolo_ready_dataset_v2b/`.
 - **Roboflow copies deduped:** train 5,275 copies → **1,615 unique frames** (3,241 rotated copies

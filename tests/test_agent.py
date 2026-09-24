@@ -94,9 +94,9 @@ def test_review_and_rejected_tiers():
 def test_frame_result_counts_and_serialisation():
     dets = [_det(0.30, (90, 60, 110, 84)), _det(0.11, (10, 10, 26, 30))]
     res = _agent(dets, relook_normal=0.0, relook_enhanced=0.0)
-    # first det: conf 0.30 no relook -> REVIEW ; second: conf 0.11 no relook -> REJECTED
+    # first det: conf 0.30 no relook -> REVIEW ; second: conf 0.11 no relook -> LOW_RISK
     r = res.run_frame(_frame())
-    assert r.counts["review"] == 1 and r.counts["rejected"] == 1
+    assert r.counts["review"] == 1 and r.counts["low_risk"] == 1
     d = r.to_dict()
     assert d["candidates"][0]["trace"] and "counts" in d and d["nadir"] == "top"
 
@@ -161,6 +161,76 @@ def test_stitching_keeps_the_stronger_sighting():
     assert len(survey.tracked) == 1
     t = survey.tracked[0]
     assert t.frame_id == "Rec6_wcp_ss_port_00011" and t.verdict is Verdict.CONFIRMED
+
+
+# ---- calibrated (guaranteed-tier) mode: the value-of-information agent -------------------------
+class _BatchStub(_StubPerceptor):
+    """Stub with the batched re-look API; counts how many candidates were re-looked."""
+    def __init__(self, dets, relook_by_conf):
+        super().__init__(dets, 0.0)
+        self.relook_by_conf = relook_by_conf
+        self.relooked = []
+
+    def relook_batch(self, frame, items, enhance=False):
+        out = []
+        for bbox, cls in items:
+            d = next(d for d in self.dets if d.bbox == bbox)
+            self.relooked.append(d.conf)
+            c = self.relook_by_conf.get(d.conf, 0.0)
+            out.append(RelookResult(found=c > 0, conf=c, gain=0.0, scale=1.0))
+        return out
+
+
+def _tiers(**kw):
+    from src.agentic.policy import GuaranteedTiers
+    base = dict(tau_review=0.10, tau_confirm=0.50, relook_mode="mosaic", escalate_clahe=False,
+                p_pot_bins=[{"lo": 0.1, "hi": 0.3, "p_pot": 0.3, "n": 10}, {"lo": 0.3, "hi": 1.0, "p_pot": 0.6, "n": 10}],
+                guarantees={"recall_promise": 0.6, "precision_promise": 0.85})
+    base.update(kw)
+    return GuaranteedTiers(**base)
+
+
+def test_value_of_information_relooks_only_the_uncertain_band():
+    dets = [_det(0.70, (10, 10, 30, 30)), _det(0.30, (60, 60, 80, 80)), _det(0.06, (120, 120, 140, 140))]
+    stub = _BatchStub(dets, {0.30: 0.62})
+    agent = ReLookAgent(perceptor=stub, shadow_prover=ShadowProver(ShadowConfig(nadir="top")),
+                        cfg=AgentConfig(tiers=_tiers()))
+    r = agent.run_frame(_frame(), frame_id="Rec9_wcp_ss_port_00001")
+    v = [c.verdict for c in r.candidates]
+    assert v == [Verdict.CONFIRMED, Verdict.CONFIRMED, Verdict.LOW_RISK]
+    assert stub.relooked == [0.30]                          # only the band candidate cost compute
+    assert r.stage_ms["inferences"] == 2                     # detect + one mosaic pass
+    assert "no re-look spent" in r.candidates[0].trace[-1].rationale
+    assert "lifted the score" in r.candidates[1].trace[-1].rationale
+    assert r.candidates[2].trace[-1].detail["relooked"] is False
+
+
+def test_review_card_carries_calibrated_p_pot_and_promise_text():
+    stub = _BatchStub([_det(0.20)], {0.20: 0.35})
+    agent = ReLookAgent(perceptor=stub, shadow_prover=ShadowProver(ShadowConfig(nadir="top")),
+                        cfg=AgentConfig(tiers=_tiers()))
+    c = agent.run_frame(_frame()).candidates[0]
+    assert c.verdict is Verdict.REVIEW and c.evidence.p_pot == 0.6 and c.evidence.evidence_score == 0.35
+    assert "REVIEW card" in c.trace[-1].rationale
+
+
+def test_no_precision_promise_means_nothing_is_auto_confirmed():
+    stub = _BatchStub([_det(0.95)], {})
+    agent = ReLookAgent(perceptor=stub, shadow_prover=ShadowProver(ShadowConfig(nadir="top")),
+                        cfg=AgentConfig(tiers=_tiers(tau_confirm=None)))
+    c = agent.run_frame(_frame()).candidates[0]
+    assert c.verdict is Verdict.REVIEW                       # even conf 0.95 is never auto-confirmed
+    assert stub.relooked == [0.95]                            # re-look spent only to ORDER the queue
+    assert "no precision promise" in c.trace[-1].rationale
+
+
+def test_non_guaranteed_classes_never_auto_confirm():
+    dets = [Detection((10, 10, 40, 40), 2, "structural_fragment", 0.9),
+            Detection((60, 60, 90, 90), 3, "natural_formation", 0.9)]
+    agent = ReLookAgent(perceptor=_BatchStub(dets, {}), shadow_prover=ShadowProver(ShadowConfig(nadir="top")),
+                        cfg=AgentConfig(tiers=_tiers()))
+    r = agent.run_frame(_frame())
+    assert [c.verdict for c in r.candidates] == [Verdict.REVIEW, Verdict.LOW_RISK]
 
 
 def _run_all():

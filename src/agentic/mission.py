@@ -22,6 +22,9 @@ from .geo import haversine_m
 from .types import MissionPlan, TrackedObject, Verdict, SurveyResult
 
 _SYNTH_WARN = "SYNTHETIC DEMO GPS - not real coordinates"
+# Seconds an analyst spends per REVIEW card. ASSUMED until the timed user study replaces it
+# (docs/user_study.md); every budget plan says so.
+DEFAULT_SEC_PER_CARD = 8.0
 
 
 def _nearest_neighbour(points: list[TrackedObject]) -> list[TrackedObject]:
@@ -65,6 +68,49 @@ def build_mission(tracked: list[TrackedObject], gps_available: bool,
     )
 
 
+def review_queue(tracked: list[TrackedObject]) -> list[TrackedObject]:
+    """REVIEW cards, most-likely-real first: calibrated P(pot), then evidence score, then confidence."""
+    rev = [t for t in tracked if t.verdict is Verdict.REVIEW]
+    return sorted(rev, key=lambda t: (-(t.p_pot if t.p_pot is not None else -1.0),
+                                      -t.evidence_score, -t.conf, t.oid))
+
+
+def plan_inspection(mission: MissionPlan, tracked: list[TrackedObject], ids: list[str]) -> None:
+    """Nearest-neighbour INSPECTION route through the REVIEW cards an analyst/boat should check first
+    (the budgeted, most-likely-real ones). Distinct from the recovery route: nothing on it is a
+    confirmed hazard — it is where a human (or a re-survey) must look. Needs GPS; mutates ``mission``."""
+    if not mission.gps_available:
+        mission.inspection_route, mission.inspection_length_m = list(ids), None
+        return
+    idx = _by_id(tracked)
+    ordered = _nearest_neighbour([idx[i] for i in ids if i in idx])
+    mission.inspection_route = [t.oid for t in ordered]
+    mission.inspection_length_m = round(sum(haversine_m((a.lat, a.lon), (b.lat, b.lon))
+                                            for a, b in zip(ordered, ordered[1:])), 1) if len(ordered) > 1 else 0.0
+
+
+def plan_budget(queue: list[TrackedObject], minutes: float,
+                sec_per_card: float = DEFAULT_SEC_PER_CARD, measured: bool = False) -> dict:
+    """Budget mode: given the analyst's minutes, which cards to review first and what that buys.
+
+    Expected real pots = Σ calibrated P(pot) over the cards reviewed. Returned figures are
+    expectations under the calibration, not guarantees."""
+    k = max(0, int(minutes * 60 // max(1e-6, sec_per_card)))
+    ps = [t.p_pot for t in queue if t.p_pot is not None]
+    in_budget = [t.p_pot for t in queue[:k] if t.p_pot is not None]
+    total = float(sum(ps))
+    got = float(sum(in_budget))
+    return {
+        "minutes": minutes, "sec_per_card": sec_per_card,
+        "sec_per_card_source": "measured (user study)" if measured else "ASSUMED - replace with the timed user study",
+        "cards_total": len(queue), "cards_affordable": min(k, len(queue)),
+        "review_ids": [t.oid for t in queue[:k]],
+        "expected_pots_in_budget": round(got, 2), "expected_pots_in_queue": round(total, 2),
+        "share_of_expected_pots": round(got / total, 3) if total > 0 else None,
+        "minutes_for_whole_queue": round(len(queue) * sec_per_card / 60, 1),
+    }
+
+
 # ---- exporters --------------------------------------------------------------------------------
 def _by_id(tracked: list[TrackedObject]) -> dict[str, TrackedObject]:
     return {t.oid: t for t in tracked}
@@ -81,7 +127,7 @@ def to_geojson(tracked: list[TrackedObject], mission: MissionPlan) -> str:
             "properties": {"id": t.oid, "class": t.cls_name, "verdict": t.verdict.value,
                            "conf": t.conf, "evidence_score": t.evidence_score,
                            "height_m": t.height_m, "height_rel_alt": t.height_rel,
-                           "shadow": t.shadow_quality, "also_in": t.also_in,
+                           "shadow": t.shadow_quality, "also_in": t.also_in, "p_pot": t.p_pot,
                            "geo_error_m": t.geo_error_m, "frame": t.frame_id},
         })
     idx = _by_id(tracked)
@@ -89,9 +135,15 @@ def to_geojson(tracked: list[TrackedObject], mission: MissionPlan) -> str:
     if len(coords) > 1:
         features.append({"type": "Feature", "geometry": {"type": "LineString", "coordinates": coords},
                          "properties": {"name": "recovery_route", "length_m": mission.route_length_m}})
+    icoords = [[idx[i].lon, idx[i].lat] for i in mission.inspection_route if idx.get(i) and idx[i].lat is not None]
+    if len(icoords) > 1:
+        features.append({"type": "Feature", "geometry": {"type": "LineString", "coordinates": icoords},
+                         "properties": {"name": "inspection_route", "length_m": mission.inspection_length_m,
+                                        "note": "REVIEW cards to inspect first - pending human approval"}})
     fc = {"type": "FeatureCollection",
           "properties": {"human_approval_required": True,
-                         "note": _SYNTH_WARN if mission.gps_synthetic else "real GPS"},
+                         "note": _SYNTH_WARN if mission.gps_synthetic else "real GPS",
+                         "guarantees": mission.guarantees},
           "features": features}
     return json.dumps(fc, indent=2)
 

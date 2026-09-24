@@ -57,7 +57,7 @@ def test_triage_rejected_only_when_low_conf_and_no_relook():
     img, det = _frame_and_det()          # det.conf = 0.20
     sp = ShadowProver(ShadowConfig(nadir="top"))
     ev = EvidenceGatherer(_StubPerceptor(0.0), sp).gather(img, det)
-    # conf 0.20 is above reject_conf 0.15 -> REVIEW, not REJECTED (recall-safe)
+    # conf 0.20 is above reject_conf 0.15 -> REVIEW, not LOW_RISK (legacy rule, recall-safe)
     assert triage(det.conf, ev) is Verdict.REVIEW
     low = Detection(bbox=det.bbox, cls_id=0, cls_name="fishing_gear", conf=0.11)
     ev_low = EvidenceGatherer(_StubPerceptor(0.0), sp).gather(img, low)

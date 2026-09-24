@@ -1,20 +1,98 @@
 {
   "model": "EXP-001",
-  "names": ["fishing_gear", "pipe_cylinder", "structural_fragment", "natural_formation"],
+  "names": [
+    "fishing_gear",
+    "pipe_cylinder",
+    "structural_fragment",
+    "natural_formation"
+  ],
   "detector": {
     "imgsz": 640,
     "iou_nms": 0.45,
     "class_aware_nms": true,
-    "conf": {"fishing_gear": 0.10, "pipe_cylinder": 0.25, "structural_fragment": 0.25, "natural_formation": 0.25},
+    "conf": {
+      "fishing_gear": 0.05,
+      "pipe_cylinder": 0.25,
+      "structural_fragment": 0.25,
+      "natural_formation": 0.25
+    },
     "relook_conf": 0.05
   },
   "tiers": {
-    "method": "legacy-rules",
-    "score": "max(det_conf, relook_conf)",
-    "tau_review": null,
+    "method": "conformal-LTT (Clopper-Pearson, fixed-sequence)",
+    "score": "conf",
+    "tau_review": 0.05,
     "tau_confirm": null,
-    "guarantees": {}
+    "guarantees": {
+      "recall_promise": 0.65,
+      "requested_recall_achievable": false,
+      "precision_promise": null,
+      "best_precision_promise_achievable": 0.6246,
+      "recall_ceiling": 0.7239,
+      "verified_on_test": {
+        "recall": 0.8623,
+        "recall_promise_held": true,
+        "confirmed_precision": null,
+        "precision_promise_held": null
+      },
+      "report": "docs/calibration_exp001.md"
+    },
+    "policy": "baseline_conf",
+    "relook_mode": null,
+    "escalate_clahe": false,
+    "combine": "lift",
+    "guaranteed_class": "fishing_gear",
+    "non_hazard_classes": [
+      "natural_formation"
+    ],
+    "alpha_requested": 0.1,
+    "target_precision": 0.85,
+    "delta": 0.05,
+    "p_pot_bins": [
+      {
+        "lo": 0.0502,
+        "hi": 0.0723,
+        "p_pot": 0.1458,
+        "n": 46
+      },
+      {
+        "lo": 0.0723,
+        "hi": 0.1111,
+        "p_pot": 0.2083,
+        "n": 46
+      },
+      {
+        "lo": 0.1111,
+        "hi": 0.1554,
+        "p_pot": 0.2083,
+        "n": 46
+      },
+      {
+        "lo": 0.1554,
+        "hi": 0.2325,
+        "p_pot": 0.4375,
+        "n": 46
+      },
+      {
+        "lo": 0.2325,
+        "hi": 0.3719,
+        "p_pot": 0.4375,
+        "n": 46
+      },
+      {
+        "lo": 0.3719,
+        "hi": 0.7499,
+        "p_pot": 0.7083,
+        "n": 46
+      }
+    ]
   },
-  "fit": {"split": null, "frames": 0, "created": "2026-09-24",
-          "note": "legacy values; refit on validation with `python -m src.agentic.calibrate`"}
+  "fit": {
+    "split": "`DATASET/03_yolo_ready_dataset_v1/val` crabpot_*wcp_ss_*.jpg \u2014 66 unique frames, recordings ['Rec19']",
+    "frames": 66,
+    "created": "2026-09-24",
+    "note": "fitted by `python -m src.agentic.calibrate` (calibration split only; test scored once)",
+    "pots": 134,
+    "verified_on": "`DATASET/03_yolo_ready_dataset_v1/test` crabpot_*wcp_ss_*.jpg \u2014 92 unique frames, recordings ['Rec10', 'Rec3', 'Rec4', 'Rec6']"
+  }
 }

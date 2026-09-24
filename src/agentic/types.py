@@ -24,11 +24,16 @@ def _json(obj):
 
 
 class Verdict(str, Enum):
-    """The agent's decision for a candidate. No candidate is ever deleted — REJECTED means
-    'low evidence, retained for audit and deprioritised', not discarded (recall-safe)."""
-    CONFIRMED = "confirmed"   # auto-trusted; high precision; eligible for the cleanup route
-    REVIEW = "review"         # routed to a human; ranked by evidence (recall preserved here)
-    REJECTED = "rejected"     # low evidence; kept for audit, not surfaced as a hazard
+    """The agent's decision for a candidate. No candidate is ever deleted.
+
+    With a fitted ``calibration.json`` the tiers are statistical PROMISES (``guarantees.py``):
+    CONFIRMED ⇒ "≥ target precision are real"; CONFIRMED+REVIEW ⇒ "≥ promised share of pots reach a
+    human"; LOW_RISK ⇒ "holds at most the complementary share of pots" — retained for audit,
+    deprioritised, never deleted. (LOW_RISK was called REJECTED; the old name is kept as an alias.)"""
+    CONFIRMED = "confirmed"   # auto-trusted under the precision promise; eligible for the route
+    REVIEW = "review"         # routed to a human; ordered by P(pot) (the recall promise lives here)
+    LOW_RISK = "low_risk"     # below τ_review; kept for audit, not surfaced as a hazard
+    REJECTED = "low_risk"     # legacy alias of LOW_RISK
 
 
 class ShadowQuality(str, Enum):
@@ -81,8 +86,9 @@ class Evidence:
     relook: RelookResult
     shadow: ShadowProof
     echo_ratio: float
-    evidence_score: float                # 0..1 combined trust score (drives ranking + triage)
+    evidence_score: float                # 0..1 the agent score the tiers are calibrated on
     notes: list[str] = field(default_factory=list)
+    p_pot: Optional[float] = None        # calibrated P(real pot | score) — budget-mode ordering
 
     def to_dict(self) -> dict:
         return {
@@ -91,6 +97,7 @@ class Evidence:
             "echo_ratio": self.echo_ratio,
             "evidence_score": self.evidence_score,
             "notes": list(self.notes),
+            "p_pot": self.p_pot,
         }
 
 
@@ -196,6 +203,7 @@ class TrackedObject:
     height_rel: float = 0.0
     shadow_quality: str = "none"
     also_in: list[str] = field(default_factory=list)   # other chunks showing the same object
+    p_pot: Optional[float] = None                      # calibrated P(real pot) for REVIEW ordering
 
     def to_dict(self) -> dict:
         return _json(asdict(self))
@@ -211,6 +219,11 @@ class MissionPlan:
     gps_synthetic: bool = False                     # True ⇒ demo track, NOT real coordinates
     human_approval_required: bool = True            # nothing is ever auto-dispatched
     counts: dict[str, int] = field(default_factory=dict)
+    review_queue: list[str] = field(default_factory=list)   # REVIEW ids, most-likely-pot first
+    inspection_route: list[str] = field(default_factory=list)   # REVIEW ids to inspect (budget), NN order
+    inspection_length_m: Optional[float] = None
+    budget: dict = field(default_factory=dict)             # budget-mode plan (analyst minutes)
+    guarantees: dict = field(default_factory=dict)         # the promises the tiers carry
 
     def to_dict(self) -> dict:
         return _json(asdict(self))

@@ -4,9 +4,10 @@
 > stages spell the name.
 
 > Agentic detection of derelict fishing gear (ghost pots/nets) and wreck debris in **side-scan
-> sonar**. Every find is **proven** (acoustic-shadow physics + a zoom-in re-look), **triaged** by a
-> human-gated agent, and turned into a **cleanup route** with geotagged reports — through a live web
-> dashboard.
+> sonar**. Every find **comes with evidence**; the agent sorts finds into tiers that carry
+> **calibrated statistical promises** (how many pots reach a human, how many auto-confirmed finds
+> are real), spends compute and analyst minutes only where they can change the outcome, and turns the
+> result into routes and geotagged reports — with a human approving every action.
 
 **Competition:** OpenCV AI Competition 2026 (Sponsor: AWS · Administrator: OpenCV Foundation)
 **Team:** Syndicate (solo — Madhesh) · **Awards targeted:** Agentic Vision · Best Use of COOL
@@ -29,9 +30,9 @@ The differentiator is not "YOLO on sonar" (published work already does that) —
 | Stage | Engine | What it does |
 |---|---|---|
 | **See** | YOLO11 via OpenCV 5 `cv2.dnn` (no torch at inference) | full-frame detection; `fishing_gear` runs hot (0.10) to catch small pots |
-| **Prove** | OpenCV 5 (pure) | per candidate: **re-look persistence** (zoom in, re-detect) + acoustic **shadow** where it exists + height estimate |
-| **Decide** | deterministic, human-gated agent | an **adaptive controller** selects tools by evidence, triages CONFIRMED/REVIEW/REJECTED, logs every step |
-| **Act** | reporting + map | confirmed hazards → nearest-neighbour recovery route + honest geotagged reports |
+| **Prove** | OpenCV 5 (pure) | per candidate, only where it can matter: **re-look** (1 or 4 crops per inference) + CLAHE pass; thin-line acoustic **shadow** + **relative** height as card evidence |
+| **Decide** | deterministic, human-gated agent | **guaranteed tiers** CONFIRMED / REVIEW / LOW-RISK fit on held-out data (Clopper–Pearson / LTT); value-of-information tool use; budget mode |
+| **Act** | reporting + map | chunk stitching → recovery route (CONFIRMED) + inspection route (budgeted REVIEW) + honest geotagged reports |
 
 > **Honest architecture note (a deliberate strength).** We first planned a classical-CV Stage-1 ROI
 > *gate* to cut Stage-2 false positives ≥60%. **STUDY-01 disproved it** on this data (classical CV
@@ -91,10 +92,14 @@ crab-pot 398-frame test split** for a head-to-head vs the published GhostVision 
 > The real target — `fishing_gear` (ghost gear) on **sonar** — is recall ~0.47 @conf 0.25, lifted to
 > ~0.69 by per-class thresholds; EXP-002 (higher resolution) targets the rest.
 
-**Agent value (STUDY-04, real crab-pot test split, `python -m src.agentic.calibrate`):** the raw hot
-detector is precision 0.60; the agent's **CONFIRMED** tier (re-look persistence ⋃ high detector
-confidence) is **precision 0.737 at 30% recall-share** — better than either signal alone — while
-REJECTED stays recall-safe (91% of true pots retained, never deleted).
+**Agent tiers (STUDY-07, [`docs/calibration_exp001.md`](docs/calibration_exp001.md) — calibrated on
+66 unseen validation frames, verified once on 92 unseen test frames):**
+**≥ 65% of pots reach a human (95% confidence) — held on test (86.2%, lower bound 80.5%).** The
+requested 90% is impossible for EXP-001 (it never proposes 28% of pots), and **no ≥85% precision
+promise is supportable**, so nothing is auto-confirmed: every find goes to a human, ordered by
+calibrated P(pot). Re-look variants did **not** beat plain detector confidence on unseen data, so the
+agent spends **1 inference/frame** (was 4–7). The old "CONFIRMED precision 0.737" was tuned on test;
+on unseen data it is 0.58 — retired.
 
 ---
 
@@ -112,8 +117,9 @@ python -m src.detection.infer <image_or_dir>
 python -m src.agentic.agent <image_or_dir> --out runs/agent
 python -m src.agentic.pipeline --survey <dir> --gps synthetic --out runs/survey
 
-# Calibrate the agent on the test split (STUDY-03/04 numbers) and run the tests
-python -m src.agentic.calibrate --frames 160 --out runs/prove
+# Fit the guaranteed tiers on validation, verify once on test (writes models/<MODEL>/calibration.json
+# + docs/calibration_<model>.md), then run the tests
+python -m src.agentic.calibrate
 pytest -q
 ```
 

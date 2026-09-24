@@ -95,3 +95,38 @@ class Toolbox:
             tool="estimate_height", rationale=why, latency_ms=round(ms, 1),
             detail={"height_rel": proof.height_rel, "height_m": proof.height_m},
         )
+
+    # -- Prove: batched re-look of the uncertain band (value-of-information agent) ---------
+    def relook_band(self, frame, dets: list[Detection], mode: Optional[str],
+                    enhance: bool = False) -> tuple[list[RelookResult], list[AgentStep], int]:
+        """Re-look every candidate the agent judged worth it, in ONE batch.
+
+        ``mode="mosaic"`` packs up to 4 crops into a single detector pass (review I-6);
+        ``mode="single"`` runs one pass per candidate. Returns (results, per-candidate steps,
+        number of inferences spent)."""
+        t0 = time.perf_counter()
+        items = [(d.bbox, d.cls_name) for d in dets]
+        batch = getattr(self.perceptor, "relook_batch", None)
+        if mode == "mosaic" and batch is not None:
+            results = batch(frame, items, enhance=enhance)
+            n_inf = -(-len(items) // 4)
+        else:
+            results = [self.perceptor.zoom_relook(frame, b, c, enhance=enhance) for b, c in items]
+            n_inf = len(items)
+        ms = (time.perf_counter() - t0) * 1000
+        label = ("enhanced " if enhance else "") + ("mosaic re-look" if mode == "mosaic" else "re-look")
+        share = f"{n_inf} inference(s) for {len(items)} candidate(s)"
+        steps = []
+        for d, r in zip(dets, results):
+            r.gain = round(r.conf - d.conf, 4)
+            if r.found:
+                verb = "persisted" if r.conf >= d.conf else "weakened"
+                why = f"{label}: {verb} at {r.conf:.2f} (was {d.conf:.2f}); {share}"
+            else:
+                why = f"{label}: did not re-fire (was {d.conf:.2f}); {share}"
+            steps.append(AgentStep(
+                tool="enhance_relook" if enhance else ("mosaic_relook" if mode == "mosaic" else "zoom_relook"),
+                rationale=why, latency_ms=round(ms / max(1, len(items)), 1),
+                conf_before=round(d.conf, 4), conf_after=round(r.conf, 4),
+                detail={"scale": round(r.scale, 2), "found": r.found, "batch": len(items), "inferences": n_inf}))
+        return results, steps, n_inf

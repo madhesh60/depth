@@ -29,6 +29,18 @@ from .types import RelookResult
 RELOOK_PAD_FRAC = 1.5        # context pad = this × max(box side)
 RELOOK_TARGET_PX = 220       # upscale the crop so its long side ≈ this (object ~detector scale)
 RELOOK_MATCH_PX = 12         # min half-window (px) to accept a re-fire as "the same object"
+MOSAIC_GRID = 2              # re-look mosaic = GRID x GRID cells in one detector input (4 crops / pass)
+
+
+def _relook_crop(frame: np.ndarray, bbox) -> Optional[tuple[np.ndarray, int, int]]:
+    """The padded context window the re-look inspects → (crop, x0, y0) in frame pixels."""
+    x1, y1, x2, y2 = bbox
+    H, W = frame.shape[:2]
+    pad = int(max(x2 - x1, y2 - y1) * RELOOK_PAD_FRAC) + 10
+    cx1, cy1 = max(0, x1 - pad), max(0, y1 - pad)
+    cx2, cy2 = min(W, x2 + pad), min(H, y2 + pad)
+    crop = frame[cy1:cy2, cx1:cx2]
+    return (crop, cx1, cy1) if crop.size else None
 
 
 class Perceptor:
@@ -103,6 +115,65 @@ class Perceptor:
             if abs(dcx - ocx) <= tol_x and abs(dcy - ocy) <= tol_y:
                 best = max(best, d.conf)
         return RelookResult(found=best > 0.0, conf=float(best), gain=0.0, scale=float(scale))
+
+    # -- batched re-look: up to GRID² crops share ONE inference -----------------------------
+    def relook_batch(
+        self,
+        frame: np.ndarray,
+        items: Sequence[tuple[tuple[int, int, int, int], str]],
+        enhance: bool = False,
+    ) -> list[RelookResult]:
+        """Re-look several candidates with ONE forward pass per mosaic of ``MOSAIC_GRID²`` crops.
+
+        Each padded crop is resized into its own cell of a 640 px mosaic (cell = 640/GRID px long
+        side, aspect kept, grey padding), the detector runs once, and every same-class detection is
+        assigned to the cell containing its centre and matched to that cell's object centre. With 4
+        cells this is ~4x cheaper than :meth:`zoom_relook` (review I-6). The effective zoom is half
+        the single re-look's, so the product uses whichever mode ``calibration.json`` was fit with
+        (the guarantee is only valid for the mode it was calibrated on)."""
+        det = self.relook_detector
+        size = det.imgsz
+        cell = size // MOSAIC_GRID
+        per = MOSAIC_GRID * MOSAIC_GRID
+        results: list[RelookResult] = [RelookResult(False, 0.0, 0.0, 1.0) for _ in items]
+        for start in range(0, len(items), per):
+            chunk = list(enumerate(items))[start:start + per]
+            canvas = np.full((size, size, 3), 114, np.uint8)
+            cells = []                                   # (idx, ox, oy, scale, obj_cx, obj_cy, tol_x, tol_y, cls)
+            for slot, (idx, (bbox, cls_name)) in enumerate(chunk):
+                got = _relook_crop(frame, bbox)
+                if got is None:
+                    continue
+                crop, cx1, cy1 = got
+                if enhance:
+                    crop = self.enhance_contrast(crop)
+                if crop.ndim == 2:
+                    crop = cv2.cvtColor(crop, cv2.COLOR_GRAY2BGR)
+                scale = cell / max(crop.shape[:2])
+                nw, nh = max(1, int(round(crop.shape[1] * scale))), max(1, int(round(crop.shape[0] * scale)))
+                interp = cv2.INTER_CUBIC if scale > 1 else cv2.INTER_AREA
+                tile = cv2.resize(crop, (nw, nh), interpolation=interp)
+                gx, gy = (slot % MOSAIC_GRID) * cell, (slot // MOSAIC_GRID) * cell
+                ox, oy = gx + (cell - nw) // 2, gy + (cell - nh) // 2
+                canvas[oy:oy + nh, ox:ox + nw] = tile
+                x1, y1, x2, y2 = bbox
+                bw, bh = x2 - x1, y2 - y1
+                cells.append((idx, gx, gy, ox, oy, scale,
+                              ((x1 + x2) / 2 - cx1), ((y1 + y2) / 2 - cy1),
+                              max(bw, RELOOK_MATCH_PX), max(bh, RELOOK_MATCH_PX), cls_name))
+                results[idx] = RelookResult(False, 0.0, 0.0, float(scale))
+            if not cells:
+                continue
+            preds, sc, px, py = det.forward_raw(canvas)
+            for d in det.decode(preds, sc, px, py, (size, size)):
+                dcx, dcy = 0.5 * (d.bbox[0] + d.bbox[2]), 0.5 * (d.bbox[1] + d.bbox[3])
+                for idx, gx, gy, ox, oy, scale, ocx, ocy, tx, ty, cls_name in cells:
+                    if not (gx <= dcx < gx + cell and gy <= dcy < gy + cell) or d.cls_name != cls_name:
+                        continue
+                    ccx, ccy = (dcx - ox) / scale, (dcy - oy) / scale     # back to crop pixels
+                    if abs(ccx - ocx) <= tx and abs(ccy - ocy) <= ty and d.conf > results[idx].conf:
+                        results[idx] = RelookResult(True, float(d.conf), 0.0, float(scale))
+        return results
 
     # -- secondary re-look aid ---------------------------------------------------------------
     @staticmethod

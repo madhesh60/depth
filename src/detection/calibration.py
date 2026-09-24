@@ -141,6 +141,7 @@ class Calibration:
         return {
             "model": self.data.get("model"),
             "method": t.get("method"),
+            "policy": t.get("policy"),
             "tau_review": t.get("tau_review"),
             "tau_confirm": t.get("tau_confirm"),
             "guarantees": t.get("guarantees") or {},

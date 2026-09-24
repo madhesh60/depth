@@ -1,17 +1,25 @@
 """
-agent.py — the **Decide** stage: a deterministic, logged, human-gated re-look agent.
+agent.py — the **Decide** stage: a deterministic, logged, human-gated agent with a stated objective.
 
-For each candidate the agent gathers evidence by *calling tools* (shadow_check → zoom_relook →,
-if still uncertain, an enhanced re-look) and then triages it into CONFIRMED / REVIEW / REJECTED via
-the pre-registered rules in ``policy.py``. Every tool call is recorded as an :class:`AgentStep`, so
-each decision carries a full audit trail — including cases where a re-look *changed* the outcome
-(the evidence the Agentic-Vision award asks for: perception results must change the agent's next
-step). The rule core is the sole decision authority (reproducible + safe); an LLM narrator could
-sit on top later without touching this logic.
+**Objective (calibrated mode — the product default):** meet the two promises in
+``models/<MODEL>/calibration.json`` — "≥ R% of pots reach a human" and "≥ P% of CONFIRMED are real"
+(``guarantees.py``) — while spending the **least compute and the fewest human cards**. For every
+candidate the agent asks *"can more looking change this tier?"* (value of information):
 
-Recall-safe by design: REJECTED means "low evidence — deprioritised, retained for audit", never
-deleted; the only auto-*trusted* tier is CONFIRMED — two independently-calibrated paths (re-look
-persistence and high detector confidence), union precision ~0.74 vs ~0.60 raw (STUDY-03/04).
+* detector confidence ≥ τ_confirm → **CONFIRMED** with no extra compute (a re-look cannot change it);
+* confidence < τ_review → **LOW-RISK** with no extra compute (the calibrated tier that holds at most
+  the complementary share of pots — kept for audit, never deleted);
+* only the **uncertain band** in between gets tools: a re-look (packed 4 crops per inference in
+  mosaic mode) and, if calibration showed it helps, a CLAHE "try harder" pass. The re-look can lift
+  the score over τ_confirm; otherwise the candidate becomes a **REVIEW** card ordered by the
+  calibrated P(pot).
+
+Every tool call is an :class:`AgentStep`, so each decision carries a full audit trail — including
+the calls the agent chose *not* to make and why. The rule core is the sole decision authority
+(reproducible + safe).
+
+**Legacy mode** (no fitted calibration, and the unit tests): the old re-look ladder with the
+thresholds in ``policy.TriageConfig`` (tuned on test — superseded by the calibrated tiers).
 
 CLI:  python -m src.agentic.agent <image|dir> --out runs/agent [--limit N]
 """
@@ -19,6 +27,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Optional
@@ -27,29 +36,36 @@ import cv2
 import numpy as np
 
 from src.cv_pipeline.orientation import resolve_orientation
+from src.detection.calibration import load_calibration
 from src.detection.infer import Detection
 from .perception import Perceptor
 from .shadow import ShadowProver
 from .tools import Toolbox
 from .evidence import fuse_score, evidence_notes
-from .policy import TriageConfig, decide
-from .types import AgentStep, Candidate, Evidence, FrameResult, Verdict
+from .policy import TriageConfig, GuaranteedTiers, decide
+from .types import AgentStep, Candidate, Evidence, FrameResult, RelookResult, Verdict
 
 REPO = Path(__file__).resolve().parents[2]
 
 _VERDICT_BGR = {
     Verdict.CONFIRMED: (0, 210, 0),      # green
     Verdict.REVIEW: (0, 170, 235),       # amber
-    Verdict.REJECTED: (130, 130, 130),   # grey
+    Verdict.LOW_RISK: (130, 130, 130),   # grey
 }
 
 
 @dataclass
 class AgentConfig:
     triage: TriageConfig = field(default_factory=TriageConfig)
-    # try an enhanced (CLAHE) re-look only when the first look is uncertain AND conf is low
+    # legacy ladder: try an enhanced (CLAHE) re-look only when uncertain AND conf is low
     enhance_when_relook_below: float = 0.40
     enhance_when_conf_below: float = 0.35
+    # calibrated mode (None ⇒ legacy rules)
+    tiers: Optional[GuaranteedTiers] = None
+
+    @classmethod
+    def from_calibration(cls) -> "AgentConfig":
+        return cls(tiers=GuaranteedTiers.from_calibration(load_calibration()))
 
 
 class ReLookAgent:
@@ -61,18 +77,20 @@ class ReLookAgent:
         self.perceptor = perceptor or Perceptor()
         self.shadow = shadow_prover or ShadowProver()
         self.tools = Toolbox(self.perceptor, self.shadow)
-        self.cfg = cfg or AgentConfig()
+        self.cfg = cfg if cfg is not None else AgentConfig.from_calibration()
+
+    @property
+    def mode(self) -> str:
+        return "calibrated" if self.cfg.tiers is not None else "legacy"
 
     def run_frame(self, frame: np.ndarray, frame_id: str = "frame",
                   nadir: str | None = None,
                   progress_cb: Optional[Callable[[str, dict], None]] = None) -> FrameResult:
         """``nadir`` is an explicit override; otherwise orientation comes from the source rule in
         ``src.cv_pipeline.orientation`` (or the prover's configured default) — never guessed."""
-        import time
         H, W = frame.shape[:2]
         gray = frame if frame.ndim == 2 else cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         orient = resolve_orientation(frame_id, override=nadir or self.shadow.cfg.nadir, gray=gray)
-        nadir = orient.nadir
 
         t0 = time.perf_counter()
         dets, _see = self.tools.detect(frame)
@@ -80,44 +98,137 @@ class ReLookAgent:
         if progress_cb:
             progress_cb("see", {"candidates": len(dets), "nadir": orient.label})
 
-        candidates: list[Candidate] = []
         t0 = time.perf_counter()
-        for det in dets:
-            candidates.append(self._decide_candidate(frame, gray, det, nadir))
+        if self.cfg.tiers is not None:
+            candidates, n_inf = self._decide_calibrated(frame, gray, dets, orient.nadir)
+        else:
+            candidates = [self._decide_legacy(frame, gray, d, orient.nadir) for d in dets]
+            n_inf = 1 + sum(sum(s.tool in ("zoom_relook", "enhance_relook") for s in c.trace)
+                            for c in candidates)
         prove_decide_ms = (time.perf_counter() - t0) * 1000
         if progress_cb:
             progress_cb("decide", {"counts": _counts(candidates)})
 
         return FrameResult(
             frame_id=frame_id, width=W, height=H, candidates=candidates,
-            stage_ms={"see": see_ms, "prove_decide": prove_decide_ms}, nadir=orient.label,
-            orientation=orient.to_dict(),
+            stage_ms={"see": see_ms, "prove_decide": prove_decide_ms, "inferences": float(n_inf)},
+            nadir=orient.label, orientation=orient.to_dict(),
         )
 
-    # -- per-candidate decision procedure (an adaptive escalation controller) ----------------
-    def _decide_candidate(self, frame, gray, det: Detection, nadir: Optional[str]) -> Candidate:
-        """Gather evidence by *adaptively* selecting tools — a cheap→expensive escalation ladder
-        that stops as soon as the decision is confident. Different candidates take different tool
-        paths and terminate at different depths; the trace records the whole route (Agentic-Vision:
-        the perception result drives the agent's next step)."""
+    # ======================================================================= calibrated mode
+    def _decide_calibrated(self, frame, gray, dets: list[Detection], nadir: Optional[str]):
+        tiers = self.cfg.tiers
+        traces: list[list[AgentStep]] = [[] for _ in dets]
+        relooks: list[Optional[RelookResult]] = [None] * len(dets)
+        scores = [d.conf for d in dets]
+
+        # 1) value of information: which candidates can a re-look move (tier or queue position)?
+        band = [i for i, d in enumerate(dets)
+                if d.cls_name == tiers.guaranteed_class and tiers.needs_relook(d.conf)]
+        n_inf = 1                                                          # the detect pass
+        if band:
+            items = [dets[i] for i in band]
+            res, steps, n = self.tools.relook_band(frame, items, tiers.relook_mode, enhance=False)
+            n_inf += n
+            for i, r, s in zip(band, res, steps):
+                relooks[i], scores[i] = r, tiers.score(dets[i].conf, r.conf)
+                traces[i].append(s)
+            # 2) optional CLAHE escalation — only for band candidates still below τ_confirm
+            if tiers.escalate_clahe:
+                still = [i for i in band if tiers.tau_confirm is None or scores[i] < tiers.tau_confirm]
+                if still:
+                    res2, steps2, n2 = self.tools.relook_band(frame, [dets[i] for i in still],
+                                                               tiers.relook_mode, enhance=True)
+                    n_inf += n2
+                    for i, r, s in zip(still, res2, steps2):
+                        traces[i].append(s)
+                        if r.conf > relooks[i].conf:
+                            relooks[i] = r
+                        scores[i] = tiers.score(dets[i].conf, relooks[i].conf)
+
+        out: list[Candidate] = []
+        for i, det in enumerate(dets):
+            trace = traces[i]
+            rl = relooks[i] or RelookResult(found=False, conf=0.0, gain=0.0, scale=1.0)
+            if relooks[i] is not None:
+                rl.gain = round(rl.conf - det.conf, 4)
+            # physical evidence for the card (cheap, no inference): shadow + relative height
+            proof, s = self.tools.shadow_check(gray, det.bbox, nadir)
+            trace.append(s)
+            if proof.has_shadow and proof.orientation_known:
+                _, s = self.tools.estimate_height(proof)
+                trace.append(s)
+
+            verdict, why, p = self._tier(det, scores[i], relooks[i] is not None)
+            notes = evidence_notes(det.conf, det.cls_name, rl, proof)
+            if relooks[i] is None and det.cls_name == tiers.guaranteed_class:
+                notes[0] = "re-look: not needed - it could not change this tier (value of information 0)"
+            evidence = Evidence(relook=rl, shadow=proof, echo_ratio=proof.echo_ratio,
+                                evidence_score=round(scores[i], 4), notes=notes, p_pot=p)
+            trace.append(AgentStep(
+                tool="decide", rationale=why, latency_ms=0.0, conf_before=round(det.conf, 4),
+                conf_after=round(scores[i], 4),
+                detail={"verdict": verdict.value, "score": round(scores[i], 4), "p_pot": p,
+                        "tau_review": tiers.tau_review, "tau_confirm": tiers.tau_confirm,
+                        "relooked": relooks[i] is not None, "mode": "calibrated"},
+            ))
+            out.append(Candidate(bbox=det.bbox, cls_id=det.cls_id, cls_name=det.cls_name,
+                                 conf=det.conf, evidence=evidence, verdict=verdict, trace=trace))
+        return out, n_inf
+
+    def _tier(self, det: Detection, score: float, relooked: bool) -> tuple[Verdict, str, Optional[float]]:
+        t = self.cfg.tiers
+        if det.cls_name in t.non_hazard_classes:
+            return (Verdict.LOW_RISK, f"class '{det.cls_name}' is natural seabed, not debris -> "
+                                      f"kept for audit, not a hazard", None)
+        if det.cls_name != t.guaranteed_class:
+            return (Verdict.REVIEW, f"class '{det.cls_name}' is not covered by the calibrated guarantee "
+                                    f"-> a human decides (never auto-confirmed)", None)
+        v = t.tier(det.conf, score)
+        p = t.p_pot(score) if v is Verdict.REVIEW else None
+        rp = t.recall_promise
+        pp = t.precision_promise
+        if v is Verdict.CONFIRMED:
+            if relooked and score > det.conf:
+                how = f"re-look lifted the score {det.conf:.2f} -> {score:.2f}"
+            elif relooked:
+                how = f"re-look re-fired (no veto), score {score:.2f}"
+            else:
+                how = f"detector confidence {det.conf:.2f} already above tau_confirm, no re-look spent"
+            return v, (f"{how} >= tau_confirm {t.tau_confirm:.2f} -> CONFIRMED "
+                       f"(tier promise: >= {pp:.0%} real, 95% conf.)" if pp else f"{how} -> CONFIRMED"), None
+        if v is Verdict.LOW_RISK:
+            return v, (f"confidence {det.conf:.2f} < tau_review {t.tau_review:.2f}: a re-look cannot lift it "
+                       f"into review -> LOW-RISK, no compute spent; kept for audit"
+                       + (f" (this tier holds <= {1 - rp:.0%} of pots)" if rp else "")), None
+        why = (f"uncertain band ({t.tau_review:.2f} <= conf {det.conf:.2f}"
+               + (f" < {t.tau_confirm:.2f}" if t.tau_confirm is not None else "") + ")")
+        if relooked and score < det.conf:
+            why += f", did NOT re-fire when zoomed -> score vetoed {det.conf:.2f} -> {score:.2f}"
+        elif relooked:
+            why += f", re-look score {score:.2f}" + (" still below tau_confirm" if t.tau_confirm is not None else "")
+        why += " -> REVIEW card" + (f", P(pot) ~{p:.0%}" if p is not None else "")
+        if t.tau_confirm is None:
+            why += " (no precision promise is achievable with this model, so nothing is auto-confirmed)"
+        return v, why, p
+
+    # ======================================================================= legacy mode
+    def _decide_legacy(self, frame, gray, det: Detection, nadir: Optional[str]) -> Candidate:
+        """The old adaptive ladder with the test-tuned thresholds (fallback + unit tests)."""
         cfg = self.cfg
         tri = cfg.triage
         trace: list[AgentStep] = []
 
-        # 1) re-look — the agent's first probe (the primary discriminator, STUDY-03).
         relook, s = self.tools.zoom_relook(frame, det.bbox, det.cls_name, det.conf)
         trace.append(s)
         confident = relook.conf >= tri.confirm_relook or det.conf >= tri.confirm_conf
 
-        # 2) physical evidence for the human/card: acoustic shadow + height (shown, never a gate).
         proof, s = self.tools.shadow_check(gray, det.bbox, nadir)
         trace.append(s)
         if proof.has_shadow and proof.orientation_known:
             _, s = self.tools.estimate_height(proof)
             trace.append(s)
 
-        # 3) escalate ONLY when still uncertain — an enhanced (CLAHE) "try harder" re-look.
-        #    Skipped once confident: the agent doesn't waste a second inference on a settled call.
         escalated = False
         if (not confident and relook.conf < cfg.enhance_when_relook_below
                 and det.conf < cfg.enhance_when_conf_below):
@@ -134,33 +245,32 @@ class ReLookAgent:
         )
         verdict, path = decide(det.conf, evidence, tri)
         trace.append(AgentStep(
-            tool="decide", rationale=self._why(verdict, path, det.conf, relook, escalated),
+            tool="decide", rationale=self._why_legacy(verdict, path, det.conf, relook, escalated),
             latency_ms=0.0, conf_before=round(det.conf, 4), conf_after=round(relook.conf, 4),
             detail={"verdict": verdict.value, "confirm_path": path,
-                    "evidence_score": evidence.evidence_score, "escalated": escalated},
+                    "evidence_score": evidence.evidence_score, "escalated": escalated, "mode": "legacy"},
         ))
         return Candidate(bbox=det.bbox, cls_id=det.cls_id, cls_name=det.cls_name,
                          conf=det.conf, evidence=evidence, verdict=verdict, trace=trace)
 
-    def _why(self, verdict: Verdict, path: str, conf: float, relook, escalated: bool) -> str:
+    def _why_legacy(self, verdict: Verdict, path: str, conf: float, relook, escalated: bool) -> str:
         t = self.cfg.triage
         if verdict is Verdict.CONFIRMED:
             if path == "high_confidence":
                 return (f"detector already highly confident ({conf:.2f} >= {t.confirm_conf:.2f}) -> "
-                        f"auto-confirmed (precision ~0.83 at this tier); escalation skipped")
+                        f"auto-confirmed; escalation skipped (legacy rule)")
             if path == "both":
                 return (f"detector confident ({conf:.2f}) and re-look persisted ({relook.conf:.2f}) -> "
-                        f"confirmed on two independent signals")
-            return (f"re-look persisted ({relook.conf:.2f} >= {t.confirm_relook:.2f}) -> confirmed "
-                    f"(precision ~0.71 at this tier)"
+                        f"confirmed on two signals (legacy rule)")
+            return (f"re-look persisted ({relook.conf:.2f} >= {t.confirm_relook:.2f}) -> confirmed (legacy rule)"
                     + (" after an enhanced try-harder pass" if escalated else ""))
-        if verdict is Verdict.REJECTED:
+        if verdict is Verdict.LOW_RISK:
             return (f"low confidence ({conf:.2f}) and no re-look ({relook.conf:.2f})"
                     + (" even after enhancement" if escalated else "")
-                    + " -> deprioritised, kept for audit (not deleted)")
+                    + " -> LOW-RISK, kept for audit (not deleted)")
         return (f"uncertain (conf {conf:.2f}, re-look {relook.conf:.2f})"
                 + (" even after an enhanced pass" if escalated else "")
-                + " -> routed to human review, ranked by evidence")
+                + " -> routed to human review")
 
 
 def _counts(cands: list[Candidate]) -> dict:
@@ -175,11 +285,11 @@ def render(frame: np.ndarray, result: FrameResult) -> np.ndarray:
         x1, y1, x2, y2 = c.bbox
         colour = _VERDICT_BGR[c.verdict]
         cv2.rectangle(vis, (x1, y1), (x2, y2), colour, 2)
-        rl = c.evidence.relook.conf if c.evidence else 0.0
-        cv2.putText(vis, f"{c.verdict.value} {c.conf:.2f}->{rl:.2f}", (x1, max(11, y1 - 4)),
+        sc = c.evidence.evidence_score if c.evidence else c.conf
+        cv2.putText(vis, f"{c.verdict.value} {c.conf:.2f}->{sc:.2f}", (x1, max(11, y1 - 4)),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.45, colour, 1, cv2.LINE_AA)
     cc = result.counts
-    cv2.putText(vis, f"CONFIRMED {cc['confirmed']}  REVIEW {cc['review']}  REJECTED {cc['rejected']}",
+    cv2.putText(vis, f"CONFIRMED {cc['confirmed']}  REVIEW {cc['review']}  LOW-RISK {cc['low_risk']}",
                 (8, 22), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2, cv2.LINE_AA)
     return vis
 
@@ -201,9 +311,7 @@ def main():
 
     agent = ReLookAgent()
     out = Path(a.out); out.mkdir(parents=True, exist_ok=True)
-    results = []
-    flips = 0
-    n = 0
+    n = inf = 0
     for ip in _iter_images(Path(a.source)):
         frame = cv2.imread(str(ip))
         if frame is None:
@@ -211,17 +319,14 @@ def main():
         res = agent.run_frame(frame, frame_id=ip.stem)
         cv2.imwrite(str(out / f"{ip.stem}.jpg"), render(frame, res))
         (out / f"{ip.stem}.json").write_text(json.dumps(res.to_dict(), indent=2))
-        # highlight decisions a re-look flipped: CONFIRMED despite a low raw confidence
-        for c in res.candidates:
-            if c.verdict is Verdict.CONFIRMED and c.conf < 0.25:
-                flips += 1
         cc = res.counts
-        print(f"{ip.name}: {len(res.candidates)} cand | "
-              f"CONFIRMED {cc['confirmed']} REVIEW {cc['review']} REJECTED {cc['rejected']}")
+        inf += res.stage_ms.get("inferences", 0)
+        print(f"{ip.name}: {len(res.candidates)} cand | CONFIRMED {cc['confirmed']} "
+              f"REVIEW {cc['review']} LOW-RISK {cc['low_risk']} | {res.stage_ms.get('inferences', 0):.0f} inferences")
         n += 1
         if a.limit and n >= a.limit:
             break
-    print(f"\n{n} frames -> {out}  ({flips} decisions where a re-look confirmed a low-confidence candidate)")
+    print(f"\n{n} frames -> {out}  ({agent.mode} mode, {inf / max(1, n):.2f} inferences/frame)")
 
 
 if __name__ == "__main__":

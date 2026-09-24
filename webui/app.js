@@ -7,13 +7,14 @@ const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const API = ""; // same-origin (served by FastAPI)
 const SVGNS = "http://www.w3.org/2000/svg";
 
-const VERDICTS = ["confirmed", "review", "rejected"];
-const VCOLOR = { confirmed: "#2ea043", review: "#d9a441", rejected: "#5f6f7d" };
+const VERDICTS = ["confirmed", "review", "low_risk"];
+const VCOLOR = { confirmed: "#2ea043", review: "#d9a441", low_risk: "#5f6f7d", rejected: "#5f6f7d" };
+const VLABEL = { confirmed: "confirmed", review: "review", low_risk: "low-risk", rejected: "low-risk" };
 const CLASS_SW = ["#1fb6d5", "#d9a441", "#8b7ff0", "#4fb477", "#e5789b"];
 
 const state = {
   samples: [], selected: null, survey: null, map: null, mapLayers: [],
-  _analyze: null, _boxes: [], _cursor: -1, gate: 0.10,
+  _analyze: null, _boxes: [], _cursor: -1, gate: 0.05,
   hiddenClasses: new Set(),
   _ready: false,               // an analyze result is on screen (keyboard guard)
   _tour: false, _tourOptOut: false,
@@ -39,11 +40,36 @@ async function loadHealth() {
     md.className = "pill " + (h.model_loaded ? "pill-ok" : "pill");
     const rc = $("#regCv"), rm = $("#regModel");
     if (rc) rc.textContent = h.opencv;
-    if (rm) rm.textContent = h.model_loaded ? "loaded" : "lazy (loads on first run)";
+    if (rm) rm.textContent = h.model_loaded ? "loaded + warm" : "loading…";
+    state.calibration = h.calibration || null;
+    renderGuarantees(h.calibration);
   } catch (e) {
     $("#pillCv").textContent = "backend offline";
     $("#pillCv").className = "pill pill-bad";
   }
+}
+
+/* The promises the tiers carry — read from models/<MODEL>/calibration.json via /api/health. */
+function renderGuarantees(c) {
+  const panel = $("#guarPanel"), meta = $("#guarMeta"), gate = $("#regGate"), tiers = $("#regTiers");
+  if (!panel) return;
+  if (!c || c.tau_review == null) {
+    panel.innerHTML = `<p class="panel-note">No calibrated guarantee loaded — tiers use the legacy rules.</p>`;
+    if (tiers) tiers.textContent = "legacy rules"; if (gate) gate.textContent = "0.10";
+    return;
+  }
+  const g = c.guarantees || {}, v = g.verified_on_test || {};
+  const pct = x => x == null ? "—" : `${Math.round(x * 100)}%`;
+  const held = ok => ok == null ? "" : ok ? `<span class="g-held">held on test</span>` : `<span class="g-miss">NOT held on test</span>`;
+  meta.textContent = "95% confidence";
+  if (gate) gate.textContent = `${(c.detector_floor ?? c.tau_review).toFixed(2)} (floor) · review ≥ ${c.tau_review.toFixed(2)}`;
+  if (tiers) tiers.textContent = `${c.method ? "conformal (CP · LTT)" : "calibrated"}${c.policy ? " · " + c.policy : ""}`;
+  panel.innerHTML = `
+    <div class="g-row"><span class="g-badge g-recall">≥ ${pct(g.recall_promise)}</span>
+      <span class="g-txt">of pots reach a human (CONFIRMED + REVIEW)${g.requested_recall_achievable === false ? ` — the requested 90% is <b>not</b> achievable with this detector (proposal ceiling ${pct(g.recall_ceiling)})` : ""}. ${held(v.recall_promise_held)}</span></div>
+    <div class="g-row"><span class="g-badge g-prec">${g.precision_promise ? "≥ " + pct(g.precision_promise) : "none"}</span>
+      <span class="g-txt">${g.precision_promise ? `of CONFIRMED finds are real (τ_confirm ${c.tau_confirm != null ? c.tau_confirm.toFixed(2) : "—"}). ${held(v.precision_promise_held)}` : "no auto-confirm can be promised with this model — every find goes to a human."}</span></div>
+    <p class="panel-note">Fit on held-out validation frames, verified once on test (${escapeHtml((c.fit && c.fit.frames) ? c.fit.frames + " calib. frames" : "")}). <a href="https://github.com/madhesh60/depth/blob/main/${escapeHtml(g.report || "docs/")}" target="_blank" rel="noopener">report</a></p>`;
 }
 
 async function loadSamples() {
@@ -341,7 +367,7 @@ function renderAnalyze(d) {
     grid.innerHTML = `<p class="empty-hint">No candidates on this frame — the detector found nothing to prove. (For the "no labelled pot" samples, that is the correct, honest result.)</p>`;
     buildClassLegend([]); applyFilters(); streamLog(d, []); return;
   }
-  const order = { confirmed: 0, review: 1, rejected: 2 };
+  const order = { confirmed: 0, review: 1, low_risk: 2, rejected: 2 };
   const ordered = state._boxes.slice().sort((a, b) =>
     (order[a.verdict] - order[b.verdict]) || ((b.cand.evidence?.evidence_score || 0) - (a.cand.evidence?.evidence_score || 0)));
   ordered.forEach(b => grid.appendChild(evidenceCard(b.cand, b.id)));
@@ -397,11 +423,27 @@ function streamLog(d, ordered) {
   });
   Log.push(entries);
 }
+// Did the agent actually spend a re-look on this candidate? (calibrated mode skips it when the
+// value of information is zero — the decide step records that choice.)
+function relooked(c) {
+  const d = (c.trace || []).find(s => s.tool === "decide");
+  if (d && d.detail && d.detail.relooked != null) return !!d.detail.relooked;
+  return (c.trace || []).some(s => /relook/.test(s.tool));
+}
+function decideDetail(c) { const d = (c.trace || []).find(s => s.tool === "decide"); return (d && d.detail) || {}; }
+function tierPromise(c) {
+  const g = (state.calibration && state.calibration.guarantees) || {}, d = decideDetail(c);
+  if (d.mode !== "calibrated") return "legacy rule (no calibrated promise)";
+  if (c.verdict === "confirmed") return `CONFIRMED tier promise: ≥ ${Math.round((g.precision_promise || 0) * 100)}% are real (95% conf.)`;
+  if (c.verdict === "review") return `REVIEW + CONFIRMED together reach ≥ ${Math.round((g.recall_promise || 0) * 100)}% of pots (95% conf.)`;
+  if (c.cls_name === "natural_formation") return "natural seabed class — not a hazard, kept for audit";
+  return `LOW-RISK tier holds ≤ ${Math.round((1 - (g.recall_promise || 0)) * 100)}% of pots — kept for audit, never deleted`;
+}
 function verdictReason(c) {
-  const rl = (c.evidence || {}).relook || {};
-  if (c.verdict === "confirmed") return rl.found && rl.conf >= 0.4 ? "re-look persisted" : "high detector confidence";
-  if (c.verdict === "review") return "human review — evidence retained, ranked";
-  return "low evidence — retained for audit, not surfaced";
+  const d = decideDetail(c), p = (c.evidence || {}).p_pot;
+  if (c.verdict === "confirmed") return d.mode === "calibrated" ? "above tau_confirm — carries the precision promise" : "legacy rule";
+  if (c.verdict === "review") return `human review${p != null ? ` · P(pot) ~${Math.round(p * 100)}%` : ""} — ordered in the queue`;
+  return "LOW-RISK — below tau_review, retained for audit, not surfaced";
 }
 
 function selectCandidate(id) {
@@ -429,9 +471,12 @@ function gazeTo(id) {
   $$(".ev-card").forEach(x => x.classList.toggle("is-linked", +x.dataset.id === id));
   const card = $(`.ev-card[data-id="${id}"]`);
   if (card && !state._tour) card.scrollIntoView({ behavior: "smooth", block: "nearest" });
-  const msg = rl.found
-    ? `Agent zoomed ${rl.scale ? rl.scale.toFixed(1) + "×" : ""} here → re-fired at ${(rl.conf || 0).toFixed(2)} (${(rl.gain || 0) >= 0 ? "+" : ""}${(rl.gain || 0).toFixed(2)})`
-    : `Agent zoomed in here → did not re-fire (speckle, not a solid object)`;
+  const p = (c.evidence || {}).p_pot;
+  const msg = !relooked(c)
+    ? `${VLABEL[c.verdict] || c.verdict}: det ${c.conf.toFixed(2)}${p != null ? ` · P(pot) ~${Math.round(p * 100)}%` : ""} — no re-look spent (it could not change this tier)`
+    : rl.found
+      ? `Agent zoomed ${rl.scale ? rl.scale.toFixed(1) + "×" : ""} here → re-fired at ${(rl.conf || 0).toFixed(2)} (${(rl.gain || 0) >= 0 ? "+" : ""}${(rl.gain || 0).toFixed(2)})`
+      : `Agent zoomed in here → did not re-fire at higher resolution`;
   toast(msg); if (!state._tour) setTimeout(toastHide, 2600);
 }
 function showAgentEye(c) {
@@ -440,7 +485,8 @@ function showAgentEye(c) {
   if (!src) { hideAgentEye(); return; }
   $("#aeImg").src = src;
   const rl = (c.evidence || {}).relook || {};
-  $("#aeCap").textContent = `agent's eye${rv && rv.scale ? " · " + rv.scale.toFixed(1) + "× · CLAHE" : ""}` + (rl.found ? ` · re-fire ${(rl.conf || 0).toFixed(2)}` : " · no re-fire");
+  $("#aeCap").textContent = `agent's eye${rv && rv.scale ? " · " + rv.scale.toFixed(1) + "× · CLAHE" : ""}` +
+    (!relooked(c) ? " · view only (no re-look inference)" : rl.found ? ` · re-fire ${(rl.conf || 0).toFixed(2)}` : " · no re-fire");
   ae.hidden = false; ae.classList.remove("pop"); void ae.offsetWidth; ae.classList.add("pop");
 }
 function hideAgentEye() { const ae = $("#agentEye"); if (ae) ae.hidden = true; }
@@ -476,8 +522,9 @@ function evidenceCard(c, id) {
   const ev = c.evidence || {}, sh = ev.shadow || {}, rl = ev.relook || {}, v = c.verdict;
   const card = document.createElement("div");
   card.className = `ev-card v-${v}`; card.dataset.id = id;
-  const rlConf = rl.conf || 0, gain = (rlConf - c.conf);
-  const arrowCls = rlConf > c.conf ? "up" : (rlConf < c.conf ? "down" : "");
+  const rlDone = relooked(c), rlConf = rl.conf || 0, gain = (rlConf - c.conf);
+  const sc = ev.evidence_score ?? c.conf;
+  const arrowCls = sc > c.conf + 1e-6 ? "up" : (sc < c.conf - 1e-6 ? "down" : "");
   const shCls = sh.quality === "clear" ? "chip-clear" : sh.quality === "weak" ? "chip-weak" : "chip-none";
   const height = heightText(sh.height_m, sh.height_rel, sh.run_px);
   card.innerHTML = `
@@ -489,17 +536,18 @@ function evidenceCard(c, id) {
       <button class="gaze-btn" title="replay what the agent saw (G)">◉ Replay gaze</button>
     </div>
     <div class="ev-body">
+      <p class="ev-tier">${escapeHtml(tierPromise(c))}</p>
       <div class="conf-flow">
         <div class="conf-chip"><span class="lbl">detector</span><span class="val">${(c.conf).toFixed(2)}</span></div>
         <div class="conf-arrow ${arrowCls}"><div class="track"></div>
-          <span class="tag">re-look ${rl.found ? `${rlConf.toFixed(2)} (${gain >= 0 ? "+" : ""}${gain.toFixed(2)})` : "no re-fire"}</span></div>
-        <div class="conf-chip"><span class="lbl">${rl.scale ? rl.scale.toFixed(1) + "× zoom" : "zoom"}</span><span class="val ${arrowCls}">${rl.found ? rlConf.toFixed(2) : "—"}</span></div>
+          <span class="tag">${!rlDone ? "no re-look (VoI 0)" : `re-look ${rl.found ? `${rlConf.toFixed(2)} (${gain >= 0 ? "+" : ""}${gain.toFixed(2)})` : "no re-fire"}`}</span></div>
+        <div class="conf-chip"><span class="lbl">score</span><span class="val ${arrowCls}">${(ev.evidence_score ?? c.conf).toFixed(2)}</span></div>
       </div>
       <div class="ev-facts">
         <div class="fact"><span class="k">shadow</span><span class="v ${shCls}">${sh.quality || "none"}${sh.contrast ? ` · c${sh.contrast}` : ""}</span></div>
         <div class="fact"><span class="k">rel. height</span><span class="v">${height}</span></div>
         <div class="fact"><span class="k">echo × bg</span><span class="v">${(sh.echo_ratio ?? ev.echo_ratio ?? 0).toFixed(1)}×</span></div>
-        <div class="fact"><span class="k">evidence</span><span class="v">${(ev.evidence_score ?? 0).toFixed(2)}</span></div>
+        <div class="fact"><span class="k">P(pot)</span><span class="v">${ev.p_pot != null ? Math.round(ev.p_pot * 100) + "%" : "—"}</span></div>
       </div>
       <ul class="ev-notes">${(ev.notes || []).map(n => `<li>${escapeHtml(n)}</li>`).join("")}</ul>
       ${traceBlock(c.trace || [])}
@@ -529,8 +577,9 @@ async function runSurvey() {
   stepperRun(["see", "prove", "decide", "act"]);
   Log.reset(); Log.now({ stage: true, tool: "SURVEY", msg: "running See→Prove→Decide→Act over all sample frames …", t: "run" });
   const gps = $("#gpsMode").value;
+  const budget = Math.max(1, Math.min(600, parseFloat($("#budgetMin").value) || 5));
   try {
-    const d = await fetch(`${API}/api/survey?use_samples=1&gps=${gps}`, { method: "POST" }).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); });
+    const d = await fetch(`${API}/api/survey?use_samples=1&gps=${gps}&budget_minutes=${budget}`, { method: "POST" }).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); });
     state.survey = d;
     renderSurvey(d);
     stepperFinish(["see", "prove", "decide", "act"]);
@@ -550,11 +599,12 @@ function renderSurvey(d) {
   const mb = $("#missionBanner"); mb.hidden = false; mb.className = "mission-banner";
   mb.innerHTML = `<b>🧭 Mission plan ready</b>
     <span>${cc.confirmed || 0} confirmed → <b>${m.recovery_route.length}-stop recovery route</b>${m.route_length_m != null ? ` (${m.route_length_m} m)` : ""}</span>
-    <span>· ${cc.review || 0} to re-survey</span>${gpsTag}
+    <span>· ${cc.review || 0} REVIEW → <b>${(m.inspection_route || []).length}-stop inspection route</b>${m.inspection_length_m != null ? ` (${m.inspection_length_m} m)` : ""}</span>${gpsTag}
     <span class="mb-tag" style="border-color:rgba(217,164,65,.5);color:#ffd9a3">✋ human approval required — nothing auto-dispatched</span>`;
-  renderMap(d); renderDownloads(d.survey_id, m); renderThumbs(d); renderHazards(d);
+  renderMap(d); renderDownloads(d.survey_id, m); renderThumbs(d); renderHazards(d); renderEffort(d);
   Log.push([
-    { stage: true, tool: "ACT", msg: `${cc.confirmed || 0} confirmed · ${cc.review || 0} review · ${cc.rejected || 0} rejected`, t: "" },
+    { stage: true, tool: "ACT", msg: `${cc.confirmed || 0} confirmed · ${cc.review || 0} review · ${cc.low_risk || 0} low-risk (kept for audit)`, t: "" },
+    ...(m.budget && m.budget.cards_total != null ? [{ tool: "budget_plan", msg: `${m.budget.cards_affordable}/${m.budget.cards_total} review cards fit ${m.budget.minutes} min → ~${m.budget.expected_pots_in_budget} of ~${m.budget.expected_pots_in_queue} expected real pots`, t: "" }] : []),
     { tool: "plan_route", msg: `${m.recovery_route.length}-stop nearest-neighbour recovery route${m.route_length_m != null ? " · " + m.route_length_m + " m" : ""}`, t: "" },
     { tool: "human_gate", msg: "human approval required — nothing auto-dispatched", t: "" },
   ]);
@@ -587,6 +637,12 @@ function renderMap(d) {
       state.mapLayers.push(badge);
     });
   }
+  const inspPts = (m.inspection_route || []).map(id => byId[id]).filter(t => t && t.lat != null).map(t => [t.lat, t.lon]);
+  if (inspPts.length > 1) {
+    const il = L.polyline(inspPts, { color: "#d9a441", weight: 2, dashArray: "2 6", opacity: .85 })
+      .bindTooltip("inspection route — REVIEW cards to check first (pending human approval)").addTo(state.map);
+    state.mapLayers.push(il);
+  }
   state.map.fitBounds(L.latLngBounds(latlngs).pad(0.25)); setTimeout(() => state.map.invalidateSize(), 60);
 }
 
@@ -605,14 +661,16 @@ function renderThumbs(d) {
 }
 function renderHazards(d) {
   const rows = d.tracked;
-  $("#hazCount").textContent = `${rows.length} on map · REJECTED kept for audit`;
+  const rank = Object.fromEntries((d.mission.review_queue || []).map((id, i) => [id, i]));
+  rows.sort((a, b) => (VERDICTS.indexOf(a.verdict) - VERDICTS.indexOf(b.verdict)) || ((rank[a.oid] ?? 1e9) - (rank[b.oid] ?? 1e9)));
+  $("#hazCount").textContent = `${rows.length} hazards · REVIEW ordered by P(pot) · LOW-RISK kept for audit`;
   const body = $("#hazBody"); body.innerHTML = "";
   rows.forEach(t => {
     const tr = document.createElement("tr");
     const coords = t.lat != null ? `${t.lat.toFixed(5)}, ${t.lon.toFixed(5)}` : `<span class="muted">no GPS</span>`;
     tr.innerHTML = `<td>${t.oid}</td><td>${t.cls_name}</td>
-      <td><span class="v-tag" style="color:${VCOLOR[t.verdict]};background:${VCOLOR[t.verdict]}22">${t.verdict}</span></td>
-      <td>${t.conf}</td><td>${t.evidence_score}</td><td>${heightText(t.height_m, t.height_rel, t.height_rel ? 1 : 0)}</td>
+      <td><span class="v-tag" style="color:${VCOLOR[t.verdict]};background:${VCOLOR[t.verdict]}22">${VLABEL[t.verdict] || t.verdict}</span></td>
+      <td>${t.conf}</td><td>${t.evidence_score}</td><td>${t.p_pot != null ? Math.round(t.p_pot * 100) + "%" : "—"}</td><td>${heightText(t.height_m, t.height_rel, t.height_rel ? 1 : 0)}</td>
       <td class="${t.shadow_quality === "clear" ? "chip-clear" : t.shadow_quality === "weak" ? "chip-weak" : "chip-none"}">${t.shadow_quality}</td>
       <td>${coords}</td><td>${t.geo_error_m != null ? "±" + t.geo_error_m + " m" : "—"}</td><td>${reviewCell(t)}</td>`;
     body.appendChild(tr);
@@ -629,5 +687,38 @@ function reviewCell(t) {
 
 /* ------------------------------------------------------------------ utils */
 function fmt(x) { return x == null ? "—" : (Math.round(x * 10) / 10).toFixed(1); }
-function cShort(c) { return `C${c.confirmed || 0} R${c.review || 0} X${c.rejected || 0}`; }
+function cShort(c) { return `C${c.confirmed || 0} R${c.review || 0} L${c.low_risk || 0}`; }
+
+/* Analyst effort: cumulative expected real pots vs review minutes, REVIEW queue in P(pot) order,
+   with the budget line. Seconds-per-card is ASSUMED until the timed user study replaces it. */
+function renderEffort(d) {
+  const box = $("#effortPanel"), meta = $("#effortMeta"), m = d.mission, b = m.budget || {};
+  const byId = Object.fromEntries(d.tracked.map(t => [t.oid, t]));
+  const q = (m.review_queue || []).map(id => byId[id]).filter(Boolean);
+  const conf = (m.counts || {}).confirmed || 0;
+  if (!q.length) { box.innerHTML = `<p class="empty-hint">No REVIEW cards in this survey — ${conf} auto-confirmed under the precision promise.</p>`; meta.textContent = ""; return; }
+  const spc = b.sec_per_card || 8, W = 300, H = 120, P = 26;
+  const mins = [0], pots = [0];
+  q.forEach((t, i) => { mins.push((i + 1) * spc / 60); pots.push(pots[i] + (t.p_pot ?? 0)); });
+  const X = x => P + (W - P - 6) * x / Math.max(mins[mins.length - 1], b.minutes || 0, 1e-6);
+  const Y = y => H - 18 - (H - 30) * y / Math.max(pots[pots.length - 1], 1e-6);
+  const path = mins.map((x, i) => `${i ? "L" : "M"}${X(x).toFixed(1)},${Y(pots[i]).toFixed(1)}`).join("");
+  const bx = b.minutes != null ? X(b.minutes) : null;
+  meta.textContent = `${spc}s/card · ${b.sec_per_card_source && b.sec_per_card_source.startsWith("ASSUMED") ? "assumed" : "measured"}`;
+  box.innerHTML = `
+    <svg class="effort-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="expected real pots found versus review minutes">
+      <line x1="${P}" y1="${H - 18}" x2="${W - 4}" y2="${H - 18}" class="ax"/><line x1="${P}" y1="8" x2="${P}" y2="${H - 18}" class="ax"/>
+      ${bx != null ? `<rect x="${P}" y="8" width="${Math.max(0, bx - P).toFixed(1)}" height="${H - 26}" class="budget-fill"/><line x1="${bx.toFixed(1)}" y1="8" x2="${bx.toFixed(1)}" y2="${H - 18}" class="budget-line"/>` : ""}
+      <path d="${path}" class="curve"/>
+      <text x="${P}" y="${H - 4}" class="lbl">0</text><text x="${W - 6}" y="${H - 4}" class="lbl" text-anchor="end">${mins[mins.length - 1].toFixed(1)} min</text>
+      <text x="${P - 4}" y="${Y(pots[pots.length - 1]) + 3}" class="lbl" text-anchor="end">${pots[pots.length - 1].toFixed(1)}</text>
+    </svg>
+    <div class="effort-stats">
+      <div><b>${conf}</b><span>auto-confirmed (no card)</span></div>
+      <div><b>${b.cards_affordable ?? "—"}/${q.length}</b><span>cards in ${b.minutes ?? "—"} min</span></div>
+      <div><b>~${b.expected_pots_in_budget ?? "—"}</b><span>expected real pots in budget</span></div>
+      <div><b>${b.share_of_expected_pots != null ? Math.round(b.share_of_expected_pots * 100) + "%" : "—"}</b><span>of the queue's expected pots</span></div>
+    </div>
+    <p class="panel-note">Curve = cumulative Σ P(pot) reviewing cards most-likely-first. ${b.sec_per_card_source ? escapeHtml(b.sec_per_card_source) + "." : ""}</p>`;
+}
 function escapeHtml(s) { return String(s).replace(/[&<>"']/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m])); }

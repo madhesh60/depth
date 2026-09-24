@@ -35,6 +35,7 @@ from src.agentic.shadow import ShadowProver
 from src.agentic.geo import synthetic_track
 from src.agentic.mission import export
 from src.agentic.types import SurveyResult
+from src.detection.calibration import load_calibration
 from . import samples as samples_mod
 
 REPO = Path(__file__).resolve().parents[2]
@@ -44,6 +45,16 @@ WEBUI_DIST = _WEBUI / "dist" if (_WEBUI / "dist").exists() else _WEBUI
 
 app = FastAPI(title="Marine Debris — See→Prove→Decide→Act", version="1.0.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+
+
+@app.middleware("http")
+async def _revalidate_static(request, call_next):
+    """Browsers must revalidate the zero-build UI on every load (ETag makes it cheap), so a judge
+    never sees a stale app.js/styles.css after a deploy."""
+    resp = await call_next(request)
+    if not request.url.path.startswith("/api/"):
+        resp.headers.setdefault("Cache-Control", "no-cache")
+    return resp
 
 _PIPELINE: Optional[AgenticPipeline] = None
 _PROVER = ShadowProver()
@@ -105,8 +116,11 @@ def _frame_payload(frame: np.ndarray, result) -> dict:
 # ---- API ---------------------------------------------------------------------------------------
 @app.get("/api/health")
 def health():
+    cal = load_calibration()
+    summary = cal.summary()
+    summary["detector_floor"] = cal.conf.get(cal.tiers.get("guaranteed_class", "fishing_gear"))
     return {"status": "ok", "opencv": cv2.__version__, "model_loaded": _MODEL_OK,
-            "samples": len(samples_mod.list_samples())}
+            "samples": len(samples_mod.list_samples()), "calibration": summary}
 
 
 @app.get("/api/samples")
@@ -157,6 +171,7 @@ async def analyze(sample: Optional[str] = Query(None), file: Optional[UploadFile
 
 @app.post("/api/survey")
 async def survey(use_samples: bool = Query(False), gps: str = Query("synthetic"),
+                 budget_minutes: Optional[float] = Query(None, ge=0, le=600),
                  files: Optional[list[UploadFile]] = File(None)):
     frames: list[tuple[str, np.ndarray]] = []
     if use_samples:
@@ -175,7 +190,8 @@ async def survey(use_samples: bool = Query(False), gps: str = Query("synthetic")
 
     track = synthetic_track([fid for fid, _ in frames]) if gps == "synthetic" else None
     survey_id = f"survey-{int(time.time())}"
-    result = get_pipeline().run_survey(frames, track=track, survey_id=survey_id)
+    result = get_pipeline().run_survey(frames, track=track, survey_id=survey_id,
+                                       budget_minutes=budget_minutes)
     _SURVEYS[survey_id] = result
 
     frame_map = dict(frames)

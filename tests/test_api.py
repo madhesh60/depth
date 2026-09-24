@@ -46,7 +46,7 @@ def test_analyze_and_report_path():
     body = a.json()
     assert "counts" in body and "overlay_png" in body and body["overlay_png"].startswith("data:image")
     for c in body["candidates"]:
-        assert c["verdict"] in ("confirmed", "review", "rejected")
+        assert c["verdict"] in ("confirmed", "review", "low_risk")
         assert c["trace"] and c["trace"][-1]["tool"] == "decide"
 
     s = client.post("/api/survey?use_samples=1&gps=synthetic")

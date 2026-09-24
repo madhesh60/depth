@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>DEPTH — See · Prove · Decide · Act</title>
-  <meta name="description" content="DEPTH — agentic marine-debris detection studio for side-scan sonar: prove every find with acoustic-shadow physics + a re-look, decide with a human-gated agent, act with a cleanup route." />
+  <meta name="description" content="DEPTH — agentic marine-debris detection studio for side-scan sonar: every find comes with evidence, the agent's tiers carry calibrated statistical promises, and a human approves every action." />
   <link rel="preconnect" href="https://unpkg.com" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
         integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
@@ -66,8 +66,16 @@
             <option value="none">None (honest no-GPS)</option>
           </select>
         </label>
+        <label class="field"><span>Analyst budget (minutes)</span>
+          <input type="number" id="budgetMin" min="1" max="600" step="1" value="5" />
+        </label>
         <button class="btn btn-primary btn-block" id="surveyBtn">Run full survey</button>
-        <p class="panel-note">Every sample → proven hazards → human-approved route + reports.</p>
+        <p class="panel-note">Every sample → evidence-backed hazards → budgeted review queue → human-approved route + reports.</p>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head"><span class="panel-title">Guarantees</span><span class="panel-meta" id="guarMeta"></span></div>
+        <div class="guar" id="guarPanel"><p class="panel-note">loading calibration …</p></div>
       </section>
 
       <section class="panel">
@@ -76,7 +84,8 @@
           <div class="reg-row"><span class="reg-k">detector</span><span class="reg-v">YOLO11 · cv2.dnn</span></div>
           <div class="reg-row"><span class="reg-k">weights</span><span class="reg-v">EXP-001 best.onnx</span></div>
           <div class="reg-row"><span class="reg-k">classes</span><span class="reg-v">4 · torch-free</span></div>
-          <div class="reg-row"><span class="reg-k">gate · fishing_gear</span><span class="reg-v">0.10 (hot)</span></div>
+          <div class="reg-row"><span class="reg-k">gate · fishing_gear</span><span class="reg-v" id="regGate">…</span></div>
+          <div class="reg-row"><span class="reg-k">tiers</span><span class="reg-v" id="regTiers">…</span></div>
           <div class="reg-row"><span class="reg-k">opencv</span><span class="reg-v" id="regCv">…</span></div>
           <div class="reg-row"><span class="reg-k">runtime</span><span class="reg-v" id="regModel">…</span></div>
         </div>
@@ -110,7 +119,7 @@
           </figure>
           <div class="viewer-placeholder" id="analyzePlaceholder">
             <div class="ph-ring"></div>
-            <p>Pick a frame and run the loop. Each detection is <b>proven</b> (acoustic-shadow physics + a zoom-in re-look), then <b>triaged</b> by the agent — watch it fly to every find.</p>
+            <p>Pick a frame and run the loop. Each detection gets <b>evidence</b> (re-look view, acoustic shadow, relative height) and a <b>calibrated tier</b> with a stated promise — watch the agent fly to every find.</p>
           </div>
         </div>
         <div class="viewer-bar">
@@ -123,8 +132,8 @@
           </div>
           <div class="vb-gate">
             <span class="vb-gate-lbl">gate</span>
-            <input type="range" id="confGate" min="0.05" max="0.9" step="0.05" value="0.10" aria-label="detector confidence gate" />
-            <output class="mono" id="confGateVal">0.10</output>
+            <input type="range" id="confGate" min="0.05" max="0.9" step="0.05" value="0.05" aria-label="detector confidence gate" />
+            <output class="mono" id="confGateVal">0.05</output>
             <span class="vb-gate-showing mono" id="gateShowing"></span>
           </div>
           <div class="vb-hint">scroll zoom · drag pan · click box · ←/→ · G gaze</div>
@@ -150,9 +159,9 @@
     <aside class="rail inspector scrollable">
       <!-- analyze: evidence -->
       <section class="panel evidence-panel" data-when="analyze">
-        <div class="panel-head"><span class="panel-title">Evidence</span><span class="panel-meta">proven before trusted</span></div>
+        <div class="panel-head"><span class="panel-title">Evidence</span><span class="panel-meta">evidence before trust</span></div>
         <div class="evidence-grid" id="evidenceGrid">
-          <p class="empty-hint">Run the loop — every detection gets an evidence card here: detector→re-look confidence, acoustic shadow, height, and the full tool-call trace.</p>
+          <p class="empty-hint">Run the loop — every detection gets an evidence card here: its tier and the promise that tier carries, detector→re-look score, P(pot), acoustic shadow, relative height, and the full tool-call trace (including the calls the agent chose not to make).</p>
         </div>
       </section>
 
@@ -164,10 +173,14 @@
         <div class="thumb-strip" id="thumbStrip"></div>
       </section>
       <section class="panel" data-when="survey">
+        <div class="panel-head"><span class="panel-title">Analyst effort</span><span class="panel-meta mono" id="effortMeta"></span></div>
+        <div id="effortPanel"><p class="empty-hint">Run a survey — the agent orders the REVIEW queue by calibrated P(pot) and shows what your time budget buys.</p></div>
+      </section>
+      <section class="panel" data-when="survey">
         <div class="panel-head"><span class="panel-title">Hazards</span><span class="panel-meta mono" id="hazCount"></span></div>
         <div class="table-scroll">
           <table class="haz-table"><thead><tr>
-            <th>ID</th><th>Class</th><th>Verdict</th><th>Conf</th><th>Ev</th><th>H</th><th>Shadow</th><th>Lat, Lon</th><th>±</th><th>Review</th>
+            <th>ID</th><th>Class</th><th>Verdict</th><th>Conf</th><th>Score</th><th>P(pot)</th><th>H</th><th>Shadow</th><th>Lat, Lon</th><th>±</th><th>Review</th>
           </tr></thead><tbody id="hazBody"></tbody></table>
         </div>
       </section>
@@ -179,9 +192,9 @@
     <div class="dock-stepper" id="stepper" aria-label="pipeline stages">
       <div class="dstep" data-stage="see"><span class="dnode">1</span><div class="dtxt"><b>See</b><span>YOLO11 · cv2.dnn</span></div></div>
       <div class="dlink"></div>
-      <div class="dstep" data-stage="prove"><span class="dnode">2</span><div class="dtxt"><b>Prove</b><span>shadow + re-look</span></div></div>
+      <div class="dstep" data-stage="prove"><span class="dnode">2</span><div class="dtxt"><b>Prove</b><span>re-look · evidence</span></div></div>
       <div class="dlink"></div>
-      <div class="dstep" data-stage="decide"><span class="dnode">3</span><div class="dtxt"><b>Decide</b><span>triage · human-gated</span></div></div>
+      <div class="dstep" data-stage="decide"><span class="dnode">3</span><div class="dtxt"><b>Decide</b><span>guaranteed tiers</span></div></div>
       <div class="dlink"></div>
       <div class="dstep" data-stage="act"><span class="dnode">4</span><div class="dtxt"><b>Act</b><span>route + reports</span></div></div>
     </div>
