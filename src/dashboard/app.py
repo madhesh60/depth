@@ -11,6 +11,7 @@ Endpoints
     GET  /api/jobs/{job_id}          — status + progress; the survey result when done
     POST /api/survey?use_samples=1   — synchronous survey for small runs (≤ MAX_SYNC_FRAMES)
     GET  /api/report/{fmt}?survey_id — geojson | gpx | kml | csv | json (memory, else disk)
+    GET  /api/metrics                — rolling per-stage p50/p95 on THIS host + arch / EC2 type / COOL
 
 Hardening (review §3.8 / I-9):
 * endpoints are plain ``def`` (FastAPI runs them in a thread pool) and every inference is guarded by
@@ -55,6 +56,7 @@ from src.detection.calibration import load_calibration
 from src.detection.infer import configure_runtime, DEFAULT_ONNX
 from . import samples as samples_mod
 from .jobs import JobStore, REPORT_FORMATS
+from .metrics import Metrics
 
 log = logging.getLogger("depth.api")
 REPO = Path(__file__).resolve().parents[2]
@@ -76,6 +78,7 @@ _PROVER = ShadowProver()
 _SURVEYS: "OrderedDict[str, SurveyResult]" = OrderedDict()   # bounded LRU (report downloads)
 _JOBS = JobStore(max_jobs=50, workers=1)
 _RUNTIME = configure_runtime()
+_METRICS = Metrics()
 
 
 def get_pipeline() -> AgenticPipeline:
@@ -229,6 +232,8 @@ def _run_survey(frames, gps: str, budget_minutes: Optional[float], nadir: Option
                              budget_minutes=budget_minutes, progress_cb=cb,
                              frame_lock=_INFER_LOCK)      # per frame: /api/analyze can interleave
     _remember(result)
+    for fr in result.frames:
+        _METRICS.record("survey", fr.frame_id, fr.stage_ms, counts=fr.counts)
     frame_map = dict(frames)
     d = result.to_dict()
     for fr, fd in zip(result.frames, d["frames"]):          # light thumbnails, not full-res base64
@@ -255,6 +260,14 @@ def health():
         "samples": len(samples_mod.list_samples()), "calibration": summary, "jobs": _JOBS.counts(),
         "limits": {"max_upload_mb": MAX_UPLOAD_MB, "max_frames": MAX_FRAMES, "max_sync_frames": MAX_SYNC_FRAMES},
     }
+
+
+@app.get("/api/metrics")
+def metrics():
+    """Rolling per-stage latency on this server + host / OpenCV (COOL) provenance."""
+    out = _METRICS.summary()
+    out["runtime"] = _RUNTIME
+    return out
 
 
 @app.get("/api/samples")
@@ -305,6 +318,7 @@ def analyze(sample: Optional[str] = Query(None), nadir: Optional[str] = Query(No
     payload = _frame_payload(frame, result)
     payload["wall_ms"] = round((time.perf_counter() - t0) * 1000, 1)
     payload["guarantees"] = pipe.guarantees()
+    _METRICS.record("analyze", frame_id, result.stage_ms, payload["wall_ms"], result.counts)
     return JSONResponse(payload)
 
 

@@ -1,74 +1,78 @@
-# infra/ — AWS deployment & the COOL benchmark (deploy-ready, pending credits)
+# infra/ — deploy DEPTH on Graviton + COOL, and prove it with the 3-way benchmark
 
-Everything here is written and locally verified but **not yet deployed** (AWS credits pending).
-When credits land it's *deploy, not build*. The primary judged deliverable is **Best Use of
-COOL**, so this is organised around that.
+**One product, one deploy target.** The live demo is the FastAPI app (`src/dashboard/app.py`) running
+the full agent on an **EC2 Graviton instance launched from the COOL AMI** (OpenCV 5 under
+`/opt/cool`), behind CloudFront for HTTPS. The earlier Lambda / API Gateway / DynamoDB / Amplify /
+SageMaker plan is **retired** (review §3.7/§8): Lambda could not use COOL (COOL is an AMI) and ran a
+different, detection-only product with its own thresholds. Status: **scripts written and dry-run
+checked; not yet executed** (AWS work is scheduled for a dedicated day).
 
-## Why this wins "Best Use of COOL"
+## Architecture
 
-Scorecard: verified COOL on Graviton **30%** + measured perf vs baseline **20%** +
-architecture **25%** + innovation **15%** + reproducibility **10%**. Half the award is a
-**reproducible Graviton-vs-x86 benchmark of the CPU workload** — not a fancier model. So the
-CPU-side pipeline is deliberately built from COOL/KleidiCV-accelerated OpenCV ops (resize,
-adaptive-gaussian threshold, contours) and benchmarked three ways.
+```
+Judge ──HTTPS──► CloudFront ──:8000 (CloudFront origin-facing IPs only)──► EC2 c8g.xlarge · COOL AMI
+                                                                        systemd `depth` (COOL python)
+                                                                        FastAPI + job queue
+   STAGE 1 canonicalise (OpenCV/COOL) → SEE YOLO11 cv2.dnn → PROVE evidence → DECIDE guaranteed
+   tiers → ACT geotag · routes · exports
+S3  (models · uploads 7-day lifecycle · results/<survey> · benchmarks)   ◄── job results mirrored
+CloudWatch (status-check alarm → auto-recover + email · JSON frame logs)  Budgets (50% / 90% alerts)
+SSM Session Manager (no SSH port)                                        IAM role scoped to the bucket
+```
 
-Honest scoping (see `experiments.md` STUDY-01): classical CV is **not** the detector — it has
-no discriminative power on this sonar. The COOL workload is the **sonar preprocessing /
-tiling** pass; YOLO (`cv2.dnn`) does detection. OpenCV 5 is used substantively throughout:
-preprocessing → tiling → DNN inference → overlay rendering, all CPU, all Graviton-capable.
+Scaling story (described, not built): survey jobs → SQS → Auto Scaling group of the same COOL AMI
+workers (Spot) → S3. Same code, more workers.
 
-## Components
+## Files
 
-| File | Role | Status |
-|---|---|---|
-| `lambda_handler.py` | Inference endpoint: image → `cv2.dnn` ONNX detect → geotagged JSON. No torch (small pkg, Arm-ready). Mirrors `src/detection/infer.py`. | ✅ local smoke-tested |
-| `benchmark_graviton.sh` | Runs `src.cv_pipeline.benchmark` for one config, stamps an input-manifest hash, uploads JSON to S3. | ✅ ready |
+| File | Role |
+|---|---|
+| `deploy_aws.sh` | One command, **dry-run by default** (`APPLY=1` executes): budget alarm → S3 → IAM → security group → EC2 (COOL AMI, IMDSv2, user-data) → CloudFront → alarms. Run it from **AWS CloudShell** or Linux/WSL. |
+| `setup_cool_instance.sh` | On the instance (root): repo → model from S3 (sha256-checked) → web deps into `/opt/depth/pydeps` with `pip --target` (**the COOL venv is never modified**) → systemd unit → waits until `/api/health` shows `model_loaded` and `is_cool_path`. Idempotent. |
+| `depth.service` | systemd unit template: COOL interpreter, `DEPTH_THREADS` = vCPUs, restart on failure, JSON frame logs. |
+| `bench_cool.sh` | The 3-way COOL benchmark of the **product** workload (`src/bench/product_bench.py`). |
 
-## The 3-way COOL benchmark (the money shot)
+The pinned web stack in `setup_cool_instance.sh` was verified locally: a clean venv holding only
+`numpy` + `opencv-python-headless` (standing in for the COOL venv) plus the `--target` deps imports
+and serves the app (`/api/health` → model warm in 0.3 s; `/api/analyze` works).
 
-Run the *same* frame set (≥1,000, pinned by sha256) in three configs:
+## The 3-way COOL benchmark (what the award measures)
+
+Same code, same frames (content sha256), same model (sha256), three machines:
 
 ```bash
-# (A) x86 baseline — on a c7i.xlarge
-LABEL=baseline_x86   OPENCV_FLAVOR=stock S3_BUCKET=$B ./infra/benchmark_graviton.sh
-# (B) Graviton, stock OpenCV — on a c7g.xlarge / c8g.xlarge
-LABEL=graviton_stock OPENCV_FLAVOR=stock S3_BUCKET=$B ./infra/benchmark_graviton.sh
-# (C) Graviton, COOL/KleidiCV — SAME c7g/c8g instance
-LABEL=graviton_cool  OPENCV_FLAVOR=cool  S3_BUCKET=$B ./infra/benchmark_graviton.sh
+# (A) x86 + stock OpenCV 5 — c7i.xlarge (Ubuntu 24.04)
+FLAVOR=stock LABEL=baseline_x86   PRICE_HOUR=0.1785 ./infra/bench_cool.sh
+# (B) Graviton + stock OpenCV 5 — c8g.xlarge
+FLAVOR=stock LABEL=graviton_stock PRICE_HOUR=0.1595 ./infra/bench_cool.sh
+# (C) Graviton + COOL — the SAME c8g.xlarge on the COOL AMI (+ $0.01/h COOL fee)
+FLAVOR=cool  LABEL=graviton_cool  PRICE_HOUR=0.1695 ./infra/bench_cool.sh
+# then, with all runs/bench/*.json in one place:
+python -m src.bench.compare        # → docs/cool_benchmark.md + docs/img/cool_benchmark.png
 ```
-Each JSON records OpenCV build (KleidiCV detected y/n), `platform.machine` (aarch64 vs
-x86_64), per-op p50/p95, throughput, and the input-manifest hash → self-documenting and
-one-command reproducible. (B)→(C) = COOL's contribution on identical hardware; (A)→(C) =
-Arm-vs-x86 headline.
+_(Prices: us-east-1 on-demand Linux as remembered on 2026-09-24 — confirm on the pricing page on the day.)_
 
-## Planned AWS architecture
+What each run records and why (review §3.7 fixes):
 
-```
-S3 (raw/ processed/ models/ reports/ benchmarks/)
-  └─ API Gateway → Lambda (lambda_handler.py, ARM64/Graviton)
-        ├─ Stage-1 preprocess + tiling (COOL-accelerated OpenCV)
-        └─ Stage-2 cv2.dnn ONNX detect → geotagged JSON
-  └─ DynamoDB (detections; geo + time GSIs)
-  └─ Amplify dashboard (upload → overlays + downloadable report)
-  └─ CloudWatch (latency/throughput) · SageMaker (training)
-```
+* **the product workload**, per stage — decode → Stage 1 → `cv2.dnn` → evidence/tiers → render —
+  plus a `cv` workload (all OpenCV image ops, no network) that isolates where COOL/KleidiCV acts;
+* **threads pinned** (`THREADS="0 1"`: all vCPUs, then one thread — an Intel vCPU is a hyper-thread,
+  a Graviton vCPU is a physical core);
+* **provenance** — a run is labelled COOL only if `cv2.__file__` is under `/opt/cool`; the script
+  refuses to mislabel. The stock runs use a private venv (Ubuntu 24.04 / PEP 668), the COOL run
+  uses COOL's interpreter as-is;
+* **cost** — $/1,000 frames and, per **survey-hour** of sonar, compute seconds, real-time factor and
+  $ (frames per survey-hour = ping rate × 3600 / pings per frame × channels; assumptions recorded).
 
-## Instance types & cost
+Local reference (this laptop, x86, stock OpenCV 5.0.0): see `docs/cool_benchmark.md`.
 
-| Purpose | Instance | Notes |
-|---|---|---|
-| COOL compute / benchmark (C,B) | `c7g.xlarge` / `c8g.xlarge` (Graviton3/4) | award-critical path |
-| x86 baseline (A) | `c7i.xlarge` | apples-to-apples vCPU/GHz |
-| Inference | Lambda **arm64** | serverless, scale-to-zero |
-| Training | SageMaker `ml.g5.xlarge` (or Kaggle T4 for now) | |
+## Deploy checklist (the AWS day)
 
-**Cost discipline:** tear down benchmark EC2 immediately after each run; stay within the $150
-grant + Free Tier; Lambda/DynamoDB scale to zero. Deploy order: **S3 → benchmark (COOL locked
-first) → Lambda/API → DynamoDB → Amplify.**
-
-## Deploy checklist (when credits land)
-1. `aws configure` (AWS CLI still not installed locally — blocker B6).
-2. Create S3 buckets/prefixes; upload `best.onnx` → `models/` and ≥1,000 frames → `frames/`.
-3. Run the 3-way benchmark above; verify KleidiCV detected in `graviton_cool.json`.
-4. Package `lambda_handler.py` + deps (arm64) → Lambda; set `MODEL_S3`; wire API Gateway.
-5. Smoke-test the endpoint; record latency by `arch`.
+1. `aws login` (profile `hackathon`, us-east-1); subscribe to the COOL Graviton listing; note the AMI id.
+2. `aws s3 cp runs/EXP-001/weights/best.onnx s3://<bucket>/models/EXP-001/` (+ record its sha256).
+3. `AWS_PROFILE=hackathon COOL_AMI_ID=… ALERT_EMAIL=… ./infra/deploy_aws.sh` → read the plan →
+   `APPLY=1 …` → wait for CloudFront → `curl https://<cf>/api/health` shows `is_cool_path: true`.
+4. SSM into the instance → `bench_cool.sh` (C). Launch a c7i.xlarge for (A) and a stock Ubuntu c8g
+   for (B), run, **terminate them**. `python -m src.bench.compare`.
+5. Leave the demo instance running for judging (27 Oct – 9 Nov): ≈ $0.17/h ⇒ ≈ $60 for the window;
+   the budget alarm is set before anything else is created.

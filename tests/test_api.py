@@ -73,6 +73,13 @@ def test_unknown_job_is_404():
     assert client.get("/api/jobs/nope").status_code == 404
 
 
+def test_metrics_reports_host_and_provenance():
+    j = client.get("/api/metrics").json()
+    assert j["host"]["machine"] and j["host"]["vcpus"]
+    assert isinstance(j["opencv"]["is_cool_path"], bool) and j["opencv"]["version"]
+    assert "stages_ms" in j and j["frames_total"] >= 0
+
+
 def test_analyze_and_report_path():
     if not (_HAVE_MODEL and _HAVE_SAMPLES):
         print("  skip  test_analyze_and_report_path (model/samples absent)")
@@ -107,6 +114,11 @@ def test_analyze_and_report_path():
     assert rec["result"]["survey_id"] == job["survey_id"]
     assert rec["progress"]["done"] == rec["progress"]["total"] == job["frames"]
     assert client.get(f"/api/report/csv?survey_id={job['survey_id']}").status_code == 200
+
+    # every analysed frame (analyze + both surveys) fed the live per-stage metrics
+    m = client.get("/api/metrics").json()
+    assert m["stages_ms"]["see"]["n"] >= 1 + 2 * job["frames"] and m["stages_ms"]["stage1"]["p50"] >= 0
+    assert body["stage1"]["orientation"]["nadir"] in ("top", "unknown")
 
 
 def _run_all():

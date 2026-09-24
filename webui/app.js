@@ -27,7 +27,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   wireInputs();
   wireKeyboard();
   Viewer.init();
-  await Promise.all([loadHealth(), loadSamples()]);
+  await Promise.all([loadHealth(), loadSamples(), loadMetrics()]);
 });
 
 async function loadHealth() {
@@ -50,6 +50,18 @@ async function loadHealth() {
     $("#pillCv").textContent = "backend offline";
     $("#pillCv").className = "pill pill-bad";
   }
+}
+
+/* Live runtime: where this server runs (arch · EC2 type · COOL?) + rolling per-stage p50. */
+async function loadMetrics() {
+  try {
+    const m = await fetch(`${API}/api/metrics`).then(r => r.json());
+    const h = m.host || {}, e = m.ec2 || {}, o = m.opencv || {};
+    const arch = /aarch64|arm64/i.test(h.machine || "") ? "Arm64 (Graviton)" : (h.machine || "?");
+    $("#regHost").textContent = `${arch}${e["instance-type"] ? " · " + e["instance-type"] : ""} · ${h.vcpus || "?"} vCPU · ${o.is_cool_path ? "COOL" : "stock"} OpenCV`;
+    const s = m.stages_ms || {};
+    if (s.see) $("#regLat").textContent = `stage1 ${s.stage1 ? s.stage1.p50 : "—"} · see ${s.see.p50} · decide ${s.prove_decide ? s.prove_decide.p50 : "—"} ms (n=${s.see.n})`;
+  } catch (e) { /* metrics are optional */ }
 }
 
 /* The promises the tiers carry — read from models/<MODEL>/calibration.json via /api/health. */
@@ -351,6 +363,7 @@ async function runAnalyze() {
     const d = await fetch(url, opts).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); });
     state._analyze = d;
     renderAnalyze(d);
+    loadMetrics();
     stepperFinish(["see", "prove", "decide"]);
   } catch (e) {
     stepperReset();
@@ -608,6 +621,7 @@ async function runSurvey() {
     const d = await pollJob(job.job_id);
     state.survey = d;
     renderSurvey(d);
+    loadMetrics();
     stepperFinish(["see", "prove", "decide", "act"]);
   } catch (e) {
     stepperReset();

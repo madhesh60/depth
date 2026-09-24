@@ -44,8 +44,8 @@ what moved, what's blocked, what's next. Newest entries at the top of §4.
 | Evaluation + ablation | ✅ Done (EXP-001) | `evaluate.py` (deploy-faithful cv2.dnn): val-tuned thresholds/test-once, per-sensor & per-source tables, bootstrap CIs → `docs/eval_exp001.md` (STUDY-05). Aggregate 0.827 reproduces 0.822; honest sonar `fishing_gear` AP 0.473. GhostVision head-to-head pending EXP-002. |
 | Reporting engine | ✅ Done | `src/agentic/{geo,mission}.py`: honest geotag + GeoJSON/GPX/KML/CSV/JSON exports. |
 | Dashboard | ✅ Done | Zero-build static web app (`webui/`), served by FastAPI; hardened (job queue, per-frame model lock, upload limits, shipped samples, vendored Leaflet). See→Prove→Decide→Act stepper, evidence cards (conf→relook), agent trace, Leaflet hazard map + recovery route, downloads, honesty banners. Verified under uvicorn. |
-| AWS deployment | ⬜ Not started | AWS CLI not yet installed. |
-| **COOL benchmark (Arm vs x86)** | ⬜ Not started | **Bonus-prize deliverable (Best Use of COOL).** |
+| AWS deployment | 🟡 Scripted, not run | `infra/deploy_aws.sh` (dry-run default) + `setup_cool_instance.sh` + `depth.service`; EC2 c8g COOL AMI + CloudFront + S3 + alarms. Scheduled for the AWS day. |
+| **COOL benchmark (Arm vs x86)** | 🟡 Tooling done, EC2 runs pending | Product-workload benchmark (`src/bench/`, `infra/bench_cool.sh`): per stage, threads pinned, $/survey-hour, COOL provenance. Local x86 reference: 238 ms/frame p50, RTF 0.012. |
 | Agentic loop (See→Prove→Decide→Act) | ✅ Done | **Primary Agentic-Vision entry.** All 4 stages + an **adaptive escalation controller** (STUDY-04) + live dashboard. Two calibrated CONFIRMED paths (re-look ⋃ high-confidence → precision **0.737 @ 30% recall**), cross-pass corroboration, 6-tool toolbox, full audit trace, human-gated. `src/agentic/` + `webui/`; 30/30 tests. Remaining is *deployment* (AWS/COOL), not the brain. |
 | Submission package (report + video) | ⬜ Not started | Due 2026-10-26. |
 
@@ -74,6 +74,33 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 ---
 
 ## 4. Session log
+
+### 2026-09-24 (review sweep 7) — COOL benchmark v3 (product workload) + Graviton/COOL deploy kit
+Review M-5 / I-1 prep / X-6 / §3.7 (not yet executed on AWS — scheduled for the AWS day).
+- **`src/bench/product_bench.py`** times what `/api/analyze` runs, per stage (decode → Stage 1 →
+  `cv2.dnn` → evidence/tiers → render) + a `cv` workload (OpenCV image ops only, where COOL/KleidiCV
+  acts); threads pinned; **$/1k frames** and **per survey-hour** compute, real-time factor and $.
+  `fingerprint.py` records arch / vCPUs / EC2 type / AMI / `cv2.__file__` (`/opt/cool` ⇒ COOL) /
+  model + calibration sha256 / git commit. `compare.py` → `docs/cool_benchmark.md` + chart with the
+  (B→C) COOL-on-identical-Graviton and (A→C) x86→Graviton+COOL rows.
+- **Local reference (laptop x86, stock OpenCV 5):** product **p50 238 ms/frame** (target < 300),
+  one thread 522 ms; the network is ~86% of the time; OpenCV-only share 22 ms; **one survey-hour of
+  sonar (≈169 frames) → 43 s compute, real-time factor 0.012**.
+- **`infra/bench_cool.sh`** replaces `benchmark_graviton.sh`: product workload; stock runs in a private
+  venv (Ubuntu 24.04 / PEP 668); **nothing is ever installed into `/opt/cool/venvs`**; refuses to
+  label a run COOL unless cv2 loads from `/opt/cool`; checks the build has `dnn`.
+- **Deploy kit:** `setup_cool_instance.sh` (repo + sha256-checked model + web deps via `pip --target`
+  + systemd; waits for `model_loaded` and `is_cool_path`), `depth.service`, `deploy_aws.sh`
+  (**dry-run by default**: budget alarm → private S3 w/ 7-day uploads → scoped IAM → SG open to
+  CloudFront origin IPs only, no SSH → EC2 c8g COOL AMI, IMDSv2 → CloudFront HTTPS → status-check
+  auto-recover + email). The pinned web stack was verified in a clean venv holding only numpy +
+  OpenCV (model warm 0.3 s, analyze OK).
+- **Retired** `infra/lambda_handler.py` (second, detection-only product with duplicated thresholds;
+  Lambda can't use COOL) and the old Stage-1 `benchmark_graviton.sh`.
+- **Live runtime metrics:** `/api/metrics` (rolling per-stage p50/p95 on this host + arch / EC2 type /
+  COOL provenance); JSON frame log lines for CloudWatch (`DEPTH_LOG_JSON=1`); UI model registry shows
+  host + live p50.
+- Tests: +4 (`tests/test_bench.py`) + metrics API test.
 
 ### 2026-09-24 (review sweep 6) — Stage 1 in the product path: sonar canonicalisation (STUDY-08)
 Review I-4 / X-1 / part of X-3.
