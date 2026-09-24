@@ -27,7 +27,19 @@ import numpy as np
 from src.detection.calibration import load_calibration
 
 REPO = Path(__file__).resolve().parents[2]
-DEFAULT_ONNX = Path(os.environ.get("DEPTH_ONNX", REPO / "runs" / "EXP-001" / "weights" / "best.onnx"))
+def _default_onnx() -> Path:
+    """``$DEPTH_ONNX``, else ``models/<MODEL>/best.onnx``, else ``runs/<MODEL>/weights/best.onnx``
+    (``<MODEL>`` = ``$DEPTH_MODEL``, default EXP-001). Weights are git-ignored; calibration is tracked."""
+    if os.environ.get("DEPTH_ONNX"):
+        return Path(os.environ["DEPTH_ONNX"])
+    model = os.environ.get("DEPTH_MODEL", "EXP-001")
+    for p in (REPO / "models" / model / "best.onnx", REPO / "runs" / model / "weights" / "best.onnx"):
+        if p.exists():
+            return p
+    return REPO / "runs" / model / "weights" / "best.onnx"
+
+
+DEFAULT_ONNX = _default_onnx()
 
 # Every runtime threshold comes from ONE file: models/<MODEL>/calibration.json (see
 # calibration.py). fishing_gear is the mission-critical, small-object class and runs hot (0.10 —
@@ -91,7 +103,7 @@ class YoloOnnxDetector:
         self,
         onnx_path: str | Path = DEFAULT_ONNX,
         names: Sequence[str] = DEFAULT_NAMES,
-        imgsz: int = 640,
+        imgsz: Optional[int] = None,
         conf_thres: "float | dict[str, float] | Sequence[float]" = 0.25,
         iou_thres: float = DEFAULT_IOU_NMS,
         class_aware_nms: bool = _CAL.class_aware_nms,
@@ -106,7 +118,7 @@ class YoloOnnxDetector:
         self._onnx_path = str(onnx_path)
         self.names = list(names)
         self.class_aware_nms = class_aware_nms
-        self.imgsz = imgsz
+        self.imgsz = int(imgsz or _CAL.imgsz)          # EXP-001 640; EXP-002 1024 (calibration.json)
         self.iou_thres = iou_thres
         # per-class confidence thresholds → array aligned to `names`; `conf_floor` is the min
         # used for the initial keep + NMS, then each detection is filtered by its class threshold.

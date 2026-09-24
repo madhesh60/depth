@@ -32,9 +32,10 @@ class Toolbox:
         t0 = time.perf_counter()
         dets = self.perceptor.perceive(frame)
         ms = (time.perf_counter() - t0) * 1000
-        n_fg = sum(d.cls_name == "fishing_gear" for d in dets)
+        g = getattr(self.perceptor, "guaranteed_class", "fishing_gear")
+        n_fg = sum(d.cls_name == g for d in dets)
         return dets, AgentStep(
-            tool="detect", rationale=f"full-frame scan found {len(dets)} candidates ({n_fg} fishing_gear)",
+            tool="detect", rationale=f"full-frame scan found {len(dets)} candidates ({n_fg} {g})",
             latency_ms=round(ms, 1), detail={"n": len(dets)},
         )
 

@@ -116,6 +116,16 @@ class Calibration:
     def imgsz(self) -> int:
         return int(self.data["detector"]["imgsz"])
 
+    @property
+    def guaranteed_class(self) -> str:
+        """The class the recall/precision promises are about (EXP-001 ``fishing_gear``, EXP-002
+        ``ghost_gear``) — defaults to the first class name."""
+        return str(self.data["tiers"].get("guaranteed_class") or self.names[0])
+
+    @property
+    def non_hazard_classes(self) -> list[str]:
+        return [c for c in (self.data["tiers"].get("non_hazard_classes") or []) if c in self.names]
+
     # -- decision tiers --------------------------------------------------------------------
     @property
     def tiers(self) -> dict:
@@ -147,6 +157,10 @@ class Calibration:
         t = self.data["tiers"]
         return {
             "model": self.data.get("model"),
+            "names": self.names,
+            "imgsz": self.imgsz,
+            "guaranteed_class": self.guaranteed_class,
+            "non_hazard_classes": self.non_hazard_classes,
             "method": t.get("method"),
             "policy": t.get("policy"),
             "tau_review": t.get("tau_review"),

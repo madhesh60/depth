@@ -44,6 +44,10 @@ async function loadHealth() {
     if (rc) rc.textContent = h.opencv + (h.is_cool_path ? " (COOL /opt/cool)" : "");
     if (rm) rm.textContent = h.model_loaded ? "loaded + warm" : "loading…";
     state.calibration = h.calibration || null;
+    const cal = h.calibration || {};
+    if ($("#regWeights")) $("#regWeights").textContent = `${cal.model || h.model} · ${cal.imgsz || "?"} px ONNX`;
+    if ($("#regClasses")) $("#regClasses").textContent = `${(cal.names || []).length} · ${(cal.names || []).join(", ")}`;
+    if ($("#regGateK")) $("#regGateK").textContent = `gate · ${cal.guaranteed_class || "?"}`;
     renderGuarantees(h.calibration);
     if (!h.model_loaded && !h.model_error) setTimeout(loadHealth, 1500);   // re-poll until warm
   } catch (e) {
@@ -470,7 +474,7 @@ function tierPromise(c) {
   if (d.mode !== "calibrated") return "legacy rule (no calibrated promise)";
   if (c.verdict === "confirmed") return `CONFIRMED tier promise: ≥ ${Math.round((g.precision_promise || 0) * 100)}% are real (95% conf.)`;
   if (c.verdict === "review") return `REVIEW + CONFIRMED together reach ≥ ${Math.round((g.recall_promise || 0) * 100)}% of pots (95% conf.)`;
-  if (c.cls_name === "natural_formation") return "natural seabed class — not a hazard, kept for audit";
+  if (((state.calibration || {}).non_hazard_classes || []).includes(c.cls_name)) return "natural seabed class — not a hazard, kept for audit";
   return `LOW-RISK tier holds ≤ ${Math.round((1 - (g.recall_promise || 0)) * 100)}% of pots — kept for audit, never deleted`;
 }
 function verdictReason(c) {

@@ -249,7 +249,7 @@ def _run_survey(frames, gps: str, budget_minutes: Optional[float], nadir: Option
 def health():
     cal = load_calibration()
     summary = cal.summary()
-    summary["detector_floor"] = cal.conf.get(cal.tiers.get("guaranteed_class", "fishing_gear"))
+    summary["detector_floor"] = cal.conf.get(cal.guaranteed_class)
     cv2_file = getattr(cv2, "__file__", "") or ""
     return {
         "status": "ok", "opencv": cv2.__version__,

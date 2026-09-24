@@ -53,12 +53,15 @@ class Perceptor:
         iou_thres: float = DEFAULT_IOU_NMS,
         relook_conf: Optional[float] = None,
     ):
-        relook_conf = load_calibration().relook_conf if relook_conf is None else relook_conf
+        cal = load_calibration()
+        relook_conf = cal.relook_conf if relook_conf is None else relook_conf
+        self.guaranteed_class = cal.guaranteed_class
         # main detector runs at the per-class thresholds (hot for fishing_gear, 0.10)
         self.detector = YoloOnnxDetector(onnx_path, conf_thres=conf_thres, iou_thres=iou_thres)
         # the re-look detector runs even hotter so a faint re-fire is still measurable
         rl = dict(PER_CLASS_CONF)
-        rl["fishing_gear"] = min(rl.get("fishing_gear", 0.10), relook_conf)
+        g = self.guaranteed_class
+        rl[g] = min(rl.get(g, 0.10), relook_conf)
         self.relook_detector = self.detector.with_conf(rl)      # shares the loaded network
 
     def warmup(self) -> float:
@@ -75,7 +78,7 @@ class Perceptor:
         self,
         frame: np.ndarray,
         bbox: tuple[int, int, int, int],
-        cls_name: str = "fishing_gear",
+        cls_name: Optional[str] = None,
         enhance: bool = False,
     ) -> RelookResult:
         """Crop a padded window around ``bbox``, upscale it, re-detect, and report the best
@@ -84,6 +87,7 @@ class Perceptor:
         ``enhance=True`` first runs CLAHE on the crop — the agent's "try harder" pass for an
         otherwise uncertain candidate (local-contrast boost before the higher-resolution look).
         """
+        cls_name = cls_name or self.guaranteed_class
         x1, y1, x2, y2 = bbox
         bw, bh = x2 - x1, y2 - y1
         H, W = frame.shape[:2]

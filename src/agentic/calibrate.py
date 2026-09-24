@@ -575,7 +575,8 @@ def main():
                 f"conf * (0.5 + 0.5*[relook_{rl} re-fired])" if comb == "demote"
                 else f"max(conf, relook_{rl}{', relook_' + rl + '_clahe' if clahe else ''})"),
             "policy": choice, "relook_mode": rl, "escalate_clahe": bool(clahe), "combine": comb,
-            "guaranteed_class": a.cls_name, "non_hazard_classes": ["natural_formation"],
+            "guaranteed_class": a.cls_name,
+            "non_hazard_classes": [c for c in ("natural_formation",) if c in load_calibration(a.model).names],
             "tau_review": float(fitres["tau_review"]),
             "tau_confirm": None if pc["tau_confirm"] is None else float(pc["tau_confirm"]),
             "alpha_requested": a.alpha, "target_precision": a.target_precision, "delta": a.delta,

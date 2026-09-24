@@ -64,7 +64,7 @@ class GuaranteedTiers:
                    tau_confirm=None if t.get("tau_confirm") is None else float(t["tau_confirm"]),
                    relook_mode=t.get("relook_mode"), escalate_clahe=bool(t.get("escalate_clahe")),
                    combine=t.get("combine", "lift"),
-                   guaranteed_class=t.get("guaranteed_class", "fishing_gear"),
+                   guaranteed_class=cal.guaranteed_class,
                    non_hazard_classes=tuple(t.get("non_hazard_classes") or ()),
                    p_pot_bins=list(t.get("p_pot_bins") or []), guarantees=dict(t.get("guarantees") or {}),
                    policy=t.get("policy", ""))

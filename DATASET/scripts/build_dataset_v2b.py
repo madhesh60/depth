@@ -216,10 +216,13 @@ def main() -> None:
 
     (DST / "groups.json").write_text(json.dumps(groups, indent=1))
     (DST / "official_crabpot_test.txt").write_text("\n".join(official) + "\n")
+    # UTF-8 + ASCII only, and NO `path:` key: ultralytics resolves a relative `path` against the
+    # current working directory (on Kaggle: the repo), not the yaml's folder -> "images not found".
+    # Without `path` it uses the yaml's own folder.
     (DST / "data.yaml").write_text(
-        "# dataset v2b — deduplicated, recording-level val, unique-frame test (build_dataset_v2b.py)\n"
-        "path: .\ntrain: train/images\nval: val/images\ntest: test/images\n"
-        f"nc: {len(CLASS_NAMES)}\nnames:\n" + "".join(f"- {n}\n" for n in CLASS_NAMES))
+        "# dataset v2b - deduplicated, recording-level val, unique-frame test (build_dataset_v2b.py)\n"
+        "train: train/images\nval: val/images\ntest: test/images\n"
+        f"nc: {len(CLASS_NAMES)}\nnames:\n" + "".join(f"- {n}\n" for n in CLASS_NAMES), encoding="utf-8")
     manifest = {
         "version": "v2b", "created": date.today().isoformat(), "parent": "v2",
         "taxonomy": dict(enumerate(CLASS_NAMES)),
