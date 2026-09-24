@@ -4,216 +4,198 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>DEPTH — See · Prove · Decide · Act</title>
-  <meta name="description" content="Agentic marine-debris detection for side-scan sonar: prove every find with acoustic-shadow physics + a re-look, decide with a human-gated agent, act with a cleanup route." />
+  <meta name="description" content="DEPTH — agentic marine-debris detection studio for side-scan sonar: prove every find with acoustic-shadow physics + a re-look, decide with a human-gated agent, act with a cleanup route." />
   <link rel="preconnect" href="https://unpkg.com" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
         integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <!-- ambient sonar sweep backdrop -->
-  <div class="bg-grid" aria-hidden="true"></div>
+<div class="app">
 
+  <!-- ============================ TOPBAR ============================ -->
   <header class="topbar">
     <div class="brand">
       <div class="brand-mark" aria-hidden="true">
-        <span class="ping"></span><span class="ping p2"></span>
-        <svg viewBox="0 0 24 24" width="22" height="22"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm0 3.5A6.5 6.5 0 0 1 18.5 12H12V5.5Z" fill="currentColor"/></svg>
+        <svg viewBox="0 0 24 24" width="18" height="18"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm0 3.4A6.6 6.6 0 0 1 18.6 12H12V5.4Z" fill="currentColor"/></svg>
       </div>
       <div class="brand-txt">
-        <h1>DEPTH</h1>
-        <p>See · Prove · Decide · Act — agentic ghost-gear detection</p>
+        <h1>DEPTH<span class="brand-sub">studio</span></h1>
+        <p>See · Prove · Decide · Act</p>
       </div>
     </div>
+
+    <nav class="modes" role="tablist" aria-label="workspace">
+      <button class="mode-btn is-active" data-mode="analyze" role="tab">Analyze</button>
+      <button class="mode-btn" data-mode="survey" role="tab">Survey</button>
+    </nav>
+
     <div class="status-pills" id="healthPills">
-      <span class="pill pill-muted" id="pillCv">OpenCV …</span>
-      <span class="pill pill-muted" id="pillModel">model …</span>
+      <span class="pill" id="pillCv">OpenCV …</span>
+      <span class="pill" id="pillModel">model …</span>
       <span class="pill pill-live" id="pillLive"><span class="dot"></span>live</span>
     </div>
   </header>
 
-  <!-- See → Prove → Decide → Act stepper (the visual spine) -->
-  <nav class="stepper" id="stepper" aria-label="pipeline stages">
-    <div class="step" data-stage="see">
-      <div class="step-ico">👁</div>
-      <div class="step-body"><b>See</b><span>full-frame YOLO11 · cv2.dnn</span></div>
-    </div>
-    <div class="step-link"></div>
-    <div class="step" data-stage="prove">
-      <div class="step-ico">🔬</div>
-      <div class="step-body"><b>Prove</b><span>acoustic shadow + re-look</span></div>
-    </div>
-    <div class="step-link"></div>
-    <div class="step" data-stage="decide">
-      <div class="step-ico">⚖️</div>
-      <div class="step-body"><b>Decide</b><span>triage agent · human-gated</span></div>
-    </div>
-    <div class="step-link"></div>
-    <div class="step" data-stage="act">
-      <div class="step-ico">🧭</div>
-      <div class="step-body"><b>Act</b><span>cleanup route + reports</span></div>
-    </div>
-  </nav>
+  <!-- ============================ WORKSPACE ============================ -->
+  <div class="workspace" id="workspace" data-mode="analyze">
 
-  <div class="tabs" role="tablist">
-    <button class="tab is-active" data-tab="analyze" role="tab">Analyze a frame</button>
-    <button class="tab" data-tab="survey" role="tab">Run a survey</button>
-    <a class="tab tab-doc" href="#about">How it works</a>
+    <!-- ---------------- LEFT RAIL ---------------- -->
+    <aside class="rail rail-left scrollable">
+      <section class="panel">
+        <div class="panel-head"><span class="panel-title">Sources</span><span class="panel-meta" id="sampleCount"></span></div>
+        <p class="panel-note">One click — no sonar files needed, or drop your own frame.</p>
+        <div class="sample-grid" id="sampleGrid"><div class="skeleton"></div><div class="skeleton"></div></div>
+        <label class="dropzone" id="dropzone">
+          <input type="file" id="fileInput" accept="image/*" hidden />
+          <span class="dz-ico">⇪</span><span>Drop a sonar frame or <u>browse</u></span>
+        </label>
+      </section>
+
+      <section class="panel" data-when="analyze">
+        <div class="panel-head"><span class="panel-title">Run</span></div>
+        <button class="btn btn-primary btn-block" id="analyzeBtn" disabled>Run See → Prove → Decide</button>
+        <p class="panel-note" id="analyzeHint">Choose a sample above to begin.</p>
+      </section>
+
+      <section class="panel" data-when="survey">
+        <div class="panel-head"><span class="panel-title">Survey run</span></div>
+        <label class="field"><span>GPS source</span>
+          <select id="gpsMode">
+            <option value="synthetic">Synthetic demo track</option>
+            <option value="none">None (honest no-GPS)</option>
+          </select>
+        </label>
+        <button class="btn btn-primary btn-block" id="surveyBtn">Run full survey</button>
+        <p class="panel-note">Every sample → proven hazards → human-approved route + reports.</p>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head"><span class="panel-title">Model registry</span></div>
+        <div class="reg" id="modelReg">
+          <div class="reg-row"><span class="reg-k">detector</span><span class="reg-v">YOLO11 · cv2.dnn</span></div>
+          <div class="reg-row"><span class="reg-k">weights</span><span class="reg-v">EXP-001 best.onnx</span></div>
+          <div class="reg-row"><span class="reg-k">classes</span><span class="reg-v">4 · torch-free</span></div>
+          <div class="reg-row"><span class="reg-k">gate · fishing_gear</span><span class="reg-v">0.10 (hot)</span></div>
+          <div class="reg-row"><span class="reg-k">opencv</span><span class="reg-v" id="regCv">…</span></div>
+          <div class="reg-row"><span class="reg-k">runtime</span><span class="reg-v" id="regModel">…</span></div>
+        </div>
+      </section>
+    </aside>
+
+    <!-- ---------------- CENTER CANVAS ---------------- -->
+    <main class="canvas">
+      <div class="canvas-toolbar" id="canvasToolbar" data-when="analyze">
+        <div class="verdict-counts" id="verdictCounts"></div>
+        <div class="tb-seg seg" role="group" aria-label="image view">
+          <button class="seg-btn is-active" data-view="overlay">Verdicts</button>
+          <button class="seg-btn" data-view="frame">Raw</button>
+        </div>
+        <div class="class-legend" id="classLegend" title="show / cut a detected class"></div>
+        <div class="tb-spacer"></div>
+        <div class="latency mono" id="latency"></div>
+      </div>
+
+      <!-- analyze viewer -->
+      <div class="viewer" id="viewer" data-when="analyze">
+        <div class="viewer-canvas" id="viewerCanvas">
+          <div class="viewer-stage" id="viewerStage">
+            <img id="stageImg" alt="analysed sonar frame" draggable="false" />
+            <svg id="boxLayer" class="box-layer" xmlns="http://www.w3.org/2000/svg"></svg>
+          </div>
+          <div class="viewer-empty" id="viewerEmpty" hidden>no detections on this frame</div>
+          <figure class="agent-eye" id="agentEye" hidden>
+            <figcaption class="ae-cap"><span class="ae-dot"></span><span id="aeCap">agent's eye</span></figcaption>
+            <img id="aeImg" alt="agent's-eye re-look view" />
+          </figure>
+          <div class="viewer-placeholder" id="analyzePlaceholder">
+            <div class="ph-ring"></div>
+            <p>Pick a frame and run the loop. Each detection is <b>proven</b> (acoustic-shadow physics + a zoom-in re-look), then <b>triaged</b> by the agent — watch it fly to every find.</p>
+          </div>
+        </div>
+        <div class="viewer-bar">
+          <div class="vb-grp">
+            <button class="vb-btn" id="zoomOut" title="zoom out ( − )">−</button>
+            <span class="zoom-read mono" id="zoomRead">100%</span>
+            <button class="vb-btn" id="zoomIn" title="zoom in ( + )">+</button>
+            <button class="vb-btn vb-fit" id="zoomFit" title="fit ( 0 )">fit</button>
+            <button class="vb-btn vb-tour" id="tourBtn" title="fly through every find the way the agent looked">▶ agent tour</button>
+          </div>
+          <div class="vb-gate">
+            <span class="vb-gate-lbl">gate</span>
+            <input type="range" id="confGate" min="0.05" max="0.9" step="0.05" value="0.10" aria-label="detector confidence gate" />
+            <output class="mono" id="confGateVal">0.10</output>
+            <span class="vb-gate-showing mono" id="gateShowing"></span>
+          </div>
+          <div class="vb-hint">scroll zoom · drag pan · click box · ←/→ · G gaze</div>
+        </div>
+        <div class="canvas-cap mono" id="stageCap"></div>
+      </div>
+
+      <!-- survey map center -->
+      <div class="survey-center" data-when="survey">
+        <div class="mission-banner" id="missionBanner" hidden></div>
+        <div class="map-wrap" id="mapWrap">
+          <div id="map"></div>
+          <div class="map-note mono" id="mapNote"></div>
+        </div>
+        <div class="viewer-placeholder" id="surveyPlaceholder">
+          <div class="ph-ring"></div>
+          <p>Run a survey to see the <b>Act</b> stage: hazards on a map, a nearest-neighbour recovery route, and GeoJSON / GPX / KML / CSV exports — human-approved before dispatch.</p>
+        </div>
+      </div>
+    </main>
+
+    <!-- ---------------- RIGHT INSPECTOR ---------------- -->
+    <aside class="rail inspector scrollable">
+      <!-- analyze: evidence -->
+      <section class="panel evidence-panel" data-when="analyze">
+        <div class="panel-head"><span class="panel-title">Evidence</span><span class="panel-meta">proven before trusted</span></div>
+        <div class="evidence-grid" id="evidenceGrid">
+          <p class="empty-hint">Run the loop — every detection gets an evidence card here: detector→re-look confidence, acoustic shadow, height, and the full tool-call trace.</p>
+        </div>
+      </section>
+
+      <!-- survey: downloads + hazards -->
+      <section class="panel" data-when="survey">
+        <div class="panel-head"><span class="panel-title">Reports</span><span class="panel-meta">open on any GPS / GIS</span></div>
+        <div class="dl-grid" id="dlGrid"></div>
+        <div class="panel-head" style="margin-top:14px"><span class="panel-title">Frames</span></div>
+        <div class="thumb-strip" id="thumbStrip"></div>
+      </section>
+      <section class="panel" data-when="survey">
+        <div class="panel-head"><span class="panel-title">Hazards</span><span class="panel-meta mono" id="hazCount"></span></div>
+        <div class="table-scroll">
+          <table class="haz-table"><thead><tr>
+            <th>ID</th><th>Class</th><th>Verdict</th><th>Conf</th><th>Ev</th><th>H</th><th>Shadow</th><th>Lat, Lon</th><th>±</th><th>Review</th>
+          </tr></thead><tbody id="hazBody"></tbody></table>
+        </div>
+      </section>
+    </aside>
   </div>
 
-  <main class="wrap">
-    <!-- ============================ ANALYZE ============================ -->
-    <section class="panel-tab is-active" id="tab-analyze">
-      <div class="cols">
-        <!-- input rail -->
-        <aside class="rail">
-          <h2 class="rail-h">1 · Pick a sonar frame</h2>
-          <p class="rail-sub">One click — no sonar files needed. Or drop your own frame.</p>
-          <div class="sample-grid" id="sampleGrid"><div class="skeleton"></div><div class="skeleton"></div></div>
-
-          <label class="dropzone" id="dropzone">
-            <input type="file" id="fileInput" accept="image/*" hidden />
-            <span class="dz-ico">⇪</span>
-            <span>Drop a sonar frame or <u>browse</u></span>
-          </label>
-
-          <button class="btn btn-primary btn-block" id="analyzeBtn" disabled>Run See → Prove → Decide</button>
-          <p class="hint" id="analyzeHint">Choose a sample above to begin.</p>
-        </aside>
-
-        <!-- results -->
-        <div class="result" id="analyzeResult" hidden>
-          <div class="result-head">
-            <div class="verdict-counts" id="verdictCounts"></div>
-            <div class="latency" id="latency"></div>
-            <div class="seg" role="group" aria-label="image view">
-              <button class="seg-btn is-active" data-view="overlay">Agent verdicts</button>
-              <button class="seg-btn" data-view="frame">Raw sonar</button>
-            </div>
-          </div>
-
-          <div class="viewer" id="viewer">
-            <div class="viewer-canvas" id="viewerCanvas">
-              <div class="viewer-stage" id="viewerStage">
-                <img id="stageImg" alt="analysed sonar frame" draggable="false" />
-                <svg id="boxLayer" class="box-layer" xmlns="http://www.w3.org/2000/svg"></svg>
-              </div>
-              <div class="viewer-empty" id="viewerEmpty" hidden>no detections on this frame</div>
-              <figure class="agent-eye" id="agentEye" hidden>
-                <figcaption class="ae-cap"><span class="ae-dot"></span><span id="aeCap">agent's eye</span></figcaption>
-                <img id="aeImg" alt="agent's-eye re-look view" />
-              </figure>
-            </div>
-            <div class="viewer-bar">
-              <div class="vb-grp">
-                <button class="vb-btn" id="zoomOut" title="zoom out ( − )">−</button>
-                <span class="zoom-read" id="zoomRead">100%</span>
-                <button class="vb-btn" id="zoomIn" title="zoom in ( + )">+</button>
-                <button class="vb-btn vb-fit" id="zoomFit" title="fit to view ( 0 )">⤢ fit</button>
-                <button class="vb-btn vb-tour" id="tourBtn" title="fly through every find the way the agent looked">▶ agent&nbsp;tour</button>
-              </div>
-              <div class="vb-gate">
-                <span class="vb-gate-lbl">detector gate</span>
-                <input type="range" id="confGate" min="0.05" max="0.9" step="0.05" value="0.10"
-                       aria-label="detector confidence gate" />
-                <output id="confGateVal">0.10</output>
-                <span class="vb-gate-showing" id="gateShowing"></span>
-              </div>
-              <div class="vb-hint">scroll = zoom · drag = pan · click a box = inspect · ⇤/⇥ cycle · G replay agent gaze</div>
-            </div>
-            <figcaption id="stageCap" class="viewer-cap"></figcaption>
-          </div>
-
-          <h3 class="evidence-h">Evidence cards <span class="muted">— every find is proven before it's trusted · hover a card to locate it · <b>Replay gaze</b> shows what the agent saw</span></h3>
-          <div class="evidence-grid" id="evidenceGrid"></div>
-        </div>
-
-        <div class="result placeholder" id="analyzePlaceholder">
-          <div class="ph-ring"></div>
-          <p>Pick a frame and run the loop.<br/>You'll see each detection <b>proven</b> with acoustic-shadow physics and a zoom-in re-look, then <b>triaged</b> by the agent — with the full tool-call trace.</p>
-        </div>
-      </div>
-    </section>
-
-    <!-- ============================ SURVEY ============================ -->
-    <section class="panel-tab" id="tab-survey">
-      <div class="survey-controls">
-        <div>
-          <h2 class="rail-h">Run the full loop over a survey</h2>
-          <p class="rail-sub">Every sample frame → proven hazards → a human-approved cleanup route + downloadable reports.</p>
-        </div>
-        <div class="survey-actions">
-          <label class="gps-toggle">
-            <span>GPS</span>
-            <select id="gpsMode">
-              <option value="synthetic">Synthetic demo track</option>
-              <option value="none">None (honest no-GPS)</option>
-            </select>
-          </label>
-          <button class="btn btn-primary" id="surveyBtn">Run survey</button>
-        </div>
-      </div>
-
-      <div id="surveyResult" hidden>
-        <div class="mission-banner" id="missionBanner"></div>
-
-        <div class="survey-cols">
-          <div class="map-wrap">
-            <div id="map"></div>
-            <div class="map-note" id="mapNote"></div>
-          </div>
-          <div class="mission-side">
-            <h3 class="evidence-h">Downloads <span class="muted">— open on any GPS / GIS</span></h3>
-            <div class="dl-grid" id="dlGrid"></div>
-            <h3 class="evidence-h">Frames</h3>
-            <div class="thumb-strip" id="thumbStrip"></div>
-          </div>
-        </div>
-
-        <h3 class="evidence-h">Hazards <span class="muted" id="hazCount"></span></h3>
-        <div class="table-scroll">
-          <table class="haz-table">
-            <thead><tr>
-              <th>ID</th><th>Class</th><th>Verdict</th><th>Conf</th><th>Evidence</th>
-              <th>Height</th><th>Shadow</th><th>Lat, Lon</th><th>±err</th><th>Review</th>
-            </tr></thead>
-            <tbody id="hazBody"></tbody>
-          </table>
-        </div>
-      </div>
-
-      <div class="result placeholder" id="surveyPlaceholder">
-        <div class="ph-ring"></div>
-        <p>Run a survey to see the <b>Act</b> stage: hazards plotted on a map, a nearest-neighbour recovery route, and GeoJSON / GPX / KML / CSV exports — with a human-approval gate on every dispatch.</p>
-      </div>
-    </section>
-
-    <!-- ============================ ABOUT ============================ -->
-    <section class="about" id="about">
-      <h2>Why this is trustworthy, not just a detector</h2>
-      <div class="about-grid">
-        <div class="about-card"><b>See</b><p>YOLO11 runs full-frame through OpenCV 5 <code>cv2.dnn</code> (no torch at inference). The mission-critical <code>fishing_gear</code> class runs at a hot threshold to catch small crab-pots.</p></div>
-        <div class="about-card"><b>Prove</b><p>A real object on the seabed casts a dark <b>acoustic shadow</b> — like a person under a streetlight. We measure it and estimate object height. The stronger discriminator is a <b>re-look</b>: zoom in and re-detect — real objects persist, speckle doesn't.</p></div>
-        <div class="about-card"><b>Decide</b><p>A deterministic, <b>human-gated</b> agent calls tools in sequence and triages each find into CONFIRMED / REVIEW / REJECTED — recording every tool call. <b>Nothing is ever deleted</b>: REJECTED is kept for audit.</p></div>
-        <div class="about-card"><b>Act</b><p>Confirmed hazards become a nearest-neighbour recovery route and geotagged reports a boat crew can load. GPS is <b>honest</b>: no coordinates are invented when the file has none.</p></div>
-      </div>
-      <p class="about-foot">Design principle: <b>honesty first.</b> On this crab-pot sonar the shadow is only measurable on a minority of objects, so it is shown <i>where it exists</i> and never used as a silent gate — the re-look persistence is what earns a CONFIRMED (precision ≈0.79 vs ≈0.61 raw).</p>
-    </section>
-  </main>
-
-  <footer class="footer" id="footer">
-    <span id="footVer">OpenCV … · model …</span>
-    <span class="foot-sep">·</span>
-    <span>No candidate is ever deleted — REJECTED is retained for audit</span>
-    <span class="foot-sep">·</span>
-    <span>Human approval required before any dispatch</span>
+  <!-- ============================ PIPELINE DOCK ============================ -->
+  <footer class="dock">
+    <div class="dock-stepper" id="stepper" aria-label="pipeline stages">
+      <div class="dstep" data-stage="see"><span class="dnode">1</span><div class="dtxt"><b>See</b><span>YOLO11 · cv2.dnn</span></div></div>
+      <div class="dlink"></div>
+      <div class="dstep" data-stage="prove"><span class="dnode">2</span><div class="dtxt"><b>Prove</b><span>shadow + re-look</span></div></div>
+      <div class="dlink"></div>
+      <div class="dstep" data-stage="decide"><span class="dnode">3</span><div class="dtxt"><b>Decide</b><span>triage · human-gated</span></div></div>
+      <div class="dlink"></div>
+      <div class="dstep" data-stage="act"><span class="dnode">4</span><div class="dtxt"><b>Act</b><span>route + reports</span></div></div>
+    </div>
+    <div class="dock-log">
+      <div class="dock-log-head"><span class="panel-title">Agent log</span><span class="mono" id="dockLatency"></span></div>
+      <ol class="agent-log scrollable" id="agentLog"><li class="log-idle">idle — run the loop to stream the agent's tool calls</li></ol>
+    </div>
   </footer>
+</div>
 
-  <!-- live agent trace overlay (fires during a run) -->
-  <div class="run-toast" id="runToast" hidden><span class="spin"></span><span id="runToastTxt">working…</span></div>
+<div class="run-toast" id="runToast" hidden><span class="spin"></span><span id="runToastTxt">working…</span></div>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-  <script src="app.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="app.js"></script>
 </body>
 </html>

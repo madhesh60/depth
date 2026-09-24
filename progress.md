@@ -75,6 +75,30 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ## 4. Session log
 
+### 2026-09-24 (cont.3) — Frontend rebuilt as a DepthWizard-class agentic studio
+- **Studied the user's reference** `C:\Users\RAJ\Desktop\ExP\DepthWizard` (React+TS+Tailwind+Zustand
+  Tauri studio) and rebuilt DEPTH's web app to that bar — **kept zero-build vanilla** (the live judge
+  demo must stay up without a toolchain; Tauri/React would jeopardise it) while adopting the
+  instrument aesthetic + panelled layout.
+- **Studio shell** (`webui/index.html` + `styles.css` full rewrite): full-viewport, no page scroll;
+  topbar (brand + **Analyze/Survey mode switch** + status pills); 3-column **workspace** — left rail
+  (**Sources** + **Model Registry**) · center **canvas** (toolbar + interactive viewer) · right
+  **inspector** (Evidence / Survey reports+hazards); **bottom pipeline dock** = See→Prove→Decide→Act
+  status-node stepper + a **live streaming agent log** (tool calls appear line-by-line with timings as
+  the loop runs — the "agentic running" feel).
+- **Class cut/toggle:** per-class legend chips in the toolbar — click to **cut/show a detected class**
+  (dims its boxes + evidence cards); combined with the detector-gate slider.
+- **Smoother zoom:** wheel now eases (.10s) instead of stepping; drag stays instant; cinematic
+  gaze-tour + agent's-eye PiP retained.
+- **Cleaner aesthetic:** DepthWizard palette (near-black surfaces #0a0e13, teal accent #1fb6d5, thin
+  5px scrollbars, tiny uppercase panel titles, mono tabular metrics, status-dot nodes) — dropped the
+  marketing hero/emoji-steps.
+- **Preserved every DOM id** the viewer/agent logic uses (`app.js` rewritten around the new shell but
+  same contract) → **backend untouched, 30/30 tests still valid**.
+- **Verified:** `node --check`, all `#id` refs resolve, uvicorn serves the studio (title=DEPTH,
+  app.js/styles 200, studio elements present) + `/api/analyze` returns candidates + relook_view.
+  *Pixel-level polish is best judged in a browser — run `uvicorn src.dashboard.app:app --port 8000`.*
+
 ### 2026-09-24 (cont.2) — "See what the agent sees": agent's-eye OpenCV view + cinematic synchronized zoom
 - **OpenCV, upgraded.** `zoom_relook` built the exact upscaled+CLAHE image the re-look detector
   sees, then discarded it. Added **`Perceptor.relook_view()`** (pure cv2, **no extra inference** — the
