@@ -46,6 +46,15 @@ def test_geotag_fills_coords_with_error():
     assert c.lon > fix.lon
 
 
+def test_geotag_unknown_orientation_is_honest():
+    """No orientation => no range: the object sits at the boat fix with a swath-wide error."""
+    c = Candidate(bbox=(300, 400, 340, 460), cls_id=0, cls_name="fishing_gear", conf=0.5)
+    fix = PingFix(lat=37.98, lon=-76.0, heading_deg=0.0)
+    geotag(c, fix, nadir="unknown", w=640, h=640, frame_id="upload")
+    assert (c.lat, c.lon) == (37.98, -76.0) and c.geo_error_m >= 640 * 0.05 - 1e-6
+    assert range_px_from_nadir((0, 0, 10, 10), None, 640, 640) is None
+
+
 def test_synthetic_track_is_flagged_and_ordered():
     ids = ["Rec6_wcp_ss_port_00030", "Rec6_wcp_ss_port_00010", "Rec6_wcp_ss_port_00020"]
     tr = synthetic_track(ids)

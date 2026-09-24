@@ -80,7 +80,8 @@ def to_geojson(tracked: list[TrackedObject], mission: MissionPlan) -> str:
             "geometry": {"type": "Point", "coordinates": [t.lon, t.lat]},
             "properties": {"id": t.oid, "class": t.cls_name, "verdict": t.verdict.value,
                            "conf": t.conf, "evidence_score": t.evidence_score,
-                           "height_m": t.height_m, "shadow": t.shadow_quality,
+                           "height_m": t.height_m, "height_rel_alt": t.height_rel,
+                           "shadow": t.shadow_quality, "also_in": t.also_in,
                            "geo_error_m": t.geo_error_m, "frame": t.frame_id},
         })
     idx = _by_id(tracked)
@@ -125,7 +126,7 @@ def to_kml(tracked: list[TrackedObject], mission: MissionPlan) -> str:
             continue
         out.append(f"  <Placemark><name>{t.oid}</name>"
                    f"<description>{t.verdict.value} {t.cls_name} conf={t.conf:.2f} "
-                   f"height={t.height_m} shadow={t.shadow_quality}</description>"
+                   f"height_rel_alt={t.height_rel} shadow={t.shadow_quality}</description>"
                    f"<Point><coordinates>{t.lon},{t.lat},0</coordinates></Point></Placemark>")
     route = [idx[i] for i in mission.recovery_route if idx.get(i) and idx[i].lat is not None]
     if len(route) > 1:
@@ -140,13 +141,13 @@ def to_csv(tracked: list[TrackedObject]) -> str:
     buf = io.StringIO()
     w = csv.writer(buf)
     w.writerow(["id", "class", "verdict", "conf", "evidence_score", "frame",
-                "lat", "lon", "geo_error_m", "height_m", "shadow", "bbox"])
+                "lat", "lon", "geo_error_m", "height_m", "height_rel_alt", "shadow", "bbox", "also_in"])
     for t in tracked:
         w.writerow([t.oid, t.cls_name, t.verdict.value, f"{t.conf:.3f}", t.evidence_score, t.frame_id,
                     t.lat if t.lat is not None else "", t.lon if t.lon is not None else "",
                     t.geo_error_m if t.geo_error_m is not None else "",
-                    t.height_m if t.height_m is not None else "", t.shadow_quality,
-                    " ".join(map(str, t.bbox))])
+                    t.height_m if t.height_m is not None else "", t.height_rel, t.shadow_quality,
+                    " ".join(map(str, t.bbox)), " ".join(t.also_in)])
     return buf.getvalue()
 
 

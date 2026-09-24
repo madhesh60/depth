@@ -25,7 +25,7 @@ flowchart LR
   SH --> TRI
   TRI -->|evidence-ranked| REV["REVIEW<br/>human queue"]
   TRI -->|low evidence| REJ["REJECTED<br/>kept for audit, deprioritised"]
-  CONF --> MP["match_other_pass<br/>cross-pass corroboration (survey)"]
+  CONF --> MP["stitch_boundary<br/>one object cut by a chunk boundary = one hazard"]
   REV --> MP
   MP --> ACT["ACT<br/>human-approved recovery route<br/>+ geotagged GeoJSON/GPX/KML/CSV"]
 ```
@@ -35,7 +35,8 @@ flowchart LR
   0.47→0.69), trading precision that the agent then repairs.
 - **PROVE** — for each candidate the agent gathers *physical + consistency* evidence: re-look
   persistence (zoom in and re-detect — a real object re-fires, speckle does not), the acoustic
-  **shadow** where it exists (+ a height estimate), and echo strength.
+  **shadow** where it exists (+ a height *relative to sonar altitude*), and echo strength. The frame
+  orientation comes from a **source rule** (`src/cv_pipeline/orientation.py`), never a guess.
 - **DECIDE** — an adaptive controller (below) selects tools by evidence and triages into
   **CONFIRMED / REVIEW / REJECTED**, recording every tool call.
 - **ACT** — CONFIRMED hazards become a nearest-neighbour **recovery route** + geotagged reports;
@@ -54,8 +55,8 @@ human-readable trace entry.
 | `zoom_relook` | crop + 2.5× upscale + re-detect | re-fire ⇒ confirm; no re-fire ⇒ escalate |
 | `enhance_relook` | CLAHE contrast boost, then re-look | a "try harder" pass for uncertain candidates |
 | `shadow_check` | measure the acoustic shadow (contrast, run) | physical evidence + quality for the card |
-| `estimate_height` | height from shadow geometry `h = alt·Ls/(range+Ls)` | plausibility evidence (pixel scale cancels) |
-| `match_other_pass` | corroborate in an overlapping pass | second sighting ⇒ boosts review ranking |
+| `estimate_height` | relative height from shadow geometry `h/H = Ls/(range+Ls)` | plausibility evidence; metres only with a *measured* altitude |
+| `stitch_boundary` | link an object cut by a chunk boundary (same range, adjacent chunks) | counts it once in the route/report; never changes a verdict |
 
 The rule core (`policy.py`) is the **sole decision authority** — deterministic, reproducible,
 human-gated. An LLM narrator (e.g. Bedrock) could sit on top to write the mission brief without ever
@@ -75,7 +76,7 @@ Different candidates take different paths and stop at different depths:
 3. IF still uncertain AND low conf:  ← ESCALATE only when it will help
       enhance_relook (CLAHE)         ← the "try harder" pass; SKIPPED once confident
 4. decide → CONFIRMED / REVIEW / REJECTED   (records which CONFIRMED path won)
-5. (survey) match_other_pass         ← corroborate across overlapping passes
+5. (survey) stitch_boundary          ← one object split across adjacent chunks = one hazard
 ```
 
 Two real traces the award asks for (captured in `runs/`):
@@ -122,9 +123,10 @@ the cue that *didn't* work).
 - **No auto-dispatch.** Every `MissionPlan` carries `human_approval_required = True`.
 - **Honest geotagging.** Coordinates are attached only when real per-ping GPS exists; otherwise
   `gps_available = False` and the UI says so. Demo tracks are stamped `SYNTHETIC DEMO GPS`.
-- **Known limits:** `match_other_pass` is a filename/geometry heuristic (kept non-gating until the
-  slant-range geometry lands); the model is trained on one bay's crab-pots + one sonar brand; optical
-  debris is out of domain. All stated, none hidden.
+- **Known limits:** the model is trained on one bay's crab-pots + one sonar brand; optical debris is
+  out of domain; orientation is only known for PINGMapper sonograms (other sources: shadow not
+  measured). The old "cross-pass corroboration" was removed — adjacent chunks image *different*
+  seabed, so its matches were coincidences. All stated, none hidden.
 
 ---
 
@@ -140,5 +142,4 @@ the cue that *didn't* work).
 
 **Reproduce the evidence:** `python -m src.agentic.calibrate` (tiers + per-path precision + the
 shadow statistic) · `python -m src.agentic.pipeline --survey <dir>` (full loop → overlays + reports)
-· `pytest -q` (30/30, incl. the cross-pass integration test that asserts corroboration never changes
-a verdict).
+· `pytest -q` (incl. the stitching test that asserts it never changes a verdict).

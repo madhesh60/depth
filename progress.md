@@ -75,6 +75,21 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ## 4. Session log
 
+### 2026-09-24 (review sweep 2) — Honesty fixes: orientation by rule, thin-line shadow, no cross-pass
+Review items C-6 / I-8 (physics + geo part). See `experiments.md` STUDY-06.
+- **`src/cv_pipeline/orientation.py`** — nadir from a *source rule* (PINGMapper `*_ss_port/star*` →
+  top), explicit user override, else **unknown**. The auto-guess (26% right) is now a labelled
+  diagnostic only. `FrameResult.orientation` carries the provenance to the UI.
+- **Shadow** (`shadow.py`): thin 3-px darkest line + flank-referenced contrast (seabed no longer
+  reads as "weak shadow" 30% of the time); relative height `h/H`; metres only with a measured
+  altitude; slant→ground correction hook for Stage-1 bottom tracking; unknown orientation ⇒ not measured.
+- **Removed `match_other_pass`** and its +0.10 ranking boost / "overlapping pass" note (physically
+  wrong). **Added `stitch.py`** — chunk-boundary stitching; survey counts a split object once and keeps
+  the stronger sighting (`TrackedObject.also_in`).
+- Geotag: unknown orientation ⇒ boat fix + swath-wide error (no fake range).
+- UI/exports: "rel. height" (% of altitude) instead of metres; orientation source in the caption.
+- Tests: 39 fast (+9: orientation, stitching, relative height, thin line, unknown-orientation) + 4 API.
+
 ### 2026-09-24 (review sweep 1) — Detector core: one threshold source, per-class NMS, warm-up
 Start of the NEEDTOIMPROVE review sweep (M-3 + part of I-5/I-6).
 - **`src/detection/calibration.py` + `models/EXP-001/calibration.json`** — the ONE place every

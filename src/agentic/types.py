@@ -48,11 +48,12 @@ class ShadowProof:
     contrast: float                      # (background − shadow) / background, ∈ (−∞, 1]
     run_px: int                          # shadow length along the range axis, pixels
     strength: float                      # 0..1 soft score (contrast × length plausibility)
-    height_m: Optional[float]            # estimated object height, metres (None if scale unknown)
-    height_rel: float                    # scale-free height proxy = run / ground_range
+    height_m: Optional[float]            # height in metres — ONLY when the altitude was measured
+    height_rel: float                    # height as a fraction of sonar altitude, h/H = Ls/(R+Ls)
     echo_ratio: float                    # echo brightness / local background
     echo_xy: tuple[int, int]             # echo location in original pixels (for the overlay)
     strip: tuple[int, int, int, int]     # shadow search box x1,y1,x2,y2 (for the overlay)
+    orientation_known: bool = True       # False ⇒ frame orientation unknown, nothing measured
 
     @property
     def has_shadow(self) -> bool:
@@ -121,6 +122,9 @@ class Candidate:
     lat: Optional[float] = None
     lon: Optional[float] = None
     geo_error_m: Optional[float] = None
+    # chunk-boundary stitching (survey-level): the same object split across two adjacent chunks
+    continues_in: Optional[str] = None   # frame id where this object continues (kept as primary)
+    continuation_of: Optional[str] = None  # frame id of the primary sighting (this one is merged)
 
     @property
     def center(self) -> tuple[float, float]:
@@ -139,6 +143,8 @@ class Candidate:
             "lat": self.lat,
             "lon": self.lon,
             "geo_error_m": self.geo_error_m,
+            "continues_in": self.continues_in,
+            "continuation_of": self.continuation_of,
         }
 
 
@@ -150,7 +156,8 @@ class FrameResult:
     height: int
     candidates: list[Candidate]
     stage_ms: dict[str, float] = field(default_factory=dict)   # see/prove/decide latency
-    nadir: str = "top"                                         # calibrated range/nadir edge
+    nadir: str = "unknown"                                     # resolved nadir edge (or "unknown")
+    orientation: dict = field(default_factory=dict)            # {nadir, rule, source} provenance
 
     def by_verdict(self, v: Verdict) -> list[Candidate]:
         return [c for c in self.candidates if c.verdict is v]
@@ -165,6 +172,7 @@ class FrameResult:
             "width": self.width,
             "height": self.height,
             "nadir": self.nadir,
+            "orientation": dict(self.orientation),
             "counts": self.counts,
             "stage_ms": {k: round(v, 2) for k, v in self.stage_ms.items()},
             "candidates": [c.to_dict() for c in self.candidates],
@@ -185,7 +193,9 @@ class TrackedObject:
     lon: Optional[float] = None
     geo_error_m: Optional[float] = None
     height_m: Optional[float] = None
+    height_rel: float = 0.0
     shadow_quality: str = "none"
+    also_in: list[str] = field(default_factory=list)   # other chunks showing the same object
 
     def to_dict(self) -> dict:
         return _json(asdict(self))

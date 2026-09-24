@@ -23,6 +23,7 @@ import numpy as np
 from .agent import ReLookAgent, render
 from .geo import PingFix, geotag, synthetic_track, DEFAULT_M_PER_PX
 from .mission import build_mission, export
+from .stitch import stitch_boundaries
 from .types import Candidate, FrameResult, MissionPlan, SurveyResult, TrackedObject, Verdict
 
 REPO = Path(__file__).resolve().parents[2]
@@ -36,9 +37,9 @@ class AgenticPipeline:
 
     # -- one frame ---------------------------------------------------------------------------
     def run_frame(self, frame: np.ndarray, frame_id: str = "frame",
-                  fix: Optional[PingFix] = None,
+                  fix: Optional[PingFix] = None, nadir: Optional[str] = None,
                   progress_cb: Optional[Callable[[str, dict], None]] = None) -> FrameResult:
-        result = self.agent.run_frame(frame, frame_id=frame_id, progress_cb=progress_cb)
+        result = self.agent.run_frame(frame, frame_id=frame_id, nadir=nadir, progress_cb=progress_cb)
         if fix is not None:
             for c in result.candidates:
                 geotag(c, fix, result.nadir, result.width, result.height, frame_id, self.m_per_px)
@@ -49,6 +50,7 @@ class AgenticPipeline:
     # -- many frames -------------------------------------------------------------------------
     def run_survey(self, frames: list[tuple[str, np.ndarray]],
                    track: Optional[dict[str, PingFix]] = None, survey_id: str = "survey",
+                   nadir: Optional[str] = None,
                    progress_cb: Optional[Callable[[str, dict], None]] = None) -> SurveyResult:
         gps_available = bool(track)
         gps_synthetic = gps_available and any(f.synthetic for f in track.values())
@@ -56,23 +58,31 @@ class AgenticPipeline:
         frame_results: list[FrameResult] = []
         for frame_id, image in frames:
             fix = track.get(frame_id) if track else None
-            fr = self.run_frame(image, frame_id=frame_id, fix=fix)
+            fr = self.run_frame(image, frame_id=frame_id, fix=fix, nadir=nadir)
             frame_results.append(fr)
             if progress_cb:
                 progress_cb("frame_done", {"frame_id": frame_id, "counts": fr.counts})
 
-        # cross-pass corroboration (survey-level, non-gating): does each candidate re-appear in an
-        # overlapping pass? Adds a match_other_pass trace step + evidence note + a review-ranking
-        # boost. Never changes a verdict, so the CONFIRMED tier stays exactly the calibrated set.
-        self._corroborate(frame_results)
+        # chunk-boundary stitching (survey-level, non-gating): an object cut by the chunk boundary
+        # is one hazard, not two. Never changes a verdict or a score.
+        # Each stitched pair becomes ONE hazard, represented by the stronger sighting.
+        merged_away: set[int] = set()
+        also_in: dict[int, str] = {}
+        for a, b, _ in stitch_boundaries(frame_results):
+            keep, drop = (a, b) if _strength(a) >= _strength(b) else (b, a)
+            merged_away.add(id(drop))
+            also_in[id(keep)] = b.continuation_of if keep is b else a.continues_in
 
         tracked: list[TrackedObject] = []
         n = 0
         for fr in frame_results:
             for c in fr.candidates:
-                if c.verdict in _TRACKED_VERDICTS:
+                if c.verdict in _TRACKED_VERDICTS and id(c) not in merged_away:
                     n += 1
-                    tracked.append(_to_tracked(f"H{n:03d}", fr.frame_id, c))
+                    t = _to_tracked(f"H{n:03d}", fr.frame_id, c)
+                    if id(c) in also_in:
+                        t.also_in.append(also_in[id(c)])
+                    tracked.append(t)
 
         mission = build_mission(tracked, gps_available, gps_synthetic)
         if progress_cb:
@@ -80,26 +90,11 @@ class AgenticPipeline:
         return SurveyResult(survey_id=survey_id, frames=frame_results, tracked=tracked, mission=mission)
 
 
-    # -- cross-pass corroboration (non-gating) -----------------------------------------------
-    def _corroborate(self, frame_results: list[FrameResult]) -> None:
-        """For every candidate, ask ``match_other_pass`` whether the same object appears in an
-        overlapping pass, and record it in the trace + evidence (ranking only — never the verdict)."""
-        sightings = [
-            {"frame_id": fr.frame_id, "cls": c.cls_name,
-             "cx": c.center[0] / max(1, fr.width), "cy": c.center[1] / max(1, fr.height)}
-            for fr in frame_results for c in fr.candidates
-        ]
-        if len(sightings) < 2:
-            return
-        for fr in frame_results:
-            for c in fr.candidates:
-                cx, cy = c.center[0] / max(1, fr.width), c.center[1] / max(1, fr.height)
-                matched, mframe, step = self.agent.tools.match_other_pass(
-                    fr.frame_id, cx, cy, c.cls_name, sightings)
-                c.trace.append(step)   # after 'decide' — a survey-level corroboration pass
-                if matched and c.evidence is not None:
-                    c.evidence.notes.append(f"cross-pass: also seen in an overlapping pass ({mframe})")
-                    c.evidence.evidence_score = round(min(1.0, c.evidence.evidence_score + 0.10), 3)
+_VERDICT_RANK = {Verdict.CONFIRMED: 2, Verdict.REVIEW: 1, Verdict.REJECTED: 0}
+
+
+def _strength(c: Candidate) -> tuple[int, float]:
+    return (_VERDICT_RANK.get(c.verdict, 0), c.evidence.evidence_score if c.evidence else c.conf)
 
 
 def _to_tracked(oid: str, frame_id: str, c: Candidate) -> TrackedObject:
@@ -109,6 +104,7 @@ def _to_tracked(oid: str, frame_id: str, c: Candidate) -> TrackedObject:
         evidence_score=ev.evidence_score if ev else 0.0, frame_id=frame_id, bbox=c.bbox,
         lat=c.lat, lon=c.lon, geo_error_m=c.geo_error_m,
         height_m=ev.shadow.height_m if ev else None,
+        height_rel=ev.shadow.height_rel if ev else 0.0,
         shadow_quality=ev.shadow.quality.value if ev else "none",
     )
 

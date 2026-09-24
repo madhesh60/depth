@@ -325,7 +325,7 @@ function renderAnalyze(d) {
   $("#analyzePlaceholder").hidden = true;
   $$(".seg-btn").forEach(x => x.classList.toggle("is-active", x.dataset.view === "overlay"));
   $("#viewer").classList.remove("boxes-off");
-  $("#stageCap").textContent = `${d.frame_id} · ${d.width}×${d.height}px · nadir=${d.nadir} · ${d.candidates.length} candidate(s)`;
+  $("#stageCap").textContent = `${d.frame_id} · ${d.width}×${d.height}px · nadir=${d.nadir}${d.orientation && d.orientation.source ? ` (${d.orientation.source})` : ""} · ${d.candidates.length} candidate(s)`;
   $("#verdictCounts").innerHTML = VERDICTS.map(v => `<span class="vc vc-${v}"><span class="n">${d.counts[v] || 0}</span>${v}</span>`).join("");
   const sm = d.stage_ms || {};
   $("#latency").textContent = `⏱ ${d.wall_ms}ms · see ${fmt(sm.see)} · prove+decide ${fmt(sm.prove_decide)}`;
@@ -465,6 +465,13 @@ function playGazeTour() {
 function endTour() { state._tour = false; clearTimeout(_tourTimer); _tourTimer = null; const btn = $("#tourBtn"); if (btn) { btn.classList.remove("is-on"); btn.innerHTML = "▶ agent tour"; } }
 function cancelTour() { if (state._tour) state._tourOptOut = true; endTour(); hideAgentEye(); }
 
+// Height is RELATIVE to sonar altitude unless the altitude was measured (never an assumed 10 m).
+function heightText(m, rel, run) {
+  if (m != null) return `${m} m`;
+  if (run && rel) return `${Math.round(rel * 100)}% alt`;
+  return "—";
+}
+
 function evidenceCard(c, id) {
   const ev = c.evidence || {}, sh = ev.shadow || {}, rl = ev.relook || {}, v = c.verdict;
   const card = document.createElement("div");
@@ -472,7 +479,7 @@ function evidenceCard(c, id) {
   const rlConf = rl.conf || 0, gain = (rlConf - c.conf);
   const arrowCls = rlConf > c.conf ? "up" : (rlConf < c.conf ? "down" : "");
   const shCls = sh.quality === "clear" ? "chip-clear" : sh.quality === "weak" ? "chip-weak" : "chip-none";
-  const height = sh.height_m != null ? `${sh.height_m} m` : "—";
+  const height = heightText(sh.height_m, sh.height_rel, sh.run_px);
   card.innerHTML = `
     <div class="ev-crop${c.relook_view ? " has-enh" : ""}">
       ${c.crop_png ? `<img class="ev-img raw" alt="evidence crop" src="${c.crop_png}"/>` : `<div style="aspect-ratio:1"></div>`}
@@ -490,7 +497,7 @@ function evidenceCard(c, id) {
       </div>
       <div class="ev-facts">
         <div class="fact"><span class="k">shadow</span><span class="v ${shCls}">${sh.quality || "none"}${sh.contrast ? ` · c${sh.contrast}` : ""}</span></div>
-        <div class="fact"><span class="k">est. height</span><span class="v">${height}</span></div>
+        <div class="fact"><span class="k">rel. height</span><span class="v">${height}</span></div>
         <div class="fact"><span class="k">echo × bg</span><span class="v">${(sh.echo_ratio ?? ev.echo_ratio ?? 0).toFixed(1)}×</span></div>
         <div class="fact"><span class="k">evidence</span><span class="v">${(ev.evidence_score ?? 0).toFixed(2)}</span></div>
       </div>
@@ -569,7 +576,7 @@ function renderMap(d) {
   geoObjs.forEach(t => {
     const color = VCOLOR[t.verdict] || "#8ba6c2";
     const mk = L.circleMarker([t.lat, t.lon], { radius: t.verdict === "confirmed" ? 8 : 6, color: "#02121d", weight: 1.5, fillColor: color, fillOpacity: .95 })
-      .bindPopup(`<b>${t.oid}</b> · ${t.verdict}<br/>${t.cls_name} · conf ${t.conf}<br/>evidence ${t.evidence_score} · ${t.shadow_quality} shadow${t.height_m != null ? ` · h~${t.height_m} m` : ""}<br/>${t.lat.toFixed(5)}, ${t.lon.toFixed(5)} ±${t.geo_error_m ?? "?"} m`);
+      .bindPopup(`<b>${t.oid}</b> · ${t.verdict}<br/>${t.cls_name} · conf ${t.conf}<br/>evidence ${t.evidence_score} · ${t.shadow_quality} shadow${t.height_m != null || t.height_rel ? ` · h ${heightText(t.height_m, t.height_rel, 1)}` : ""}<br/>${t.lat.toFixed(5)}, ${t.lon.toFixed(5)} ±${t.geo_error_m ?? "?"} m`);
     mk.addTo(state.map); state.mapLayers.push(mk); latlngs.push([t.lat, t.lon]);
   });
   const routePts = m.recovery_route.map(id => byId[id]).filter(t => t && t.lat != null).map(t => [t.lat, t.lon]);
@@ -605,7 +612,7 @@ function renderHazards(d) {
     const coords = t.lat != null ? `${t.lat.toFixed(5)}, ${t.lon.toFixed(5)}` : `<span class="muted">no GPS</span>`;
     tr.innerHTML = `<td>${t.oid}</td><td>${t.cls_name}</td>
       <td><span class="v-tag" style="color:${VCOLOR[t.verdict]};background:${VCOLOR[t.verdict]}22">${t.verdict}</span></td>
-      <td>${t.conf}</td><td>${t.evidence_score}</td><td>${t.height_m != null ? t.height_m + " m" : "—"}</td>
+      <td>${t.conf}</td><td>${t.evidence_score}</td><td>${heightText(t.height_m, t.height_rel, t.height_rel ? 1 : 0)}</td>
       <td class="${t.shadow_quality === "clear" ? "chip-clear" : t.shadow_quality === "weak" ? "chip-weak" : "chip-none"}">${t.shadow_quality}</td>
       <td>${coords}</td><td>${t.geo_error_m != null ? "±" + t.geo_error_m + " m" : "—"}</td><td>${reviewCell(t)}</td>`;
     body.appendChild(tr);

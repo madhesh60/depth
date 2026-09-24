@@ -43,8 +43,11 @@ def evidence_notes(det_conf: float, cls_name: str, relook: RelookResult, proof: 
         notes.append(f"re-look {verb}: re-fired at {relook.conf:.2f} on {relook.scale:.1f}x zoom")
     else:
         notes.append("re-look: did not re-fire when zoomed in")
-    if proof.quality is ShadowQuality.CLEAR:
-        h = f", h~{proof.height_m:.1f} m" if proof.height_m is not None else ""
+    if not proof.orientation_known:
+        notes.append("acoustic shadow: not measured (frame orientation unknown)")
+    elif proof.quality is ShadowQuality.CLEAR:
+        h = (f", h~{proof.height_m:.2f} m" if proof.height_m is not None
+             else f", h~{100 * proof.height_rel:.0f}% of sonar altitude")
         notes.append(f"acoustic shadow: clear (contrast {proof.contrast:.2f}, {proof.run_px}px{h})")
     elif proof.quality is ShadowQuality.WEAK:
         notes.append(f"acoustic shadow: weak (contrast {proof.contrast:.2f})")
@@ -62,6 +65,8 @@ class EvidenceGatherer:
         self.shadow = shadow_prover or ShadowProver()
 
     def gather(self, frame: np.ndarray, det: Detection, nadir: str | None = None) -> Evidence:
+        """``nadir`` must be the resolved edge (``src.cv_pipeline.orientation``); None ⇒ the
+        prover's configured default, and if that is unknown the shadow is not measured."""
         gray = frame if frame.ndim == 2 else cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
         relook = self.perceptor.zoom_relook(frame, det.bbox, det.cls_name)

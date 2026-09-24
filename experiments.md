@@ -108,6 +108,39 @@ Promote each into the log below with full results as it runs.
 
 ## Experiment log
 
+### STUDY-06 — Orientation by source rule + thin-line shadow re-measured (honesty fixes)
+
+**Why.** Review §3.4: the auto-nadir guess picked the correct edge on only 26% of real PINGMapper
+sonograms (whose nadir is always the top edge), so the shadow search and the geotag range pointed the
+wrong way on ~3 of 4 frames; heights used an assumed 10 m altitude; `match_other_pass` "corroborated"
+detections across adjacent chunks that image different seabed.
+
+**Setup.** Viewed real frames from every crab-pot source (`runs/_look/`): `Rec*_wcp_ss_{port,star}`
+sonograms → water column at the top, shadows are **2–4 px vertical lines** below each pot; `Contact_*_sslo`
+(orange) → horizontal range, sonar side not recoverable from the crop; `BC_POST`/`baycove`/`TI` →
+rotated mosaics. Shadow statistic measured on **952 labelled pots vs 952 same-size random seabed boxes**
+(v1 val wcp frames, nadir forced top).
+
+| Shadow measure | AUC pot vs random seabed | CLEAR rate pots / seabed |
+|---|--:|--:|
+| old wide-column mean (for reference, review pilot) | ~0.62 (their thin-line) | — |
+| thin darkest line, naive contrast | 0.556 | WEAK on **30%** of empty seabed |
+| **thin darkest line, flank-referenced (shipped)** | **0.571** | ~0.18 / ~0.13 |
+
+**Result.**
+1. Orientation now comes from `src/cv_pipeline/orientation.py`: PINGMapper sonograms → `top` by rule
+   (100% correct by construction on that source); everything else **unknown** → shadow *not measured*,
+   geotag falls back to the boat fix with a swath-wide error. `auto` survives only as a labelled diagnostic.
+2. The shadow separates real pots from seabed only weakly (AUC 0.57) — it remains **evidence shown on
+   the card, never a filter** (consistent with STUDY-03/04). The unbiased reference stops speckle from
+   being reported as a shadow.
+3. Height is **relative** (`h/H`, % of sonar altitude); metres only when the altitude is measured.
+4. `match_other_pass` (+0.10 score boost, "also seen in an overlapping pass") **removed**; replaced by
+   chunk-boundary **stitching** (same range, adjacent chunks, touching edges → one hazard; keeps the
+   stronger sighting; never changes a verdict).
+
+**Decision.** Ship. Tagline changes from "proven by physics" to "every find comes with evidence".
+
 ### STUDY-05 — Deploy-faithful evaluation: val-tuned thresholds, per-domain tables, bootstrap CIs
 - Date: 2026-09-24 · Status: done · Code: `src/detection/evaluate.py`; reproduce:
   `python -m src.detection.evaluate --bootstrap 1000`. Artifacts: `docs/eval_exp001.md`,

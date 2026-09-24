@@ -64,16 +64,25 @@ def parse_ping(frame_id: str) -> Optional[int]:
     return int(m.group(1)) if m else None
 
 
-def range_px_from_nadir(bbox, nadir: str, w: int, h: int) -> float:
-    """Across-track distance (pixels) of the box centre from the nadir edge."""
+def range_px_from_nadir(bbox, nadir: Optional[str], w: int, h: int) -> Optional[float]:
+    """Across-track distance (pixels) of the box centre from the nadir edge; None if the frame's
+    orientation is unknown (never guessed — see ``src.cv_pipeline.orientation``)."""
     cx, cy = 0.5 * (bbox[0] + bbox[2]), 0.5 * (bbox[1] + bbox[3])
-    return {"top": cy, "bottom": h - cy, "left": cx, "right": w - cx}.get(nadir, cy)
+    return {"top": cy, "bottom": h - cy, "left": cx, "right": w - cx}.get(nadir or "")
 
 
 def geotag(cand: Candidate, fix: PingFix, nadir: str, w: int, h: int,
            frame_id: str = "", m_per_px: float = DEFAULT_M_PER_PX) -> Candidate:
-    """Fill ``cand.lat/lon/geo_error_m`` from the boat fix + across-track range. Mutates and returns."""
-    ground_range_m = range_px_from_nadir(cand.bbox, nadir, w, h) * m_per_px
+    """Fill ``cand.lat/lon/geo_error_m`` from the boat fix + across-track range. Mutates and returns.
+
+    Unknown orientation ⇒ the range can't be measured, so the object is placed at the boat fix with
+    an error radius covering the whole swath (an honest "somewhere in this frame")."""
+    range_px = range_px_from_nadir(cand.bbox, nadir, w, h)
+    if range_px is None:
+        cand.lat, cand.lon = round(fix.lat, 6), round(fix.lon, 6)
+        cand.geo_error_m = round(max(3.0, max(w, h) * m_per_px), 1)
+        return cand
+    ground_range_m = range_px * m_per_px
     side = parse_side(frame_id) or "starboard"
     cross_bearing = fix.heading_deg + (90.0 if side == "starboard" else -90.0)
     lat, lon = offset_latlon(fix.lat, fix.lon, ground_range_m, cross_bearing)

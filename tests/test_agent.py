@@ -107,43 +107,60 @@ def test_render_returns_image():
     assert vis.shape == (200, 200, 3) and vis.dtype == np.uint8
 
 
-def test_toolbox_estimate_height_and_cross_pass():
-    """The two new tools are pure/deterministic — test them directly."""
+def test_toolbox_estimate_height_is_relative():
+    """Height is reported relative to sonar altitude; no metres without a measured altitude."""
     from src.agentic.tools import Toolbox
     from src.agentic.types import ShadowProof, ShadowQuality
     tb = Toolbox(_StubPerceptor([], 0.0), ShadowProver(ShadowConfig(nadir="top")))
-
-    proof = ShadowProof(ShadowQuality.CLEAR, 0.4, 8, 0.8, 0.7, 0.2, 3.1, (10, 10), (5, 12, 15, 20))
+    proof = ShadowProof(ShadowQuality.CLEAR, 0.4, 8, 0.8, None, 0.2, 3.1, (10, 10), (5, 12, 15, 20))
     h, step = tb.estimate_height(proof)
-    assert h == 0.7 and step.tool == "estimate_height" and "0.7" in step.rationale
-
-    # two overlapping passes (same recording+channel, adjacent ping, same across-track position)
-    others = [
-        {"frame_id": "crabpot_Rec6_ss_port_00010", "cls": "fishing_gear", "cx": 0.5, "cy": 0.4},
-        {"frame_id": "crabpot_Rec6_ss_port_00011", "cls": "fishing_gear", "cx": 0.51, "cy": 0.41},
-    ]
-    matched, mframe, step = tb.match_other_pass("crabpot_Rec6_ss_port_00010", 0.5, 0.4, "fishing_gear", others)
-    assert matched and mframe == "crabpot_Rec6_ss_port_00011" and step.detail["matched"] is True
-    # a different recording does not corroborate
-    solo, _, _ = tb.match_other_pass("crabpot_Rec9_ss_star_00099", 0.5, 0.4, "fishing_gear", others)
-    assert solo is False
+    assert h == 0.2 and step.tool == "estimate_height" and "20% of sonar altitude" in step.rationale
 
 
-def test_cross_pass_corroboration_is_noted_never_gated():
-    """Survey-level corroboration adds a match_other_pass step + note + score boost, and NEVER
-    changes a verdict (the CONFIRMED tier stays exactly the calibrated set)."""
+def test_orientation_comes_from_source_rule_not_a_guess():
+    agent = ReLookAgent(perceptor=_StubPerceptor([_det(0.3)], 0.0), shadow_prover=ShadowProver())
+    r = agent.run_frame(_frame(), frame_id="Rec9_wcp_ss_port_00031")
+    assert r.nadir == "top" and r.orientation["source"] == "source-rule"
+    u = agent.run_frame(_frame(), frame_id="BC_POST_T2_00_00_1_7")
+    assert u.nadir == "unknown"
+    assert u.candidates[0].evidence.shadow.orientation_known is False
+
+
+def _boundary_survey(conf_a=0.30, conf_b=0.30):
+    """Two adjacent chunks with one object cut by the boundary (same range)."""
     from src.agentic.pipeline import AgenticPipeline
-    agent = _agent([_det(0.30, (90, 60, 110, 84))], relook_normal=0.0)   # conf 0.30, no re-fire -> REVIEW
-    pipe = AgenticPipeline(agent=agent)
-    frames = [("crabpot_Rec6_ss_port_00010", _frame()), ("crabpot_Rec6_ss_port_00011", _frame())]
-    survey = pipe.run_survey(frames, track=None, survey_id="t")
-    for fr in survey.frames:
-        c = fr.candidates[0]
-        assert c.verdict is Verdict.REVIEW                                # unchanged by corroboration
-        steps = [s.tool for s in c.trace]
-        assert "match_other_pass" in steps and steps.index("decide") < steps.index("match_other_pass")
-        assert any("cross-pass" in n for n in c.evidence.notes)
-    assert survey.mission.human_approval_required is True
+
+    class _Seq(_StubPerceptor):
+        def __init__(self):
+            super().__init__([], 0.0)
+            self.calls = 0
+
+        def perceive(self, frame):
+            self.calls += 1
+            if self.calls == 1:     # chunk 10: box touches the trailing (right) edge
+                return [Detection((186, 60, 200, 84), 0, "fishing_gear", conf_a)]
+            return [Detection((0, 62, 12, 86), 0, "fishing_gear", conf_b)]   # chunk 11: leading edge
+
+    agent = ReLookAgent(perceptor=_Seq(), shadow_prover=ShadowProver(), cfg=AgentConfig())
+    frames = [("Rec6_wcp_ss_port_00010", _frame()), ("Rec6_wcp_ss_port_00011", _frame())]
+    return AgenticPipeline(agent=agent).run_survey(frames, track=None, survey_id="t")
+
+
+def test_chunk_boundary_stitching_counts_one_hazard_and_never_changes_verdicts():
+    survey = _boundary_survey()
+    a, b = survey.frames[0].candidates[0], survey.frames[1].candidates[0]
+    assert a.continues_in == "Rec6_wcp_ss_port_00011" and b.continuation_of == "Rec6_wcp_ss_port_00010"
+    assert a.verdict is Verdict.REVIEW and b.verdict is Verdict.REVIEW       # verdicts untouched
+    assert any(s.tool == "stitch_boundary" for s in a.trace)
+    assert len(survey.tracked) == 1 and survey.tracked[0].also_in           # counted once
+    assert not any("cross-pass" in n for n in a.evidence.notes)             # old claim is gone
+
+
+def test_stitching_keeps_the_stronger_sighting():
+    survey = _boundary_survey(conf_a=0.11, conf_b=0.70)     # earlier half weak, later half confident
+    assert len(survey.tracked) == 1
+    t = survey.tracked[0]
+    assert t.frame_id == "Rec6_wcp_ss_port_00011" and t.verdict is Verdict.CONFIRMED
 
 
 def _run_all():

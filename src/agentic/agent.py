@@ -26,6 +26,7 @@ from typing import Callable, Optional
 import cv2
 import numpy as np
 
+from src.cv_pipeline.orientation import resolve_orientation
 from src.detection.infer import Detection
 from .perception import Perceptor
 from .shadow import ShadowProver
@@ -65,16 +66,19 @@ class ReLookAgent:
     def run_frame(self, frame: np.ndarray, frame_id: str = "frame",
                   nadir: str | None = None,
                   progress_cb: Optional[Callable[[str, dict], None]] = None) -> FrameResult:
+        """``nadir`` is an explicit override; otherwise orientation comes from the source rule in
+        ``src.cv_pipeline.orientation`` (or the prover's configured default) — never guessed."""
         import time
         H, W = frame.shape[:2]
         gray = frame if frame.ndim == 2 else cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        nadir = nadir or self.shadow.calibrate_nadir(gray)
+        orient = resolve_orientation(frame_id, override=nadir or self.shadow.cfg.nadir, gray=gray)
+        nadir = orient.nadir
 
         t0 = time.perf_counter()
         dets, _see = self.tools.detect(frame)
         see_ms = (time.perf_counter() - t0) * 1000
         if progress_cb:
-            progress_cb("see", {"candidates": len(dets), "nadir": nadir})
+            progress_cb("see", {"candidates": len(dets), "nadir": orient.label})
 
         candidates: list[Candidate] = []
         t0 = time.perf_counter()
@@ -86,11 +90,12 @@ class ReLookAgent:
 
         return FrameResult(
             frame_id=frame_id, width=W, height=H, candidates=candidates,
-            stage_ms={"see": see_ms, "prove_decide": prove_decide_ms}, nadir=nadir,
+            stage_ms={"see": see_ms, "prove_decide": prove_decide_ms}, nadir=orient.label,
+            orientation=orient.to_dict(),
         )
 
     # -- per-candidate decision procedure (an adaptive escalation controller) ----------------
-    def _decide_candidate(self, frame, gray, det: Detection, nadir: str) -> Candidate:
+    def _decide_candidate(self, frame, gray, det: Detection, nadir: Optional[str]) -> Candidate:
         """Gather evidence by *adaptively* selecting tools — a cheap→expensive escalation ladder
         that stops as soon as the decision is confident. Different candidates take different tool
         paths and terminate at different depths; the trace records the whole route (Agentic-Vision:
@@ -107,7 +112,7 @@ class ReLookAgent:
         # 2) physical evidence for the human/card: acoustic shadow + height (shown, never a gate).
         proof, s = self.tools.shadow_check(gray, det.bbox, nadir)
         trace.append(s)
-        if proof.has_shadow:
+        if proof.has_shadow and proof.orientation_known:
             _, s = self.tools.estimate_height(proof)
             trace.append(s)
 
