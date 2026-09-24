@@ -91,9 +91,10 @@ def tau_review(pot_scores: Sequence[float], alpha: float = 0.10, delta: float = 
     fails — the detector cannot support that recall."""
     s = np.asarray(pot_scores, float)
     n = len(s)
+    never = s <= 0.0                      # never proposed ⇒ missed at ANY threshold (even t = 0)
     best = None
     for t in (default_grid() if grid is None else grid):
-        if cp_upper(int((s < t).sum()), n, delta) <= alpha:
+        if cp_upper(int(((s < t) | never).sum()), n, delta) <= alpha:
             best = float(t)
         else:
             break
@@ -122,7 +123,7 @@ def tau_confirm(cand_scores: Sequence[float], cand_tp: Sequence[bool], target: f
 def achievable_recall(pot_scores: Sequence[float], tau: float, delta: float = 0.05) -> float:
     """The recall that CAN be promised at threshold ``tau``: 1 - CP upper bound on the miss rate."""
     s = np.asarray(pot_scores, float)
-    return 1.0 - cp_upper(int((s < tau).sum()), len(s), delta)
+    return 1.0 - cp_upper(int(((s < tau) | (s <= 0.0)).sum()), len(s), delta)
 
 
 def best_recall_guarantee(pot_scores: Sequence[float], floor: float, delta: float = 0.05,
