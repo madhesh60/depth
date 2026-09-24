@@ -6,6 +6,7 @@ DATASET/scripts/*
 !DATASET/scripts/audit_dataset.py
 !DATASET/scripts/build_dataset_v1.py
 !DATASET/scripts/build_dataset_v2.py
+!DATASET/scripts/build_dataset_v2b.py
 !DATASET/scripts/visualize_labels.py
 
 # Python

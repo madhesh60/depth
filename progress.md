@@ -75,6 +75,18 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ## 4. Session log
 
+### 2026-09-24 (review sweep 3) — Dataset v2b: dedupe, recording-level val, unique-frame test
+Review I-2 / C-4. `DATASET/scripts/build_dataset_v2b.py` → `03_yolo_ready_dataset_v2b/`.
+- **Roboflow copies deduped:** train 5,275 copies → **1,615 unique frames** (3,241 rotated copies
+  dropped; least-changed copy kept). Official test 398 → **214 unique frames**.
+- **val = held-out training recordings** Rec10/12/16 (163 frames, 186 pots, same Humminbird sonar as
+  test) + v2 wreck/seabed val. The orange Contact_sslo "valid" became `test_xsonar/` (cross-sonar).
+- `test_official398/` kept for the GhostVision head-to-head only; `groups.json` for group bootstrap.
+- **Pixel leakage probe:** 0 test frames with a train twin (max corr 0.92, different recordings).
+- **Finding for EXP-001:** its only unseen crab-pot sonograms are v1 val (66 unique frames, Rec19)
+  and v1 test (92 unique) — every EXP-001 guarantee must be fit/verified there (next component).
+- Audit: 0 leakage, 0 malformed; `DATASET/exports/audit_summary_03_yolo_ready_dataset_v2b.json`.
+
 ### 2026-09-24 (review sweep 2) — Honesty fixes: orientation by rule, thin-line shadow, no cross-pass
 Review items C-6 / I-8 (physics + geo part). See `experiments.md` STUDY-06.
 - **`src/cv_pipeline/orientation.py`** — nadir from a *source rule* (PINGMapper `*_ss_port/star*` →

@@ -58,7 +58,11 @@ SageMaker for training. Details/diagram in [AGENT.md](AGENT.md#4-planned-aws-arc
 `pipe_cylinder`) → use class weights / focal loss / augmentation; mixed sensors (80% sonar /
 20% optical, tagged in `manifest.json`) → domain-split experiment.
 
-**Training should point at `DATASET/03_yolo_ready_dataset_v1/data.yaml`.**
+**EXP-001 (the deployed model) trained on v1. EXP-002 should train on
+`DATASET/03_yolo_ready_dataset_v2b/data.yaml`** — v2b (`build_dataset_v2b.py`): 2-class sonar-only,
+one copy per Roboflow frame (3,241 rotated copies dropped), val = held-out recordings Rec10/12/16,
+test = 214 unique crab-pot frames; `test_official398/` (GhostVision only) + `test_xsonar/`
+(Contact_sslo cross-sonar); `groups.json` for group bootstrap. See `docs/dataset_card.md`.
 
 ## Environment
 

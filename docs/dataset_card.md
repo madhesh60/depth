@@ -40,6 +40,28 @@ The v1 class *names* over-claimed. What the data actually is, and the v2 rename:
   (`build_dataset_v2.py`). Fixes three v1 label bugs (below). train 6,291 (1,550 bg) / val 626 /
   test 469; leakage 0/0/0; **official crab-pot 398-frame test split locked** for the GhostVision
   head-to-head. Held-out UATD forward-looking eval kept separate.
+- **v2b** (`03_yolo_ready_dataset_v2b/`, **EXP-002 trains here**) — v2 with its three *evaluation
+  traps* removed (`build_dataset_v2b.py`, below). train **1,773** (1,615 unique Roboflow frames +
+  158 wreck/seabed; 462 bg) / val **234** (recordings Rec10/12/16 held out whole: 163 frames, 186
+  pots + 71 wreck/seabed) / test **285** (**214 unique** crab-pot frames + 71 wreck) — plus
+  `test_official398/` (the exact official 398, GhostVision comparison only) and `test_xsonar/`
+  (555 orange Contact_sslo crops, cross-sonar). `groups.json` maps every image to its frame and
+  recording group for group bootstrap. Leakage 0/0/0 by frame key and by held-out recording.
+
+## Evaluation traps found & fixed (v2 → v2b)
+
+1. **Baked-in Roboflow augmentation** — the HF crab-pot archive was exported *with* augmentation:
+   1,615 train frames appeared as 5,275 copies (2-12 each), 3,241 of them **rotated** (black
+   corners; rotation breaks sonar range/shadow geometry). → one least-changed copy per frame;
+   `train.py` augments at train time.
+2. **Duplicate test frames** — official test = 398 images but **214 unique frames**, so metrics
+   double-counted and bootstrap CIs were too narrow. → `test/` = unique frames (primary);
+   the 398 are kept only for the like-for-like GhostVision number.
+3. **Validation was a different sonar** — the official `valid` is 555 orange `Contact_*_sslo`
+   crops (horizontal range) vs greyscale Humminbird test sonograms. → val = held-out *training
+   recordings* of the test sonar; Contact_sslo became a cross-sonar test.
+4. Pixel check: no unique test frame has a train twin (max thumbnail correlation 0.92, and that
+   pair is from different recordings). `Rec14_Sensor_Depth` (train) ≠ `Rec14_wcp` (test).
 
 ## Bugs found & fixed (v1 → v2)
 
@@ -57,3 +79,10 @@ The v1 class *names* over-claimed. What the data actually is, and the v2 rename:
 - Crab-pot frames carry **no GPS** — geotagging is demonstrated on synthetic/PINGMapper tracks and
   clearly labelled as such (see [`responsible_use.md`](responsible_use.md)).
 - Trained on one bay's crab-pots and one sonar brand; generalisation is unproven — stated, not hidden.
+  `test_xsonar/` (Contact_sslo) and the UATD hold-out now measure it.
+- After dedupe the data is **small** (1,015 unique crab-pot sonogram frames in total; test 214):
+  expect wide confidence intervals and report them.
+- **EXP-001's own clean data is tiny:** it trained on v1, whose train split contains the official
+  crab-pot test recordings. Its only unseen crab-pot sonograms are v1 val (**66 unique frames**,
+  Rec19; 439 images incl. copies) and v1 test (**92 unique frames**). All EXP-001 agent/guarantee
+  numbers are fit on the former and checked on the latter.
