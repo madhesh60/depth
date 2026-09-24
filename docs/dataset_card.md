@@ -1,4 +1,4 @@
-# Dataset card — GhostGear Sonar
+# Dataset card — DEPTH
 
 Honest provenance for the training data. The data itself is git-ignored (S3); the build scripts
 (`DATASET/scripts/`) are tracked. Regenerate the audit: `python DATASET/scripts/audit_dataset.py <root>`.

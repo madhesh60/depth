@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>GhostGear Sonar — See · Prove · Decide · Act</title>
+  <title>DEPTH — See · Prove · Decide · Act</title>
   <meta name="description" content="Agentic marine-debris detection for side-scan sonar: prove every find with acoustic-shadow physics + a re-look, decide with a human-gated agent, act with a cleanup route." />
   <link rel="preconnect" href="https://unpkg.com" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -21,7 +21,7 @@
         <svg viewBox="0 0 24 24" width="22" height="22"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm0 3.5A6.5 6.5 0 0 1 18.5 12H12V5.5Z" fill="currentColor"/></svg>
       </div>
       <div class="brand-txt">
-        <h1>GhostGear&nbsp;Sonar</h1>
+        <h1>DEPTH</h1>
         <p>See · Prove · Decide · Act — agentic ghost-gear detection</p>
       </div>
     </div>
@@ -92,12 +92,34 @@
             </div>
           </div>
 
-          <figure class="stage-figure">
-            <img id="stageImg" alt="analysed sonar frame" />
-            <figcaption id="stageCap"></figcaption>
-          </figure>
+          <div class="viewer" id="viewer">
+            <div class="viewer-canvas" id="viewerCanvas">
+              <div class="viewer-stage" id="viewerStage">
+                <img id="stageImg" alt="analysed sonar frame" draggable="false" />
+                <svg id="boxLayer" class="box-layer" xmlns="http://www.w3.org/2000/svg"></svg>
+              </div>
+              <div class="viewer-empty" id="viewerEmpty" hidden>no detections on this frame</div>
+            </div>
+            <div class="viewer-bar">
+              <div class="vb-grp">
+                <button class="vb-btn" id="zoomOut" title="zoom out ( − )">−</button>
+                <span class="zoom-read" id="zoomRead">100%</span>
+                <button class="vb-btn" id="zoomIn" title="zoom in ( + )">+</button>
+                <button class="vb-btn vb-fit" id="zoomFit" title="fit to view ( 0 )">⤢ fit</button>
+              </div>
+              <div class="vb-gate">
+                <span class="vb-gate-lbl">detector gate</span>
+                <input type="range" id="confGate" min="0.05" max="0.9" step="0.05" value="0.10"
+                       aria-label="detector confidence gate" />
+                <output id="confGateVal">0.10</output>
+                <span class="vb-gate-showing" id="gateShowing"></span>
+              </div>
+              <div class="vb-hint">scroll = zoom · drag = pan · click a box = inspect · ⇤/⇥ cycle · G replay agent gaze</div>
+            </div>
+            <figcaption id="stageCap" class="viewer-cap"></figcaption>
+          </div>
 
-          <h3 class="evidence-h">Evidence cards <span class="muted">— every find is proven before it's trusted</span></h3>
+          <h3 class="evidence-h">Evidence cards <span class="muted">— every find is proven before it's trusted · hover a card to locate it · <b>Replay gaze</b> shows what the agent saw</span></h3>
           <div class="evidence-grid" id="evidenceGrid"></div>
         </div>
 

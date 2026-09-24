@@ -75,6 +75,29 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ## 4. Session log
 
+### 2026-09-24 (cont.) — Rebrand to **DEPTH** + interactive sonar viewer (peak, robust frontend)
+- **Renamed the product to DEPTH** across all surfaces (README, `webui/` title + brand, dataset &
+  model cards) — reverted the inherited "GhostGear Sonar". README adds the backronym
+  **DEPTH = Detect · Evidence · Prove · Triage · Hazard-map** (the loop spells the name). GitHub repo
+  stays `depth` (rename deferred by user).
+- **Built an interactive sonar viewer** (`webui/`, still zero-build): cursor-anchored **wheel zoom**,
+  **drag-pan**, fit/±, and **live SVG vector detection boxes** over the raw frame — verdict-coloured,
+  constant on-screen stroke at any zoom (`--inv` scale var), dashed for REJECTED. Boxes are clickable
+  objects **linked to evidence cards** (hover a card → its box highlights; click a box → scroll+focus
+  its card).
+- **"Replay agent gaze"** per candidate — animates the viewer to pan+zoom into the candidate at the
+  agent's *actual* re-look scale, draws the measured **shadow strip + echo** overlay, and toasts the
+  outcome ("agent zoomed 2.1× → re-fired at 0.54"). Makes *"the picture result changed the agent's
+  next step"* literally visible; the user can also zoom/pan the frame himself.
+- **Detector-gate slider** (dim boxes+cards below a live confidence gate) + **keyboard nav**
+  (←/→ cycle candidates, +/−/0 zoom, **G** replay gaze) — the user explores recall/precision himself.
+- **Verified:** `node --check` clean; all referenced DOM ids resolve; uvicorn end-to-end — health
+  OpenCV 5.0.0, `/` (title=DEPTH), `/app.js`, `/styles.css` all 200, `/api/analyze` returns the
+  `bbox` + `relook.scale` the viewer needs. **Backend unchanged** (30/30 tests still valid).
+- **Deferred (user):** AWS/MCP setup → a dedicated "peak architecture" day (state saved in memory).
+- **Next:** more novel agentic/frontend (before/after re-look compare slider, persisted human
+  corrections → retrain seed, client re-triage explorer); EXP-002 training support.
+
 ### 2026-09-24 — `evaluate.py`: deploy-faithful, honest per-domain metrics (#10/#11/#13) + AWS CLI in
 - **Built `src/detection/evaluate.py`** — the missing evaluator the WINNING_REPORT leaned on four
   times. It scores the **exact shipped ONNX** through the torch-free **`cv2.dnn`** path (same as the

@@ -1,4 +1,4 @@
-# Model card — GhostGear Sonar detector (EXP-001)
+# Model card — DEPTH detector (EXP-001)
 
 ## Overview
 

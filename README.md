@@ -1,4 +1,7 @@
-# GhostGear Sonar — See · Prove · Decide · Act
+# DEPTH — See · Prove · Decide · Act
+
+> **DEPTH** = **D**etect · **E**vidence · **P**rove · **T**riage · **H**azard-map — the pipeline
+> stages spell the name.
 
 > Agentic detection of derelict fishing gear (ghost pots/nets) and wreck debris in **side-scan
 > sonar**. Every find is **proven** (acoustic-shadow physics + a zoom-in re-look), **triaged** by a

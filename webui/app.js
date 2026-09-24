@@ -1,10 +1,11 @@
-/* GhostGear Sonar dashboard — drives the See → Prove → Decide → Act loop over the FastAPI backend.
+/* DEPTH dashboard — drives the See → Prove → Decide → Act loop over the FastAPI backend.
    Zero-build vanilla JS. All API shapes match src/dashboard/app.py. */
 "use strict";
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const API = ""; // same-origin (served by FastAPI). Set to e.g. "http://localhost:8000" for split dev.
+const SVGNS = "http://www.w3.org/2000/svg";
 
 const VERDICTS = ["confirmed", "review", "rejected"];
 const VCOLOR = { confirmed: "#2ee06a", review: "#f7a83b", rejected: "#6c8199" };
@@ -15,13 +16,19 @@ const state = {
   survey: null,          // last SurveyResult
   map: null,
   mapLayers: [],
+  _analyze: null,        // last analyze payload
+  _boxes: [],            // [{id, bbox, verdict, conf, cand}]
+  _cursor: -1,           // keyboard-selected candidate id
+  gate: 0.10,            // detector-confidence visual gate
 };
 
 /* ------------------------------------------------------------------ boot */
 window.addEventListener("DOMContentLoaded", async () => {
   wireTabs();
-  wireImageToggle();
+  wireViewerControls();
   wireInputs();
+  wireKeyboard();
+  Viewer.init();
   await Promise.all([loadHealth(), loadSamples()]);
 });
 
@@ -92,12 +99,17 @@ function wireTabs() {
   });
 }
 
-function wireImageToggle() {
+function wireViewerControls() {
+  // box-visibility toggle (was "overlay/frame") — both over the raw frame; we draw vector boxes
   $$(".seg-btn").forEach(b => b.onclick = () => {
     $$(".seg-btn").forEach(x => x.classList.toggle("is-active", x === b));
-    const d = state._analyze;
-    if (d) $("#stageImg").src = b.dataset.view === "frame" ? d.frame_png : d.overlay_png;
+    $("#viewer").classList.toggle("boxes-off", b.dataset.view === "frame");
   });
+  $("#zoomIn").onclick = () => Viewer.zoomBy(1.3);
+  $("#zoomOut").onclick = () => Viewer.zoomBy(1 / 1.3);
+  $("#zoomFit").onclick = () => Viewer.fit();
+  const gate = $("#confGate");
+  gate.oninput = () => { state.gate = parseFloat(gate.value); $("#confGateVal").textContent = state.gate.toFixed(2); applyGate(); };
 }
 
 function wireInputs() {
@@ -111,12 +123,161 @@ function wireInputs() {
   $("#surveyBtn").onclick = runSurvey;
 }
 
+function wireKeyboard() {
+  window.addEventListener("keydown", e => {
+    if ($("#analyzeResult").hidden) return;
+    const tag = (e.target.tagName || "").toLowerCase();
+    if (tag === "input" || tag === "textarea" || tag === "select") return;
+    if (e.key === "+" || e.key === "=") { Viewer.zoomBy(1.3); e.preventDefault(); }
+    else if (e.key === "-" || e.key === "_") { Viewer.zoomBy(1 / 1.3); e.preventDefault(); }
+    else if (e.key === "0") { Viewer.fit(); e.preventDefault(); }
+    else if (e.key === "ArrowRight") { cycleCandidate(1); e.preventDefault(); }
+    else if (e.key === "ArrowLeft") { cycleCandidate(-1); e.preventDefault(); }
+    else if (e.key.toLowerCase() === "g" && state._cursor >= 0) { gazeTo(state._cursor); e.preventDefault(); }
+  });
+}
+
 function pickFile(file) {
   state.selected = { file };
   $$(".sample-card").forEach(c => c.classList.remove("is-sel"));
   $("#analyzeBtn").disabled = false;
   $("#analyzeHint").textContent = `Uploaded ${file.name}. Ready to run.`;
 }
+
+/* ------------------------------------------------------------------ interactive viewer */
+const Viewer = (() => {
+  let scale = 1, tx = 0, ty = 0, natW = 0, natH = 0;
+  let drag = null;
+  const canvas = () => $("#viewerCanvas");
+  const stage = () => $("#viewerStage");
+  const svg = () => $("#boxLayer");
+
+  function apply() {
+    stage().style.transform = `translate(${tx}px,${ty}px) scale(${scale})`;
+    $("#zoomRead").textContent = Math.round(scale * 100) + "%";
+    // keep vector strokes a constant on-screen width regardless of zoom
+    svg().style.setProperty("--inv", (1 / scale).toFixed(4));
+  }
+  const clamp = s => Math.min(16, Math.max(0.05, s));
+
+  function fit() {
+    const c = canvas().getBoundingClientRect();
+    if (!natW || !natH || !c.width) return;
+    const s = Math.min(c.width / natW, c.height / natH);
+    scale = s; tx = (c.width - natW * s) / 2; ty = (c.height - natH * s) / 2;
+    stage().style.transition = "transform .35s ease"; apply();
+    setTimeout(() => stage().style.transition = "", 360);
+  }
+  function zoomAtPoint(px, py, factor) {
+    const ns = clamp(scale * factor);
+    tx = px - (px - tx) * (ns / scale);
+    ty = py - (py - ty) * (ns / scale);
+    scale = ns; apply();
+  }
+  function zoomBy(factor) {
+    const c = canvas().getBoundingClientRect();
+    zoomAtPoint(c.width / 2, c.height / 2, factor);
+  }
+  function focusBox(bbox, opts = {}) {
+    const [x1, y1, x2, y2] = bbox;
+    const bw = Math.max(4, x2 - x1), bh = Math.max(4, y2 - y1);
+    const cx = (x1 + x2) / 2, cy = (y1 + y2) / 2;
+    const c = canvas().getBoundingClientRect();
+    const fill = 3.0; // ROI fills ~1/fill of the viewport
+    let target = Math.min(c.width / (bw * fill), c.height / (bh * fill));
+    if (opts.scale) target = Math.max(target, opts.scale * 1.4);
+    scale = clamp(target);
+    tx = c.width / 2 - cx * scale; ty = c.height / 2 - cy * scale;
+    stage().style.transition = "transform .8s cubic-bezier(.22,.61,.36,1)"; apply();
+    setTimeout(() => stage().style.transition = "", 820);
+  }
+
+  function render(d, boxes) {
+    natW = d.width; natH = d.height;
+    const im = $("#stageImg");
+    const s = svg();
+    s.setAttribute("viewBox", `0 0 ${natW} ${natH}`);
+    s.style.width = natW + "px"; s.style.height = natH + "px";
+    stage().style.width = natW + "px"; stage().style.height = natH + "px";
+    drawBoxes(boxes);
+    im.onload = () => fit();
+    im.src = d.frame_png;
+    if (im.complete && im.naturalWidth) fit();
+  }
+  function drawBoxes(boxes) {
+    const s = svg(); s.innerHTML = "";
+    const proof = document.createElementNS(SVGNS, "g"); proof.id = "proofLayer"; s.appendChild(proof);
+    boxes.forEach(b => {
+      const [x1, y1, x2, y2] = b.bbox;
+      const g = document.createElementNS(SVGNS, "g");
+      g.setAttribute("class", `bx bx-${b.verdict}`); g.dataset.id = b.id;
+      const r = document.createElementNS(SVGNS, "rect");
+      r.setAttribute("x", x1); r.setAttribute("y", y1);
+      r.setAttribute("width", x2 - x1); r.setAttribute("height", y2 - y1);
+      g.appendChild(r);
+      const t = document.createElementNS(SVGNS, "text");
+      t.setAttribute("x", x1 + 2); t.setAttribute("y", y1 - 3);
+      t.setAttribute("class", "bx-label"); t.textContent = b.conf.toFixed(2);
+      g.appendChild(t);
+      g.addEventListener("click", ev => { ev.stopPropagation(); selectCandidate(b.id); });
+      s.appendChild(g);
+    });
+  }
+  function drawProof(cand) {
+    const p = $("#proofLayer"); if (!p) return;
+    p.innerHTML = "";
+    const sh = (cand.evidence || {}).shadow || {};
+    if (Array.isArray(sh.strip)) {
+      const [x1, y1, x2, y2] = sh.strip;
+      const r = document.createElementNS(SVGNS, "rect");
+      r.setAttribute("x", x1); r.setAttribute("y", y1);
+      r.setAttribute("width", x2 - x1); r.setAttribute("height", y2 - y1);
+      r.setAttribute("class", "proof-strip"); p.appendChild(r);
+    }
+    if (Array.isArray(sh.echo_xy)) {
+      const [ex, ey] = sh.echo_xy;
+      const c = document.createElementNS(SVGNS, "circle");
+      c.setAttribute("cx", ex); c.setAttribute("cy", ey); c.setAttribute("r", 5);
+      c.setAttribute("class", "proof-echo"); p.appendChild(c);
+    }
+    p.classList.remove("flash"); void p.offsetWidth; p.classList.add("flash");
+  }
+  function clearProof() { const p = $("#proofLayer"); if (p) p.innerHTML = ""; }
+
+  function highlight(id, on) {
+    const g = svg().querySelector(`.bx[data-id="${id}"]`);
+    if (g) g.classList.toggle("bx-hi", on);
+  }
+  function pulse(id) {
+    const g = svg().querySelector(`.bx[data-id="${id}"]`);
+    if (!g) return; g.classList.remove("bx-pulse"); void g.getBBox; g.classList.add("bx-pulse");
+    setTimeout(() => g.classList.remove("bx-pulse"), 1200);
+  }
+
+  function init() {
+    const cv = canvas();
+    cv.addEventListener("wheel", e => {
+      e.preventDefault();
+      const rect = cv.getBoundingClientRect();
+      zoomAtPoint(e.clientX - rect.left, e.clientY - rect.top, e.deltaY < 0 ? 1.12 : 1 / 1.12);
+    }, { passive: false });
+    cv.addEventListener("pointerdown", e => {
+      if (e.target.closest(".bx")) return; // let box clicks through
+      drag = { x: e.clientX, y: e.clientY, tx, ty }; cv.setPointerCapture(e.pointerId);
+      cv.classList.add("grabbing");
+    });
+    cv.addEventListener("pointermove", e => {
+      if (!drag) return;
+      tx = drag.tx + (e.clientX - drag.x); ty = drag.ty + (e.clientY - drag.y); apply();
+    });
+    const end = () => { drag = null; cv.classList.remove("grabbing"); };
+    cv.addEventListener("pointerup", end); cv.addEventListener("pointercancel", end);
+    cv.addEventListener("dblclick", () => fit());
+    window.addEventListener("resize", () => { if (natW) fit(); });
+  }
+
+  return { init, render, fit, zoomBy, focusBox, drawProof, clearProof, highlight, pulse };
+})();
 
 /* ------------------------------------------------------------------ stepper animation */
 let stepperTimer = null;
@@ -188,7 +349,7 @@ async function runAnalyze() {
 function renderAnalyze(d) {
   $("#analyzeResult").hidden = false;
   $$(".seg-btn").forEach(x => x.classList.toggle("is-active", x.dataset.view === "overlay"));
-  $("#stageImg").src = d.overlay_png;
+  $("#viewer").classList.remove("boxes-off");
   $("#stageCap").textContent =
     `${d.frame_id} · ${d.width}×${d.height}px · nadir=${d.nadir} · ${d.candidates.length} candidate(s)`;
 
@@ -199,27 +360,88 @@ function renderAnalyze(d) {
   $("#latency").textContent =
     `⏱ ${d.wall_ms} ms wall · see ${fmt(sm.see)} ms · prove+decide ${fmt(sm.prove_decide)} ms`;
 
+  // candidate id == original index; boxes + cards share it
+  state._boxes = d.candidates.map((c, i) => ({ id: i, bbox: c.bbox, verdict: c.verdict, conf: c.conf, cand: c }));
+  state._cursor = -1;
+  Viewer.render(d, state._boxes);
+  $("#viewerEmpty").hidden = d.candidates.length > 0;
+
   const grid = $("#evidenceGrid");
   grid.innerHTML = "";
   if (!d.candidates.length) {
     grid.innerHTML = `<p class="hint">No candidates on this frame — the detector found nothing to prove. (For the "no labelled pot" samples, that is the correct, honest result.)</p>`;
+    applyGate();
     return;
   }
-  // sort: confirmed → review → rejected, then by evidence score
+  // display order: confirmed → review → rejected, then by evidence score (keep original id)
   const order = { confirmed: 0, review: 1, rejected: 2 };
-  [...d.candidates]
+  state._boxes
+    .slice()
     .sort((a, b) => (order[a.verdict] - order[b.verdict]) ||
-                    ((b.evidence?.evidence_score || 0) - (a.evidence?.evidence_score || 0)))
-    .forEach((c, i) => grid.appendChild(evidenceCard(c, i)));
+                    ((b.cand.evidence?.evidence_score || 0) - (a.cand.evidence?.evidence_score || 0)))
+    .forEach(b => grid.appendChild(evidenceCard(b.cand, b.id)));
+  applyGate();
 }
 
-function evidenceCard(c, i) {
+/* detector-confidence visual gate: dim boxes + cards below the slider value */
+function applyGate() {
+  const g = state.gate;
+  let shown = 0;
+  state._boxes.forEach(b => {
+    const on = b.conf >= g;
+    if (on) shown++;
+    const box = $(`#boxLayer .bx[data-id="${b.id}"]`);
+    if (box) box.classList.toggle("bx-under", !on);
+    const card = $(`.ev-card[data-id="${b.id}"]`);
+    if (card) card.classList.toggle("ev-under", !on);
+  });
+  const total = state._boxes.length;
+  const el = $("#gateShowing");
+  if (el) el.textContent = total ? `showing ${shown}/${total} ≥ ${g.toFixed(2)}` : "";
+}
+
+function selectCandidate(id) {
+  state._cursor = id;
+  Viewer.focusBox(state._boxes.find(b => b.id === id).bbox);
+  Viewer.pulse(id);
+  $$(".ev-card").forEach(c => c.classList.toggle("is-linked", +c.dataset.id === id));
+  const card = $(`.ev-card[data-id="${id}"]`);
+  if (card) card.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+function cycleCandidate(dir) {
+  if (!state._boxes.length) return;
+  // cycle in display order over gate-visible candidates
+  const visible = $$(".ev-card:not(.ev-under)").map(c => +c.dataset.id);
+  if (!visible.length) return;
+  let idx = visible.indexOf(state._cursor);
+  idx = (idx + dir + visible.length) % visible.length;
+  if (state._cursor < 0) idx = dir > 0 ? 0 : visible.length - 1;
+  selectCandidate(visible[idx]);
+}
+
+function gazeTo(id) {
+  const b = state._boxes.find(x => x.id === id); if (!b) return;
+  const c = b.cand, rl = (c.evidence || {}).relook || {};
+  state._cursor = id;
+  Viewer.focusBox(c.bbox, { scale: rl.scale });
+  Viewer.drawProof(c);
+  Viewer.pulse(id);
+  $$(".ev-card").forEach(x => x.classList.toggle("is-linked", +x.dataset.id === id));
+  const msg = rl.found
+    ? `Agent zoomed ${rl.scale ? rl.scale.toFixed(1) + "×" : ""} here → re-fired at ${(rl.conf || 0).toFixed(2)} (${(rl.gain || 0) >= 0 ? "+" : ""}${(rl.gain || 0).toFixed(2)})`
+    : `Agent zoomed in here → did not re-fire (speckle, not a solid object)`;
+  toast(msg); setTimeout(toastHide, 2600);
+}
+
+function evidenceCard(c, id) {
   const ev = c.evidence || {};
   const sh = ev.shadow || {};
   const rl = ev.relook || {};
   const v = c.verdict;
   const card = document.createElement("div");
   card.className = `ev-card v-${v}`;
+  card.dataset.id = id;
 
   const rlConf = rl.conf || 0, gain = (rlConf - c.conf);
   const arrowCls = rlConf > c.conf ? "up" : (rlConf < c.conf ? "down" : "");
@@ -230,6 +452,7 @@ function evidenceCard(c, i) {
     <div class="ev-crop">
       ${c.crop_png ? `<img alt="evidence crop" src="${c.crop_png}"/>` : `<div style="aspect-ratio:1"></div>`}
       <span class="ev-badge b-${v}">${v}</span>
+      <button class="gaze-btn" title="replay what the agent saw (G)">◉ Replay gaze</button>
     </div>
     <div class="ev-body">
       <div class="conf-flow">
@@ -249,6 +472,11 @@ function evidenceCard(c, i) {
       <ul class="ev-notes">${(ev.notes || []).map(n => `<li>${escapeHtml(n)}</li>`).join("")}</ul>
       ${traceBlock(c.trace || [])}
     </div>`;
+
+  card.addEventListener("mouseenter", () => Viewer.highlight(id, true));
+  card.addEventListener("mouseleave", () => Viewer.highlight(id, false));
+  card.querySelector(".ev-crop").addEventListener("click", () => selectCandidate(id));
+  card.querySelector(".gaze-btn").addEventListener("click", e => { e.stopPropagation(); gazeTo(id); });
   return card;
 }
 
