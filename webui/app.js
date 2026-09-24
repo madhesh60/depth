@@ -20,6 +20,8 @@ const state = {
   _boxes: [],            // [{id, bbox, verdict, conf, cand}]
   _cursor: -1,           // keyboard-selected candidate id
   gate: 0.10,            // detector-confidence visual gate
+  _tour: false,          // cinematic agent-gaze tour running
+  _tourOptOut: false,    // user took over → don't auto-restart the tour this frame
 };
 
 /* ------------------------------------------------------------------ boot */
@@ -93,6 +95,7 @@ function selectSample(id, card) {
 /* ------------------------------------------------------------------ tabs + inputs */
 function wireTabs() {
   $$(".tab[data-tab]").forEach(t => t.onclick = () => {
+    cancelTour();
     $$(".tab[data-tab]").forEach(x => x.classList.toggle("is-active", x === t));
     $$(".panel-tab").forEach(p => p.classList.toggle("is-active", p.id === `tab-${t.dataset.tab}`));
     if (t.dataset.tab === "survey" && state.map) setTimeout(() => state.map.invalidateSize(), 60);
@@ -105,9 +108,10 @@ function wireViewerControls() {
     $$(".seg-btn").forEach(x => x.classList.toggle("is-active", x === b));
     $("#viewer").classList.toggle("boxes-off", b.dataset.view === "frame");
   });
-  $("#zoomIn").onclick = () => Viewer.zoomBy(1.3);
-  $("#zoomOut").onclick = () => Viewer.zoomBy(1 / 1.3);
-  $("#zoomFit").onclick = () => Viewer.fit();
+  $("#zoomIn").onclick = () => { cancelTour(); Viewer.zoomBy(1.3); };
+  $("#zoomOut").onclick = () => { cancelTour(); Viewer.zoomBy(1 / 1.3); };
+  $("#zoomFit").onclick = () => { cancelTour(); Viewer.fit(); };
+  $("#tourBtn").onclick = () => (state._tour ? cancelTour() : playGazeTour(true));
   const gate = $("#confGate");
   gate.oninput = () => { state.gate = parseFloat(gate.value); $("#confGateVal").textContent = state.gate.toFixed(2); applyGate(); };
 }
@@ -188,8 +192,8 @@ const Viewer = (() => {
     if (opts.scale) target = Math.max(target, opts.scale * 1.4);
     scale = clamp(target);
     tx = c.width / 2 - cx * scale; ty = c.height / 2 - cy * scale;
-    stage().style.transition = "transform .8s cubic-bezier(.22,.61,.36,1)"; apply();
-    setTimeout(() => stage().style.transition = "", 820);
+    stage().style.transition = "transform .95s cubic-bezier(.34,.08,.18,1)"; apply();
+    setTimeout(() => stage().style.transition = "", 980);
   }
 
   function render(d, boxes) {
@@ -257,12 +261,13 @@ const Viewer = (() => {
   function init() {
     const cv = canvas();
     cv.addEventListener("wheel", e => {
-      e.preventDefault();
+      e.preventDefault(); cancelTour();
       const rect = cv.getBoundingClientRect();
       zoomAtPoint(e.clientX - rect.left, e.clientY - rect.top, e.deltaY < 0 ? 1.12 : 1 / 1.12);
     }, { passive: false });
     cv.addEventListener("pointerdown", e => {
       if (e.target.closest(".bx")) return; // let box clicks through
+      cancelTour();
       drag = { x: e.clientX, y: e.clientY, tx, ty }; cv.setPointerCapture(e.pointerId);
       cv.classList.add("grabbing");
     });
@@ -348,6 +353,7 @@ async function runAnalyze() {
 
 function renderAnalyze(d) {
   $("#analyzeResult").hidden = false;
+  cancelTour(); hideAgentEye(); state._tourOptOut = false;
   $$(".seg-btn").forEach(x => x.classList.toggle("is-active", x.dataset.view === "overlay"));
   $("#viewer").classList.remove("boxes-off");
   $("#stageCap").textContent =
@@ -381,6 +387,7 @@ function renderAnalyze(d) {
                     ((b.cand.evidence?.evidence_score || 0) - (a.cand.evidence?.evidence_score || 0)))
     .forEach(b => grid.appendChild(evidenceCard(b.cand, b.id)));
   applyGate();
+  maybeAutoTour();
 }
 
 /* detector-confidence visual gate: dim boxes + cards below the slider value */
@@ -427,11 +434,58 @@ function gazeTo(id) {
   Viewer.focusBox(c.bbox, { scale: rl.scale });
   Viewer.drawProof(c);
   Viewer.pulse(id);
+  showAgentEye(c);
   $$(".ev-card").forEach(x => x.classList.toggle("is-linked", +x.dataset.id === id));
+  const card = $(`.ev-card[data-id="${id}"]`);
+  if (card && !state._tour) card.scrollIntoView({ behavior: "smooth", block: "nearest" });
   const msg = rl.found
     ? `Agent zoomed ${rl.scale ? rl.scale.toFixed(1) + "×" : ""} here → re-fired at ${(rl.conf || 0).toFixed(2)} (${(rl.gain || 0) >= 0 ? "+" : ""}${(rl.gain || 0).toFixed(2)})`
     : `Agent zoomed in here → did not re-fire (speckle, not a solid object)`;
-  toast(msg); setTimeout(toastHide, 2600);
+  toast(msg); if (!state._tour) setTimeout(toastHide, 2600);
+}
+
+/* the agent's-eye picture-in-picture: the actual zoomed + CLAHE re-look image the detector saw */
+function showAgentEye(c) {
+  const ae = $("#agentEye"); if (!ae) return;
+  const rv = c.relook_view;
+  const src = rv ? (rv.enhanced_png || rv.zoom_png) : c.crop_png;
+  if (!src) { hideAgentEye(); return; }
+  $("#aeImg").src = src;
+  const rl = (c.evidence || {}).relook || {};
+  $("#aeCap").textContent = `agent's eye${rv && rv.scale ? " · " + rv.scale.toFixed(1) + "× · CLAHE" : ""}`
+    + (rl.found ? ` · re-fire ${(rl.conf || 0).toFixed(2)}` : " · no re-fire");
+  ae.hidden = false; ae.classList.remove("pop"); void ae.offsetWidth; ae.classList.add("pop");
+}
+function hideAgentEye() { const ae = $("#agentEye"); if (ae) ae.hidden = true; }
+
+/* cinematic auto-tour: fly the viewport through every visible find the way the agent looked */
+let _tourTimer = null;
+function maybeAutoTour() {
+  if (state._boxes.length && !state._tourOptOut)
+    setTimeout(() => { if (!state._tourOptOut && !state._tour) playGazeTour(false); }, 750);
+}
+function playGazeTour(manual) {
+  endTour();
+  const ids = $$(".ev-card:not(.ev-under)").map(c => +c.dataset.id);
+  if (!ids.length) return;
+  state._tour = true; state._tourOptOut = false;
+  const btn = $("#tourBtn"); if (btn) { btn.classList.add("is-on"); btn.innerHTML = "⏸ stop"; }
+  let i = 0;
+  const step = () => {
+    if (!state._tour) return;
+    if (i >= ids.length) { endTour(); setTimeout(() => Viewer.fit(), 400); setTimeout(hideAgentEye, 1300); return; }
+    gazeTo(ids[i]); i++;
+    _tourTimer = setTimeout(step, 2100);
+  };
+  step();
+}
+function endTour() {
+  state._tour = false; clearTimeout(_tourTimer); _tourTimer = null;
+  const btn = $("#tourBtn"); if (btn) { btn.classList.remove("is-on"); btn.innerHTML = "▶ agent&nbsp;tour"; }
+}
+function cancelTour() {
+  if (state._tour) state._tourOptOut = true;   // user took over → don't auto-restart this frame
+  endTour(); hideAgentEye();
 }
 
 function evidenceCard(c, id) {
@@ -449,9 +503,11 @@ function evidenceCard(c, id) {
   const height = sh.height_m != null ? `${sh.height_m} m` : "—";
 
   card.innerHTML = `
-    <div class="ev-crop">
-      ${c.crop_png ? `<img alt="evidence crop" src="${c.crop_png}"/>` : `<div style="aspect-ratio:1"></div>`}
+    <div class="ev-crop${c.relook_view ? " has-enh" : ""}">
+      ${c.crop_png ? `<img class="ev-img raw" alt="evidence crop" src="${c.crop_png}"/>` : `<div style="aspect-ratio:1"></div>`}
+      ${c.relook_view ? `<img class="ev-img enh" alt="CLAHE re-look (what the agent saw)" src="${c.relook_view.enhanced_png}"/>` : ""}
       <span class="ev-badge b-${v}">${v}</span>
+      ${c.relook_view ? `<button class="cmp-chip" title="toggle raw ⇄ CLAHE re-look">raw ⇄ enhanced</button>` : ""}
       <button class="gaze-btn" title="replay what the agent saw (G)">◉ Replay gaze</button>
     </div>
     <div class="ev-body">
@@ -477,6 +533,8 @@ function evidenceCard(c, id) {
   card.addEventListener("mouseleave", () => Viewer.highlight(id, false));
   card.querySelector(".ev-crop").addEventListener("click", () => selectCandidate(id));
   card.querySelector(".gaze-btn").addEventListener("click", e => { e.stopPropagation(); gazeTo(id); });
+  const chip = card.querySelector(".cmp-chip");
+  if (chip) chip.addEventListener("click", e => { e.stopPropagation(); card.querySelector(".ev-crop").classList.toggle("show-enh"); });
   return card;
 }
 

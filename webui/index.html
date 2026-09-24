@@ -99,6 +99,10 @@
                 <svg id="boxLayer" class="box-layer" xmlns="http://www.w3.org/2000/svg"></svg>
               </div>
               <div class="viewer-empty" id="viewerEmpty" hidden>no detections on this frame</div>
+              <figure class="agent-eye" id="agentEye" hidden>
+                <figcaption class="ae-cap"><span class="ae-dot"></span><span id="aeCap">agent's eye</span></figcaption>
+                <img id="aeImg" alt="agent's-eye re-look view" />
+              </figure>
             </div>
             <div class="viewer-bar">
               <div class="vb-grp">
@@ -106,6 +110,7 @@
                 <span class="zoom-read" id="zoomRead">100%</span>
                 <button class="vb-btn" id="zoomIn" title="zoom in ( + )">+</button>
                 <button class="vb-btn vb-fit" id="zoomFit" title="fit to view ( 0 )">⤢ fit</button>
+                <button class="vb-btn vb-tour" id="tourBtn" title="fly through every find the way the agent looked">▶ agent&nbsp;tour</button>
               </div>
               <div class="vb-gate">
                 <span class="vb-gate-lbl">detector gate</span>

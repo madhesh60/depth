@@ -75,6 +75,24 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ## 4. Session log
 
+### 2026-09-24 (cont.2) — "See what the agent sees": agent's-eye OpenCV view + cinematic synchronized zoom
+- **OpenCV, upgraded.** `zoom_relook` built the exact upscaled+CLAHE image the re-look detector
+  sees, then discarded it. Added **`Perceptor.relook_view()`** (pure cv2, **no extra inference** — the
+  calibrated agent path + 30/30 tests are untouched): reproduces that crop as **display images** — a
+  **LANCZOS4** zoom + the **CLAHE** "try-harder" pass (BGR) + the object box in crop px. Evidence-card
+  crops now upscale with **INTER_CUBIC** (was blocky INTER_NEAREST) at 300px. `/api/analyze` attaches
+  `relook_view{zoom_png, enhanced_png, scale, obj_box}` per candidate.
+- **Cinematic synchronized zoom (the ask).** After a run the viewer **auto-tours** every find —
+  flying/zooming the user's viewport to each candidate at the agent's *actual* re-look scale (smoother
+  .95s ease), popping an **"agent's eye" picture-in-picture** of the CLAHE re-look, drawing the shadow
+  strip/echo, and toasting the re-fire. **Any scroll/drag/zoom hands control back to the user**
+  (opt-out for that frame); `▶ agent tour` / `⏸ stop` toggles it manually.
+- **Dynamic interactiveness.** Evidence cards gain a **raw ⇄ enhanced (CLAHE)** before/after toggle
+  using the agent's-eye images; plus the box↔card linking, keyboard (←/→ · G · ±/0) and detector-gate
+  slider from the prior drop.
+- **Verified:** `node --check`, DOM ids resolve, python parse, uvicorn `/api/analyze` returns
+  `relook_view` (zoom 26 KB / enhanced 36 KB, scale 3.3×), **30/30 tests pass**.
+
 ### 2026-09-24 (cont.) — Rebrand to **DEPTH** + interactive sonar viewer (peak, robust frontend)
 - **Renamed the product to DEPTH** across all surfaces (README, `webui/` title + brand, dataset &
   model cards) — reverted the inherited "GhostGear Sonar". README adds the backronym

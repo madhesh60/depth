@@ -30,6 +30,7 @@ from fastapi.staticfiles import StaticFiles
 
 from src.agentic.pipeline import AgenticPipeline
 from src.agentic.agent import render
+from src.agentic.perception import Perceptor
 from src.agentic.shadow import ShadowProver
 from src.agentic.geo import synthetic_track
 from src.agentic.mission import export
@@ -64,7 +65,7 @@ def _b64(img: np.ndarray, quality: int = 85) -> str:
     return "data:image/jpeg;base64," + base64.b64encode(buf).decode() if ok else ""
 
 
-def _evidence_crop(frame: np.ndarray, cand, target: int = 240) -> str:
+def _evidence_crop(frame: np.ndarray, cand, target: int = 300) -> str:
     """Zoomed crop around a candidate with the shadow/echo overlay — the evidence-card image."""
     vis = _PROVER.overlay(frame, cand.bbox, cand.evidence.shadow) if cand.evidence else frame
     x1, y1, x2, y2 = cand.bbox
@@ -76,7 +77,9 @@ def _evidence_crop(frame: np.ndarray, cand, target: int = 240) -> str:
         return ""
     scale = target / max(1, max(crop.shape[:2]))
     if scale > 1:
-        crop = cv2.resize(crop, None, fx=scale, fy=scale, interpolation=cv2.INTER_NEAREST)
+        crop = cv2.resize(crop, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
+    elif scale < 1:
+        crop = cv2.resize(crop, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA)
     return _b64(crop)
 
 
@@ -90,6 +93,12 @@ def _frame_payload(frame: np.ndarray, result) -> dict:
     d["overlay_png"] = _b64(render(frame, result))
     for cand, cd in zip(result.candidates, d["candidates"]):
         cd["crop_png"] = _evidence_crop(frame, cand)
+        rv = Perceptor.relook_view(frame, cand.bbox)      # the agent's-eye zoom (display-only)
+        if rv:
+            cd["relook_view"] = {
+                "zoom_png": _b64(rv["zoom"]), "enhanced_png": _b64(rv["enhanced"]),
+                "scale": round(rv["scale"], 2), "obj_box": rv["obj_box"],
+            }
     return d
 
 

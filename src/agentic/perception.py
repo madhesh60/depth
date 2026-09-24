@@ -105,3 +105,38 @@ class Perceptor:
         gray = crop if crop.ndim == 2 else cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
         clahe = cv2.createCLAHE(clipLimit=clip, tileGridSize=(grid, grid))
         return clahe.apply(gray)
+
+    # -- the agent's-eye view (display-only; the images zoom_relook detects on) ---------------
+    @staticmethod
+    def relook_view(
+        frame: np.ndarray,
+        bbox: tuple[int, int, int, int],
+        target_px: int = 340,
+    ) -> Optional[dict]:
+        """Reproduce the exact re-look crop geometry (:meth:`zoom_relook`) as **display images**
+        for the UI — no inference, so this never touches the calibrated agent path.
+
+        Returns ``{"zoom", "enhanced", "scale", "obj_box"}`` where ``zoom`` is the plain
+        high-quality upscale (LANCZOS4 — what a naive zoom shows) and ``enhanced`` is the agent's
+        CLAHE "try-harder" pass, both BGR at ``obj_box`` = the object rectangle in crop pixels.
+        This lets the dashboard show *what the agent actually saw* when it zoomed in.
+        """
+        x1, y1, x2, y2 = bbox
+        bw, bh = x2 - x1, y2 - y1
+        H, W = frame.shape[:2]
+        pad = int(max(bw, bh) * RELOOK_PAD_FRAC) + 10
+        cx1, cy1 = max(0, x1 - pad), max(0, y1 - pad)
+        cx2, cy2 = min(W, x2 + pad), min(H, y2 + pad)
+        crop = frame[cy1:cy2, cx1:cx2]
+        if crop.size == 0:
+            return None
+        long_side = max(1, max(crop.shape[:2]))
+        scale = max(1.0, target_px / long_side)
+        dsize = (max(1, int(crop.shape[1] * scale)), max(1, int(crop.shape[0] * scale)))
+        zoom = cv2.resize(crop, dsize, interpolation=cv2.INTER_LANCZOS4)
+        enh_gray = Perceptor.enhance_contrast(crop)                       # CLAHE on the native crop
+        enh = cv2.resize(cv2.cvtColor(enh_gray, cv2.COLOR_GRAY2BGR), dsize,
+                         interpolation=cv2.INTER_LANCZOS4)
+        obj_box = [int((x1 - cx1) * scale), int((y1 - cy1) * scale),
+                   int((x2 - cx1) * scale), int((y2 - cy1) * scale)]
+        return {"zoom": zoom, "enhanced": enh, "scale": float(scale), "obj_box": obj_box}
