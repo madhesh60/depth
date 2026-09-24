@@ -103,6 +103,8 @@ code { font-family: var(--mono); font-size: .88em; color: #a9ecf8; }
 .btn-primary:hover:not(:disabled) { filter: brightness(1.07); }
 .btn-block { width: 100%; }
 .field { display: flex; flex-direction: column; gap: 5px; font-size: 11px; color: var(--txt-2); margin-bottom: 10px; }
+.field input[type="number"] { font: 12px var(--mono); padding: 7px 10px; border-radius: var(--radius); background: var(--surface-3); color: var(--txt); border: 1px solid var(--border-2); }
+.rs-arrow { color: #b3a8ff; font: 700 14px/1 var(--mono); text-shadow: 0 0 3px #04121a; }
 .field select { font: 12px var(--sans); padding: 8px 10px; border-radius: var(--radius); background: var(--surface-3); color: var(--txt); border: 1px solid var(--border-2); }
 
 /* ---------- model registry ---------- */

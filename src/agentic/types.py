@@ -214,6 +214,7 @@ class TrackedObject:
     shadow_quality: str = "none"
     also_in: list[str] = field(default_factory=list)   # other chunks showing the same object
     p_pot: Optional[float] = None                      # calibrated P(real pot) for REVIEW ordering
+    sightings: int = 1                                 # passes/frames that saw it (repeat sightings merged)
 
     def to_dict(self) -> dict:
         return _json(asdict(self))
@@ -234,6 +235,8 @@ class MissionPlan:
     inspection_length_m: Optional[float] = None
     budget: dict = field(default_factory=dict)             # budget-mode plan (analyst minutes)
     guarantees: dict = field(default_factory=dict)         # the promises the tiers carry
+    resurvey_plan: dict = field(default_factory=dict)      # second-look passes (opposite side, mid-swath)
+    repeat_merges: int = 0                                 # detections merged as repeat sightings
 
     def to_dict(self) -> dict:
         return _json(asdict(self))

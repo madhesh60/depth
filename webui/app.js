@@ -641,9 +641,11 @@ async function runSurvey() {
   Log.reset(); Log.now({ stage: true, tool: "SURVEY", msg: "running See→Prove→Decide→Act over all sample frames …", t: "run" });
   const gps = $("#gpsMode").value;
   const budget = Math.max(1, Math.min(600, parseFloat($("#budgetMin").value) || 5));
+  const boat = parseFloat($("#boatMin").value);
+  const boatQ = Number.isFinite(boat) && boat > 0 ? `&boat_minutes=${Math.min(1440, boat)}` : "";
   try {
     // Surveys run as background jobs (no proxy timeouts, the server stays responsive); poll progress.
-    const job = await fetch(`${API}/api/jobs/survey?use_samples=1&gps=${gps}&budget_minutes=${budget}`, { method: "POST" })
+    const job = await fetch(`${API}/api/jobs/survey?use_samples=1&gps=${gps}&budget_minutes=${budget}${boatQ}`, { method: "POST" })
       .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); });
     Log.now({ tool: "queue_job", msg: `${job.job_id} · ${job.frames} frames queued`, t: "" });
     const d = await pollJob(job.job_id);
@@ -685,12 +687,16 @@ function renderSurvey(d) {
   mb.innerHTML = `<b>🧭 Mission plan ready</b>
     <span>${cc.confirmed || 0} confirmed → <b>${m.recovery_route.length}-stop recovery route</b>${m.route_length_m != null ? ` (${m.route_length_m} m)` : ""}</span>
     <span>· ${cc.review || 0} REVIEW → <b>${(m.inspection_route || []).length}-stop inspection route</b>${m.inspection_length_m != null ? ` (${m.inspection_length_m} m)` : ""}</span>${gpsTag}
+    ${(m.resurvey_plan && (m.resurvey_plan.lines || []).length) ? `<span>· <b>${m.resurvey_plan.lines.length} re-survey pass${m.resurvey_plan.lines.length > 1 ? "es" : ""}</b> (${m.resurvey_plan.boat_minutes_planned} min boat) — opposite side, mid-swath</span>` : ""}
+    ${m.repeat_merges ? `<span>· ${m.repeat_merges} repeat sighting${m.repeat_merges > 1 ? "s" : ""} merged</span>` : ""}
     <span class="mb-tag" style="border-color:rgba(217,164,65,.5);color:#ffd9a3">✋ human approval required — nothing auto-dispatched</span>`;
   renderMap(d); renderDownloads(d.survey_id, m); renderThumbs(d); renderHazards(d); renderEffort(d);
   Log.push([
     { stage: true, tool: "ACT", msg: `${cc.confirmed || 0} confirmed · ${cc.review || 0} review · ${cc.low_risk || 0} low-risk (kept for audit)`, t: "" },
     ...(m.budget && m.budget.cards_total != null ? [{ tool: "budget_plan", msg: `${m.budget.cards_affordable}/${m.budget.cards_total} review cards fit ${m.budget.minutes} min → ~${m.budget.expected_pots_in_budget} of ~${m.budget.expected_pots_in_queue} expected real pots`, t: "" }] : []),
     { tool: "plan_route", msg: `${m.recovery_route.length}-stop nearest-neighbour recovery route${m.route_length_m != null ? " · " + m.route_length_m + " m" : ""}`, t: "" },
+    ...(m.resurvey_plan && m.resurvey_plan.lines ? [{ tool: "plan_resurvey", msg: `${m.resurvey_plan.lines.length} second-look passes · ${m.resurvey_plan.targets_covered}/${m.resurvey_plan.targets_total} uncertain targets · uncertainty Σp(1−p) ${m.resurvey_plan.voi_covered}/${m.resurvey_plan.voi_total} · ${m.resurvey_plan.boat_minutes_planned} min boat${m.resurvey_plan.boat_minutes_budget ? " (budget " + m.resurvey_plan.boat_minutes_budget + ")" : ""} — a real object's shadow must flip`, t: "" }] : []),
+    ...(m.repeat_merges != null ? [{ tool: "merge_sightings", msg: `${m.repeat_merges} repeat sighting(s) merged (error circles overlap, different frames)`, t: "" }] : []),
     { tool: "human_gate", msg: "human approval required — nothing auto-dispatched", t: "" },
   ]);
 }
@@ -745,6 +751,18 @@ function renderMap(d) {
       .bindTooltip("inspection route — REVIEW cards to check first (pending human approval)").addTo(state.map);
     state.mapLayers.push(il);
   }
+  ((m.resurvey_plan || {}).lines || []).forEach(Lr => {
+    const pts = [Lr.start, Lr.end];
+    const line = L.polyline(pts, { color: "#b3a8ff", weight: 2.5, dashArray: "8 5", opacity: .95 })
+      .bindPopup(`<b>${Lr.id}</b> · re-survey pass <i>(planned, not executed)</i><br/>heading ${Lr.heading_deg}° · ${Lr.length_m} m · ~${Lr.boat_min} min<br/>`
+        + `targets on ${Lr.targets_on}: ${Lr.targets.join(", ")}<br/>uncertainty Σp(1−p) ${Lr.voi} · ${Lr.voi_per_100m}/100 m<br/>`
+        + (Lr.predictions || []).slice(0, 3).map(p => `${p.id}: shadow was ${p.shadow_was.toFixed(0)}° → must point ${p.shadow_must_point.toFixed(0)}°`).join("<br/>"))
+      .addTo(state.map);
+    state.mapLayers.push(line); latlngs.push(Lr.start, Lr.end);
+    const arrow = L.marker(Lr.end, { interactive: false, icon: L.divIcon({ className: "", iconSize: [14, 14], iconAnchor: [7, 7],
+      html: `<div class="rs-arrow" style="transform:rotate(${Lr.heading_deg - 90}deg)">➤</div>` }) }).addTo(state.map);
+    state.mapLayers.push(arrow);
+  });
   state.map.fitBounds(L.latLngBounds(latlngs).pad(0.25)); setTimeout(() => state.map.invalidateSize(), 60);
 }
 
@@ -770,7 +788,7 @@ function renderHazards(d) {
   rows.forEach(t => {
     const tr = document.createElement("tr"); tr.dataset.oid = t.oid;
     const coords = t.lat != null ? `${t.lat.toFixed(5)}, ${t.lon.toFixed(5)}` : `<span class="muted">no GPS</span>`;
-    tr.innerHTML = `<td>${t.oid}</td><td>${t.cls_name}</td>
+    tr.innerHTML = `<td>${t.oid}${t.sightings > 1 ? ` <span class="muted" title="seen on ${t.sightings} frames/passes">×${t.sightings}</span>` : ""}</td><td>${t.cls_name}</td>
       <td><span class="v-tag" style="color:${VCOLOR[t.verdict]};background:${VCOLOR[t.verdict]}22">${VLABEL[t.verdict] || t.verdict}</span></td>
       <td>${t.conf}</td><td>${t.evidence_score}</td><td>${t.p_pot != null ? Math.round(t.p_pot * 100) + "%" : "—"}</td><td>${heightText(t.height_m, t.height_rel, t.height_rel ? 1 : 0)}</td>
       <td class="${t.shadow_quality === "clear" ? "chip-clear" : t.shadow_quality === "weak" ? "chip-weak" : "chip-none"}">${t.shadow_quality}</td>

@@ -75,6 +75,26 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ## 4. Session log
 
+### 2026-09-25 (review sweep 11) — Physical second look: opposite-side re-survey + repeat-sighting merge (A-1, X-3)
+- **`src/agentic/resurvey.py` → `plan_resurvey`**: for every uncertain (REVIEW) target the agent
+  plans the pass that can settle it — a straight line on the **opposite side** with the target at
+  **mid-swath** — groups targets whose lines align into one pass, and ranks passes by **uncertainty
+  resolved per metre of boat travel** (Σ p(1−p), p = calibrated P(pot)). A **boat-time budget**
+  keeps the densest passes (greedy knapsack) — the boat-side twin of the analyst budget. Each target
+  carries a **falsifiable prediction**: its shadow pointed θ, on the new pass it must point θ+180°
+  (a standing object's shadow flips; speckle doesn't). Sample survey, 8-min budget: 3 passes,
+  6.3 min, 4.5 of 9.6 units of uncertainty.
+- **`merge_repeat_sightings`**: different-frame detections of one class merge when their geotag
+  error circles overlap (≤ max(3 m, ½√(e₁²+e₂²)) — tight: pot strings are 10–30 m apart), closest
+  pairs first; **found + fixed** a transitive-fusion bug (two distinct detections in ONE frame could
+  merge through a third sighting) — clusters never hold two detections of the same frame.
+  `sightings` per hazard; tiers/scores untouched. Straight synthetic track ⇒ 0 merges (honest).
+- Exports: GeoJSON LineStrings (`kind: resurvey_plan`, status PLANNED), GPX routes, KML lines.
+  UI: violet dashed passes with heading arrows + popups (targets, uncertainty, shadow predictions),
+  banner + agent-log lines, "re-survey boat time" input, `×N` sightings in the hazard table.
+- Tests +4 (`test_resurvey.py`: opposite side at 16 m, predicted shadow bearing flip, grouping,
+  budget, no-GPS). Browser-verified.
+
 ### 2026-09-25 (review sweep 10) — Timed user study mode + analyst-effort curve (X-2, STUDY-09)
 - **Found by computing first:** with the ASSUMED timings (20 s/frame manual, 8 s/card) DEPTH only
   *matches* a perfect human at the recall promise (19.3 vs 19.5 min on the 92 verification frames)

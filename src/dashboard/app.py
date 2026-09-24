@@ -248,7 +248,8 @@ def _remember(result: SurveyResult) -> None:
 
 
 def _run_survey(frames, gps: str, budget_minutes: Optional[float], nadir: Optional[str],
-                survey_id: str, progress: Optional[Callable[[dict], None]] = None) -> dict:
+                survey_id: str, progress: Optional[Callable[[dict], None]] = None,
+                boat_minutes: Optional[float] = None) -> dict:
     track = synthetic_track([fid for fid, _ in frames]) if gps == "synthetic" else None
     pipe = get_pipeline()
     total = len(frames)
@@ -263,7 +264,8 @@ def _run_survey(frames, gps: str, budget_minutes: Optional[float], nadir: Option
 
     result = pipe.run_survey(frames, track=track, survey_id=survey_id, nadir=nadir,
                              budget_minutes=budget_minutes, progress_cb=cb,
-                             frame_lock=_INFER_LOCK)      # per frame: /api/analyze can interleave
+                             frame_lock=_INFER_LOCK,      # per frame: /api/analyze can interleave
+                             boat_minutes=boat_minutes)
     _remember(result)
     for fr in result.frames:
         _METRICS.record("survey", fr.frame_id, fr.stage_ms, counts=fr.counts)
@@ -457,11 +459,12 @@ def analyze(sample: Optional[str] = Query(None), nadir: Optional[str] = Query(No
 def submit_survey(use_samples: bool = Query(False), gps: str = Query("synthetic"),
                   budget_minutes: Optional[float] = Query(None, ge=0, le=600),
                   nadir: Optional[str] = Query(None),
+                  boat_minutes: Optional[float] = Query(None, ge=0, le=1440),
                   files: Optional[list[UploadFile]] = File(None)):
     frames = _collect_frames(use_samples, files)
     survey_id = f"survey-{time.strftime('%Y%m%d-%H%M%S')}-{len(frames)}f"
-    jid = _JOBS.submit(lambda progress: _run_survey(frames, gps, budget_minutes, nadir, survey_id, progress),
-                       total=len(frames))
+    jid = _JOBS.submit(lambda progress: _run_survey(frames, gps, budget_minutes, nadir, survey_id, progress,
+                                                    boat_minutes), total=len(frames))
     return {"job_id": jid, "survey_id": survey_id, "frames": len(frames)}
 
 

@@ -70,6 +70,9 @@
         <label class="field"><span>Analyst budget (minutes)</span>
           <input type="number" id="budgetMin" min="1" max="600" step="1" value="5" />
         </label>
+        <label class="field" title="boat time for second-look passes (opposite side, mid-swath); empty = plan every pass"><span>Re-survey boat time (minutes)</span>
+          <input type="number" id="boatMin" min="1" max="1440" step="1" value="10" />
+        </label>
         <button class="btn btn-primary btn-block" id="surveyBtn">Run full survey</button>
         <p class="panel-note">Every sample → evidence-backed hazards → budgeted review queue → human-approved route + reports.</p>
       </section>

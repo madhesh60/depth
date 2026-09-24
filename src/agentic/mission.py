@@ -140,6 +140,13 @@ def to_geojson(tracked: list[TrackedObject], mission: MissionPlan) -> str:
         features.append({"type": "Feature", "geometry": {"type": "LineString", "coordinates": icoords},
                          "properties": {"name": "inspection_route", "length_m": mission.inspection_length_m,
                                         "note": "REVIEW cards to inspect first - pending human approval"}})
+    for L in (mission.resurvey_plan or {}).get("lines", []):
+        features.append({"type": "Feature",
+                         "geometry": {"type": "LineString", "coordinates": [L["start"][::-1], L["end"][::-1]]},
+                         "properties": {"name": L["id"], "kind": "resurvey_plan", "status": L["status"],
+                                        "heading_deg": L["heading_deg"], "targets": L["targets"],
+                                        "targets_on": L["targets_on"], "voi": L["voi"], "boat_min": L["boat_min"],
+                                        "predictions": L["predictions"], "why": L["why"]}})
     fc = {"type": "FeatureCollection",
           "properties": {"human_approval_required": True,
                          "note": _SYNTH_WARN if mission.gps_synthetic else "real GPS",
@@ -164,6 +171,12 @@ def to_gpx(tracked: list[TrackedObject], mission: MissionPlan) -> str:
         out.append(f'  <rte><name>recovery_route ({mission.route_length_m} m)</name>')
         out += [f'    <rtept lat="{t.lat}" lon="{t.lon}"><name>{t.oid}</name></rtept>' for t in route]
         out.append("  </rte>")
+    for L in (mission.resurvey_plan or {}).get("lines", []):
+        out.append(f'  <rte><name>{L["id"]} re-survey (PLANNED, {L["boat_min"]} min)</name>'
+                   f'<desc>{L["why"]}</desc>')
+        out.append(f'    <rtept lat="{L["start"][0]}" lon="{L["start"][1]}"><name>{L["id"]}-start</name></rtept>')
+        out.append(f'    <rtept lat="{L["end"][0]}" lon="{L["end"][1]}"><name>{L["id"]}-end</name></rtept>')
+        out.append("  </rte>")
     out.append("</gpx>")
     return "\n".join(out)
 
@@ -185,6 +198,10 @@ def to_kml(tracked: list[TrackedObject], mission: MissionPlan) -> str:
         line = " ".join(f"{t.lon},{t.lat},0" for t in route)
         out.append(f"  <Placemark><name>recovery_route</name><LineString>"
                    f"<coordinates>{line}</coordinates></LineString></Placemark>")
+    for L in (mission.resurvey_plan or {}).get("lines", []):
+        out.append(f"  <Placemark><name>{L['id']} re-survey (planned)</name><description>{L['why']}</description>"
+                   f"<LineString><coordinates>{L['start'][1]},{L['start'][0]},0 {L['end'][1]},{L['end'][0]},0"
+                   f"</coordinates></LineString></Placemark>")
     out.append("</Document></kml>")
     return "\n".join(out)
 
