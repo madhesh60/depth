@@ -75,6 +75,21 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ## 4. Session log
 
+### 2026-09-24 (review sweep 1) — Detector core: one threshold source, per-class NMS, warm-up
+Start of the NEEDTOIMPROVE review sweep (M-3 + part of I-5/I-6).
+- **`src/detection/calibration.py` + `models/EXP-001/calibration.json`** — the ONE place every
+  runtime threshold comes from (per-class conf, NMS IoU, class-aware NMS, re-look conf, decision
+  tiers). Detector, agent, dashboard (and next: Lambda/benchmark) read it; a missing/partial file
+  falls back to the shipped defaults, so nothing can change silently. Tracked in git (tiny JSON).
+- **Class-aware NMS** (`cv2.dnn.NMSBoxesBatched`) — a crab pot next to a wreck box is no longer
+  suppressed by it. On 60 v1-val sonar frames: 221 detections either way (single-class frames), so
+  no regression; unit test proves the cross-class case.
+- **Runtime:** `configure_runtime()` pins `cv2.setNumThreads` from `$DEPTH_THREADS`;
+  `$DEPTH_DNN_ENGINE` selects auto|new|classic (default AUTO = OpenCV 5 new engine w/ fallback;
+  laptop timings too noisy to prefer one); `warmup()`; the re-look detector now **shares** the
+  loaded network (`with_conf`) instead of loading a second copy.
+- Tests: +4 (`tests/test_calibration.py`) → 30 fast tests + API smoke.
+
 ### 2026-09-24 (cont.3) — Frontend rebuilt as a DepthWizard-class agentic studio
 - **Studied the user's reference** `C:\Users\RAJ\Desktop\ExP\DepthWizard` (React+TS+Tailwind+Zustand
   Tauri studio) and rebuilt DEPTH's web app to that bar — **kept zero-build vanilla** (the live judge

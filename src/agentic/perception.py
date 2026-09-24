@@ -21,7 +21,8 @@ from typing import Optional, Sequence
 import cv2
 import numpy as np
 
-from src.detection.infer import YoloOnnxDetector, Detection, PER_CLASS_CONF, DEFAULT_ONNX
+from src.detection.infer import YoloOnnxDetector, Detection, PER_CLASS_CONF, DEFAULT_ONNX, DEFAULT_IOU_NMS
+from src.detection.calibration import load_calibration
 from .types import RelookResult
 
 # Re-look geometry (validated on the crab-pot test split — see STUDY-03).
@@ -37,15 +38,20 @@ class Perceptor:
         self,
         onnx_path: str | Path = DEFAULT_ONNX,
         conf_thres: "float | dict[str, float]" = PER_CLASS_CONF,
-        iou_thres: float = 0.45,
-        relook_conf: float = 0.05,
+        iou_thres: float = DEFAULT_IOU_NMS,
+        relook_conf: Optional[float] = None,
     ):
+        relook_conf = load_calibration().relook_conf if relook_conf is None else relook_conf
         # main detector runs at the per-class thresholds (hot for fishing_gear, 0.10)
         self.detector = YoloOnnxDetector(onnx_path, conf_thres=conf_thres, iou_thres=iou_thres)
         # the re-look detector runs even hotter so a faint re-fire is still measurable
         rl = dict(PER_CLASS_CONF)
         rl["fishing_gear"] = min(rl.get("fishing_gear", 0.10), relook_conf)
-        self.relook_detector = YoloOnnxDetector(onnx_path, conf_thres=rl, iou_thres=iou_thres)
+        self.relook_detector = self.detector.with_conf(rl)      # shares the loaded network
+
+    def warmup(self) -> float:
+        """Pay the model's first-forward cost at startup, not on the first judge request."""
+        return self.detector.warmup()
 
     # -- See ---------------------------------------------------------------------------------
     def perceive(self, frame: np.ndarray) -> list[Detection]:

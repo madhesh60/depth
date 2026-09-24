@@ -1,0 +1,20 @@
+{
+  "model": "EXP-001",
+  "names": ["fishing_gear", "pipe_cylinder", "structural_fragment", "natural_formation"],
+  "detector": {
+    "imgsz": 640,
+    "iou_nms": 0.45,
+    "class_aware_nms": true,
+    "conf": {"fishing_gear": 0.10, "pipe_cylinder": 0.25, "structural_fragment": 0.25, "natural_formation": 0.25},
+    "relook_conf": 0.05
+  },
+  "tiers": {
+    "method": "legacy-rules",
+    "score": "max(det_conf, relook_conf)",
+    "tau_review": null,
+    "tau_confirm": null,
+    "guarantees": {}
+  },
+  "fit": {"split": null, "frames": 0, "created": "2026-09-24",
+          "note": "legacy values; refit on validation with `python -m src.agentic.calibrate`"}
+}

@@ -1,15 +1,13 @@
 """
 infer.py — Stage 2 YOLO inference for marine-debris detection, via ``cv2.dnn``.
 
-Loads the exported ONNX detector with ``cv2.dnn.readNetFromONNX`` (the same path the
-AWS Lambda handler will use — no ultralytics/torch at inference time) and offers two
-detection modes:
+Loads the exported ONNX detector with ``cv2.dnn.readNetFromONNX`` (OpenCV 5; no
+ultralytics/torch at inference time). Thresholds, NMS IoU and class-aware NMS come from
+``models/<MODEL>/calibration.json`` (``calibration.py``) — the single threshold source.
 
-* ``full_frame``  — run the detector on the whole frame (the conventional baseline).
-* ``roi_guided``  — run Stage 1 classical CV first, then keep only detections that fall
-  inside a Stage-1 candidate ROI. The detector is *identical* in both modes, so any
-  difference in false-positives is attributable purely to the Stage-1 spatial prior —
-  which is exactly what the FP-reduction ablation measures (see ``ablation_fp.py``).
+* ``full_frame``  — run the detector on the whole frame (the product path).
+* ``roi_guided``  — the retired Stage-1 ROI gate, kept only to reproduce STUDY-01
+  (``ablation_fp.py``); it is not used by the product.
 
 YOLO11/YOLOv8 detect head: the ONNX output is ``(1, 4+nc, N)`` — 4 bbox (cx,cy,w,h in
 letterboxed 640-space) followed by ``nc`` class scores, transposed. We letterbox on the
@@ -18,6 +16,7 @@ way in and un-letterbox boxes back to original pixels on the way out.
 from __future__ import annotations
 
 import argparse
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Sequence
@@ -25,20 +24,38 @@ from typing import Optional, Sequence
 import cv2
 import numpy as np
 
-REPO = Path(__file__).resolve().parents[2]
-DEFAULT_ONNX = REPO / "runs" / "EXP-001" / "weights" / "best.onnx"
-DEFAULT_NAMES = ["fishing_gear", "pipe_cylinder", "structural_fragment", "natural_formation"]
+from src.detection.calibration import load_calibration
 
-# Per-class confidence thresholds (EXP-001 error analysis, src/detection/error_analysis.py).
-# fishing_gear is the mission-critical, small-object class: at conf 0.25 recall is 0.46, at 0.10
-# it is 0.69 (sonar) — for a human-review hazard triage recall >> precision, so it runs lower.
-# The others are already high-confidence and stay at the standard 0.25.
-PER_CLASS_CONF = {
-    "fishing_gear": 0.10,
-    "pipe_cylinder": 0.25,
-    "structural_fragment": 0.25,
-    "natural_formation": 0.25,
-}
+REPO = Path(__file__).resolve().parents[2]
+DEFAULT_ONNX = Path(os.environ.get("DEPTH_ONNX", REPO / "runs" / "EXP-001" / "weights" / "best.onnx"))
+
+# Every runtime threshold comes from ONE file: models/<MODEL>/calibration.json (see
+# calibration.py). fishing_gear is the mission-critical, small-object class and runs hot (0.10 —
+# EXP-001 error analysis: recall 0.46 @0.25 -> 0.69 @0.10); the others stay at 0.25.
+_CAL = load_calibration()
+DEFAULT_NAMES = _CAL.names
+PER_CLASS_CONF = _CAL.conf
+DEFAULT_IOU_NMS = _CAL.iou_nms
+
+_ENGINES = {"auto": "ENGINE_AUTO", "new": "ENGINE_NEW", "classic": "ENGINE_CLASSIC"}
+
+
+def configure_runtime(threads: Optional[int] = None) -> dict:
+    """Pin OpenCV's thread pool so benchmarks are comparable (``$DEPTH_THREADS``; 0 = OpenCV
+    default). Returns the effective settings for provenance logs."""
+    n = threads if threads is not None else int(os.environ.get("DEPTH_THREADS", "0") or 0)
+    if n > 0:
+        cv2.setNumThreads(n)
+    return {"threads": cv2.getNumThreads(), "engine": os.environ.get("DEPTH_DNN_ENGINE", "auto")}
+
+
+def _read_net(onnx_path: Path):
+    """``cv2.dnn.readNetFromONNX`` with the engine from ``$DEPTH_DNN_ENGINE`` (auto|new|classic).
+    ENGINE_AUTO (default) tries OpenCV 5's new engine first and falls back to the classic one."""
+    eng = getattr(cv2.dnn, _ENGINES.get(os.environ.get("DEPTH_DNN_ENGINE", "auto").lower(), "ENGINE_AUTO"), None)
+    if eng is None:
+        return cv2.dnn.readNetFromONNX(str(onnx_path))
+    return cv2.dnn.readNetFromONNX(str(onnx_path), eng)
 
 
 @dataclass
@@ -76,7 +93,8 @@ class YoloOnnxDetector:
         names: Sequence[str] = DEFAULT_NAMES,
         imgsz: int = 640,
         conf_thres: "float | dict[str, float] | Sequence[float]" = 0.25,
-        iou_thres: float = 0.45,
+        iou_thres: float = DEFAULT_IOU_NMS,
+        class_aware_nms: bool = _CAL.class_aware_nms,
     ):
         onnx_path = Path(onnx_path)
         if not onnx_path.exists():
@@ -84,8 +102,10 @@ class YoloOnnxDetector:
                 f"ONNX weights not found: {onnx_path}\n"
                 f"Export them first: python src/detection/export_onnx.py"
             )
-        self.net = cv2.dnn.readNetFromONNX(str(onnx_path))
+        self.net = _read_net(onnx_path)
+        self._onnx_path = str(onnx_path)
         self.names = list(names)
+        self.class_aware_nms = class_aware_nms
         self.imgsz = imgsz
         self.iou_thres = iou_thres
         # per-class confidence thresholds → array aligned to `names`; `conf_floor` is the min
@@ -99,17 +119,50 @@ class YoloOnnxDetector:
         self.conf_floor = float(self.conf_by_class.min())
         self.conf_thres = self.conf_floor  # back-compat alias
 
-    # -- core detector ------------------------------------------------------------------
-    def detect(self, img: np.ndarray) -> list[Detection]:
-        """Full-frame detection: letterbox → forward → decode → NMS → original px."""
+    def with_conf(self, conf_thres: "float | dict[str, float]") -> "YoloOnnxDetector":
+        """A view of this detector with different confidence thresholds that SHARES the loaded
+        network (no second model in memory, one warm-up covers both)."""
+        import copy
+        other = copy.copy(self)
+        if isinstance(conf_thres, dict):
+            other.conf_by_class = np.array([conf_thres.get(n, 0.25) for n in self.names], float)
+        else:
+            other.conf_by_class = np.full(len(self.names), float(conf_thres))
+        other.conf_floor = float(other.conf_by_class.min())
+        other.conf_thres = other.conf_floor
+        return other
+
+    def warmup(self, n: int = 2) -> float:
+        """Run ``n`` dummy forwards so the first real request doesn't pay graph/alloc setup.
+        Returns the last warm-up latency in ms."""
+        import time
+        dummy = np.full((self.imgsz, self.imgsz, 3), 114, np.uint8)
+        ms = 0.0
+        for _ in range(max(1, n)):
+            t0 = time.perf_counter()
+            self.forward_raw(dummy)
+            ms = (time.perf_counter() - t0) * 1000
+        return ms
+
+    def forward_raw(self, img: np.ndarray) -> tuple[np.ndarray, float, int, int]:
+        """Letterbox + forward only. Returns (preds (N, 4+nc), scale, padx, pady)."""
         if img.ndim == 2:
             img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
         canvas, scale, padx, pady = _letterbox(img, self.imgsz)
         blob = cv2.dnn.blobFromImage(canvas, 1 / 255.0, (self.imgsz, self.imgsz), swapRB=True)
         self.net.setInput(blob)
         out = self.net.forward()                      # (1, 4+nc, N)
-        preds = out[0].T                              # (N, 4+nc)
+        return out[0].T, scale, padx, pady
 
+    # -- core detector ------------------------------------------------------------------
+    def detect(self, img: np.ndarray) -> list[Detection]:
+        """Full-frame detection: letterbox → forward → decode → NMS → original px."""
+        preds, scale, padx, pady = self.forward_raw(img)
+        return self.decode(preds, scale, padx, pady, img.shape[:2])
+
+    def decode(self, preds: np.ndarray, scale: float, padx: int, pady: int,
+               hw: tuple[int, int]) -> list[Detection]:
+        """Decode raw (N, 4+nc) predictions → per-class-NMS'd detections in original pixels."""
         cxcywh = preds[:, :4]
         scores = preds[:, 4:]
         cls_ids = np.argmax(scores, axis=1)
@@ -127,14 +180,11 @@ class YoloOnnxDetector:
         h = bh / scale
         boxes = np.stack([x, y, w, h], axis=1)
 
-        idxs = cv2.dnn.NMSBoxes(
-            boxes.tolist(), confs.tolist(), self.conf_floor, self.iou_thres
-        )
+        idxs = nms(boxes, confs, cls_ids, self.conf_floor, self.iou_thres, self.class_aware_nms)
         if len(idxs) == 0:
             return []
-        idxs = np.array(idxs).flatten()
 
-        H, W = img.shape[:2]
+        H, W = hw
         dets: list[Detection] = []
         for i in idxs:
             cid = int(cls_ids[i])
@@ -165,6 +215,21 @@ class YoloOnnxDetector:
         if not rois:
             return []
         return [d for d in dets if _backed_by_roi(d.bbox, rois, gate_iou)]
+
+
+def nms(boxes_xywh: np.ndarray, confs: np.ndarray, cls_ids: np.ndarray, score_thr: float,
+        iou_thr: float, class_aware: bool = True) -> np.ndarray:
+    """Non-max suppression. ``class_aware=True`` (default) suppresses only within a class
+    (``cv2.dnn.NMSBoxesBatched``), so a crab pot lying next to a wreck box is not deleted by it."""
+    if len(confs) == 0:
+        return np.empty(0, int)
+    b = np.asarray(boxes_xywh, float).tolist()
+    c = np.asarray(confs, float).tolist()
+    if class_aware:
+        idxs = cv2.dnn.NMSBoxesBatched(b, c, np.asarray(cls_ids, int).tolist(), score_thr, iou_thr)
+    else:
+        idxs = cv2.dnn.NMSBoxes(b, c, score_thr, iou_thr)
+    return np.array(idxs, int).flatten()
 
 
 def _iou(a: tuple[int, int, int, int], b: tuple[int, int, int, int]) -> float:
@@ -216,7 +281,7 @@ def main():
     p.add_argument("--mode", choices=["full_frame", "roi_guided"], default="full_frame")
     p.add_argument("--conf", type=float, default=None,
                    help="global conf override; default uses per-class thresholds (PER_CLASS_CONF)")
-    p.add_argument("--iou", type=float, default=0.45)
+    p.add_argument("--iou", type=float, default=DEFAULT_IOU_NMS)
     p.add_argument("--out", default=str(REPO / "runs" / "infer_out"),
                    help="directory for annotated overlays")
     p.add_argument("--limit", type=int, default=0, help="max images (0 = all)")
