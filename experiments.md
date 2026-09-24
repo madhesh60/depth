@@ -108,6 +108,26 @@ Promote each into the log below with full results as it runs.
 
 ## Experiment log
 
+### STUDY-09 — Analyst effort: does DEPTH save review minutes? (curve + timed study)
+
+**Why.** Review X-2: the impact claim ("minutes per survey-hour") was never measured.
+**Setup.** `python -m src.agentic.effort` on the EXP-001 verification split (92 unique frames,
+138 pots — every frame has ≥ 1 pot); `docs/effort_curve.md`. Timings ASSUMED until the Study-mode
+sessions exist (`docs/user_study.md`).
+
+| at the recall promise (≥ 65%) | manual (every frame) | DEPTH queue |
+|---|--:|--:|
+| minutes for 92 frames (20 s/frame, 8 s/card) | 19.3 | 19.5 (146 cards) |
+| per survey-hour (~169 frames) | 35.5 | 35.7 |
+| **break-even card time** | — | **7.95 s** |
+| agent forecast vs actual real pots | — | 84.5 vs 90 |
+
+**Reading.** With these assumptions DEPTH merely ties a *perfect* manual reviewer; the win requires
+card review under ~8 s and/or imperfect manual recall — both are exactly what the study measures.
+DEPTH's order equals confidence order for EXP-001 (STUDY-07); its measurable extras are the promise
+(when to stop) and a forecast that held (slightly conservative). Status: **study pending** (needs
+3+ people). A higher recall ceiling (EXP-002) moves the promise and the card count.
+
 ### EXP-002 — YOLO11s @1024 on v2b + tiles (+ sonar-aware copy-paste variant EXP-002p) — READY TO RUN
 
 - Status: **kit built and round-trip tested; GPU run pending (Kaggle T4)** — `docs/exp002_kaggle.md`.

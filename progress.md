@@ -75,6 +75,25 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ## 4. Session log
 
+### 2026-09-25 (review sweep 10) — Timed user study mode + analyst-effort curve (X-2, STUDY-09)
+- **Found by computing first:** with the ASSUMED timings (20 s/frame manual, 8 s/card) DEPTH only
+  *matches* a perfect human at the recall promise (19.3 vs 19.5 min on the 92 verification frames)
+  — the minutes-saved claim rests entirely on two stopwatch numbers nobody had measured. So the
+  headline is now a **break-even card time (7.95 s)**: faster card review than that and DEPTH wins.
+- **`src/agentic/effort.py`**: recall-vs-minutes on the verification split for manual review,
+  a detector list (survey order) and the DEPTH queue (P(pot) order) + the promise point, the
+  break-even, per-survey-hour minutes, and **forecast vs actual** (the agent forecast 84.5 real pots
+  at the promise point; 90 were real). Writes `models/<MODEL>/effort_curve.json` (UI replays it),
+  `docs/effort_curve.md` + chart.
+- **`src/agentic/study.py` + Study mode:** counterbalanced **2×2 Latin square** (frame halves ×
+  task order; nobody sees a frame twice), manual arm (click every pot, timed per frame) and cards
+  arm (the agent's queue, Y/N, timed per card), server-side scoring vs labels (clicks within a box
+  +8 px; cards IoU ≥ 0.3; DEPTH recall counts pots in frames that produced no card — fixed a bug
+  that silently excluded them). Pooled summary → the effort panel switches from "assumed" to
+  "measured"; live what-if sliders; `$DEPTH_STUDY_DIR` for a bigger frame set.
+- API: `/api/study/plan|frame|result|summary`, `/api/effort`. Protocol: `docs/user_study.md`.
+- Tests +4 (`test_study.py`). Browser-verified the full session flow; test session deleted.
+
 ### 2026-09-25 (review sweep 9) — Every human decision becomes a training label (A-2)
 - **`src/agentic/feedback.py`**: append-only `runs/feedback/decisions.jsonl` (confirm / reject /
   **missed**), latest decision wins per object (same frame, IoU ≥ 0.7); uploaded frames persisted

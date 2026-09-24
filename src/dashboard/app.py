@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import json
 import logging
 import os
 import threading
@@ -59,6 +60,8 @@ from . import samples as samples_mod
 from .jobs import JobStore, REPORT_FORMATS
 from .metrics import Metrics
 from src.agentic.feedback import FeedbackStore
+from src.agentic import study as study_mod
+from src.agentic import effort as effort_mod
 
 log = logging.getLogger("depth.api")
 REPO = Path(__file__).resolve().parents[2]
@@ -82,6 +85,7 @@ _JOBS = JobStore(max_jobs=50, workers=1)
 _RUNTIME = configure_runtime()
 _METRICS = Metrics()
 _FEEDBACK = FeedbackStore()
+_STUDY: "OrderedDict[str, dict]" = OrderedDict()          # active study sessions (plan + the cards shown)
 _UPLOADS: "OrderedDict[str, np.ndarray]" = OrderedDict()     # recent uploaded frames (feedback persists them)
 MAX_UPLOAD_CACHE = 64
 
@@ -310,6 +314,82 @@ def feedback(rec: dict = Body(...)):
 @app.get("/api/feedback/stats")
 def feedback_stats():
     return {**_FEEDBACK.stats(), "agreement_with_gt": _FEEDBACK.agreement()}
+
+
+# ---- timed user study + analyst-effort curve (src/agentic/study.py, effort.py) ------------------
+@app.get("/api/study/plan")
+def study_plan(participant: str = Query("anon", max_length=40)):
+    """Counterbalanced session: half the frames manual, half as the agent's cards (in queue order)."""
+    try:
+        plan = study_mod.plan(participant)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    pipe = get_pipeline()
+    g = load_calibration().guaranteed_class
+    cards = []
+    for fr in plan["card_frames"]:
+        fp = study_mod.frame_path(fr["frame_id"])
+        img = cv2.imread(str(fp)) if fp else None
+        if img is None:
+            continue
+        with _INFER_LOCK:
+            res = pipe.run_frame(img, frame_id=fr["frame_id"])
+        for i, c in enumerate(res.candidates):
+            if c.verdict is None or c.verdict.value not in ("confirmed", "review") or c.cls_name != g:
+                continue
+            cards.append({"card_id": f"{fr['frame_id'][-12:]}-{i}", "frame_id": fr["frame_id"], "bbox": list(c.bbox),
+                          "p_pot": c.evidence.p_pot if c.evidence else None, "conf": round(c.conf, 3),
+                          "verdict": c.verdict.value, "crop_png": _evidence_crop(img, c, 280)})
+    cards.sort(key=lambda c: (-(c["p_pot"] or 0), -c["conf"]))           # the DEPTH queue order
+    _STUDY[plan["session_id"]] = {"plan": plan, "cards": {c["card_id"]: c for c in cards}}
+    while len(_STUDY) > 32:
+        _STUDY.popitem(last=False)
+    return {**plan, "cards": cards}
+
+
+@app.get("/api/study/frame/{frame_id}")
+def study_frame(frame_id: str):
+    fp = study_mod.frame_path(frame_id)
+    if not fp or not fp.exists():
+        raise HTTPException(404, "not a study frame")
+    return Response(fp.read_bytes(), media_type="image/jpeg", headers={"Cache-Control": "no-store"})
+
+
+@app.post("/api/study/result")
+def study_result(body: dict = Body(...)):
+    sess = _STUDY.get(str(body.get("session_id", "")))
+    if sess is None:
+        raise HTTPException(404, "unknown or expired study session - start a new one")
+    rec = study_mod.score(sess["plan"], body, sess["cards"])
+    study_mod.save(rec)
+    _STUDY.pop(sess["plan"]["session_id"], None)
+    return {"session": {k: v for k, v in rec.items() if k != "raw"}, "summary": study_mod.summary()}
+
+
+@app.get("/api/study/summary")
+def study_summary():
+    params, prov = effort_mod.measured_params()
+    return {"summary": study_mod.summary(), "effort_params": params, "effort_provenance": prov}
+
+
+@app.get("/api/effort")
+def effort(sec_per_frame: Optional[float] = Query(None, gt=0, le=600),
+           sec_per_card: Optional[float] = Query(None, gt=0, le=120),
+           manual_recall: Optional[float] = Query(None, gt=0, le=1),
+           card_accuracy: Optional[float] = Query(None, gt=0, le=1)):
+    """Recall-vs-minutes curves for manual review / detector list / DEPTH queue with any timings."""
+    ep = REPO / "models" / load_calibration().data.get("model", "EXP-001") / "effort_curve.json"
+    if not ep.exists():
+        raise HTTPException(404, "no effort data for this model - run python -m src.agentic.effort")
+    E = json.loads(ep.read_text(encoding="utf-8"))
+    params, prov = effort_mod.measured_params()
+    for k, v in (("sec_per_frame", sec_per_frame), ("sec_per_card", sec_per_card),
+                 ("manual_recall", manual_recall), ("card_accuracy", card_accuracy)):
+        if v is not None:
+            params[k], prov = v, "set in the UI"
+    C = effort_mod.curves(E, **params)
+    return {"curves": C, "provenance": prov, "frames": E["frames"], "pots": E["pots"],
+            "frames_per_survey_hour": E["frames_per_survey_hour"], "split": E.get("split")}
 
 
 @app.get("/api/metrics")

@@ -28,6 +28,7 @@
     <nav class="modes" role="tablist" aria-label="workspace">
       <button class="mode-btn is-active" data-mode="analyze" role="tab">Analyze</button>
       <button class="mode-btn" data-mode="survey" role="tab">Survey</button>
+      <button class="mode-btn" data-mode="study" role="tab" title="timed user study: manual review vs DEPTH cards">Study</button>
     </nav>
 
     <div class="status-pills" id="healthPills">
@@ -42,7 +43,7 @@
 
     <!-- ---------------- LEFT RAIL ---------------- -->
     <aside class="rail rail-left scrollable">
-      <section class="panel">
+      <section class="panel" data-when="analyze survey">
         <div class="panel-head"><span class="panel-title">Sources</span><span class="panel-meta" id="sampleCount"></span></div>
         <p class="panel-note">One click — no sonar files needed, or drop your own frame.</p>
         <div class="sample-grid" id="sampleGrid"><div class="skeleton"></div><div class="skeleton"></div></div>
@@ -71,6 +72,16 @@
         </label>
         <button class="btn btn-primary btn-block" id="surveyBtn">Run full survey</button>
         <p class="panel-note">Every sample → evidence-backed hazards → budgeted review queue → human-approved route + reports.</p>
+      </section>
+
+      <section class="panel" data-when="study">
+        <div class="panel-head"><span class="panel-title">Timed study</span><span class="panel-meta" id="studyMeta"></span></div>
+        <p class="panel-note">Measures the minutes DEPTH saves instead of assuming them. You review half the frames <b>by hand</b> (click every pot) and the other half as <b>DEPTH cards</b> (real pot / not a pot). Every answer is timed; scoring is against the labels. ~5 minutes.</p>
+        <label class="field">Your name or initials
+          <input type="text" id="studyName" maxlength="40" placeholder="e.g. RK" />
+        </label>
+        <button class="btn btn-primary btn-block" id="studyStartBtn">Start session</button>
+        <p class="panel-note" style="margin-top:10px">Order and frame halves rotate between people (2×2 Latin square), so nobody sees a frame twice and learning effects cancel out.</p>
       </section>
 
       <section class="panel">
@@ -157,10 +168,59 @@
           <p>Run a survey to see the <b>Act</b> stage: hazards on a map, a nearest-neighbour recovery route, and GeoJSON / GPX / KML / CSV exports — human-approved before dispatch.</p>
         </div>
       </div>
+
+      <!-- study -->
+      <div class="study-center" data-when="study" id="studyCenter">
+        <div class="study-screen" id="studyIntro">
+          <div class="st-card">
+            <h2>Does DEPTH save analyst time? Measure it.</h2>
+            <p>Two tasks, timed separately:</p>
+            <ol>
+              <li><b>Manual review</b> — a raw sonar frame. Click on every crab pot you see, then <kbd>Next</kbd> (<kbd>Enter</kbd>). <kbd>Backspace</kbd> undoes a click.</li>
+              <li><b>DEPTH cards</b> — the agent's review queue. For each card answer <kbd>Y</kbd> real pot or <kbd>N</kbd> not a pot.</li>
+            </ol>
+            <p class="muted">Pots are small bright returns, often with a thin dark shadow line beyond them (away from the top edge). Enter your name on the left and press <b>Start session</b>.</p>
+          </div>
+        </div>
+        <div class="study-screen" id="studyManual" hidden>
+          <div class="st-bar"><span class="st-arm">Manual review</span><span class="mono" id="stManProg"></span>
+            <span class="mono st-timer" id="stManTimer">0.0 s</span><span class="mono" id="stManClicks">0 marks</span>
+            <span class="tb-spacer"></span><button class="tb-btn" id="stUndo">undo</button><button class="btn btn-primary" id="stNext">Next frame →</button></div>
+          <div class="st-frame" id="stFrameWrap"><img id="stFrame" alt="sonar frame to review" draggable="false" /><svg id="stMarks"></svg></div>
+        </div>
+        <div class="study-screen" id="studyCards" hidden>
+          <div class="st-bar"><span class="st-arm">DEPTH cards</span><span class="mono" id="stCardProg"></span>
+            <span class="mono st-timer" id="stCardTimer">0.0 s</span><span class="tb-spacer"></span></div>
+          <div class="st-cardview">
+            <img id="stCard" alt="DEPTH evidence card" />
+            <div class="st-cardmeta mono" id="stCardMeta"></div>
+            <div class="st-answer"><button class="btn st-yes" id="stYes">✓ real pot <kbd>Y</kbd></button><button class="btn st-no" id="stNo">✕ not a pot <kbd>N</kbd></button></div>
+          </div>
+        </div>
+        <div class="study-screen" id="studyBreak" hidden>
+          <div class="st-card"><h2 id="stBreakTitle">Part 1 done</h2><p id="stBreakTxt"></p><button class="btn btn-primary" id="stContinue">Continue →</button></div>
+        </div>
+        <div class="study-screen" id="studyDone" hidden>
+          <div class="st-card" id="stDoneCard"></div>
+        </div>
+      </div>
     </main>
 
     <!-- ---------------- RIGHT INSPECTOR ---------------- -->
     <aside class="rail inspector scrollable">
+      <section class="panel" data-when="study">
+        <div class="panel-head"><span class="panel-title">Study results</span><span class="panel-meta" id="stSumMeta"></span></div>
+        <div id="stSummary"><p class="empty-hint">No sessions yet — the first result replaces the assumed timings everywhere.</p></div>
+      </section>
+      <section class="panel" data-when="study">
+        <div class="panel-head"><span class="panel-title">Analyst effort</span><span class="panel-meta" id="effProv"></span></div>
+        <div class="eff-ctl">
+          <label>manual s / frame <output class="mono" id="effSpfV"></output><input type="range" id="effSpf" min="3" max="120" step="1" /></label>
+          <label>s / card <output class="mono" id="effSpcV"></output><input type="range" id="effSpc" min="1" max="30" step="0.5" /></label>
+        </div>
+        <div id="effChart"></div>
+        <div class="eff-stats" id="effStats"></div>
+      </section>
       <!-- analyze: evidence -->
       <section class="panel evidence-panel" data-when="analyze">
         <div class="panel-head"><span class="panel-title">Evidence</span><span class="panel-meta">evidence before trust</span></div>
