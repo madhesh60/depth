@@ -1,139 +1,59 @@
-# TODO — Marine Debris Detection System
+# TODO — DEPTH (updated 2026-09-25)
 
-Phased, gated backlog. **Do not skip a gate** — each phase has an exit criterion that must
-be true before the next begins. Priorities reflect the judging rubric: dataset quality, ML
-validity, COOL benchmark, and a demoable product beat extra features every time.
+Deadline **2026-10-26 23:59 PT** (27 Oct 12:29 IST). Judging 27 Oct – 9 Nov (keep the demo up).
+The review's roadmap lives in the local `NEEDTOIMPROVE.md`; this is the working backlog.
 
-**Related:** [`architecture.md`](architecture.md) · [`progress.md`](progress.md) ·
-[`experiments.md`](experiments.md)
+Legend: `[x]` done · `[ ]` open · **(YOU)** needs a person / an account / a GPU
 
-Legend: `[ ]` open · `[~]` in progress · `[x]` done · **(P0)** blocker · **(P1)** high · **(P2)** nice-to-have
+## Needs you — highest leverage first
 
----
+- [ ] **(YOU) Grant check-in** — due by **2 Oct** (unlocks the second half of the grant).
+- [ ] **(YOU) EXP-002 on Kaggle** — the recall ceiling (0.72) is the binding limit. Follow
+      `docs/exp002_kaggle.md` (upload v2b once, paste the cells, Save & Run All). Then locally:
+      `python -m src.detection.onboard_model --zip EXP-002_complete.zip`. Optional EXP-002p (+copy-paste).
+- [ ] **(YOU) AWS day** — `aws login`; subscribe to the COOL Graviton listing (note the AMI id);
+      upload `best.onnx` to S3; `infra/deploy_aws.sh` (dry run → `APPLY=1`); check
+      `/api/health` shows `is_cool_path: true`. Then the 3-way benchmark (`infra/bench_cool.sh` on
+      c7i + stock c8g + COOL c8g; terminate the extra instances) → `python -m src.bench.compare`.
+- [ ] **(YOU) Timed study** — 3+ people × ~10 min in the **Study** tab (`docs/user_study.md`).
+- [ ] **(YOU) False-alarm audit** — 2+ people × ~15 min in the **Audit** tab.
 
-## Phase 0 — Foundation & hygiene  *(this week)*
+## After those land (engineering)
 
-- [x] Read full context; establish architecture and plan.
-- [x] Create documentation set (README, architecture, progress, experiments, TODO).
-- [ ] **(P1)** Initial git commit of docs; adopt typed commit prefixes (`feat/fix/data/infra/docs/exp`).
-- [x] Move + formalise stray reference docs into `docs/` (`competition_rules.md`,
-      `claude_code_playbook.md`, `dataset_report.md`); links updated in README.
-- [ ] **(P0)** Install & configure **AWS CLI** (blocks all cloud + COOL work). *(blocker B5)*
-- [ ] **(P1)** Scaffold `src/`, `infra/`, `tests/` per architecture §5 (empty modules + `__init__`).
+- [ ] EXP-002 → if the onboarding report clears the gate: switch `DEPTH_MODEL`, regenerate
+      `python -m src.agentic.effort`, re-run the audit build for EXP-002, update README numbers.
+- [ ] Log EXP-002, STUDY-09 (study numbers), STUDY-10 (audit) in `experiments.md` — including misses.
+- [ ] Put the measured study timings into the survey budget mode (`sec_per_card`).
+- [ ] Cross-sonar table from `test_xsonar` (EXP-002 is the first leakage-free model for it).
+- [ ] Fine-tune seed from human labels (`python -m src.agentic.feedback export`) — a small
+      before/after if labels accumulate.
 
-**Exit gate:** docs committed, repo scaffolded, AWS CLI authenticated.
+## Submission package (by 21 Oct freeze; 22–25 Oct polish)
 
----
+- [ ] Technical report: problem → the two promises → architecture → OpenCV 5 + COOL → evaluation
+      (guarantees, per-source, effort, audit, benchmark) → what didn't work → responsible use.
+- [ ] ≤ 5-min video: problem, live demo on AWS (Analyze → Survey → Study), guarantees + effort
+      curve, COOL chart, limits.
+- [ ] Architecture diagram (from `architecture.md` §2), COOL benchmark chart + provenance JSONs.
+- [ ] Failure gallery: 12 misses, 12 false alarms (with audit tags).
+- [ ] 24 h soak test of the live link; CloudWatch alarm to email; daily check during judging.
 
-## Phase 1 — Dataset v1 (fix blockers)  *(before ANY training)*
+## Optional (only if ahead)
 
-> Baselined on the verified audit — [`docs/dataset_report.md`](docs/dataset_report.md)
-> (`python DATASET/scripts/audit_dataset.py`). Earlier polygon/5-class blockers are already
-> resolved by prior reprocessing.
+- [ ] Bedrock mission brief written from the survey JSON only (never makes decisions).
+- [ ] SQS + Graviton Spot worker scaling demo.
+- [ ] Real per-ping GPS demo on a PINGMapper recording.
 
-- [x] **Fix cross-split leakage** — grouped split by source frame; re-audited **0/0/0**. *(B1)*
-- [x] **Taxonomy decision** — **4 classes**, `rope_line` merged into `fishing_gear`. *(B5)*
-- [x] Drop 1,258 full-frame boxes (audit confirms 0 remain). *(B2)*
-- [x] Handle degenerate boxes; keep plausibly-small ones for recall + flag for QA. *(B3)*
-- [x] Corrupt-image + parity sweep (0 corrupt, 0 orphans, 0 malformed).
-- [x] Re-audit v1 (`audit_dataset.py DATASET/03_yolo_ready_dataset_v1`) + `manifest.json`.
-- [x] Add background negatives (1,099 empty-label images) for FP control.
-- [x] Tag **dataset v1** (`VERSION` + `manifest.json`); reproducible via `build_dataset_v1.py`.
-- [ ] **(P1)** Eyeball QA renders in `DATASET/exports/qa_train`, `qa_val` (via `visualize_labels.py`); fix any obviously-bad labels found.
-- [ ] **(P1)** Decide augmentation policy for training (train-time aug on v1; the v0 baked augs are already de-duplicated).
-- [ ] **(P2)** Push dataset v1 to `S3://.../<dataset>/` (needs AWS CLI — see Phase 4).
+## Done (highlights — details in `progress.md`)
 
-**Exit gate:** ✅ 0 leakage · full-frame boxes gone · taxonomy locked · v1 tagged & scripted.
-Remaining before EXP-001: visual QA pass + class-imbalance training config.
-
----
-
-## Phase 2 — Stage 1 classical CV (COOL core workload)
-
-- [ ] **(P1)** Implement `src/cv_pipeline/` — preprocess, segment, contours, pipeline (architecture §3).
-- [ ] **(P1)** Config-driven thresholds in `src/common/config.py` (no hardcoded constants).
-- [ ] **(P1)** Unit tests with sonar fixtures; deterministic output per frame+config.
-- [ ] **(P1)** ROI + candidate-mask output contract wired to feed Stage 2.
-- [ ] **(P2)** Transparency artifacts: save raw → mask → ROI overlays for the demo view.
-
-**Exit gate:** Stage 1 emits sensible ROIs on real frames, CPU-only, tested.
-
----
-
-## Phase 3 — Stage 2 detection + evaluation
-
-- [x] **(P1)** `src/detection/train.py` — reads v1 `data.yaml`; sonar-aware aug (no hue/rotation, along-track flip only); prints inverse-freq class weights; test-split report at end.
-- [ ] **(P1)** Run **EXP-001** baseline (YOLO11s-seg, v1) → log in `experiments.md`.
-- [x] **(P1)** `src/detection/evaluate.py`: deploy-faithful (cv2.dnn) AP@0.5, P/R/F1, per-class, **val-tuned thresholds (test scored once)**, **bootstrap 95% CIs** → `docs/eval_exp001.md` (STUDY-05). Closes #10/#11/#13. *(mAP@0.5:0.95 + confusion-matrix render: add if needed.)*
-- [~] **(P1)** `src/detection/export_onnx.py` → ONNX + verify load via `cv2.dnn.readNetFromONNX()`. *(best.onnx from EXP-001 verified loading+forward via cv2.dnn; standalone export script still TODO.)*
-- [x] **(P1)** `src/detection/infer.py` with `full_frame` **and** `roi_guided` modes.
-- [x] ~~**(P0 for award)** Ablation: FP reduction (full-frame vs ROI-guided) → ≥60%.~~ **RETIRED — STUDY-01 negative result:** classical Stage 1 has no discriminative power on this sonar (GT coverage caps 72% @ 141 ROIs/frame; fires more on empty background than on debris). Gating costs recall (0.71→0.15). Stage 1 reframed as the COOL preprocessing workload; YOLO is the detector. Evidence: `ablation_fp.py`, `tune_coverage.py`.
-- [x] **(P0)** Error analysis on `fishing_gear` (recall 0.37) → `src/detection/{fn_gallery,error_analysis}.py`. **Findings:** small-object sonar problem (91% of misses <10% frame); aggregate mAP inflated by domain segregation (natural_formation optical-only); optical debris = total miss (off-product); per-source `shipwreck` struct weak (0.25).
-- [x] **(P1)** Per-class confidence thresholds (`infer.py PER_CLASS_CONF`) — fishing_gear recall 0.47→0.69 @conf0.10, no retrain.
-- [x] **(P1)** `evaluate.py`: metrics **split sonar vs optical + per-source** — done (STUDY-05); proves the 0.827 aggregate is domain-inflated (sonar `fishing_gear` AP 0.473; optical debris = total miss).
-- [ ] **(P1)** EXP-002 `--imgsz 1280` on Kaggle (small-object ceiling ~0.78); then EXP-003 sonar-only. **← next**
-- [ ] **(P2)** Experiment ladder EXP-002..006 as time allows.
-
-**Exit gate:** a model meeting (or credibly approaching) mAP@0.5 ≥ 0.70 / P ≥ 0.80 / R ≥ 0.70, with ablation.
-
----
-
-## Phase 4 — AWS + COOL benchmark (PRIMARY DELIVERABLE)
-
-- [ ] **(P0)** S3 buckets/prefixes: `raw/ processed/ models/ reports/ benchmarks/`.
-- [ ] **(P0)** Validate **COOL** on a small Stage-1 workload on Graviton before scaling.
-- [~] **(P0)** Benchmark runner ready: `infra/benchmark_graviton.sh` (3-way, input-manifest sha256, S3 upload) + `src/cv_pipeline/benchmark.py`. Needs EC2 Graviton+COOL / x86 to execute.
-- [ ] **(P0)** Capture latency (p50/p95), throughput (FPS), CPU util, cost/1,000 frames → CSV + charts. *(harness emits p50/p95 + fingerprint; run on EC2)*
-- [~] **(P0)** Reproduction package: input-manifest hash + one-command rerun **done** in `benchmark_graviton.sh`; COOL version/instance-type captured at run time.
-- [~] **(P1)** Lambda + API Gateway inference endpoint: `infra/lambda_handler.py` written (cv2.dnn ONNX → geotagged JSON, arm64-ready, locally smoke-tested). Needs deploy. See `infra/README.md`.
-- [ ] **(P1)** DynamoDB detections table (+ geo/temporal GSIs).
-- [ ] **(P1)** SageMaker training job config + Model Registry versioning.
-- [ ] **(P2)** CloudWatch dashboard for latency/throughput.
-- [ ] **(P1)** Cost audit — tear down idle benchmark instances; keep within grant + Free Tier.
-
-**Exit gate:** reproducible Graviton-vs-x86 benchmark with evidence package — the COOL award case.
-
----
-
-## Phase 5 — Reporting + Dashboard (product)
-
-- [ ] **(P1)** `src/reporting/geotag.py` — fuse ping metadata → geotagged detection record (schema in architecture §9).
-- [ ] **(P1)** `src/reporting/report.py` — JSON / CSV / GeoJSON writers.
-- [ ] **(P1)** `src/dashboard/app.py` (FastAPI): upload → run pipeline → overlays + downloadable report.
-- [ ] **(P1)** Interactive map view of detections (lat/lon + class + confidence).
-- [ ] **(P1)** **Transparency view:** raw frame → Stage 1 masks → Stage 2 classifications side-by-side.
-- [ ] **(P2)** Deploy dashboard on **AWS Amplify** (or a warm container) for the live judge endpoint.
-
-**Exit gate:** a judge can upload a sonar log and get overlays + a downloadable report end-to-end.
-
----
-
-## Phase 6 — Agentic Vision (STRETCH — only if ahead)
-
-- [ ] **(P2)** `src/agentic/tools.py` — expose OpenCV/COOL ops as MCP tools.
-- [ ] **(P2)** `src/agentic/loop.py` — perception→decision→action; low-confidence → re-scan/gain-adjust.
-- [ ] **(P2)** Capture a trace showing a visual result changing the next action.
-- [ ] **(P2)** Agent workflow diagram + task-success/failure-handling eval.
-
----
-
-## Phase 7 — Submission package  *(final week, by 2026-10-26)*
-
-- [ ] **(P0)** Technical report: problem, users, architecture, OpenCV 5 impl, AWS deploy, evaluation, limitations, responsible use.
-- [ ] **(P0)** ≤ 5-min video: team, app working, architecture, principal results, failure cases.
-- [ ] **(P0)** Judge-accessible repo/archive; pinned deps + build/deploy/test instructions.
-- [ ] **(P0)** Architecture diagram (OpenCV 5 + AWS + COOL components).
-- [ ] **(P0)** Working web endpoint OR arranged live screen-share.
-- [ ] **(P0)** Evaluation evidence incl. failure cases + COOL reproduction package.
-- [ ] **(P1)** "Skeptical judge" self-review pass — fix top weaknesses (see `docs/claude_code_playbook.md` §13).
-
-**Exit gate:** submitted before 2026-10-26 23:59 PT.
-
----
-
-## Cross-cutting (ongoing)
-
-- [ ] **(P1)** Tests for every stage before it's considered done; run after significant changes.
-- [ ] **(P1)** Update `progress.md` each session; `experiments.md` after each run.
-- [ ] **(P1)** Small, typed git commits; never a giant uncommitted tree.
-- [ ] **(P2)** Weekly code review pass on new modules (bugs, leakage, cost, complexity).
+- [x] Dataset v1 → v2 → **v2b** (deduped, recording-level val, unique-frame + official + cross-sonar tests).
+- [x] EXP-001 baseline; deploy-faithful `cv2.dnn` evaluation (per source, bootstrap CIs).
+- [x] **Guaranteed tiers** (CP / LTT) fit on validation, verified on test; VoI agent; budgets.
+- [x] **Stage 1 canonicalisation** in the product path (bottom tracking validated, STUDY-08).
+- [x] Honesty fixes: orientation by rule, thin-line shadow, relative height, no fake cross-pass.
+- [x] Backend hardening: jobs, limits, per-frame model lock, shipped samples, vendored map.
+- [x] **COOL benchmark v3** (product workload) + Graviton/COOL deploy kit (dry-run).
+- [x] **EXP-002 kit**: tiles, sonar-aware copy-paste, train → verify → zip → one-command onboarding.
+- [x] Human labels (✓ / ✕ / ＋missed), **Study** mode + effort curve, **Audit** mode.
+- [x] **Opposite-side re-survey** planner + repeat-sighting merge.
+- [x] Docs truth pass (README, architecture, CLAUDE, TODO).

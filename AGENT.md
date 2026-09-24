@@ -1,10 +1,11 @@
 > **📌 This is the original grant proposal / competition brief — a historical record, not the
-> current design.** Some choices here have since evolved with the evidence: the taxonomy is now
-> **4 classes** (`rope_line` merged into `fishing_gear`), and the two-stage plan where classical
-> CV gates Stage 2 to cut false positives was **retired** (STUDY-01 — it has no discriminative
-> power on this sonar; YOLO runs full-frame, Stage 1 is the COOL preprocessing workload). For the
-> current state read [`README.md`](README.md), [`architecture.md`](architecture.md),
-> [`experiments.md`](experiments.md), and [`progress.md`](progress.md).
+> current design.** The as-built system is in [`architecture.md`](architecture.md): the taxonomy is
+> 4 classes for EXP-001 (`rope_line` merged into `fishing_gear`) and 2 sonar-only classes for
+> EXP-002; the classical-CV ROI gate was **retired** (STUDY-01) and Stage 1 is now **sonar
+> canonicalisation** in the product path (bottom tracking, STUDY-08); the AWS plan is **one EC2
+> Graviton instance on the COOL AMI behind CloudFront** — Lambda / API Gateway / DynamoDB / Amplify /
+> SageMaker below are superseded. Current state: [`README.md`](README.md),
+> [`experiments.md`](experiments.md), [`progress.md`](progress.md).
 
 **PS**
 

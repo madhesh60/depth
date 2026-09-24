@@ -75,6 +75,23 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ## 4. Session log
 
+### 2026-09-25 (review sweep 13) — Documentation truth pass (I-10 / X-5)
+- **`architecture.md` rewritten as built** (was: ROI gate, Lambda/DynamoDB/Amplify/SageMaker): Stage 1
+  canonicalisation → See → Prove → Decide (guaranteed tiers) → Act (geotag, stitching, merge, routes,
+  re-survey) → human loop (labels, study, audit) → serving → Graviton/COOL → data/models → code map →
+  stated limits.
+- **README** (judge-facing): what is different + where the evidence is, the four studio modes,
+  honest results with splits named, what is pending by design, reproduce commands.
+- **CLAUDE.md** brought to the as-built state (it said "nothing under src/", "AWS CLI not
+  installed", the Lambda plan); git-workflow section kept verbatim. **TODO.md** is now the real
+  backlog: what needs a person (grant check-in by 2 Oct, Kaggle EXP-002, AWS day, study, audit),
+  what follows, the submission package.
+- `docs/model_card.md`: retired "CONFIRMED 0.737" and the GPU latency → the unseen-data promise and
+  the measured CPU path; `AGENT.md` banner points at the as-built design;
+  `docs/agentic_vision.md` gains §6 (Stage-1 measurement, physical second look, labels, measured
+  effort, audit) and an updated rubric map.
+- Full suite: **95 tests pass**.
+
 ### 2026-09-25 (review sweep 12) — Blinded false-alarm audit with catch trials (M-4, STUDY-10 set up)
 - **`src/detection/fp_audit.py`**: are EXP-001's "false alarms" really false? **Exact band, not a
   sample** — every false alarm with conf ≥ 0.176 on the calibration recordings (60 of them; 66 true

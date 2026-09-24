@@ -136,15 +136,50 @@ shown as evidence with a relative height, never used to accept or reject.
 
 ---
 
-## 6. Mapping to the Agentic-Vision rubric
+## 6. Closing the loop — measure the sonar, act physically, learn from people
+
+**The agent measures before it judges (Stage 1, STUDY-08).** Before detection it tracks the seabed
+in every frame: the sonar's altitude per ping (validated with no labels — port and starboard, which
+see the same pings, agree to a median 1.6 px). That measured altitude drives the relative height on
+every card, the slant→ground range of every geotag, and a traced `water_column_check` tool step.
+Orientation is decided by a source rule and never guessed; "unknown" switches the physics off.
+
+**A physical second look (`resurvey.py`).** For what stays uncertain, the agent plans the boat pass
+that can settle it: a straight line on the **opposite side** of the target with the target at
+mid-swath. A real object standing off the seabed casts its shadow *away* from the sonar, so seen
+from the other side its shadow must **flip** — the plan states the bearing it must point to, a
+falsifiable prediction speckle cannot satisfy. Targets whose lines align share one pass; passes are
+ranked by uncertainty resolved per metre of travel (Σ p(1−p)); a boat-time budget keeps the densest
+ones. Repeat sightings of one object across passes merge into one hazard (tight error-circle gate;
+never two detections of the same frame). Plans are PLANNED — a human approves them.
+
+**Learning from people (`feedback.py`).** Every approve / dismiss is saved, and a reviewer can draw
+a **missed pot** the detector never proposed — a positive label exactly where the model is blind
+(its binding limit is recall). `python -m src.agentic.feedback export` turns them into a fine-tune
+set + hard negatives; where labels exist, reviewer agreement is scored.
+
+**Measuring the impact instead of claiming it (`study.py`, `effort.py`).** The Study tab runs a
+counterbalanced 2×2 Latin-square user study (manual frame review vs the agent's cards, timed, scored
+against labels). The effort curve then reports minutes to the recall promise for manual review, a
+raw detector list and the DEPTH queue, plus the **break-even card time** (7.95 s at 20 s/frame) —
+with assumed timings DEPTH only ties a perfect human, and the study decides the real answer. The
+agent's own forecast of "pots these minutes will buy" held on unseen data (84.5 forecast vs 90 real).
+
+**Auditing the labels (`fp_audit.py`).** A blinded audit with catch trials asks whether the
+detector's most confident "false alarms" are really unlabelled objects — giving an exact audited
+precision in that confidence band, with the auditors' own reliability measured.
+
+---
+
+## 7. Mapping to the Agentic-Vision rubric
 
 | Criterion | Weight | Where it's met |
 |---|---:|---|
-| OpenCV 5 + agent doing real work | 30% | `cv2.dnn` detect + OpenCV re-look/mosaic/CLAHE/shadow; the agent's tools *are* CV ops |
-| Orchestration & autonomy | 25% | stated objective; value-of-information tool use; budget mode; stitching; routes (§3) |
-| Task success | 20% | a recall promise that **held on unseen test** (86%); honest "no auto-confirm" where the data can't support one (§4) |
-| Failure handling & human control | 15% | bounded LOW-RISK tier, budgeted REVIEW queue, human-approval gate (§5) |
-| User experience | 10% | studio UI: guarantee badges, evidence cards with the tier promise, effort panel, map + routes, downloads |
+| OpenCV 5 + agent doing real work | 30% | Stage-1 bottom tracking / `cv2.remap` / luminance, `cv2.dnn` detect, re-look + CLAHE, thin-line shadow, `seamlessClone` copy-paste for training; the agent's tools *are* CV ops |
+| Orchestration & autonomy | 25% | stated objective; value-of-information tool use; analyst **and boat** budgets; stitching; repeat-sighting merge; routes; opposite-side re-survey planning (§3, §6) |
+| Task success | 20% | a recall promise that **held on unseen test** (86%); honest "no auto-confirm"; forecast held; effort measured, not assumed (§4, §6) |
+| Failure handling & human control | 15% | bounded LOW-RISK tier, budgeted REVIEW queue, human-approval gate, missed-pot labels, blinded audit (§5, §6) |
+| User experience | 10% | studio with four modes (Analyze · Survey · Study · Audit): guarantee badges, evidence cards, seabed overlay, map + routes + re-survey passes, live effort curve, downloads |
 
 **Reproduce:** `python -m src.agentic.calibrate` (fit + verify + report + `calibration.json`) ·
-`python -m src.agentic.pipeline --survey <dir>` · `pytest -q`.
+`python -m src.agentic.pipeline --survey <dir>` · `python -m src.agentic.effort` · `pytest -q`.

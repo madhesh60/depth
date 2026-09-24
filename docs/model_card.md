@@ -35,15 +35,21 @@ autonomous removal decisions.
 > The aggregate is **inflated by domain segregation** — `natural_formation` is optical-only and
 > trivially separable. The honest headline is `fishing_gear` on sonar.
 
-**Agentic value (STUDY-04, `src/agentic/calibrate.py`):** raw hot-detector precision 0.60 → agent
-**CONFIRMED** tier **0.737 @ 30% recall-share** (re-look persistence ⋃ high detector confidence);
-REJECTED is recall-safe (91% of true pots retained, never deleted). The acoustic shadow is
-non-discriminative here (CLEAR-rate 14.5% TP vs 14.6% FP) and is used as evidence + height, never a gate.
+**Agent tiers (STUDY-07, `docs/calibration_exp001.md`):** fit on the unseen calibration recording
+(v1 val Rec19, 66 unique frames), verified once on unseen test (v1 test, 92 unique frames). Promise:
+**≥ 65% of pots reach a human (95% confidence) — held on test (86.2%, lower bound 80.5%)**. The
+requested 90% is not achievable (recall ceiling 0.72 on the calibration recording) and no ≥ 85%
+precision promise is supportable, so nothing is auto-confirmed. Re-look variants did not beat plain
+detector confidence on unseen data; the earlier "CONFIRMED 0.737" was tuned on test and is 0.58 on
+unseen frames — retired. The acoustic shadow is evidence + relative height, never a gate.
 
-## Latency
+## Latency (the deployed CPU path)
 
-~11.5 ms/frame on a T4 (GPU). On CPU (the live target) expect ~200 ms/frame — measure on the real
-Graviton/x86 server (COOL benchmark), never quote the GPU number for the deployed CPU path.
+Measured with `python -m src.bench.product_bench` on the full product path (decode → Stage 1 →
+`cv2.dnn` → evidence → render): **238 ms/frame p50** on a laptop x86 CPU (stock OpenCV 5.0.0, all
+threads; 522 ms single-thread); the network is ~86% of it. Graviton + COOL numbers come from
+`infra/bench_cool.sh` on EC2. (The ~11.5 ms figure from training was a T4 GPU and is not the
+deployed path.)
 
 ## Limitations & ethics
 

@@ -1,88 +1,99 @@
-# Marine Debris Detection — Team Syndicate
+# DEPTH — Marine Debris Detection — Team Syndicate
 
-Solo hackathon project (OpenCV AI Competition 2026 / AWS COOL Award — "Best Use of COOL",
-stretch: "Agentic Vision"). Full proposal and rationale: [AGENT.md](AGENT.md).
+Solo hackathon project (OpenCV AI Competition 2026 — targets **Agentic Vision** and **Best Use of
+COOL**). The product is named **DEPTH** (Detect · Evidence · Prove · Triage · Hazard-map); the repo
+stays `depth`. Proposal of record: [AGENT.md](AGENT.md) — the **as-built design is
+[architecture.md](architecture.md)** and supersedes the proposal where they differ.
 
-## What this is
+## What this is (as built, 2026-09-25)
 
-End-to-end pipeline that ingests side-scan sonar imagery and detects man-made marine debris
-(ghost nets, pipes, structural fragments, rope) against natural seafloor clutter, then emits
-geotagged JSON/CSV hazard reports via a web dashboard.
+Side-scan sonar frames → a human-approved cleanup plan for ghost fishing gear / wreck debris.
+Runtime is torch-free **OpenCV 5** on CPU (built for AWS Graviton + COOL):
 
-Pipeline (roles updated 2026-09-22, see `experiments.md` STUDY-01):
-1. **Classical OpenCV** (CPU, runs on AWS Graviton via COOL) — denoise, resize, adaptive
-   threshold, morphology, contours — the **CPU sonar-preprocessing workload benchmarked for
-   the COOL award** (Graviton vs x86). It is **not** a Stage-2 ROI gate: on this sonar data
-   classical CV has no discriminative power (STUDY-01 — GT coverage caps ~72% at 141 ROIs/frame;
-   fires more on empty seafloor than on debris), so ROI-gating the detector was retired.
-2. **YOLO11 detector** (loaded via `cv2.dnn.readNetFromONNX`, `src/detection/infer.py`) — the
-   actual detector, run **full-frame**; outputs boxes + class + confidence. EXP-001 baseline
-   mAP@0.5 0.822. (`-seg` masks are an option, not yet trained.)
+1. **Stage 1 — sonar canonicalisation** (`src/cv_pipeline/canonical.py`): palette→luminance,
+   orientation by source rule (never guessed), **bottom tracking** (sonar altitude px per ping),
+   slant→ground, water-column mask. It *measures geometry*; it is **not** an ROI gate (STUDY-01
+   retired that). Validated: port/starboard altitude agree to 1.6 px (STUDY-08).
+2. **See** — YOLO11 ONNX via `cv2.dnn` (`src/detection/infer.py`), class-aware NMS.
+3. **Prove** — thin-line shadow, relative height vs the tracked altitude, water-column check,
+   agent's-eye re-look view (display). Evidence, never a silent gate.
+4. **Decide** — **guaranteed tiers** fit on held-out recordings (Clopper–Pearson / LTT,
+   `src/agentic/calibrate.py`): EXP-001 promises ≥ 65% of pots reach a human (held on test);
+   no precision promise → nothing auto-confirmed. Value-of-information tool use, P(pot), budgets.
+5. **Act** — per-ping ground-range geotag, chunk stitching, repeat-sighting merge, recovery /
+   inspection routes, **opposite-side re-survey passes**, GeoJSON/GPX/KML/CSV/JSON.
+6. **Human loop** — labels (✓ / ✕ / ＋missed → fine-tune set), timed **Study** (effort curve,
+   break-even card time), blinded false-alarm **Audit** with catch trials.
 
-Classes — the **live dataset is 4-class** (`data.yaml`, `nc=4`):
-`0 fishing_gear, 1 pipe_cylinder, 2 structural_fragment, 3 natural_formation`
-(`rope_line` from the original 5-class proposal is folded into `fishing_gear`; re-introducing
-it is an open decision — see [docs/dataset_report.md](docs/dataset_report.md) §2).
+Every runtime threshold comes from **`models/<MODEL>/calibration.json`** (`$DEPTH_MODEL`, default
+`EXP-001`): class names, input size, per-class floors, guaranteed class, tiers. Never hard-code a
+class name or threshold.
 
-## Planned AWS architecture
+Classes: EXP-001 (deployed) is 4-class `fishing_gear, pipe_cylinder, structural_fragment,
+natural_formation`; EXP-002 (v2b) is 2-class `ghost_gear, wreck_debris`. The runtime is
+model-agnostic.
 
-S3 (raw/processed/models/reports) → Lambda+API Gateway (Stage 1 preprocessing on Graviton/COOL
-→ Stage 2 YOLO full-frame inference) → DynamoDB (detections) → Amplify (dashboard) + CloudWatch
-(benchmarks).
-SageMaker for training. Details/diagram in [AGENT.md](AGENT.md#4-planned-aws-architecture-and-services).
+## Cloud (scripted, not yet run — AWS work is scheduled for a dedicated day)
+
+EC2 c8g.xlarge from the **COOL AMI** (OpenCV 5 under `/opt/cool`) + systemd + CloudFront (HTTPS) +
+S3 + CloudWatch + Budgets + SSM. `infra/deploy_aws.sh` is **dry-run by default** (`APPLY=1` to
+execute). The COOL venv is never modified (web deps via `pip --target`). The 3-way COOL benchmark
+(`infra/bench_cool.sh`, `src/bench/`) times the **product workload** per stage; a run is COOL only if
+`cv2.__file__` is under `/opt/cool`. Lambda / DynamoDB / Amplify / SageMaker are **retired**.
+Details: [infra/README.md](infra/README.md).
 
 ## Dataset state
 
-`DATASET/` is git-ignored (too large — raw archives + 30k+ generated images). Pipeline already run:
+`DATASET/` is git-ignored (too large); only `DATASET/scripts/` builders are tracked.
 
-- `01_raw_archives/` — 7 source datasets (AI4Shipwrecks, crab-pot, ICRA19, TrashCan, UATD, etc.)
-- `02_intermediate_processing/unified/` — remapped/unified intermediate (`class_counts.json`).
-- `03_yolo_ready_dataset/` — v0 split (superseded; kept for provenance).
-- **`03_yolo_ready_dataset_v1/`** — the **clean, training-ready dataset** (`data.yaml`, `nc=4`):
-  **train=26,533 (incl. 1,120 background) · val=1,204 · test=1,276**; leakage-free (split by
-  **recording/clip**, 5,618 groups — a whole video clip / sonar run stays in one split so
-  near-identical consecutive frames can't leak), **jointly stratified by class box-mix + sensor
-  domain** (greedy fill-equalisation on originals) so val **and** test each mirror train's
-  per-class and sonar/optical distribution — all three splits are ~53% `fishing_gear` / 28%
-  `structural_fragment` / 15% `natural_formation` / 4% `pipe_cylinder` and ~80/20 sonar/optical.
-  All 4 classes + all 7 sources present in each split; full-frame + sliver boxes removed,
-  corrupt-checked. Counts + cleaning stats in `manifest.json`. Per-class boxes (total):
-  `fishing_gear`=21,487, `structural_fragment`=11,430, `natural_formation`=5,918,
-  `pipe_cylinder`=1,821. Residual: `pipe_cylinder` is rare (only 65 test / 120 val boxes — lives
-  in few clips) → per-class AP for it is high-variance; always report per-class metrics.
-- `scripts/audit_dataset.py [root]` — ground-truth audit · `scripts/build_dataset_v1.py` —
-  the v0→v1 cleaner · `scripts/visualize_labels.py` — box-on-image QA renders.
-- `archive_scripts/run_remaining_steps.py` — frozen v0 build script (idempotent).
+- `03_yolo_ready_dataset_v1/` — 4-class, train 26,533 · val 1,204 · test 1,276; **EXP-001 trained
+  on it**. Its unseen crab-pot sonograms (v1 val Rec19 = calibration, v1 test = verification,
+  unique frames) host EXP-001's guarantees.
+- **`03_yolo_ready_dataset_v2b/`** — **EXP-002 trains on this** (`build_dataset_v2b.py`): 2-class,
+  sonar-only, one copy per Roboflow frame, val = held-out recordings Rec10/12/16, test = 214 unique
+  crab-pot frames, `test_official398/` (GhostVision head-to-head), `test_xsonar/` (cross-sonar),
+  `groups.json`. Its `data.yaml` is UTF-8 with **no `path:` key** (ultralytics resolves a relative
+  `path` against the working directory).
+- `03_yolo_ready_dataset_v2b_tiles/` — `build_tiles.py` output: full frames + 2×2 tiles (+ optional
+  `--paste N` sonar-aware copy-paste); val/test point at v2b's full frames.
+- The raw crab-pot archive is Roboflow-augmented (crops/rotations): measure pixel geometry only on
+  single-copy originals; always evaluate on **unique frames** (`src/detection/frames.py`).
 
-**Remaining (training-time, not dataset defects):** class imbalance (`fishing_gear` ≈ 11.7×
-`pipe_cylinder`) → use class weights / focal loss / augmentation; mixed sensors (80% sonar /
-20% optical, tagged in `manifest.json`) → domain-split experiment.
+## Key commands
 
-**EXP-001 (the deployed model) trained on v1. EXP-002 should train on
-`DATASET/03_yolo_ready_dataset_v2b/data.yaml`** — v2b (`build_dataset_v2b.py`): 2-class sonar-only,
-one copy per Roboflow frame (3,241 rotated copies dropped), val = held-out recordings Rec10/12/16,
-test = 214 unique crab-pot frames; `test_official398/` (GhostVision only) + `test_xsonar/`
-(Contact_sslo cross-sonar); `groups.json` for group bootstrap. See `docs/dataset_card.md`.
+```bash
+python -m uvicorn src.dashboard.app:app --port 8000        # the studio (Analyze/Survey/Study/Audit)
+pytest -q                                                  # test suite
+python -m src.agentic.calibrate                            # guaranteed tiers (val) → verified once (test)
+python -m src.detection.evaluate [--model M --test-split S]  # deploy-faithful detector eval
+python -m src.detection.onboard_model --zip EXP-002_complete.zip   # plug in a Kaggle-trained model
+python -m src.agentic.effort                               # analyst-effort curve
+python -m src.bench.product_bench --label <host>            # benchmark this machine
+python -m src.agentic.feedback stats|export                 # human labels → fine-tune set
+python -m src.detection.fp_audit build|summary              # blinded false-alarm audit
+```
 
 ## Environment
 
-No venv — using the global Python 3.10 install, which already has `torch`, `torchvision`,
-`opencv-python`, `numpy`, `PyYAML`, `Pillow`. Run `pip install -r requirements.txt` to add
-`ultralytics`, `boto3`, `onnxruntime`, `fastapi`/`uvicorn` for training, AWS, and the dashboard API.
+Global Python 3.10 (no venv) with the runtime pinned in `requirements.txt` (OpenCV 5.0.0.93,
+numpy 2.2.6, FastAPI) plus `ultralytics` + CPU torch for local smoke tests. The local GPU (MX330,
+2 GB) cannot train YOLO11s — **training runs on Kaggle** (`docs/exp002_kaggle.md`).
+AWS CLI v2 is installed user-scoped (`C:\Users\RAJ\AppData\Local\Programs\Amazon\AWSCLIV2\aws.exe`,
+profile `hackathon`, us-east-1); login + the MCP wizard are deferred to the AWS day.
 
-AWS CLI is **not installed** on this machine yet — needed before any SageMaker/S3/Lambda work.
-
-## Repo layout (to be built out)
-
-Nothing under `src/` yet — this is a fresh setup. Suggested structure as work starts:
+## Repo layout
 
 ```
-src/
-  cv_pipeline/    # Stage 1 classical OpenCV (denoise, threshold, morph, contours)
-  detection/      # Stage 2 YOLO train/infer/export (ONNX)
-  reporting/      # geotagging + JSON/CSV/GeoJSON report generation
-  dashboard/      # FastAPI backend + upload/map UI
-infra/            # AWS: Lambda handlers, SageMaker job configs, IaC
+src/cv_pipeline/  canonical.py (Stage 1) · orientation.py · study_canonical.py · pipeline.py (STUDY-01 record)
+src/detection/    infer · calibration · evaluate · export_onnx · train · onboard_model · fp_audit · frames
+src/agentic/      agent · perception · shadow · tools · policy · guarantees · calibrate · geo · stitch ·
+                  resurvey · mission · pipeline · feedback · study · effort · types
+src/bench/        product_bench · fingerprint · compare (COOL benchmark)
+src/dashboard/    app (FastAPI) · jobs · metrics · samples
+webui/            zero-build studio · samples/ (8 CC-BY-SA frames) · audit/ crops · vendor/leaflet
+infra/            deploy_aws.sh · setup_cool_instance.sh · depth.service · bench_cool.sh
+models/<MODEL>/   calibration.json · effort_curve.json · fp_audit_val.json (weights git-ignored)
+tests/            pytest suite
 ```
 
 ## Git & delivery workflow
@@ -101,10 +112,13 @@ Repository: **https://github.com/madhesh60/depth.git** (branch `main`).
 - End every commit message with the co-author trailer:
   `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`.
 
-## Key constraints (from the proposal — keep these in mind when implementing)
+## Key constraints
 
-- Stage 1 must run CPU-only (Graviton, no GPU) — don't reach for GPU-only OpenCV ops there.
-- Target: per-frame latency < 300ms, ≥5 FPS, mAP@0.5 ≥ 0.70, precision ≥ 0.80, recall ≥ 0.70.
-- Every detection needs lat/lon + confidence + classification, traceable to its source frame.
-- Benchmarks must be reported for both Graviton (COOL) and an x86 baseline — this is the
-  primary judging criterion (Best Use of COOL).
+- CPU-only runtime (Graviton, no GPU); OpenCV 5 must do real work end to end.
+- Targets from the proposal: < 300 ms/frame, ≥ 5 FPS, mAP@0.5 ≥ 0.70 — and report the honest
+  per-class **sonar crab-pot** numbers, never only the aggregate.
+- Every detection traceable to its source frame; coordinates only with GPS (synthetic demo GPS is
+  always labelled); metres of height only with a measured altitude in metres.
+- Tune on validation, score test once; unique frames; name the split next to every number.
+- Benchmarks for both Graviton (COOL) and x86 — the Best-Use-of-COOL criterion.
+- Honesty-first: publish negative results; label assumptions until they are measured.
