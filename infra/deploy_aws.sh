@@ -95,7 +95,7 @@ echo "== [5/8] EC2 $INSTANCE_TYPE from the COOL AMI (IMDSv2, user-data = setup s
 cat > /tmp/depth-userdata.sh <<EOF
 #!/bin/bash
 set -e
-export DEPTH_MODEL_S3=s3://$BUCKET/models/EXP-001/best.onnx DEPTH_S3_BUCKET=$BUCKET
+export DEPTH_MODEL=${DEPTH_MODEL:-EXP-001} DEPTH_MODEL_S3=s3://$BUCKET/models/${DEPTH_MODEL:-EXP-001}/best.onnx DEPTH_S3_BUCKET=$BUCKET
 ${DEPTH_MODEL_SHA256:+export DEPTH_MODEL_SHA256=$DEPTH_MODEL_SHA256}
 command -v git >/dev/null || (apt-get update -y && apt-get install -y git)
 git clone -q https://github.com/madhesh60/depth.git /opt/depth || git -C /opt/depth pull -q

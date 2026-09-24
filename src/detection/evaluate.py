@@ -51,8 +51,28 @@ OPTICAL_SOURCES = {"icra", "vid", "trashcan"}
 IMG_EXTS = {".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff"}
 
 
+_CRABPOT = ("rec", "bc_post", "baycove", "ti0")
+
+
 def source_of(name: str) -> str:
+    """Filename prefix (v1: ``crabpot_…``, ``uatd_…``). v2b drops the ``crabpot_`` prefix, so its
+    PINGMapper recordings / mosaics are mapped back to ``crabpot`` and the orange Contact crops to
+    ``crabpot_xsonar`` (the cross-sonar test)."""
+    low = name.lower()
+    if low.startswith("contact_"):
+        return "crabpot_xsonar"
+    if low.startswith(_CRABPOT):
+        return "crabpot"
     return name.split("_", 1)[0]
+
+
+def _strip_ext(name: str) -> str:
+    """Drop a trailing image extension only — ``Path.stem`` would also eat the Roboflow
+    ``.rf.<hash>`` part of names listed without an extension (0/398 official frames matched)."""
+    for e in IMG_EXTS:
+        if name.lower().endswith(e):
+            return name[: -len(e)]
+    return name
 
 
 def sensor_of(src: str) -> str:
@@ -345,9 +365,9 @@ def eval_official_split(names, test_records, val_records, tuned, args) -> str:
     """Ghost_gear (== fishing_gear) F1/P/R on the locked official split. Only call when
     the model is leakage-free for this split (EXP-002 on v2)."""
     paths = {ln.strip() for ln in Path(args.official_split).read_text().splitlines() if ln.strip()}
-    stems = {Path(p).stem for p in paths}
-    rs = [r for r in test_records if Path(r["name"]).stem in stems]
-    cid = names.index("fishing_gear") if "fishing_gear" in names else 0
+    stems = {_strip_ext(Path(p).name) for p in paths}
+    rs = [r for r in test_records if _strip_ext(r["name"]) in stems]
+    cid = next((names.index(n) for n in ("ghost_gear", "fishing_gear") if n in names), 0)
     pts, n_gt = _gather(rs, cid)
     ap = voc_ap(pts, n_gt)
     p, r, f1, tp, fp, fn = prf_at(pts, n_gt, tuned[names[cid]])
@@ -374,6 +394,10 @@ def main():
     ap.add_argument("--leakage-free", action="store_true",
                     help="assert the model did NOT train on the official split (enables §4)")
     ap.add_argument("--out", default=str(REPO / "docs" / "eval_exp001.md"))
+    ap.add_argument("--model", default="EXP-001", help="run name: caches go to runs/<model>/eval")
+    ap.add_argument("--val-split", default="val", help="split dir used to tune thresholds")
+    ap.add_argument("--test-split", default="test",
+                    help="split dir scored once (e.g. test | test_official398 | test_xsonar)")
     args = ap.parse_args()
 
     names = args.names.split(",")
@@ -382,13 +406,13 @@ def main():
     det = YoloOnnxDetector(args.weights, names=names,
                            conf_thres=args.conf_floor, iou_thres=args.iou_nms)
     det._onnx_path = args.weights
-    eval_dir = REPO / "runs" / "EXP-001" / "eval"
+    eval_dir = REPO / "runs" / args.model / "eval"
 
-    print("Collecting VAL detections ...")
-    val_records = collect_split(det, root / "val", names, eval_dir / "cache_val.json",
+    print(f"Collecting {args.val_split.upper()} detections ...")
+    val_records = collect_split(det, root / args.val_split, names, eval_dir / f"cache_{args.val_split}.json",
                                 args.iou_match, args.limit)
-    print("Collecting TEST detections ...")
-    test_records = collect_split(det, root / "test", names, eval_dir / "cache_test.json",
+    print(f"Collecting {args.test_split.upper()} detections ...")
+    test_records = collect_split(det, root / args.test_split, names, eval_dir / f"cache_{args.test_split}.json",
                                  args.iou_match, args.limit)
 
     tuned = tune_thresholds(val_records, names)
@@ -398,8 +422,8 @@ def main():
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(report, encoding="utf-8")
-    (eval_dir / "metrics.json").write_text(json.dumps(js, indent=2))
-    print(f"\nWrote {out}  and  {eval_dir / 'metrics.json'}")
+    (eval_dir / f"metrics_{args.test_split}.json").write_text(json.dumps(js, indent=2))
+    print(f"\nWrote {out}  and  {eval_dir / f'metrics_{args.test_split}.json'}")
     print(f"mAP@0.5 (classes present): {_fmt(js['mAP50'])}")
 
 

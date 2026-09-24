@@ -65,7 +65,9 @@ if flavor == "cool" and "/opt/cool" not in f:
     sys.exit("ERROR: flavor=cool but cv2 is not loaded from /opt/cool - refusing to mislabel the run")
 PY
 
-[ -f "${DEPTH_ONNX:-runs/EXP-001/weights/best.onnx}" ] || { echo "ERROR: model missing (set DEPTH_ONNX or run infra/setup_cool_instance.sh)" >&2; exit 2; }
+M="${DEPTH_MODEL:-EXP-001}"
+[ -f "${DEPTH_ONNX:-models/$M/best.onnx}" ] || [ -f "runs/$M/weights/best.onnx" ] \
+  || { echo "ERROR: model missing (set DEPTH_ONNX or run infra/setup_cool_instance.sh)" >&2; exit 2; }
 
 for T in $THREADS; do
   L="$LABEL"; [ "$T" != "0" ] && L="${LABEL}_t${T}"

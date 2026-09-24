@@ -20,6 +20,7 @@ REPO_URL="${DEPTH_REPO_URL:-https://github.com/madhesh60/depth.git}"
 BRANCH="${DEPTH_BRANCH:-main}"
 APP=/opt/depth
 PORT="${DEPTH_PORT:-8000}"
+MODEL_NAME="${DEPTH_MODEL:-EXP-001}"          # models/<name>/: calibration.json tracked, best.onnx fetched
 COOL_PY="${COOL_PY:-$(ls -d /opt/cool/venvs/python_3.1*/bin/python 2>/dev/null | sort -V | tail -1)}"
 [ -x "$COOL_PY" ] || { echo "ERROR: COOL interpreter not found under /opt/cool/venvs — use the COOL AMI" >&2; exit 2; }
 
@@ -33,7 +34,7 @@ if [ -d "$APP/.git" ]; then git -C "$APP" fetch -q origin "$BRANCH" && git -C "$
 else git clone -q --branch "$BRANCH" "$REPO_URL" "$APP"; fi
 
 echo "== [3/5] model"
-MODEL="$APP/runs/EXP-001/weights/best.onnx"
+MODEL="$APP/models/$MODEL_NAME/best.onnx"
 mkdir -p "$(dirname "$MODEL")"
 if [ -n "${DEPTH_MODEL_S3:-}" ]; then aws s3 cp --only-show-errors "$DEPTH_MODEL_S3" "$MODEL"
 elif [ -n "${DEPTH_MODEL_URL:-}" ]; then curl -fsSL "$DEPTH_MODEL_URL" -o "$MODEL"; fi
@@ -56,7 +57,7 @@ chown -R depth:depth "$APP/runs" /var/log/depth
 echo "== [5/5] systemd unit"
 sed -e "s#@COOL_PY@#$COOL_PY#g" -e "s#@APP@#$APP#g" -e "s#@PORT@#$PORT#g" \
     -e "s#@THREADS@#$(nproc)#g" -e "s#@S3_BUCKET@#${DEPTH_S3_BUCKET:-}#g" \
-    -e "s#@CORS@#${DEPTH_CORS_ORIGINS:-}#g" \
+    -e "s#@CORS@#${DEPTH_CORS_ORIGINS:-}#g" -e "s#@MODEL@#$MODEL_NAME#g" \
     "$APP/infra/depth.service" > /etc/systemd/system/depth.service
 systemctl daemon-reload
 systemctl enable --now depth

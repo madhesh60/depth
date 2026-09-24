@@ -1,72 +1,102 @@
-# EXP-002 — higher-resolution retrain (Kaggle, unattended)
+# EXP-002 on Kaggle — train, then ONE command to plug it in
 
-**Goal:** recover small-object `fishing_gear` recall by training at a larger input size.
-EXP-001 error analysis: 91% of missed `fishing_gear` boxes are <10% of frame width — a
-small-object problem; higher resolution is the cheapest, highest-value lever.
+**Why this run matters most.** EXP-001 never proposes ~20–28% of crab pots even at conf 0.05
+(`docs/calibration_exp001.md`: recall ceiling 0.72 on the calibration recording), so its recall
+*promise* is capped at 65%. No triage can recover a pot the detector never proposes — only a better
+detector can. EXP-002 attacks exactly that: higher input resolution, tiles for small objects, clean
+v2b data, and model selection on the same sonar as test.
 
-**Change vs EXP-001:** only `--imgsz 640 → 1024` and `--batch 16 → 8`, `--epochs 40`
-(EXP-001 overfit after ~epoch 20, so 40 is plenty). Everything else identical.
+| | EXP-001 (deployed) | **EXP-002** |
+|---|---|---|
+| data | v1 (4 classes, optical + sonar, Roboflow copies, leaks the official test) | **v2b** (2 classes, sonar only, one copy per frame, official split locked) |
+| model selection (`best.pt`) | v1 val (optical-heavy) | **held-out recordings Rec10/12/16** — the same Humminbird sonar as test |
+| input | 640 px | **1024 px** |
+| small objects | — | **full frames + 2×2 overlapping tiles** (`build_tiles.py`) |
+| extra positives | — | optional **sonar-aware copy-paste** (pots + shadow tails, same range, Poisson-blended) |
+| schedule | 100 ep, overfit after ~16–20 | **30 ep, patience 8, cosine LR, mosaic off for the last 5** |
+| augmentation | sonar-aware | same (no hue/rotation/vertical flip); ultralytics `copy_paste` is **not** used — it is a no-op for box-only labels |
 
----
+## 0. Upload the dataset once (local machine)
 
-## Why "Save & Run All" (read this — it saves your run)
-
-- Higher resolution is ~2.5× slower → ~10–12 min/epoch → **40 epochs ≈ 8–10 h**.
-- A normal interactive run **dies if your internet drops**. A **committed** run executes on
-  Kaggle's own servers — close the laptop, lose wifi, it keeps going.
-- Kaggle hard-stops any run at **12 h**, so 1024/40ep fits; 1280/60ep would NOT.
-
-**How:** top-right → **Save Version → "Save & Run All (Commit)"** → wait for the green tick.
-Do **not** press the ▶ play buttons for the real run.
-
----
-
-## Notebook cells (paste in order)
-
-**1. GPU on:** Settings (right panel) → Accelerator → **GPU T4 x1**. Attach the same dataset
-you used for EXP-001.
-
-**2. Get the code**
-```python
-!git clone https://github.com/madhesh60/depth.git
-%cd depth
-!git log --oneline -1     # confirm it's the latest commit
+```bash
+cd DATASET && tar -czf v2b.tar.gz 03_yolo_ready_dataset_v2b   # ~ 2,300 images + labels + manifest
 ```
+Kaggle → **Datasets → New dataset** → upload `v2b.tar.gz` (Kaggle unpacks it) → name it `depth-v2b`.
+Private is fine. (The images are CC-BY-SA-4.0 — keep the attribution file in the upload.)
 
-**3. Install trainer**
+## 1. Notebook (GPU T4 ×1, Internet ON) — paste these cells
+
 ```python
+!git clone -q https://github.com/madhesh60/depth.git && cd depth && git log --oneline -1
+%cd depth
 !pip install -q ultralytics
 ```
 
-**4. Find your dataset yaml** (copy the path it prints)
 ```python
-!find /kaggle/input -name "data*.yaml"
+# find the uploaded dataset root (the folder that contains data.yaml + train/ val/ test/)
+import glob; print(glob.glob("/kaggle/input/**/data.yaml", recursive=True))
+SRC = "/kaggle/input/depth-v2b/03_yolo_ready_dataset_v2b"      # ← adjust to the printed path
 ```
 
-**5. Train EXP-002** (paste your data path into `--data`)
 ```python
-!python src/detection/train.py \
-  --model yolo11s.pt \
-  --data /kaggle/input/PASTE_YOUR_PATH/data.yaml \
-  --imgsz 1024 \
-  --batch 8 \
-  --epochs 40 \
-  --name EXP-002
-```
-*If it prints `CUDA out of memory`: change `--batch 8` to `--batch 4` and re-commit.*
-
-**6. Zip results** (last cell — runs after training)
-```python
-!cd runs && zip -r /kaggle/working/EXP-002_complete.zip EXP-002
+# tiled training set in /kaggle/working (val/test stay the source full frames)
+!python DATASET/scripts/build_tiles.py --src {SRC} --out /kaggle/working/v2b_tiles
+# variant with the sonar-aware copy-paste (+600 synthetic frames) — for EXP-002p
+!python DATASET/scripts/build_tiles.py --src {SRC} --out /kaggle/working/v2b_tiles_paste --paste 600
 ```
 
----
+```python
+# EXP-002: 1024 px, full frames + tiles  (~1.5-3 h on a T4)
+!python src/detection/train.py --data /kaggle/working/v2b_tiles/data.yaml --name EXP-002 --device 0
+```
 
-## After it finishes
-- Open the committed version → **Output** → download `EXP-002_complete.zip`.
-- **Back it up** (weights are not in git — they're too large).
-- Send me the zip. I'll run the same deep analysis (`error_analysis.py`) — per-class, split
-  sonar vs optical — and compare to EXP-001.
+Optional second run (a new notebook version, or the same one if time allows — Kaggle stops at 12 h):
+```python
+!python src/detection/train.py --data /kaggle/working/v2b_tiles_paste/data.yaml --name EXP-002p --device 0
+```
 
-**Success = `fishing_gear` sonar recall climbs from ~0.47 toward ~0.70** while the other
-classes hold. Watch the val curve in `results.png` for the overfitting point too.
+```python
+# the zips train.py wrote (weights .pt + verified .onnx + model_meta.json + curves)
+!cp runs/EXP-002_complete.zip /kaggle/working/ 2>/dev/null; cp runs/EXP-002p_complete.zip /kaggle/working/ 2>/dev/null; ls -la /kaggle/working/*.zip
+```
+
+Run it as **Save Version → Save & Run All (Commit)** so it keeps going if your browser disconnects.
+If it prints `CUDA out of memory`, add `--batch 4`.
+
+What `train.py` does after training: exports `best.pt` → ONNX (opset 12, static 1024), **loads it
+through `cv2.dnn` and runs a forward pass** (the deploy path — a broken export fails here, not in the
+demo), writes `model_meta.json` (classes, imgsz, data, args, best epoch + val metrics, ONNX sha256),
+and zips everything.
+
+## 2. Back on your machine — one command
+
+Download `EXP-002_complete.zip` from the notebook's **Output** tab into the repo root, then:
+
+```bash
+python -m src.detection.onboard_model --zip EXP-002_complete.zip
+```
+
+It unpacks → checks the ONNX sha256 and a `cv2.dnn` forward pass → registers `models/EXP-002/`
+→ **fits the guaranteed tiers on the v2b validation recordings and verifies them once on test** →
+evaluates deploy-faithfully on the v2b unique-frame test, the **official 398-frame split
+(GhostVision head-to-head, leakage-free for v2b)** and the **cross-sonar** `test_xsonar` → writes
+`docs/onboard_exp002.md` with the numbers next to EXP-001's. It warns loudly (and recommends NOT
+switching) if calibration fails or the recall promise is weak. Run the same for `EXP-002p` and keep
+the better one **by validation**, not by test.
+
+Switch the product:
+```bash
+DEPTH_MODEL=EXP-002 python -m uvicorn src.dashboard.app:app --port 8000
+```
+On the COOL server: upload `models/EXP-002/best.onnx` to S3 and set `DEPTH_MODEL=EXP-002`
+(`infra/setup_cool_instance.sh` / `infra/depth.service`).
+
+## Success criteria (from the review, §10)
+
+- recall ceiling at the detector floor on the calibration recordings: **0.72 → ≥ 0.85**
+- crab-pot AP@0.5 on the v2b unique-frame test: **≥ 0.60**
+- official 398-frame split F1 within 0.05 of GhostVision (0.71–0.73)
+- recall promise ≥ 90% (95% confidence), held on test
+
+Log the run as **EXP-002** in `experiments.md` with the onboarding report linked — including if it
+misses these targets.

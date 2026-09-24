@@ -75,6 +75,33 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ## 4. Session log
 
+### 2026-09-25 (review sweep 8) — EXP-002 kit: train on Kaggle, plug in with ONE command
+Review I-3 / C-5 (the recall ceiling is the binding constraint).
+- **Three silent failures found and fixed before they cost a GPU run:** v2b `data.yaml` was cp1252
+  (em-dash byte 0x97; ultralytics reads UTF-8) and had `path: .`, which ultralytics resolves against
+  the *working directory* (verified: it looked for `MARINE_DEBRIS/val/images`) — builder fixed,
+  file rewritten, `check_det_dataset` now resolves; the review's `copy_paste 0.3` is a **no-op** for
+  box-only labels (ultralytics `CopyPaste` returns early without masks); and `evaluate.py`'s
+  GhostVision head-to-head matched **0 of 398** official frames (`Path.stem` ate the Roboflow hash)
+  — now 398/398.
+- **`build_tiles.py`**: full frames + 2×2 overlapping tiles (boxes clipped, kept if ≥ 60% visible);
+  val/test stay full-frame → v2b 1,773 frames + 3,973 tiles. **`--paste N` sonar-aware copy-paste**:
+  real pots cut out *with their shadow tails*, pasted at the **same slant range** below the Stage-1
+  tracked seabed on empty same-sonar frames, Poisson-blended (`cv2.seamlessClone`), with a
+  visibility gate (bank 1,018 pots · 230 backgrounds). Visually QA'd.
+- **`train.py`** (EXP-002 recipe): v2b(+tiles), 1024 px, 30 ep, patience 8, cosine LR, sonar-aware
+  aug; after training → ONNX → **`cv2.dnn` forward verified** → `model_meta.json` → one zip.
+- **`onboard_model.py`**: zip → sha256 + `cv2.dnn` check → `models/<name>/` registry → calibrate the
+  guaranteed tiers on v2b val recordings (verified once on test) → evaluate on v2b test, official
+  398 (GhostVision) and cross-sonar → `docs/onboard_<name>.md` vs EXP-001, with a **do-not-switch
+  gate** (calibration failed / recall promise < 0.3 / below EXP-001).
+- **Round-trip verified on CPU:** a 1-epoch smoke model went train → export → verify → zip → onboard
+  → agent running it (2 classes, 320 px); the gate correctly refused it. Found + fixed a crash in
+  `calibrate.auc_gain_ci` when no resample has both TPs and FPs.
+- **Runtime is model-agnostic:** class names, guaranteed class, input size and ONNX path come from
+  `models/<MODEL>/` (`DEPTH_MODEL`); the COOL server kit takes `DEPTH_MODEL` too.
+- `docs/exp002_kaggle.md` rewritten as copy-paste notebook cells. Tests: +5 (`test_training_kit.py`).
+
 ### 2026-09-24 (review sweep 7) — COOL benchmark v3 (product workload) + Graviton/COOL deploy kit
 Review M-5 / I-1 prep / X-6 / §3.7 (not yet executed on AWS — scheduled for the AWS day).
 - **`src/bench/product_bench.py`** times what `/api/analyze` runs, per stage (decode → Stage 1 →

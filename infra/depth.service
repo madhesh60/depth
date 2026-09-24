@@ -14,6 +14,7 @@ WorkingDirectory=@APP@
 Environment=PYTHONPATH=@APP@:@APP@/pydeps
 Environment=PYTHONUNBUFFERED=1
 Environment=DEPTH_THREADS=@THREADS@
+Environment=DEPTH_MODEL=@MODEL@
 Environment=DEPTH_JOBS_DIR=@APP@/runs/jobs
 Environment=DEPTH_S3_BUCKET=@S3_BUCKET@
 Environment=DEPTH_CORS_ORIGINS=@CORS@

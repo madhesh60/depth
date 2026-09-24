@@ -108,6 +108,21 @@ Promote each into the log below with full results as it runs.
 
 ## Experiment log
 
+### EXP-002 — YOLO11s @1024 on v2b + tiles (+ sonar-aware copy-paste variant EXP-002p) — READY TO RUN
+
+- Status: **kit built and round-trip tested; GPU run pending (Kaggle T4)** — `docs/exp002_kaggle.md`.
+- Why: EXP-001's recall ceiling (0.72 on its calibration recording) caps the recall promise at 65%;
+  triage cannot recover unproposed pots (STUDY-07).
+- Recipe: v2b (2 classes, sonar only, deduped; `best.pt` selected on held-out recordings Rec10/12/16),
+  full frames + 2×2 tiles, 1024 px, 30 epochs, patience 8, cosine LR, sonar-aware augmentation.
+  EXP-002p adds 600 sonar-aware copy-paste frames. Choose between them **on validation**.
+- Evaluation (automatic via `onboard_model`): guarantees fit on val, verified once on v2b test;
+  deploy-faithful AP on v2b test (unique frames), official 398 split (GhostVision F1 0.71–0.73), and
+  cross-sonar `test_xsonar`.
+- Targets: ceiling ≥ 0.85 · crab-pot AP@0.5 ≥ 0.60 · F1 within 0.05 of GhostVision · promise ≥ 90%.
+- Result: _pending — record every number here, including misses._
+
+
 ### STUDY-08 — Stage-1 sonar canonicalisation: measured geometry, and does it help the detector?
 
 **Why.** Review I-4/X-1: after STUDY-01, Stage 1 existed only to be timed for COOL. Give it a real

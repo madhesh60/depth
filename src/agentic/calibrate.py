@@ -78,8 +78,10 @@ def list_frames(root: Path, pattern: str) -> list[Path]:
 
 
 def collect(root: Path, pattern: str, cls_name: str, cls_id: int, cache: Path,
-            onnx: Path = DEFAULT_ONNX) -> dict:
+            onnx: Path = DEFAULT_ONNX, limit: int = 0) -> dict:
     frames = list_frames(root, pattern)
+    if limit:
+        frames = frames[:limit]                        # smoke tests only (onboard_model --limit)
     key = f"{onnx}|{root}|{pattern}|{len(frames)}|floor{FLOOR}|v2"
     if cache.exists():
         blob = json.loads(cache.read_text())
@@ -342,10 +344,12 @@ def auc_gain_ci(frames: list[dict], name: str, reps: int = 1000, seed: int = 0) 
         sp = [x for i in idx for x in per[i][2]]; tpp = [x for i in idx for x in per[i][3]]
         tb, tpp = np.asarray(tb, bool), np.asarray(tpp, bool)
         sb, sp = np.asarray(sb), np.asarray(sp)
-        if tb.all() or (~tb).all():
+        if tb.all() or (~tb).all() or tpp.all() or (~tpp).all():
             continue
         diffs.append(auc(sp[tpp], sp[~tpp]) - auc(sb[tb], sb[~tb]))
-    d = np.asarray(diffs)
+    d = np.asarray([x for x in diffs if np.isfinite(x)])
+    if d.size == 0:            # AUC undefined on every resample (no TPs or no FPs): no evidence of a gain
+        return 0.0, 0.0, 0.0
     return float(d.mean()), float(np.percentile(d, 2.5)), float(np.percentile(d, 97.5))
 
 
@@ -470,6 +474,7 @@ def main():
     ap.add_argument("--delta", type=float, default=0.05)
     ap.add_argument("--min-n", type=int, default=15, help="min CONFIRMED set size for a precision promise")
     ap.add_argument("--no-write", action="store_true")
+    ap.add_argument("--limit", type=int, default=0, help="cap frames per split (smoke test only)")
     ap.add_argument("--out", default=None, help="report path (default docs/calibration_<model>.md)")
     a = ap.parse_args()
     if hasattr(sys.stdout, "reconfigure"):
@@ -478,10 +483,10 @@ def main():
     cache_dir = REPO / "runs" / "calib"
     print("collect calibration split ...")
     cal = collect(Path(a.cal_root), a.pattern, a.cls_name, a.cls_id,
-                  cache_dir / f"{a.model}_{Path(a.cal_root).name}.json", Path(a.onnx))
+                  cache_dir / f"{a.model}_{Path(a.cal_root).name}.json", Path(a.onnx), a.limit)
     print("collect verification split ...")
     ver = collect(Path(a.ver_root), a.pattern, a.cls_name, a.cls_id,
-                  cache_dir / f"{a.model}_{Path(a.ver_root).name}.json", Path(a.onnx))
+                  cache_dir / f"{a.model}_{Path(a.ver_root).name}.json", Path(a.onnx), a.limit)
 
     fitres = fit(cal["frames"], a.alpha, a.target_precision, a.delta, a.min_n)
     verres = verify(ver["frames"], fitres, a.delta, a.target_precision)
