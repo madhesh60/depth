@@ -1,0 +1,103 @@
+{
+ "note": "Unseen by EXP-001 (v1 test split), one un-rotated copy per frame; consecutive chunks (Rec6 port 4-9) so chunk-boundary stitching can be demonstrated.",
+ "license": "CC-BY-SA-4.0",
+ "attribution": "ATTRIBUTION.md",
+ "samples": [
+  {
+   "id": "sample-01",
+   "file": "Rec6_wcp_ss_port_00004.jpg",
+   "name": "Rec6 port #4",
+   "kind": "crab-pot sonogram \u00b7 2 labelled pots",
+   "recording": "Rec6",
+   "side": "port",
+   "chunk": 4,
+   "labelled_pots": 2,
+   "source_file": "crabpot_train_Rec6_wcp_ss_port_00004_png_jpg.rf.7610306d1f8c08a01b080aa093e7fa6a.jpg",
+   "has_gps": false
+  },
+  {
+   "id": "sample-02",
+   "file": "Rec6_wcp_ss_port_00005.jpg",
+   "name": "Rec6 port #5",
+   "kind": "crab-pot sonogram \u00b7 6 labelled pots",
+   "recording": "Rec6",
+   "side": "port",
+   "chunk": 5,
+   "labelled_pots": 6,
+   "source_file": "crabpot_train_Rec6_wcp_ss_port_00005_png_jpg.rf.08f7ca62a0cc4675ebb0c220a3535b60.jpg",
+   "has_gps": false
+  },
+  {
+   "id": "sample-03",
+   "file": "Rec6_wcp_ss_port_00006.jpg",
+   "name": "Rec6 port #6",
+   "kind": "crab-pot sonogram \u00b7 3 labelled pots",
+   "recording": "Rec6",
+   "side": "port",
+   "chunk": 6,
+   "labelled_pots": 3,
+   "source_file": "crabpot_train_Rec6_wcp_ss_port_00006_png_jpg.rf.b1ab237c06167b0eb3fcf5c75014bb83.jpg",
+   "has_gps": false
+  },
+  {
+   "id": "sample-04",
+   "file": "Rec6_wcp_ss_port_00007.jpg",
+   "name": "Rec6 port #7",
+   "kind": "crab-pot sonogram \u00b7 2 labelled pots",
+   "recording": "Rec6",
+   "side": "port",
+   "chunk": 7,
+   "labelled_pots": 2,
+   "source_file": "crabpot_train_Rec6_wcp_ss_port_00007_png_jpg.rf.8963a8245850f00acfc9c41fff89acf5.jpg",
+   "has_gps": false
+  },
+  {
+   "id": "sample-05",
+   "file": "Rec6_wcp_ss_port_00008.jpg",
+   "name": "Rec6 port #8",
+   "kind": "crab-pot sonogram \u00b7 2 labelled pots",
+   "recording": "Rec6",
+   "side": "port",
+   "chunk": 8,
+   "labelled_pots": 2,
+   "source_file": "crabpot_train_Rec6_wcp_ss_port_00008_png_jpg.rf.c21335ea27a5f147adcfecb785d0b74b.jpg",
+   "has_gps": false
+  },
+  {
+   "id": "sample-06",
+   "file": "Rec6_wcp_ss_port_00009.jpg",
+   "name": "Rec6 port #9",
+   "kind": "crab-pot sonogram \u00b7 1 labelled pot",
+   "recording": "Rec6",
+   "side": "port",
+   "chunk": 9,
+   "labelled_pots": 1,
+   "source_file": "crabpot_train_Rec6_wcp_ss_port_00009_png_jpg.rf.cedebdcc474015b05f4f942fdaedbcf9.jpg",
+   "has_gps": false
+  },
+  {
+   "id": "sample-07",
+   "file": "Rec6_wcp_ss_star_00024.jpg",
+   "name": "Rec6 starboard #24",
+   "kind": "crab-pot sonogram \u00b7 6 labelled pots",
+   "recording": "Rec6",
+   "side": "star",
+   "chunk": 24,
+   "labelled_pots": 6,
+   "source_file": "crabpot_train_Rec6_wcp_ss_star_00024_png_jpg.rf.971965f6a4ee12c09d37638705d6e028.jpg",
+   "has_gps": false
+  },
+  {
+   "id": "sample-08",
+   "file": "Rec6_wcp_ss_star_00025.jpg",
+   "name": "Rec6 starboard #25",
+   "kind": "crab-pot sonogram \u00b7 2 labelled pots",
+   "recording": "Rec6",
+   "side": "star",
+   "chunk": 25,
+   "labelled_pots": 2,
+   "source_file": "crabpot_train_Rec6_wcp_ss_star_00025_png_jpg.rf.82dfc94b1df20aab194a34066428bd46.jpg",
+   "has_gps": false
+  }
+ ]
+}

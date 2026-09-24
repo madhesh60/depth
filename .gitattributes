@@ -1,0 +1,2 @@
+# Vendored third-party assets are served with SRI hashes: keep their bytes exact (no EOL conversion).
+webui/vendor/** -text

@@ -579,7 +579,11 @@ async function runSurvey() {
   const gps = $("#gpsMode").value;
   const budget = Math.max(1, Math.min(600, parseFloat($("#budgetMin").value) || 5));
   try {
-    const d = await fetch(`${API}/api/survey?use_samples=1&gps=${gps}&budget_minutes=${budget}`, { method: "POST" }).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); });
+    // Surveys run as background jobs (no proxy timeouts, the server stays responsive); poll progress.
+    const job = await fetch(`${API}/api/jobs/survey?use_samples=1&gps=${gps}&budget_minutes=${budget}`, { method: "POST" })
+      .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); });
+    Log.now({ tool: "queue_job", msg: `${job.job_id} · ${job.frames} frames queued`, t: "" });
+    const d = await pollJob(job.job_id);
     state.survey = d;
     renderSurvey(d);
     stepperFinish(["see", "prove", "decide", "act"]);
@@ -589,6 +593,23 @@ async function runSurvey() {
     $("#surveyPlaceholder").querySelector("p").innerHTML =
       `<b style="color:var(--danger)">Survey failed (${e.message}).</b><br/>The backend needs the model + local samples.`;
   } finally { toastHide(); btn.disabled = false; }
+}
+
+async function pollJob(jobId) {
+  let lastDone = -1;
+  for (let i = 0; i < 1800; i++) {                       // ≤ ~15 min at 0.5 s
+    const j = await fetch(`${API}/api/jobs/${encodeURIComponent(jobId)}`).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); });
+    const p = j.progress || {};
+    if (p.done !== lastDone && p.total) {
+      lastDone = p.done;
+      $("#runToastTxt").textContent = `survey · frame ${Math.min(p.done + (j.status === "running" ? 1 : 0), p.total)}/${p.total}${p.frame ? " · " + p.frame : ""}`;
+      if (p.done > 0) Log.now({ tool: "frame_done", msg: `${p.done}/${p.total}${p.frame ? " · " + p.frame : ""}`, t: "" });
+    }
+    if (j.status === "done") return j.result;
+    if (j.status === "error") throw new Error(j.error || "job failed");
+    await new Promise(r => setTimeout(r, 500));
+  }
+  throw new Error("timed out waiting for the survey job");
 }
 
 function renderSurvey(d) {
@@ -618,8 +639,21 @@ function renderMap(d) {
     ? "⚠ SYNTHETIC DEMO GPS — not real coordinates. The HF crab-pot frames carry no GPS; this track is generated only to demonstrate the map + route."
     : "Real per-ping GPS.";
   if (!state.map) {
-    state.map = L.map("map", { zoomControl: true, attributionControl: true });
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", { attribution: '&copy; OpenStreetMap &copy; CARTO', maxZoom: 20, subdomains: "abcd" }).addTo(state.map);
+    state.map = L.map("map", { zoomControl: true, attributionControl: true, maxZoom: 20 });
+    // Keyless basemaps (CARTO dark now needs an API key). Satellite by default, OSM as an option; if
+    // tiles can't load (offline / blocked) the map degrades to a plain grid — the hazards, error
+    // radii and routes are vector overlays and stay correct without any basemap.
+    const sat = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+      { attribution: "Imagery &copy; Esri", maxZoom: 20, maxNativeZoom: 19, className: "tiles-dim" });
+    const osm = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+      { attribution: "&copy; OpenStreetMap contributors", maxZoom: 20, maxNativeZoom: 19, className: "tiles-dim" });
+    let tileErrors = 0;
+    [sat, osm].forEach(layer => layer.on("tileerror", () => {
+      if (++tileErrors === 6) { $("#map").classList.add("map-offline"); $("#mapNote").textContent += "  ·  basemap unavailable — overlays still exact."; }
+    }));
+    sat.addTo(state.map);
+    L.control.layers({ "satellite": sat, "streets (OSM)": osm }, null, { position: "topright" }).addTo(state.map);
+    L.control.scale({ imperial: false }).addTo(state.map);
   }
   state.mapLayers.forEach(l => state.map.removeLayer(l)); state.mapLayers = [];
   const byId = Object.fromEntries(d.tracked.map(t => [t.oid, t])), latlngs = [];
@@ -627,6 +661,10 @@ function renderMap(d) {
     const color = VCOLOR[t.verdict] || "#8ba6c2";
     const mk = L.circleMarker([t.lat, t.lon], { radius: t.verdict === "confirmed" ? 8 : 6, color: "#02121d", weight: 1.5, fillColor: color, fillOpacity: .95 })
       .bindPopup(`<b>${t.oid}</b> · ${t.verdict}<br/>${t.cls_name} · conf ${t.conf}<br/>evidence ${t.evidence_score} · ${t.shadow_quality} shadow${t.height_m != null || t.height_rel ? ` · h ${heightText(t.height_m, t.height_rel, 1)}` : ""}<br/>${t.lat.toFixed(5)}, ${t.lon.toFixed(5)} ±${t.geo_error_m ?? "?"} m`);
+    if (t.geo_error_m) {
+      const ring = L.circle([t.lat, t.lon], { radius: t.geo_error_m, color, weight: 1, opacity: .55, fillOpacity: .06, dashArray: "3 4", interactive: false });
+      ring.addTo(state.map); state.mapLayers.push(ring);
+    }
     mk.addTo(state.map); state.mapLayers.push(mk); latlngs.push([t.lat, t.lon]);
   });
   const routePts = m.recovery_route.map(id => byId[id]).filter(t => t && t.lat != null).map(t => [t.lat, t.lon]);

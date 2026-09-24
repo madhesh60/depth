@@ -2,24 +2,40 @@
 app.py — FastAPI service exposing the See → Prove → Decide → Act loop to the web dashboard.
 
 Endpoints
-    GET  /api/health                 — liveness + OpenCV version + model status (shown in the footer)
-    GET  /api/samples                — curated sample frames (one-click demo, no sonar files needed)
-    POST /api/analyze?sample=ID      — run See→Prove→Decide on a sample or an uploaded frame; returns
-         (multipart file=…)            the annotated frame, per-candidate evidence cards + traces
-    POST /api/survey?use_samples=1   — run the full loop over many frames → hazards + mission plan
-    GET  /api/report/{fmt}?survey_id — download the mission as geojson | gpx | kml | csv | json
+    GET  /api/health                 — liveness, OpenCV version + WHERE cv2 was loaded from (COOL
+                                       provenance), runtime, model state, calibration promises, jobs
+    GET  /api/samples                — shipped sample frames (webui/samples, CC-BY-SA, attributed)
+    POST /api/analyze?sample=ID      — See→Prove→Decide on a sample or ONE uploaded frame → evidence
+         (multipart file=…)            cards + traces   [?nadir=top|bottom|left|right overrides]
+    POST /api/jobs/survey            — queue a survey (samples or ≤ MAX_FRAMES uploads) → {job_id}
+    GET  /api/jobs/{job_id}          — status + progress; the survey result when done
+    POST /api/survey?use_samples=1   — synchronous survey for small runs (≤ MAX_SYNC_FRAMES)
+    GET  /api/report/{fmt}?survey_id — geojson | gpx | kml | csv | json (memory, else disk)
 
-The built React app in ``webui/dist`` is served at ``/`` when present. The model (ONNX) is loaded
-lazily on the first analyze so ``/api/health`` stays instant.
+Hardening (review §3.8 / I-9):
+* endpoints are plain ``def`` (FastAPI runs them in a thread pool) and every inference is guarded by
+  one lock — the shared ``cv2.dnn`` network is not thread-safe — so ``/api/health`` always answers
+  while a survey runs;
+* long surveys are background **jobs** (no 30 s proxy timeouts), bounded and persisted to disk
+  (``jobs.py``) so report downloads survive a restart;
+* uploads are limited (``DEPTH_MAX_UPLOAD_MB`` = 20 MB/file, ``DEPTH_MAX_FRAMES`` = 50, images only);
+* recent surveys are kept in a bounded LRU; CORS is **off** unless ``DEPTH_CORS_ORIGINS`` is set
+  (the UI is same-origin);
+* the model is loaded + warmed up at startup in the background (``/api/health`` shows when ready).
 
 Run:  uvicorn src.dashboard.app:app --host 0.0.0.0 --port 8000
 """
 from __future__ import annotations
 
 import base64
+import logging
+import os
+import threading
 import time
+from collections import OrderedDict
+from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 import cv2
 import numpy as np
@@ -36,15 +52,71 @@ from src.agentic.geo import synthetic_track
 from src.agentic.mission import export
 from src.agentic.types import SurveyResult
 from src.detection.calibration import load_calibration
+from src.detection.infer import configure_runtime, DEFAULT_ONNX
 from . import samples as samples_mod
+from .jobs import JobStore, REPORT_FORMATS
 
+log = logging.getLogger("depth.api")
 REPO = Path(__file__).resolve().parents[2]
-# Prefer a real build in webui/dist; fall back to the zero-build static app in webui/.
 _WEBUI = REPO / "webui"
 WEBUI_DIST = _WEBUI / "dist" if (_WEBUI / "dist").exists() else _WEBUI
 
-app = FastAPI(title="Marine Debris — See→Prove→Decide→Act", version="1.0.0")
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+MAX_UPLOAD_MB = float(os.environ.get("DEPTH_MAX_UPLOAD_MB", "20"))
+MAX_FRAMES = int(os.environ.get("DEPTH_MAX_FRAMES", "50"))
+MAX_SYNC_FRAMES = int(os.environ.get("DEPTH_MAX_SYNC_FRAMES", "12"))
+MAX_SURVEYS = int(os.environ.get("DEPTH_MAX_SURVEYS", "24"))
+_IMAGE_TYPES = {"image/jpeg", "image/png", "image/bmp", "image/tiff", "image/webp", "application/octet-stream", ""}
+
+# ---- shared state ----------------------------------------------------------------------------
+_PIPELINE: Optional[AgenticPipeline] = None
+_MODEL_STATE = {"loaded": False, "loading": False, "error": None, "warmup_ms": None}
+_INFER_LOCK = threading.Lock()                  # one inference at a time on the shared cv2.dnn net
+_LOAD_LOCK = threading.Lock()
+_PROVER = ShadowProver()
+_SURVEYS: "OrderedDict[str, SurveyResult]" = OrderedDict()   # bounded LRU (report downloads)
+_JOBS = JobStore(max_jobs=50, workers=1)
+_RUNTIME = configure_runtime()
+
+
+def get_pipeline() -> AgenticPipeline:
+    global _PIPELINE
+    if _PIPELINE is None:
+        with _LOAD_LOCK:
+            if _PIPELINE is None:
+                _MODEL_STATE["loading"] = True
+                try:
+                    pipe = AgenticPipeline()
+                    t0 = time.perf_counter()
+                    pipe.agent.perceptor.warmup()
+                    _MODEL_STATE["warmup_ms"] = round((time.perf_counter() - t0) * 1000, 1)
+                    _PIPELINE = pipe
+                    _MODEL_STATE["loaded"] = True
+                except Exception as e:                  # surfaced by /api/health, never crashes
+                    _MODEL_STATE["error"] = f"{type(e).__name__}: {e}"
+                    raise
+                finally:
+                    _MODEL_STATE["loading"] = False
+    return _PIPELINE
+
+
+def _warm_in_background() -> None:
+    try:
+        get_pipeline()
+    except Exception:
+        log.exception("model failed to load at startup")
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    if os.environ.get("DEPTH_LAZY_MODEL", "0") != "1":
+        threading.Thread(target=_warm_in_background, name="depth-warmup", daemon=True).start()
+    yield
+
+
+app = FastAPI(title="DEPTH — See→Prove→Decide→Act", version="2.0.0", lifespan=lifespan)
+_cors = [o.strip() for o in os.environ.get("DEPTH_CORS_ORIGINS", "").split(",") if o.strip()]
+if _cors:
+    app.add_middleware(CORSMiddleware, allow_origins=_cors, allow_methods=["GET", "POST"], allow_headers=["*"])
 
 
 @app.middleware("http")
@@ -55,19 +127,6 @@ async def _revalidate_static(request, call_next):
     if not request.url.path.startswith("/api/"):
         resp.headers.setdefault("Cache-Control", "no-cache")
     return resp
-
-_PIPELINE: Optional[AgenticPipeline] = None
-_PROVER = ShadowProver()
-_SURVEYS: dict[str, SurveyResult] = {}          # in-memory cache so report downloads work
-_MODEL_OK = False
-
-
-def get_pipeline() -> AgenticPipeline:
-    global _PIPELINE, _MODEL_OK
-    if _PIPELINE is None:
-        _PIPELINE = AgenticPipeline()
-        _MODEL_OK = True
-    return _PIPELINE
 
 
 # ---- helpers ----------------------------------------------------------------------------------
@@ -94,8 +153,17 @@ def _evidence_crop(frame: np.ndarray, cand, target: int = 300) -> str:
     return _b64(crop)
 
 
-def _read_upload(data: bytes) -> np.ndarray | None:
-    return cv2.imdecode(np.frombuffer(data, np.uint8), cv2.IMREAD_COLOR)
+def _decode_upload(f: UploadFile) -> tuple[str, np.ndarray]:
+    """Validate type + size, then decode. Raises HTTPException with a clear message."""
+    if (f.content_type or "").lower() not in _IMAGE_TYPES and not (f.content_type or "").startswith("image/"):
+        raise HTTPException(415, f"{f.filename}: only images are accepted (got {f.content_type})")
+    data = f.file.read(int(MAX_UPLOAD_MB * 1024 * 1024) + 1)
+    if len(data) > MAX_UPLOAD_MB * 1024 * 1024:
+        raise HTTPException(413, f"{f.filename}: larger than {MAX_UPLOAD_MB:g} MB")
+    img = cv2.imdecode(np.frombuffer(data, np.uint8), cv2.IMREAD_COLOR)
+    if img is None:
+        raise HTTPException(400, f"{f.filename}: could not decode image")
+    return Path(f.filename or "upload").stem, img
 
 
 def _frame_payload(frame: np.ndarray, result) -> dict:
@@ -113,14 +181,80 @@ def _frame_payload(frame: np.ndarray, result) -> dict:
     return d
 
 
+def _sample_frames() -> list[tuple[str, np.ndarray]]:
+    out = []
+    for s in samples_mod.list_samples():
+        p = samples_mod.sample_path(s["id"])
+        img = cv2.imread(str(p)) if p and p.exists() else None
+        if img is not None:
+            out.append((p.stem, img))
+    return out
+
+
+def _collect_frames(use_samples: bool, files: Optional[list[UploadFile]]) -> list[tuple[str, np.ndarray]]:
+    if use_samples:
+        frames = _sample_frames()
+    else:
+        files = files or []
+        if len(files) > MAX_FRAMES:
+            raise HTTPException(413, f"at most {MAX_FRAMES} frames per survey (got {len(files)})")
+        frames = [_decode_upload(f) for f in files]
+    if not frames:
+        raise HTTPException(400, "no frames (use ?use_samples=1 or upload files)")
+    return frames
+
+
+def _remember(result: SurveyResult) -> None:
+    _SURVEYS[result.survey_id] = result
+    _SURVEYS.move_to_end(result.survey_id)
+    while len(_SURVEYS) > MAX_SURVEYS:
+        _SURVEYS.popitem(last=False)
+
+
+def _run_survey(frames, gps: str, budget_minutes: Optional[float], nadir: Optional[str],
+                survey_id: str, progress: Optional[Callable[[dict], None]] = None) -> dict:
+    track = synthetic_track([fid for fid, _ in frames]) if gps == "synthetic" else None
+    pipe = get_pipeline()
+    total = len(frames)
+    done = {"n": 0}
+
+    def cb(stage: str, payload: dict) -> None:
+        if stage == "frame_done":
+            done["n"] += 1
+        if progress:
+            progress({"done": done["n"], "total": total, "stage": stage,
+                      "frame": payload.get("frame_id")})
+
+    result = pipe.run_survey(frames, track=track, survey_id=survey_id, nadir=nadir,
+                             budget_minutes=budget_minutes, progress_cb=cb,
+                             frame_lock=_INFER_LOCK)      # per frame: /api/analyze can interleave
+    _remember(result)
+    frame_map = dict(frames)
+    d = result.to_dict()
+    for fr, fd in zip(result.frames, d["frames"]):          # light thumbnails, not full-res base64
+        thumb = cv2.resize(render(frame_map[fr.frame_id], fr), (200, 200), interpolation=cv2.INTER_AREA)
+        fd["thumb_png"] = _b64(thumb, 70)
+    reports = {fmt: export(fmt, result) for fmt in REPORT_FORMATS}
+    _JOBS.persist(result.survey_id, {k: v for k, v in d.items() if k != "frames"}, reports)
+    return d
+
+
 # ---- API ---------------------------------------------------------------------------------------
 @app.get("/api/health")
 def health():
     cal = load_calibration()
     summary = cal.summary()
     summary["detector_floor"] = cal.conf.get(cal.tiers.get("guaranteed_class", "fishing_gear"))
-    return {"status": "ok", "opencv": cv2.__version__, "model_loaded": _MODEL_OK,
-            "samples": len(samples_mod.list_samples()), "calibration": summary}
+    cv2_file = getattr(cv2, "__file__", "") or ""
+    return {
+        "status": "ok", "opencv": cv2.__version__,
+        "cv2_file": cv2_file, "is_cool_path": "/opt/cool" in cv2_file,
+        "runtime": _RUNTIME, "model": DEFAULT_ONNX.parent.parent.name,
+        "model_loaded": _MODEL_STATE["loaded"], "model_loading": _MODEL_STATE["loading"],
+        "model_error": _MODEL_STATE["error"], "warmup_ms": _MODEL_STATE["warmup_ms"],
+        "samples": len(samples_mod.list_samples()), "calibration": summary, "jobs": _JOBS.counts(),
+        "limits": {"max_upload_mb": MAX_UPLOAD_MB, "max_frames": MAX_FRAMES, "max_sync_frames": MAX_SYNC_FRAMES},
+    }
 
 
 @app.get("/api/samples")
@@ -129,7 +263,7 @@ def samples():
 
 
 @app.get("/api/sample_thumb/{sample_id}")
-def sample_thumb(sample_id: str, size: int = 220):
+def sample_thumb(sample_id: str, size: int = Query(220, ge=32, le=640)):
     """Downscaled JPEG of a sample frame — for the gallery cards (real sonar, not a placeholder)."""
     p = samples_mod.sample_path(sample_id)
     if not p or not p.exists():
@@ -148,59 +282,63 @@ def sample_thumb(sample_id: str, size: int = 220):
 
 
 @app.post("/api/analyze")
-async def analyze(sample: Optional[str] = Query(None), file: Optional[UploadFile] = File(None)):
+def analyze(sample: Optional[str] = Query(None), nadir: Optional[str] = Query(None),
+            file: Optional[UploadFile] = File(None)):
     if file is not None:
-        frame = _read_upload(await file.read())
-        frame_id = Path(file.filename or "upload").stem
+        frame_id, frame = _decode_upload(file)
     elif sample:
         p = samples_mod.sample_path(sample)
         if not p or not p.exists():
             raise HTTPException(404, f"sample not found: {sample}")
-        frame = cv2.imread(str(p)); frame_id = p.stem
+        frame, frame_id = cv2.imread(str(p)), p.stem
+        if frame is None:
+            raise HTTPException(400, "could not decode image")
     else:
         raise HTTPException(400, "provide ?sample=ID or a multipart file")
-    if frame is None:
-        raise HTTPException(400, "could not decode image")
+    if nadir and nadir not in ("top", "bottom", "left", "right", "auto"):
+        raise HTTPException(400, "nadir must be top|bottom|left|right|auto")
 
     t0 = time.perf_counter()
-    result = get_pipeline().run_frame(frame, frame_id=frame_id)
+    pipe = get_pipeline()
+    with _INFER_LOCK:
+        result = pipe.run_frame(frame, frame_id=frame_id, nadir=nadir)
     payload = _frame_payload(frame, result)
     payload["wall_ms"] = round((time.perf_counter() - t0) * 1000, 1)
+    payload["guarantees"] = pipe.guarantees()
     return JSONResponse(payload)
 
 
+@app.post("/api/jobs/survey")
+def submit_survey(use_samples: bool = Query(False), gps: str = Query("synthetic"),
+                  budget_minutes: Optional[float] = Query(None, ge=0, le=600),
+                  nadir: Optional[str] = Query(None),
+                  files: Optional[list[UploadFile]] = File(None)):
+    frames = _collect_frames(use_samples, files)
+    survey_id = f"survey-{time.strftime('%Y%m%d-%H%M%S')}-{len(frames)}f"
+    jid = _JOBS.submit(lambda progress: _run_survey(frames, gps, budget_minutes, nadir, survey_id, progress),
+                       total=len(frames))
+    return {"job_id": jid, "survey_id": survey_id, "frames": len(frames)}
+
+
+@app.get("/api/jobs/{job_id}")
+def job_status(job_id: str):
+    rec = _JOBS.get(job_id)
+    if rec is None:
+        raise HTTPException(404, "unknown job_id")
+    return rec
+
+
 @app.post("/api/survey")
-async def survey(use_samples: bool = Query(False), gps: str = Query("synthetic"),
-                 budget_minutes: Optional[float] = Query(None, ge=0, le=600),
-                 files: Optional[list[UploadFile]] = File(None)):
-    frames: list[tuple[str, np.ndarray]] = []
-    if use_samples:
-        for s in samples_mod.list_samples():
-            p = samples_mod.sample_path(s["id"])
-            if p and p.exists():
-                frames.append((p.stem, cv2.imread(str(p))))
-    elif files:
-        for f in files:
-            img = _read_upload(await f.read())
-            if img is not None:
-                frames.append((Path(f.filename or "frame").stem, img))
-    frames = [(fid, im) for fid, im in frames if im is not None]
-    if not frames:
-        raise HTTPException(400, "no frames (use ?use_samples=1 or upload files)")
-
-    track = synthetic_track([fid for fid, _ in frames]) if gps == "synthetic" else None
-    survey_id = f"survey-{int(time.time())}"
-    result = get_pipeline().run_survey(frames, track=track, survey_id=survey_id,
-                                       budget_minutes=budget_minutes)
-    _SURVEYS[survey_id] = result
-
-    frame_map = dict(frames)
-    d = result.to_dict()
-    # light per-frame thumbnails for the gallery (not the full-res base64)
-    for fr, fd in zip(result.frames, d["frames"]):
-        thumb = cv2.resize(render(frame_map[fr.frame_id], fr), (200, 200), interpolation=cv2.INTER_AREA)
-        fd["thumb_png"] = _b64(thumb, 70)
-    return JSONResponse(d)
+def survey(use_samples: bool = Query(False), gps: str = Query("synthetic"),
+           budget_minutes: Optional[float] = Query(None, ge=0, le=600),
+           nadir: Optional[str] = Query(None),
+           files: Optional[list[UploadFile]] = File(None)):
+    frames = _collect_frames(use_samples, files)
+    if len(frames) > MAX_SYNC_FRAMES:
+        raise HTTPException(413, f"{len(frames)} frames: use POST /api/jobs/survey for more than "
+                                 f"{MAX_SYNC_FRAMES} (runs in the background, poll /api/jobs/<id>)")
+    survey_id = f"survey-{time.strftime('%Y%m%d-%H%M%S')}-{len(frames)}f"
+    return JSONResponse(_run_survey(frames, gps, budget_minutes, nadir, survey_id))
 
 
 _MEDIA = {"geojson": "application/geo+json", "gpx": "application/gpx+xml",
@@ -209,21 +347,15 @@ _MEDIA = {"geojson": "application/geo+json", "gpx": "application/gpx+xml",
 
 @app.get("/api/report/{fmt}")
 def report(fmt: str, survey_id: str = Query(...)):
-    if survey_id not in _SURVEYS:
-        raise HTTPException(404, "unknown survey_id (run /api/survey first)")
     if fmt not in _MEDIA:
         raise HTTPException(400, f"format must be one of {list(_MEDIA)}")
-    body = export(fmt, _SURVEYS[survey_id])
-    ext = fmt                                  # geojson→.geojson, json→.json, etc.
+    body = export(fmt, _SURVEYS[survey_id]) if survey_id in _SURVEYS else _JOBS.report(survey_id, fmt)
+    if body is None:
+        raise HTTPException(404, "unknown survey_id (run a survey first)")
     return Response(body, media_type=_MEDIA[fmt],
-                    headers={"Content-Disposition": f'attachment; filename="mission.{ext}"'})
+                    headers={"Content-Disposition": f'attachment; filename="mission.{fmt}"'})
 
 
-# ---- serve the built frontend (if present) -----------------------------------------------------
+# ---- serve the zero-build frontend -------------------------------------------------------------
 if WEBUI_DIST.exists():
     app.mount("/", StaticFiles(directory=str(WEBUI_DIST), html=True), name="webui")
-else:
-    @app.get("/")
-    def _root():
-        return {"status": "ok", "note": "frontend not built yet — run `npm run build` in webui/",
-                "api": ["/api/health", "/api/samples", "/api/analyze", "/api/survey", "/api/report/{fmt}"]}

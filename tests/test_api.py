@@ -36,6 +36,43 @@ def test_analyze_requires_input():
     assert client.post("/api/analyze").status_code == 400
 
 
+def test_health_reports_provenance_and_limits():
+    j = client.get("/api/health").json()
+    assert "cv2_file" in j and isinstance(j["is_cool_path"], bool)
+    assert j["limits"]["max_frames"] >= 1 and j["limits"]["max_upload_mb"] > 0
+    assert set(j["jobs"]) >= {"queued", "running", "done", "error"}
+
+
+def test_upload_rejects_non_images():
+    r = client.post("/api/analyze", files={"file": ("notes.txt", b"hello", "text/plain")})
+    assert r.status_code == 415
+
+
+def test_upload_rejects_undecodable_image():
+    r = client.post("/api/analyze", files={"file": ("broken.png", b"not really a png", "image/png")})
+    assert r.status_code == 400
+
+
+def test_survey_frame_limit(monkeypatch):
+    import src.dashboard.app as app_mod
+    monkeypatch.setattr(app_mod, "MAX_FRAMES", 2)
+    files = [("files", (f"f{i}.png", b"x", "image/png")) for i in range(3)]
+    assert client.post("/api/jobs/survey", files=files).status_code == 413
+
+
+def test_sync_survey_redirects_big_runs_to_jobs(monkeypatch):
+    if not _HAVE_SAMPLES:
+        return
+    import src.dashboard.app as app_mod
+    monkeypatch.setattr(app_mod, "MAX_SYNC_FRAMES", 1)
+    r = client.post("/api/survey?use_samples=1")
+    assert r.status_code == 413 and "/api/jobs/survey" in r.json()["detail"]
+
+
+def test_unknown_job_is_404():
+    assert client.get("/api/jobs/nope").status_code == 404
+
+
 def test_analyze_and_report_path():
     if not (_HAVE_MODEL and _HAVE_SAMPLES):
         print("  skip  test_analyze_and_report_path (model/samples absent)")
@@ -56,6 +93,20 @@ def test_analyze_and_report_path():
     rep = client.get(f"/api/report/geojson?survey_id={survey_id}")
     assert rep.status_code == 200 and "FeatureCollection" in rep.text
     assert client.get("/api/report/gpx?survey_id=does-not-exist").status_code == 404
+
+    # the same survey as a background job: queue → poll → result → report
+    import time
+    job = client.post("/api/jobs/survey?use_samples=1&gps=synthetic").json()
+    rec = {}
+    for _ in range(600):
+        rec = client.get(f"/api/jobs/{job['job_id']}").json()
+        if rec["status"] in ("done", "error"):
+            break
+        time.sleep(0.2)
+    assert rec["status"] == "done", rec.get("error")
+    assert rec["result"]["survey_id"] == job["survey_id"]
+    assert rec["progress"]["done"] == rec["progress"]["total"] == job["frames"]
+    assert client.get(f"/api/report/csv?survey_id={job['survey_id']}").status_code == 200
 
 
 def _run_all():

@@ -14,6 +14,7 @@ CLI:  python -m src.agentic.pipeline --survey <dir> [--gps synthetic|none] --out
 from __future__ import annotations
 
 import argparse
+from contextlib import nullcontext
 from pathlib import Path
 from typing import Callable, Optional
 
@@ -62,14 +63,18 @@ class AgenticPipeline:
                    track: Optional[dict[str, PingFix]] = None, survey_id: str = "survey",
                    nadir: Optional[str] = None,
                    budget_minutes: Optional[float] = None, sec_per_card: float = DEFAULT_SEC_PER_CARD,
-                   progress_cb: Optional[Callable[[str, dict], None]] = None) -> SurveyResult:
+                   progress_cb: Optional[Callable[[str, dict], None]] = None,
+                   frame_lock=None) -> SurveyResult:
+        """``frame_lock`` (optional context manager) is held per frame, not per survey, so a server
+        can interleave single-frame requests with a long survey on one shared network."""
         gps_available = bool(track)
         gps_synthetic = gps_available and any(f.synthetic for f in track.values())
 
         frame_results: list[FrameResult] = []
         for frame_id, image in frames:
             fix = track.get(frame_id) if track else None
-            fr = self.run_frame(image, frame_id=frame_id, fix=fix, nadir=nadir)
+            with (frame_lock or nullcontext()):
+                fr = self.run_frame(image, frame_id=frame_id, fix=fix, nadir=nadir)
             frame_results.append(fr)
             if progress_cb:
                 progress_cb("frame_done", {"frame_id": frame_id, "counts": fr.counts})

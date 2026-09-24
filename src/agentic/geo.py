@@ -92,7 +92,7 @@ def geotag(cand: Candidate, fix: PingFix, nadir: str, w: int, h: int,
     return cand
 
 
-def synthetic_track(frame_ids: list[str], start=(37.9800, -76.0000),
+def synthetic_track(frame_ids: list[str], start=(37.8000, -76.1500),   # open Chesapeake Bay water
                     heading_deg: float = 20.0, ping_spacing_m: float = 4.0) -> dict[str, PingFix]:
     """Build a plausible straight boat track for a demo. **All fixes are ``synthetic=True``** and must
     be surfaced as demo-only. Frames are ordered by the trailing ping index in their name when present."""

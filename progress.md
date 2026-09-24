@@ -43,7 +43,7 @@ what moved, what's blocked, what's next. Newest entries at the top of §4.
 | Stage 2 baseline train | ✅ Done | EXP-001 (yolo11s detect, v1, Kaggle T4): test mAP@0.5 **0.822**, P 0.808, R 0.800 — all targets met. |
 | Evaluation + ablation | ✅ Done (EXP-001) | `evaluate.py` (deploy-faithful cv2.dnn): val-tuned thresholds/test-once, per-sensor & per-source tables, bootstrap CIs → `docs/eval_exp001.md` (STUDY-05). Aggregate 0.827 reproduces 0.822; honest sonar `fishing_gear` AP 0.473. GhostVision head-to-head pending EXP-002. |
 | Reporting engine | ✅ Done | `src/agentic/{geo,mission}.py`: honest geotag + GeoJSON/GPX/KML/CSV/JSON exports. |
-| Dashboard | ✅ Done | Zero-build static web app (`webui/`), served by FastAPI. See→Prove→Decide→Act stepper, evidence cards (conf→relook), agent trace, Leaflet hazard map + recovery route, downloads, honesty banners. Verified under uvicorn. |
+| Dashboard | ✅ Done | Zero-build static web app (`webui/`), served by FastAPI; hardened (job queue, per-frame model lock, upload limits, shipped samples, vendored Leaflet). See→Prove→Decide→Act stepper, evidence cards (conf→relook), agent trace, Leaflet hazard map + recovery route, downloads, honesty banners. Verified under uvicorn. |
 | AWS deployment | ⬜ Not started | AWS CLI not yet installed. |
 | **COOL benchmark (Arm vs x86)** | ⬜ Not started | **Bonus-prize deliverable (Best Use of COOL).** |
 | Agentic loop (See→Prove→Decide→Act) | ✅ Done | **Primary Agentic-Vision entry.** All 4 stages + an **adaptive escalation controller** (STUDY-04) + live dashboard. Two calibrated CONFIRMED paths (re-look ⋃ high-confidence → precision **0.737 @ 30% recall**), cross-pass corroboration, 6-tool toolbox, full audit trace, human-gated. `src/agentic/` + `webui/`; 30/30 tests. Remaining is *deployment* (AWS/COOL), not the brain. |
@@ -74,6 +74,28 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 ---
 
 ## 4. Session log
+
+### 2026-09-24 (review sweep 5) — Backend hardening: job queue, limits, shipped samples, offline-safe map
+Review C-7 / I-9 + failure scenarios 10–13.
+- **Non-blocking server:** endpoints are plain `def` (thread pool); one `threading.Lock` guards the
+  shared `cv2.dnn` net and is held **per frame** (`run_survey(frame_lock=…)`), not per survey.
+  Measured on the laptop while an 8-frame survey job ran: `/api/health` p50 **18 ms** (46 polls);
+  `/api/analyze` **2.6 s** vs 2.9 s standalone (before: it waited for the whole survey).
+- **Survey jobs** (`src/dashboard/jobs.py`): `POST /api/jobs/survey` → job id, `GET /api/jobs/{id}`
+  → progress + result. Bounded (50 records, finished evicted first), reports persisted to
+  `runs/jobs/<survey_id>/` (downloads survive restarts; optional S3 mirror via `$DEPTH_S3_BUCKET`).
+  The UI polls and streams `frame_done k/N` into the agent log. Sync `/api/survey` kept for ≤ 12 frames.
+- **Input limits:** images only (415), ≤ 20 MB/file (413), ≤ 50 frames (413), undecodable → 400.
+  CORS off unless `$DEPTH_CORS_ORIGINS`. Model loads + warms up at startup (`/api/health` shows it,
+  plus `cv2_file` / `is_cool_path` for COOL provenance).
+- **Samples ship with the app:** `webui/samples/` — 8 Rec6 crab-pot sonograms unseen by EXP-001
+  (one un-rotated copy each, consecutive chunks so stitching shows), labels, CC-BY-SA attribution.
+- **Map:** Leaflet 1.9.4 **vendored** (`webui/vendor/leaflet`, SRI-verified = upstream hashes);
+  CARTO dark (now key-gated) → keyless Esri satellite + OSM layer switch; tiles failing → grid
+  fallback (overlays stay exact); **geotag error radii** drawn; scale bar. Synthetic demo track
+  moved from marsh to open Chesapeake water (37.80 N, 76.15 W).
+- Tests: +4 job-queue tests (`tests/test_jobs.py`) + 6 API tests (limits, 415/400/413, job path
+  end-to-end with the real model). Browser-verified: job progress, map, downloads, no console errors.
 
 ### 2026-09-24 (review sweep 4) — Guaranteed tiers, value-of-information agent, budget mode (STUDY-07)
 Review C-3 / I-5 / I-6 / M-1 / M-2 / X-4.

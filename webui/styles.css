@@ -250,6 +250,9 @@ code { font-family: var(--mono); font-size: .88em; color: #a9ecf8; }
 .map-wrap { flex: 1 1 auto; min-height: 260px; border: 1px solid var(--border-2); border-radius: 8px; overflow: hidden; background: var(--surface); display: flex; flex-direction: column; }
 #map { flex: 1; width: 100%; background: #07131f; }
 .leaflet-container { background: #07131f; font-family: inherit; }
+.tiles-dim { filter: brightness(.62) saturate(.75) contrast(1.05); }
+#map.map-offline { background-image: linear-gradient(rgba(31,182,213,.07) 1px, transparent 1px), linear-gradient(90deg, rgba(31,182,213,.07) 1px, transparent 1px); background-size: 32px 32px; }
+#map.map-offline .leaflet-tile-pane { display: none; }
 .map-note { padding: 9px 13px; font-size: 10.5px; color: var(--review); border-top: 1px solid var(--border); }
 .dl-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .dl-btn { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: 6px; border: 1px solid var(--border-2); background: var(--surface-2); cursor: pointer; color: inherit; text-align: left; transition: .15s; }
