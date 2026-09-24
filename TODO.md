@@ -64,13 +64,13 @@ Remaining before EXP-001: visual QA pass + class-imbalance training config.
 
 - [x] **(P1)** `src/detection/train.py` — reads v1 `data.yaml`; sonar-aware aug (no hue/rotation, along-track flip only); prints inverse-freq class weights; test-split report at end.
 - [ ] **(P1)** Run **EXP-001** baseline (YOLO11s-seg, v1) → log in `experiments.md`.
-- [ ] **(P1)** `src/detection/evaluate.py`: mAP@0.5, mAP@0.5:0.95, P/R/F1, per-class, confusion matrix.
+- [x] **(P1)** `src/detection/evaluate.py`: deploy-faithful (cv2.dnn) AP@0.5, P/R/F1, per-class, **val-tuned thresholds (test scored once)**, **bootstrap 95% CIs** → `docs/eval_exp001.md` (STUDY-05). Closes #10/#11/#13. *(mAP@0.5:0.95 + confusion-matrix render: add if needed.)*
 - [~] **(P1)** `src/detection/export_onnx.py` → ONNX + verify load via `cv2.dnn.readNetFromONNX()`. *(best.onnx from EXP-001 verified loading+forward via cv2.dnn; standalone export script still TODO.)*
 - [x] **(P1)** `src/detection/infer.py` with `full_frame` **and** `roi_guided` modes.
 - [x] ~~**(P0 for award)** Ablation: FP reduction (full-frame vs ROI-guided) → ≥60%.~~ **RETIRED — STUDY-01 negative result:** classical Stage 1 has no discriminative power on this sonar (GT coverage caps 72% @ 141 ROIs/frame; fires more on empty background than on debris). Gating costs recall (0.71→0.15). Stage 1 reframed as the COOL preprocessing workload; YOLO is the detector. Evidence: `ablation_fp.py`, `tune_coverage.py`.
 - [x] **(P0)** Error analysis on `fishing_gear` (recall 0.37) → `src/detection/{fn_gallery,error_analysis}.py`. **Findings:** small-object sonar problem (91% of misses <10% frame); aggregate mAP inflated by domain segregation (natural_formation optical-only); optical debris = total miss (off-product); per-source `shipwreck` struct weak (0.25).
 - [x] **(P1)** Per-class confidence thresholds (`infer.py PER_CLASS_CONF`) — fishing_gear recall 0.47→0.69 @conf0.10, no retrain.
-- [ ] **(P1)** `evaluate.py`: report metrics **split sonar vs optical** (aggregate hides the product-domain truth).
+- [x] **(P1)** `evaluate.py`: metrics **split sonar vs optical + per-source** — done (STUDY-05); proves the 0.827 aggregate is domain-inflated (sonar `fishing_gear` AP 0.473; optical debris = total miss).
 - [ ] **(P1)** EXP-002 `--imgsz 1280` on Kaggle (small-object ceiling ~0.78); then EXP-003 sonar-only. **← next**
 - [ ] **(P2)** Experiment ladder EXP-002..006 as time allows.
 

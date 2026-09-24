@@ -108,6 +108,37 @@ Promote each into the log below with full results as it runs.
 
 ## Experiment log
 
+### STUDY-05 — Deploy-faithful evaluation: val-tuned thresholds, per-domain tables, bootstrap CIs
+- Date: 2026-09-24 · Status: done · Code: `src/detection/evaluate.py`; reproduce:
+  `python -m src.detection.evaluate --bootstrap 1000`. Artifacts: `docs/eval_exp001.md`,
+  `runs/EXP-001/eval/metrics.json`.
+- Hypothesis / purpose: the 0.822 headline is **domain-inflated** and its per-class thresholds were
+  picked by looking at the **test** set (WINNING_REPORT #10/#11/#13). Re-evaluate the **exact shipped
+  ONNX** through the **`cv2.dnn`** path (not a torch re-run) with (i) thresholds tuned on **val**, test
+  scored **once**; (ii) **per-sensor & per-source** tables; (iii) **bootstrap 95% CIs**. AP is an
+  independent Pascal-VOC all-points implementation, so agreement with ultralytics is a cross-check.
+
+Results — **the aggregate is confirmed AND shown to be misleading:**
+- **Aggregate mAP@0.5 = 0.827** — independently reproduces the ultralytics 0.822 (validates both the
+  training run and this evaluator; small delta = 101-pt interp vs VOC all-points).
+- **Per-class (val-tuned t, test scored once):** `fishing_gear` AP **0.463** [CI 0.42–0.51], R 0.587;
+  `pipe_cylinder` 0.945 [0.87–1.00] (only 65 boxes → wide CI, high-variance); `structural_fragment`
+  0.919 [0.89–0.94]; `natural_formation` 0.981 [0.97–0.99].
+- **Per-sensor proves the inflation:** `fishing_gear` on **SONAR** AP **0.473 / R 0.599** (the honest
+  product figure); `natural_formation` is **optical** (267 optical boxes AP 0.990 vs its 2 sonar boxes
+  0.000); **optical debris = total miss** (`fishing_gear` 0.000/19, `structural_fragment` 0.000/25) —
+  the model maps optical→natural_formation, exactly as EXP-001 error analysis found.
+- **Per-source:** crabpot `fishing_gear` 0.473; `shipwreck` struct weak **0.347** (R 0.25); `uatd`
+  pipe/struct 0.950/0.987; `vid` optical debris 0.000.
+- **Val-tuned thresholds** (never touched test): fishing **0.15** / pipe 0.40 / struct 0.25 /
+  natural 0.50 — vs the shipped `PER_CLASS_CONF` fishing 0.10.
+- **GhostVision head-to-head SKIPPED (honest):** EXP-001 trained on v1, which mixed the official
+  crab-pot test frames into training → a leaked number. Gated behind `--leakage-free`; re-run on
+  EXP-002 (v2 respects the split): `--official-split .../official_crabpot_test.txt --leakage-free`.
+- **Closes** WINNING_REPORT/NEEDTOFIX **#10** (val-tuned, test-once), **#11** (per-domain tables),
+  **#13** (bootstrap CIs); **scaffolds #24** (GhostVision, ready for EXP-002).
+- Next: EXP-002 on v2 → re-run evaluate.py with `--leakage-free` for the head-to-head.
+
 ### STUDY-04 — Adaptive triage controller + a second CONFIRMED path (high detector confidence)
 - Date: 2026-09-23 · Status: done · Code: `src/agentic/` (`policy.py`, `agent.py`, `tools.py`,
   `pipeline.py`, `calibrate.py`); reproduce: `python -m src.agentic.calibrate --frames 160 --out runs/prove`

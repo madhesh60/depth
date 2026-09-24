@@ -41,7 +41,7 @@ what moved, what's blocked, what's next. Newest entries at the top of §4.
 | Stage 1 classical CV | 🟡 In progress | **Reframed** (STUDY-01): not a Stage-2 ROI gate (no discriminative power on this sonar) — now the CPU **sonar-preprocessing workload** for the COOL benchmark. `src/cv_pipeline/` + 3-way harness. Local x86: 29 ms/frame, 30.5 FPS. Needs Graviton+COOL run. |
 | Stage 1→2 wiring (cv2.dnn) | ✅ Done | `infer.py` (ONNX via `cv2.dnn`, full_frame + roi_guided) + `ablation_fp.py` + `tune_coverage.py`. ONNX verified loading/forward. |
 | Stage 2 baseline train | ✅ Done | EXP-001 (yolo11s detect, v1, Kaggle T4): test mAP@0.5 **0.822**, P 0.808, R 0.800 — all targets met. |
-| Evaluation + ablation | 🟡 In progress | Baseline (EXP-001) + STUDY-01 (ROI-gating negative result) logged. Open: `fishing_gear` recall 0.37 (EXP-002/004). FP-reduction target **retired**. |
+| Evaluation + ablation | ✅ Done (EXP-001) | `evaluate.py` (deploy-faithful cv2.dnn): val-tuned thresholds/test-once, per-sensor & per-source tables, bootstrap CIs → `docs/eval_exp001.md` (STUDY-05). Aggregate 0.827 reproduces 0.822; honest sonar `fishing_gear` AP 0.473. GhostVision head-to-head pending EXP-002. |
 | Reporting engine | ✅ Done | `src/agentic/{geo,mission}.py`: honest geotag + GeoJSON/GPX/KML/CSV/JSON exports. |
 | Dashboard | ✅ Done | Zero-build static web app (`webui/`), served by FastAPI. See→Prove→Decide→Act stepper, evidence cards (conf→relook), agent trace, Leaflet hazard map + recovery route, downloads, honesty banners. Verified under uvicorn. |
 | AWS deployment | ⬜ Not started | AWS CLI not yet installed. |
@@ -74,6 +74,35 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 ---
 
 ## 4. Session log
+
+### 2026-09-24 — `evaluate.py`: deploy-faithful, honest per-domain metrics (#10/#11/#13) + AWS CLI in
+- **Built `src/detection/evaluate.py`** — the missing evaluator the WINNING_REPORT leaned on four
+  times. It scores the **exact shipped ONNX** through the torch-free **`cv2.dnn`** path (same as the
+  Lambda/dashboard), collects detections once at a low floor and caches them, then computes everything
+  from the cache: VOC all-points AP@0.5, P/R/F1, **val-tuned per-class thresholds (test scored once)**,
+  **per-sensor & per-source tables**, and **bootstrap 95% CIs**. 30/30 tests still green.
+- **Ran it full (val 1,204 + test 1,276 imgs, 1,000 bootstrap resamples).** Results (`docs/eval_exp001.md`):
+  - **Aggregate mAP@0.5 0.827** — *independently reproduces* the ultralytics 0.822 (cross-validates
+    both the train run and this evaluator).
+  - **Honest per-sensor truth:** `fishing_gear` (crab pots) on **SONAR** = AP **0.473 / R 0.599**;
+    `natural_formation` is **optical** (AP 0.990 optical vs 0.000 on 2 sonar boxes); **optical debris =
+    total miss** (fishing 0.000/19, struct 0.000/25). The 0.827 is domain-inflated — now provable.
+  - **Val-tuned thresholds** (never touched test): fishing 0.15 / pipe 0.40 / struct 0.25 / natural 0.50.
+  - **GhostVision head-to-head SKIPPED honestly** (EXP-001 leaked v1 on the official crab-pot split);
+    gated behind `--leakage-free` for EXP-002. Logged as **STUDY-05**.
+  - **Closes NEEDTOFIX #10 (val-tuned/test-once), #11 (per-domain tables), #13 (bootstrap CIs);
+    scaffolds #24.**
+- **AWS setup started (user is retraining EXP-002 in parallel):** installed **AWS CLI v2.37.1**
+  (user-scoped, no admin) + persisted PATH; `uv` already present; created profile **`hackathon`**,
+  region **us-east-1** (standard account → advanced rule-set). Verified `aws login` +
+  `aws configure agent-toolkit` are valid subcommands. **Handed off the 2 interactive steps**
+  (browser `aws login`; the `configure agent-toolkit` wizard that installs the `aws-mcp` server +
+  skills). On return: verify identity/skills, add `AWS_MCP_PROXY_PROFILES=hackathon` to the `aws-mcp`
+  entry in `~/.claude.json`, append AWS advanced rules to `CLAUDE.md` (idempotent markers), set a
+  **budget alarm** before standing up any resource. Services to be chosen together (COOL Graviton EC2
+  first — the primary award).
+- **Next:** finish AWS MCP setup on the user's return; when EXP-002 (v2) lands, export ONNX → re-run
+  `evaluate.py --leakage-free` for the GhostVision head-to-head; then Graviton+COOL benchmark.
 
 ### 2026-09-23 (cont.7) — NEEDTOFIX/​WINNING_REPORT sweep: honesty + compliance across infra & docs
 - **Cleared the remaining `NEEDTOFIX.md` items that were code/docs (not AWS-run or GPU-train):**
@@ -444,7 +473,8 @@ Details and fixes tracked in [`TODO.md`](TODO.md) Phase 1 & Phase 4.
 | mAP@0.5:0.95 | ≥ 0.45 | **0.514** (EXP-001) | +0.064 ✅ |
 | Precision | ≥ 0.80 | **0.808** (EXP-001) | +0.008 ✅ |
 | Recall | ≥ 0.70 | **0.800** (EXP-001) | +0.100 ✅ |
-| `fishing_gear` recall (watch) | ≥ 0.70 | **0.47** sonar @conf0.25 → **0.69** @conf0.10 (per-class thr) | −0.01 🟡 |
+| `fishing_gear` recall (watch) | ≥ 0.70 | sonar **0.599** @val-tuned 0.15 (STUDY-05, test-once); 0.47@0.25→0.69@0.10 | 🟡 |
+| `fishing_gear` AP@0.5 (sonar) | — | **0.473** [CI 0.42–0.51] (STUDY-05) — the honest product number | 🟡 |
 | Agent CONFIRMED-tier precision | > raw | **0.737** @ 30% recall-share vs 0.60 raw (STUDY-04) | +0.14 ✅ |
 | ~~FP reduction (Stage 1)~~ | ~~≥ 60%~~ | **retired** (STUDY-01: gating costs recall) | — |
 | Latency / frame (Stage 2, T4) | < 300 ms | ~11.5 ms (EXP-001) | ✅ |
