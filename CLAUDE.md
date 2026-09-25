@@ -73,6 +73,7 @@ python -m src.agentic.effort                               # analyst-effort curv
 python -m src.bench.product_bench --label <host>            # benchmark this machine
 python -m src.agentic.feedback stats|export                 # human labels → fine-tune set
 python -m src.detection.fp_audit build|summary              # blinded false-alarm audit
+python -m src.agentic.study_causal [--frames DIR]           # STUDY-12 counterfactual trace
 ```
 
 ## Environment

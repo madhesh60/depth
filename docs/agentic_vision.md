@@ -179,6 +179,13 @@ precision in that confidence band, with the auditors' own reliability measured.
 
 ## 7. Mapping to the Agentic-Vision rubric
 
+**Required evidence — "a trace showing OpenCV 5 output changing a later decision/action":**
+[`docs/causal_trace.md`](causal_trace.md) (STUDY-12) runs the same survey with each OpenCV output
+withheld and diffs every downstream decision. Without Stage 1's bottom track, 193 of 264 pins land
+outside their own error circle and 13 of 63 re-survey passes regroup (tiers unchanged — it is not a
+gate); without the shadow nothing changes (evidence only). It also prints one hazard's full chain,
+and every survey exports its decision log (`mission.trace.jsonl`).
+
 | Criterion | Weight | Where it's met |
 |---|---:|---|
 | OpenCV 5 + agent doing real work | 30% | Stage-1 bottom tracking / `cv2.remap` / luminance, `cv2.dnn` detect, re-look + CLAHE, thin-line shadow, `seamlessClone` copy-paste for training; the agent's tools *are* CV ops |

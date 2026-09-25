@@ -186,7 +186,7 @@ src/detection/    infer.py · calibration.py · evaluate.py · export_onnx.py ·
 src/agentic/      agent.py · perception.py · shadow.py · tools.py · evidence.py · policy.py ·
                   guarantees.py · calibrate.py · geo.py · stitch.py · resurvey.py · mission.py ·
                   pipeline.py · feedback.py · study.py · effort.py · twin.py (3D twin) ·
-                  provenance.py · brief.py (mission brief) · types.py
+                  provenance.py · brief.py (mission brief) · study_causal.py (STUDY-12) · types.py
 src/bench/        product_bench.py · fingerprint.py · compare.py (COOL benchmark)
 src/dashboard/    app.py · jobs.py · metrics.py · samples.py
 webui/            index.html · app.js · twin3d.js (three.js twin) · styles.css · samples/ (8 CC-BY-SA

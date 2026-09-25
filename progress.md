@@ -75,6 +75,20 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ## 4. Session log
 
+### 2026-09-26 (sweep 20) — STUDY-12: the counterfactual trace (OpenCV output → the agent's actions)
+- **`src/agentic/study_causal.py`** → `docs/causal_trace.md`: the rules ask for "a trace showing
+  OpenCV 5 output changing a later decision/action"; a counterfactual shows *cause*. The same survey
+  runs as full / Stage-1 geometry withheld / shadow withheld and every downstream decision is diffed.
+- **Result (v1 test, 80 unique frames, 264 hazards):** without Stage 1 — 0 tier flips (never a gate)
+  but the median pin moves 8.6 m, **193 of 264 pins land outside their own stated error circle**, 13
+  of 63 re-survey passes regroup, 2 inspection stops move. Without the shadow — **no decision
+  changes** (evidence only, by design). Plus one hazard's end-to-end chain (bottom track → cv2.dnn →
+  tier → P(pot) → queue rank → budget → inspection stop → re-survey pass + predicted shadow flip).
+- Caught before reading numbers: the first run's single synthetic line made different recordings
+  share fixes (11 spurious merges); the study now lays recordings on parallel lines.
+- STUDY-11b (seam inference, negative) logged in `experiments.md` (was only in its report).
+- Tests +3 (`test_causal.py`).
+
 ### 2026-09-26 (sweep 19) — Mission brief: an LLM that writes, never decides
 - **`src/agentic/brief.py`**: a one-page hand-over for the crew / manager (bottom line, the promise,
   first hour of review, routes, re-survey passes with their shadow-flip prediction, caveats). The

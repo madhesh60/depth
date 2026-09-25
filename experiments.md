@@ -108,6 +108,43 @@ Promote each into the log below with full results as it runs.
 
 ## Experiment log
 
+### STUDY-12 — Counterfactual: does OpenCV 5 output change what the agent *does*?
+
+- Tool: `python -m src.agentic.study_causal [--frames …/v1/test/images --limit 80]` →
+  `docs/causal_trace.md`. Same frames, synthetic track (one recording = one line), model and
+  calibration in every arm; analyst budget 2 min. Arms: **full** · **no_stage1** (Stage-1 geometry
+  withheld from Prove/Act; detections and tiers identical) · **no_shadow**. No re-look arm: EXP-001's
+  policy spends no re-looks (STUDY-07).
+
+| downstream decision (v1 test, 80 unique frames, 264 hazards) | no_stage1 | no_shadow |
+|---|---|---|
+| tier flips · queue order (Kendall τ) · budget picks changed | 0 · 1.0 · 0 | 0 · 1.0 · 0 |
+| geotag shift, median / max | **8.6 / 15.6 m** | 0 |
+| pins pushed outside their own stated error circle | **193 of 264** | 0 |
+| re-survey passes with identical targets | **50 of 63** | 63 of 63 |
+| inspection stops moved (route length) | 2 (5883.6 → 5919.4 m) | 0 |
+
+  Shipped samples (8 frames, 46 hazards): median shift 6.6 m, 31 of 46 pins outside their circle,
+  10 inspection stops moved, 5 of 6 passes identical.
+- **Reading.** Stage 1 never changes a tier (it is not a gate) but it decides **where the boat goes**:
+  without it most pins would sit outside their own error circle, and a fifth of the re-survey passes
+  would regroup. The shadow changes **no** decision — by design it is evidence for the human card.
+- A first run laid every recording on one synthetic line: same-numbered chunks of different
+  recordings shared a fix and 11 spurious repeat-sighting merges appeared without Stage 1. Fixed in
+  the study (parallel lines 500 m apart) before reading any number; the product's demo track is
+  single-recording.
+
+### STUDY-11b — Seam inference across chunk boundaries (NEGATIVE — not shipped)
+
+- Tool: `python -m src.detection.study_seam` → `docs/seam_inference.md`. Windows straddling each chunk
+  boundary (`seam.py`), mapped back and merged with class-aware NMS; unique frames, IoU ≥ 0.3, paired
+  frame-bootstrap 95% CI.
+- Recall ceiling unchanged on both unseen splits (0.724 → 0.724 calibration; 0.862 → 0.862
+  verification); AP@0.3 slightly **lower** (−0.018, −0.012 [−0.024, −0.001]); +0.8–1.3 inferences/frame.
+- Premise checked: chunk k's right edge continues into chunk k+1's left edge (seam discontinuity 1.56
+  vs 2.52 reversed), so `stitch.py` holds. The edge cuts in these Roboflow copies are mostly
+  augmentation crops → re-test on v2b's un-augmented test frames with EXP-002.
+
 ### STUDY-11a — Failure gallery: why EXP-001 misses pots (measured, not assumed)
 
 - Tool: `python -m src.detection.failure_gallery` → `docs/failure_gallery.md` (verification split,
