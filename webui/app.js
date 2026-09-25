@@ -146,7 +146,7 @@ function wireModes() {
     cancelTour();
     $$(".mode-btn").forEach(x => x.classList.toggle("is-active", x === b));
     $("#workspace").dataset.mode = b.dataset.mode;
-    if (b.dataset.mode === "survey" && state.map) setTimeout(() => state.map.invalidateSize(), 80);
+    if (b.dataset.mode === "survey" && state.map) setTimeout(refitIfLost, 80);
     if (b.dataset.mode === "study") { loadStudySummary(); }
     if (b.dataset.mode === "audit") { loadAuditSummary(); }
   });
@@ -777,8 +777,27 @@ function renderMap(d) {
       html: `<div class="rs-arrow" style="transform:rotate(${Lr.heading_deg - 90}deg)">➤</div>` }) }).addTo(state.map);
     state.mapLayers.push(arrow);
   });
-  state.map.fitBounds(L.latLngBounds(latlngs).pad(0.25)); setTimeout(() => state.map.invalidateSize(), 60);
+  state.mapBounds = L.latLngBounds(latlngs).pad(0.25);
+  fitMap(); setTimeout(fitMap, 80);
 }
+/* size first, then fit: a container measured while hidden/0-px makes Leaflet fit the whole world.
+   Read the element, not map.getSize() — Leaflet caches that, and invalidateSize() is a no-op until the
+   map has a view, so one early 0-px read would stick. */
+function fitMap() {
+  if (!state.map || !state.mapBounds || !state.map.getContainer().clientWidth) return;
+  state.map.invalidateSize();
+  state.map.fitBounds(state.mapBounds);
+}
+/* re-fit only when the view is lost (never fitted, or world zoom) — a user's own pan/zoom is kept */
+function refitIfLost() {
+  if (!state.map) return;
+  state.map.invalidateSize();
+  if (!(state.map.getZoom() >= 4)) fitMap();
+}
+/* the map element's real size (0 while its mode/pane is hidden) drives the re-fit — window events miss
+   layout changes inside embedded panes */
+if (window.ResizeObserver) new ResizeObserver(() => refitIfLost()).observe(document.getElementById("map"));
+
 
 function renderDownloads(surveyId) {
   const fmts = [["geojson", "hazards + route (GIS)"], ["gpx", "waypoints + re-survey (boat GPS)"], ["kml", "Google Earth"], ["csv", "spreadsheet"], ["json", "full result + provenance"], ["trace", "agent decision log (JSONL)"]];
@@ -1161,7 +1180,7 @@ function wireTwin() {
   $$(".sv-btn").forEach(b => b.onclick = () => {
     $$(".sv-btn").forEach(x => x.classList.toggle("is-active", x === b));
     Twin.sv = b.dataset.sv; $("#mapWrap").style.display = Twin.sv === "3d" ? "none" : ""; $("#twinSurveyWrap").hidden = Twin.sv !== "3d";
-    if (Twin.sv === "3d") showSurveyTwin(); else if (state.map) setTimeout(() => state.map.invalidateSize(), 60);
+    if (Twin.sv === "3d") showSurveyTwin(); else setTimeout(fitMap, 60);
   });
 }
 function showFrameTwin() {
