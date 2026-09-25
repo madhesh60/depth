@@ -32,6 +32,7 @@
       <button class="mode-btn" data-mode="audit" role="tab" title="blinded audit: are the detector's false alarms really false?">Audit</button>
     </nav>
 
+    <button class="demo-btn" id="demoBtn" title="a guided 60-second walk through the whole loop — any key or click stops it">▶ 60-s demo</button>
     <div class="status-pills" id="healthPills">
       <span class="pill" id="pillCv">OpenCV …</span>
       <span class="pill" id="pillModel">model …</span>
@@ -327,6 +328,12 @@
   </footer>
 </div>
 
+<div class="demo-bar" id="demoBar" hidden>
+  <div class="demo-step mono" id="demoStep"></div>
+  <div class="demo-txt" id="demoTxt"></div>
+  <div class="demo-dots" id="demoDots"></div>
+  <button class="demo-stop" id="demoStop">stop ✕</button>
+</div>
 <div class="run-toast" id="runToast" hidden><span class="spin"></span><span id="runToastTxt">working…</span></div>
 
 <script src="vendor/leaflet/leaflet.js"

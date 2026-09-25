@@ -30,6 +30,8 @@ window.addEventListener("DOMContentLoaded", async () => {
   wireMissedTool();
   wireStudy();
   wireTwin();
+  $("#demoBtn").onclick = () => (Demo.on ? Demo.stop() : Demo.run());
+  $("#demoStop").onclick = () => Demo.stop();
   wireAudit();
   await Promise.all([loadHealth(), loadSamples(), loadMetrics(), loadLabelStats()]);
 });
@@ -1190,6 +1192,56 @@ function showSurveyTwin() {
     else { Twin.survey.showSurvey(tw); ui.note.textContent = tw.synthetic ? "⚠ synthetic demo track · scale assumed" : "real track"; }
   });
 }
+
+/* ------------------------------------------------------------------ GUIDED 60-SECOND DEMO (the judge path) */
+const Demo = {
+  on: false, token: 0,
+  steps: 7,
+  async run() {
+    this.on = true; const tok = ++this.token;
+    $("#demoBtn").classList.add("is-on"); $("#demoBtn").textContent = "■ stop demo"; $("#demoBar").hidden = false;
+    const stopper = e => { if (e.target.closest && (e.target.closest("#demoBar") || e.target.closest("#demoBtn"))) return; this.stop(); };
+    setTimeout(() => { window.addEventListener("keydown", this._k = () => this.stop(), { once: true }); window.addEventListener("pointerdown", this._p = stopper); }, 400);
+    const alive = () => this.on && tok === this.token;
+    const wait = ms => new Promise(r => setTimeout(r, ms));
+    const say = async (i, txt, ms) => {
+      if (!alive()) throw 0;
+      $("#demoStep").textContent = `${i}/${this.steps}`; $("#demoTxt").innerHTML = txt;
+      $("#demoDots").innerHTML = Array.from({ length: this.steps }, (_, k) => `<i class="${k < i ? "on" : ""}"></i>`).join("");
+      if (ms) await wait(ms);
+      if (!alive()) throw 0;
+    };
+    const mode = m => $(`.mode-btn[data-mode="${m}"]`).click();
+    try {
+      mode("analyze"); if (Twin.dim === "3d") $('.dim-btn[data-dim="2d"]').click();
+      await say(1, "<b>DEPTH</b> turns side-scan sonar into a human-approved cleanup plan. First, one frame: <b>Stage 1</b> tracks the seabed (green line) — the sonar's altitude, measured per ping.", 600);
+      const card = $('.sample-card[data-id="sample-02"]') || $(".sample-card"); if (card) card.click();
+      await runAnalyze(); await wait(3200);
+      await say(2, "Every find gets <b>evidence</b> and a <b>calibrated tier</b>: ≥ 65% of pots reach a human — a promise fit on held-out recordings and <b>held on unseen test</b> (86%).", 6200);
+      cancelTour(); toastHide(); $('.dim-btn[data-dim="3d"]').click(); await wait(1600);
+      const o = (state._analyze.twin && state._analyze.twin.objects || []).find(x => x.height_px != null);
+      if (o && Twin.frame) Twin.frame.select(o.id, false);
+      await say(3, "The <b>3D twin</b>: the seabed in true ground range, the sonar at its tracked altitude — and the <b>acoustic triangle</b> a find's height is measured from (sonar → object top → end of its shadow).", 7000);
+      $('.dim-btn[data-dim="2d"]').click(); mode("survey");
+      await say(4, "Now a whole survey runs as a background job: hazards on the map with error radii, analyst + boat budgets, and <b>opposite-side re-survey passes</b> where a real object's shadow must flip.", 0);
+      await runSurvey(); await wait(4200);
+      $('.sv-btn[data-sv="3d"]').click(); await wait(1500);
+      if (Twin.survey) { Twin.survey.goHome(); setTimeout(() => Twin.survey && Twin.survey.replay(true), 900); }
+      await say(5, "<b>Replay</b>: the boat sweeps its port / starboard sonar fans along the track — finds appear as it passes them.", 9500);
+      $('.sv-btn[data-sv="map"]').click(); mode("study");
+      await say(6, "Impact is <b>measured, not assumed</b>: the timed study + effort curve report the <b>break-even card time</b> at the recall promise, and the agent's own forecast held on unseen data.", 6500);
+      mode("survey");
+      await say(7, "Every report carries <b>provenance</b> (model, calibration, OpenCV build — COOL on Graviton) and an agent <b>decision log</b>. Nothing is dispatched without a human. ✓", 6000);
+    } catch (e) { /* stopped */ }
+    if (tok === this.token) this.stop();
+  },
+  stop() {
+    this.on = false; this.token++;
+    $("#demoBtn").classList.remove("is-on"); $("#demoBtn").textContent = "▶ 60-s demo"; $("#demoBar").hidden = true;
+    if (this._k) window.removeEventListener("keydown", this._k); if (this._p) window.removeEventListener("pointerdown", this._p);
+    if (Twin.survey) Twin.survey.play = false;
+  },
+};
 
 /* ------------------------------------------------------------------ utils */
 function fmt(x) { return x == null ? "—" : (Math.round(x * 10) / 10).toFixed(1); }

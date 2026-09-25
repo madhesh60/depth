@@ -75,6 +75,13 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ## 4. Session log
 
+### 2026-09-26 (sweep 18) — "▶ 60-s demo": the judge path, guided
+- One click in the top bar drives the whole loop with a narration bar (7 steps, ~60 s): analyze a
+  frame (Stage-1 seabed, evidence, calibrated tier) → 3D twin with the acoustic triangle of a find
+  with a measured shadow → survey job (map, budgets, re-survey passes) → 3D replay → measured effort →
+  provenance + decision log + human gate. Any key or click stops it. Browser-verified end to end
+  (7/7 steps, no console errors).
+
 ### 2026-09-25 (sweep 16) — Failure gallery with measured failure modes (STUDY-11a)
 - `src/detection/failure_gallery.py` → `docs/failure_gallery.md` + two contact sheets (12 misses
   across sizes, 12 most confident false alarms). **Finding:** 32% of missed pots touch the frame edge

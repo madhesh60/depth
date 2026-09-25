@@ -40,7 +40,7 @@ pip install -r requirements.txt                    # torch-free runtime: OpenCV 
 python -m uvicorn src.dashboard.app:app --port 8000   # open http://localhost:8000
 ```
 
-The studio has four modes (plus a 3D twin view):
+Press **▶ 60-s demo** in the top bar for a guided walk through everything below, or explore the four modes (plus a 3D twin view):
 * **Analyze** — pick a sample frame → *Run See → Prove → Decide*: the tracked seabed, verdict-coloured
   boxes, an evidence card per find (tier promise, P(pot), shadow, relative height, full agent trace),
   the agent's-eye re-look view; label finds, or draw a **missed pot** (`M`).
