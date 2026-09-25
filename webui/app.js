@@ -31,6 +31,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   wireStudy();
   wireTwin();
   $("#demoBtn").onclick = () => (Demo.on ? Demo.stop() : Demo.run());
+  $("#cfBtn").onclick = () => CF.toggle();
   $("#demoStop").onclick = () => Demo.stop();
   wireAudit();
   await Promise.all([loadHealth(), loadSamples(), loadMetrics(), loadLabelStats()]);
@@ -717,7 +718,7 @@ function renderSurvey(d) {
 
 function renderMap(d) {
   const m = d.mission, geoObjs = d.tracked.filter(t => t.lat != null && t.lon != null), note = $("#mapNote");
-  if (!m.gps_available || !geoObjs.length) { $("#mapWrap").style.display = "none"; return; }
+  if (!m.gps_available || !geoObjs.length) { $("#mapWrap").style.display = "none"; $("#cfBtn").hidden = $("#cfSum").hidden = true; CF.clear(); return; }
   $("#mapWrap").style.display = "";
   note.textContent = m.gps_synthetic
     ? "⚠ SYNTHETIC DEMO GPS — not real coordinates. The HF crab-pot frames carry no GPS; this track is generated only to demonstrate the map + route."
@@ -779,7 +780,33 @@ function renderMap(d) {
   });
   state.mapBounds = L.latLngBounds(latlngs).pad(0.25);
   fitMap(); setTimeout(fitMap, 80);
+  const cf = d.stage1_counterfactual;
+  $("#cfBtn").hidden = !(cf && cf.available);
+  CF.draw(d);
 }
+/* STUDY-12, live: ghost pins where the boat would go if the agent ignored Stage 1's bottom track */
+const CF = {
+  on: false, layers: [],
+  clear() { this.layers.forEach(l => state.map && state.map.removeLayer(l)); this.layers = []; },
+  draw(d) {
+    this.clear();
+    const cf = d && d.stage1_counterfactual, sum = $("#cfSum");
+    $("#cfBtn").classList.toggle("is-on", this.on);
+    if (!this.on || !cf || !cf.available || !state.map) { sum.hidden = true; return; }
+    const byId = Object.fromEntries(d.tracked.map(t => [t.oid, t]));
+    Object.entries(cf.pins).forEach(([oid, p]) => {
+      const t = byId[oid]; if (!t || t.lat == null) return;
+      const col = p.outside ? "#e5789b" : "#9aa8b5";
+      const link = L.polyline([[t.lat, t.lon], [p.lat, p.lon]], { color: col, weight: 1.2, opacity: .8, dashArray: "2 3", interactive: false });
+      const ghost = L.circleMarker([p.lat, p.lon], { radius: 5, color: col, weight: 1.5, fill: false, dashArray: "2 2" })
+        .bindTooltip(`<b>${oid}</b> without Stage 1: ${p.shift_m} m away${p.outside ? ` — <b>outside</b> its ±${t.geo_error_m} m circle` : ` (inside ±${t.geo_error_m} m)`}`);
+      [link, ghost].forEach(l => { l.addTo(state.map); this.layers.push(l); });
+    });
+    sum.hidden = false;
+    sum.innerHTML = `without Stage 1: <b>${cf.outside} of ${cf.n}</b> pins leave their own error circle · median shift <b>${cf.median_shift_m} m</b> (max ${cf.max_shift_m}) · tiers unchanged`;
+  },
+  toggle() { this.on = !this.on; this.draw(state.survey); },
+};
 /* size first, then fit: a container measured while hidden/0-px makes Leaflet fit the whole world.
    Read the element, not map.getSize() — Leaflet caches that, and invalidateSize() is a no-op until the
    map has a view, so one early 0-px read would stick. */
@@ -1277,7 +1304,13 @@ const Demo = {
       await say(3, "The <b>3D twin</b>: the seabed in true ground range, the sonar at its tracked altitude — and the <b>acoustic triangle</b> a find's height is measured from (sonar → object top → end of its shadow).", 7000);
       $('.dim-btn[data-dim="2d"]').click(); mode("survey");
       await say(4, "Now a whole survey runs as a background job: hazards on the map with error radii, analyst + boat budgets, and <b>opposite-side re-survey passes</b> where a real object's shadow must flip.", 0);
-      await runSurvey(); await wait(4200);
+      await runSurvey(); await wait(3600);
+      const cf = state.survey && state.survey.stage1_counterfactual;
+      if (cf && cf.available) {
+        if (!CF.on) CF.toggle();
+        await say(4, `Why measure the seabed? Switch Stage 1 off and <b>${cf.outside} of ${cf.n}</b> pins leave their own error circle (median ${cf.median_shift_m} m) — the tiers don't change, <b>where the boat goes</b> does. Measured, not claimed (STUDY-12).`, 5200);
+        if (CF.on) CF.toggle();
+      }
       $('.sv-btn[data-sv="3d"]').click(); await wait(1500);
       if (Twin.survey) { Twin.survey.goHome(); setTimeout(() => Twin.survey && Twin.survey.replay(true), 900); }
       await say(5, "<b>Replay</b>: the boat sweeps its port / starboard sonar fans along the track — finds appear as it passes them.", 9500);

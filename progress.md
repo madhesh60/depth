@@ -75,6 +75,15 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ## 4. Session log
 
+### 2026-09-26 (sweep 21) — STUDY-12 made visible: "⊘ without Stage 1" on the survey map
+- `geo.stage1_counterfactual()` re-geotags every hazard of the current survey with Stage-1 geometry
+  removed (slant range + frame-centre ping) — no re-inference; `/api/survey` + survey jobs return
+  `stage1_counterfactual` (sample survey: **31 of 46** pins leave their own error circle, median
+  6.6 m — identical to STUDY-12's offline arm).
+- UI: a toggle beside Map | 3D twin draws ghost pins linked to the measured ones (pink = outside
+  its circle) with the summary line; the 60-s demo shows it for five seconds with the live numbers.
+- Tests +1 unit, API check; suite 113 passed. Browser-verified (92 overlay layers, clean toggle).
+
 ### 2026-09-26 (sweep 20) — STUDY-12: the counterfactual trace (OpenCV output → the agent's actions)
 - **`src/agentic/study_causal.py`** → `docs/causal_trace.md`: the rules ask for "a trace showing
   OpenCV 5 output changing a later decision/action"; a counterfactual shows *cause*. The same survey

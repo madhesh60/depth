@@ -97,6 +97,8 @@ def test_analyze_and_report_path():
     assert s.status_code == 200
     survey_id = s.json()["survey_id"]
     assert s.json()["mission"]["human_approval_required"] is True
+    cf = s.json()["stage1_counterfactual"]                     # STUDY-12, live on every GPS survey
+    assert cf["available"] and cf["n"] >= 1 and 0 <= cf["outside"] <= cf["n"]
     rep = client.get(f"/api/report/geojson?survey_id={survey_id}")
     assert rep.status_code == 200 and "FeatureCollection" in rep.text
     assert client.get("/api/report/gpx?survey_id=does-not-exist").status_code == 404

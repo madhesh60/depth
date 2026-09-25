@@ -50,3 +50,19 @@ def test_diff_of_identical_surveys_is_zero_and_detects_moves():
 def test_kendall():
     assert _kendall([1, 2, 3], [1, 2, 3]) == 1.0 and _kendall([1, 2, 3], [3, 2, 1]) == -1.0
     assert _kendall([1], [1]) is None
+
+
+def test_live_stage1_counterfactual_moves_pins_without_re_inference():
+    from src.agentic.geo import PingFix, geotag, stage1_counterfactual
+    fix = PingFix(lat=37.8, lon=-76.15, heading_deg=20.0, synthetic=True)
+    c = Candidate((500, 300, 540, 340), 0, "fishing_gear", 0.6, verdict=Verdict.REVIEW)
+    c.ping_px, c.n_pings, c.ground_range_px = 520.0, 640, 300.0            # what Stage 1 measured
+    fid = "Rec6_wcp_ss_port_00004"
+    geotag(c, fix, "top", 640, 640, fid)
+    fr = FrameResult(fid, 640, 640, [c], nadir="top")
+    t = TrackedObject("H1", "fishing_gear", Verdict.REVIEW, 0.6, 0.6, fid, c.bbox, lat=c.lat, lon=c.lon,
+                      geo_error_m=c.geo_error_m)
+    cf = stage1_counterfactual([fr], [t], {fid: fix})
+    assert cf["available"] and cf["n"] == 1 and cf["pins"]["H1"]["shift_m"] > 0
+    assert c.ping_px == 520.0 and c.lat == t.lat                         # the real candidate is untouched
+    assert stage1_counterfactual([fr], [t], None)["available"] is False

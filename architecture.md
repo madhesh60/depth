@@ -118,6 +118,9 @@ tier (value of information); every call — including the ones it chose not to m
 * **exports** — GeoJSON / GPX / KML / CSV / JSON, synthetic GPS always labelled; every format but CSV
   carries the provenance stamp; `trace` = the agent decision log (JSONL, never public); `?public=1`
   generalises protected-site (wreck) positions.
+* **Stage-1 counterfactual** (`geo.stage1_counterfactual`) — every GPS survey also reports where each
+  pin would land without Stage 1 (slant range, frame-centre ping; no re-inference) and how many leave
+  their own error circle — STUDY-12 live; the map's "⊘ without Stage 1" toggle draws it.
 * **mission brief** (`brief.py`) — a one-page hand-over written from a compact facts JSON *after* every
   decision. Deterministic template always; optional Claude on Amazon Bedrock (`DEPTH_BRIEF_LLM=bedrock`)
   whose text is accepted only if every number / ID is a survey fact and the mandatory caveats are

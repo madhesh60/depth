@@ -315,6 +315,13 @@ kbd { font: 600 10px var(--mono); padding: 1px 5px; border-radius: 4px; border: 
 .dim-seg .dim-btn, .sv-seg .sv-btn { appearance: none; border: 0; background: transparent; color: var(--txt-2); font: 600 11px var(--sans); padding: 5px 11px; border-radius: 5px; cursor: pointer; }
 .dim-seg .dim-btn.is-active, .sv-seg .sv-btn.is-active { background: var(--surface-3); color: var(--accent); box-shadow: inset 0 0 0 1px var(--border-2); }
 .sv-seg { align-self: flex-start; }
+.sv-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.cf-btn { appearance: none; cursor: pointer; font: 600 10.5px var(--mono); padding: 5px 10px; border-radius: 6px; border: 1px dashed rgba(229,120,155,.55); background: transparent; color: #f0a7bf; }
+.cf-btn:hover { background: rgba(229,120,155,.08); }
+.cf-btn.is-on { border-style: solid; background: rgba(229,120,155,.14); color: #ffd0de; }
+.cf-btn[hidden], .cf-sum[hidden] { display: none; }
+.cf-sum { font-size: 10.5px; color: var(--txt-2); }
+.cf-sum b { color: #ffc2d4; }
 #viewer.dim-3d .viewer-canvas, #viewer.dim-3d .viewer-bar { display: none; }
 .twin-wrap { position: relative; flex: 1 1 auto; min-height: 280px; display: flex; flex-direction: column; border: 1px solid var(--border-2); border-radius: 8px; overflow: hidden; background: #070b10; }
 .twin-wrap[hidden] { display: none; }

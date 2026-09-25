@@ -132,3 +132,36 @@ def haversine_m(a: tuple[float, float], b: tuple[float, float]) -> float:
     dlat, dlon = lat2 - lat1, lon2 - lon1
     x = math.sin(dlat / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
     return 2 * _EARTH_R * math.asin(math.sqrt(x))
+
+
+def stage1_counterfactual(frames, tracked, track: Optional[dict], m_per_px: float = DEFAULT_M_PER_PX) -> dict:
+    """Where each hazard's pin would be WITHOUT Stage 1 — slant range read from the box and the frame's
+    centre ping instead of the tracked ground range and the object's own ping (STUDY-12, live for this
+    survey). Nothing is re-inferred: the same candidate is geotagged again with Stage-1 geometry removed.
+    ``outside`` = the pin would leave its own stated error circle."""
+    import copy
+    import statistics
+    if not track:
+        return {"available": False, "reason": "no GPS track"}
+    idx = {(fr.frame_id, tuple(c.bbox)): (fr, c) for fr in frames for c in fr.candidates}
+    pins, shifts = {}, []
+    for t in tracked:
+        hit = idx.get((t.frame_id, tuple(t.bbox)))
+        if t.lat is None or hit is None or t.frame_id not in track:
+            continue
+        fr, c = hit
+        naive = copy.copy(c)
+        naive.ping_px = naive.n_pings = naive.ground_range_px = None
+        geotag(naive, track[t.frame_id], fr.nadir, fr.width, fr.height, fr.frame_id, m_per_px)
+        if naive.lat is None:
+            continue
+        s = haversine_m((t.lat, t.lon), (naive.lat, naive.lon))
+        pins[t.oid] = {"lat": naive.lat, "lon": naive.lon, "shift_m": round(s, 1),
+                       "outside": bool(t.geo_error_m is not None and s > t.geo_error_m)}
+        shifts.append(s)
+    return {"available": bool(pins), "pins": pins, "n": len(pins),
+            "outside": sum(p["outside"] for p in pins.values()),
+            "median_shift_m": round(statistics.median(shifts), 1) if shifts else None,
+            "max_shift_m": round(max(shifts), 1) if shifts else None,
+            "note": "counterfactual: slant range + frame-centre ping instead of Stage-1 ground range + own ping "
+                    "(tiers are unchanged - Stage 1 is not a gate)"}

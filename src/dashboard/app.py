@@ -51,7 +51,7 @@ from src.agentic.pipeline import AgenticPipeline
 from src.agentic.agent import render
 from src.agentic.perception import Perceptor
 from src.agentic.shadow import ShadowProver
-from src.agentic.geo import synthetic_track
+from src.agentic.geo import synthetic_track, stage1_counterfactual
 from src.agentic.mission import export
 from src.agentic.types import SurveyResult
 from src.detection.calibration import load_calibration
@@ -284,6 +284,11 @@ def _run_survey(frames, gps: str, budget_minutes: Optional[float], nadir: Option
     except Exception as e:
         log.exception("survey twin failed")
         d["twin"] = {"available": False, "reason": f"twin error: {type(e).__name__}"}
+    try:                                                    # STUDY-12, live: where pins go without Stage 1
+        d["stage1_counterfactual"] = stage1_counterfactual(result.frames, result.tracked, track, pipe.m_per_px)
+    except Exception as e:
+        log.exception("stage-1 counterfactual failed")
+        d["stage1_counterfactual"] = {"available": False, "reason": f"error: {type(e).__name__}"}
     prov = provenance_stamp()
     d["provenance"] = prov
     reports = {fmt: export(fmt, result, prov=prov) for fmt in REPORT_FORMATS}
