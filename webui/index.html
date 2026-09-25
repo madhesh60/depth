@@ -286,6 +286,8 @@
       <!-- survey: downloads + hazards -->
       <section class="panel" data-when="survey">
         <div class="panel-head"><span class="panel-title">Reports</span><span class="panel-meta">open on any GPS / GIS</span></div>
+        <label class="pub-toggle" title="wrecks can be war graves or protected heritage sites: a public share generalises their positions to ~1.1 km and drops re-survey passes that would reveal them">
+          <input type="checkbox" id="pubShare" /> public share — generalise protected-site locations</label>
         <div class="dl-grid" id="dlGrid"></div>
         <div class="panel-head" style="margin-top:14px"><span class="panel-title">Frames</span></div>
         <div class="thumb-strip" id="thumbStrip"></div>
@@ -308,16 +310,18 @@
   <!-- ============================ PIPELINE DOCK ============================ -->
   <footer class="dock">
     <div class="dock-stepper" id="stepper" aria-label="pipeline stages">
-      <div class="dstep" data-stage="see"><span class="dnode">1</span><div class="dtxt"><b>See</b><span>stage 1 · YOLO11 · cv2.dnn</span></div></div>
+      <div class="dstep" data-stage="stage1"><span class="dnode">1</span><div class="dtxt"><b>Canonicalise</b><span>seabed track · ground range</span></div></div>
       <div class="dlink"></div>
-      <div class="dstep" data-stage="prove"><span class="dnode">2</span><div class="dtxt"><b>Prove</b><span>re-look · evidence</span></div></div>
+      <div class="dstep" data-stage="see"><span class="dnode">2</span><div class="dtxt"><b>See</b><span>YOLO11 · cv2.dnn</span></div></div>
       <div class="dlink"></div>
-      <div class="dstep" data-stage="decide"><span class="dnode">3</span><div class="dtxt"><b>Decide</b><span>guaranteed tiers</span></div></div>
+      <div class="dstep" data-stage="prove"><span class="dnode">3</span><div class="dtxt"><b>Prove</b><span>re-look · evidence</span></div></div>
       <div class="dlink"></div>
-      <div class="dstep" data-stage="act"><span class="dnode">4</span><div class="dtxt"><b>Act</b><span>route + reports</span></div></div>
+      <div class="dstep" data-stage="decide"><span class="dnode">4</span><div class="dtxt"><b>Decide</b><span>guaranteed tiers</span></div></div>
+      <div class="dlink"></div>
+      <div class="dstep" data-stage="act"><span class="dnode">5</span><div class="dtxt"><b>Act</b><span>route + reports</span></div></div>
     </div>
     <div class="dock-log">
-      <div class="dock-log-head"><span class="panel-title">Agent log</span><span class="mono" id="dockLatency"></span></div>
+      <div class="dock-log-head"><span class="panel-title">Agent log</span><span class="mono prov-line" id="provLine" title="provenance of the last result"></span><span class="mono" id="dockLatency"></span></div>
       <ol class="agent-log scrollable" id="agentLog"><li class="log-idle">idle — run the loop to stream the agent's tool calls</li></ol>
     </div>
   </footer>

@@ -75,6 +75,21 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ## 4. Session log
 
+### 2026-09-25 (sweep 15) — Provenance stamps, agent decision log, protected-site redaction
+- **`src/agentic/provenance.py`**: every analyze result and every report carries a stamp — model +
+  ONNX sha256, calibration sha256 (the promises in force), OpenCV version + `cv2` path (`/opt/cool`
+  ⇒ COOL), code commit, host / EC2 type, UTC time. GeoJSON properties, GPX/KML descriptions, JSON;
+  CSV stays a clean table. UI: provenance line in the dock.
+- **Agent decision log** (`/api/report/trace`, `mission.trace.jsonl`): provenance → survey → every
+  frame's Stage-1 record → every tool call (rationale, latency, conf before/after, detail) → every
+  verdict → mission decisions (budget, routes, re-survey plan, human gate). Sample survey: 8 frames,
+  155 tool calls, 48 verdicts.
+- **Responsible use:** `?public=1` exports generalise protected-site (wreck) positions to ~1.1 km and
+  drop re-survey passes that would point at them; ghost-gear targets keep full precision; the decision
+  log is **never** public (403). UI "public share" toggle on the Reports panel.
+- Pipeline dock now shows five stages: **Canonicalise** → See → Prove → Decide → Act.
+- Tests +3 (`test_provenance.py`). Browser-verified.
+
 ### 2026-09-25 (sweep 14) — Physics-grounded 3D digital twin (three.js, DepthWizard-class viewer)
 - **`src/agentic/twin.py`** builds two scenes from MEASURED geometry only: the **frame twin** (seabed =
   Stage-1 slant→ground remap, sonar path = tracked altitude per ping, finds at their ping / ground

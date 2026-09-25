@@ -13,6 +13,7 @@ frame-ordered CSV and a "no GPS" flag. When the GPS is a demo track, exports car
 """
 from __future__ import annotations
 
+import copy
 import csv
 import io
 import json
@@ -22,6 +23,12 @@ from .geo import haversine_m
 from .types import MissionPlan, TrackedObject, Verdict, SurveyResult
 
 _SYNTH_WARN = "SYNTHETIC DEMO GPS - not real coordinates"
+# Responsible use (docs/responsible_use.md): wrecks can be war graves / protected heritage sites.
+# In a PUBLIC share their positions are generalised to ~1.1 km (0.01°) and re-survey passes that would
+# reveal them are dropped; cleanup targets (ghost gear) keep full precision.
+SENSITIVE_CLASSES = {"structural_fragment", "wreck_debris"}
+_GENERAL_DEG = 0.01
+_REDACT_NOTE = "public share: protected-site locations generalised to ~1.1 km (0.01 deg); full precision on request"
 # Seconds an analyst spends per REVIEW card. ASSUMED until the timed user study replaces it
 # (docs/user_study.md); every budget plan says so.
 DEFAULT_SEC_PER_CARD = 8.0
@@ -116,7 +123,27 @@ def _by_id(tracked: list[TrackedObject]) -> dict[str, TrackedObject]:
     return {t.oid: t for t in tracked}
 
 
-def to_geojson(tracked: list[TrackedObject], mission: MissionPlan) -> str:
+def redact_public(tracked: list[TrackedObject], mission: MissionPlan) -> tuple[list[TrackedObject], MissionPlan, int]:
+    """Public-share copy: sensitive-class hazards get generalised coordinates; re-survey passes that
+    target them are dropped (a pass line would point straight at the wreck)."""
+    out, sens = [], set()
+    for t in tracked:
+        t2 = copy.deepcopy(t)
+        if t2.cls_name in SENSITIVE_CLASSES and t2.lat is not None:
+            t2.lat, t2.lon = round(round(t2.lat / _GENERAL_DEG) * _GENERAL_DEG, 4), round(round(t2.lon / _GENERAL_DEG) * _GENERAL_DEG, 4)
+            t2.geo_error_m = max(t2.geo_error_m or 0.0, 1100.0)
+            sens.add(t2.oid)
+        out.append(t2)
+    m2 = copy.deepcopy(mission)
+    rp = dict(m2.resurvey_plan or {})
+    if rp.get("lines"):
+        rp["lines"] = [L for L in rp["lines"] if not (set(L["targets"]) & sens)]
+        m2.resurvey_plan = rp
+    return out, m2, len(sens)
+
+
+def to_geojson(tracked: list[TrackedObject], mission: MissionPlan, prov: Optional[dict] = None,
+               note: Optional[str] = None) -> str:
     features = []
     for t in tracked:
         if t.lat is None:
@@ -150,17 +177,20 @@ def to_geojson(tracked: list[TrackedObject], mission: MissionPlan) -> str:
     fc = {"type": "FeatureCollection",
           "properties": {"human_approval_required": True,
                          "note": _SYNTH_WARN if mission.gps_synthetic else "real GPS",
-                         "guarantees": mission.guarantees},
+                         "guarantees": mission.guarantees, "provenance": prov, "redaction": note},
           "features": features}
     return json.dumps(fc, indent=2)
 
 
-def to_gpx(tracked: list[TrackedObject], mission: MissionPlan) -> str:
+def to_gpx(tracked: list[TrackedObject], mission: MissionPlan, prov: Optional[dict] = None,
+           note: Optional[str] = None) -> str:
+    from .provenance import short
     idx = _by_id(tracked)
     out = ['<?xml version="1.0" encoding="UTF-8"?>',
-           '<gpx version="1.1" creator="marine-debris-agent" xmlns="http://www.topografix.com/GPX/1/1">']
-    if mission.gps_synthetic:
-        out.append(f"  <metadata><desc>{_SYNTH_WARN}</desc></metadata>")
+           '<gpx version="1.1" creator="DEPTH" xmlns="http://www.topografix.com/GPX/1/1">']
+    desc = " | ".join(x for x in ((_SYNTH_WARN if mission.gps_synthetic else ""), (short(prov) if prov else ""), note or "") if x)
+    if desc:
+        out.append(f"  <metadata><desc>{desc}</desc></metadata>")
     for t in tracked:
         if t.lat is None:
             continue
@@ -181,11 +211,14 @@ def to_gpx(tracked: list[TrackedObject], mission: MissionPlan) -> str:
     return "\n".join(out)
 
 
-def to_kml(tracked: list[TrackedObject], mission: MissionPlan) -> str:
+def to_kml(tracked: list[TrackedObject], mission: MissionPlan, prov: Optional[dict] = None,
+           note: Optional[str] = None) -> str:
+    from .provenance import short
     idx = _by_id(tracked)
     out = ['<?xml version="1.0" encoding="UTF-8"?>',
            '<kml xmlns="http://www.opengis.net/kml/2.2"><Document>',
-           f"  <name>marine debris hazards{' (' + _SYNTH_WARN + ')' if mission.gps_synthetic else ''}</name>"]
+           f"  <name>DEPTH hazards{' (' + _SYNTH_WARN + ')' if mission.gps_synthetic else ''}</name>",
+           f"  <description>{' | '.join(x for x in ((short(prov) if prov else ''), note or '') if x)}</description>"]
     for t in tracked:
         if t.lat is None:
             continue
@@ -220,20 +253,65 @@ def to_csv(tracked: list[TrackedObject]) -> str:
     return buf.getvalue()
 
 
-def to_json(survey: SurveyResult) -> str:
-    return json.dumps(survey.to_dict(), indent=2)
+def to_json(survey: SurveyResult, prov: Optional[dict] = None, note: Optional[str] = None) -> str:
+    d = survey.to_dict()
+    d["provenance"], d["redaction"] = prov, note
+    return json.dumps(d, indent=2)
+
+
+def to_trace(survey: SurveyResult, prov: Optional[dict] = None) -> str:
+    """The agent's flight recorder: one JSON line per event — provenance, every frame's Stage-1 record,
+    every tool call of every candidate (inputs → rationale → outputs, timed), every verdict, and the
+    mission decisions (budget, routes, re-survey plan, human gate). Replayable and diffable."""
+    L = [{"type": "provenance", **(prov or {})},
+         {"type": "survey", "survey_id": survey.survey_id, "frames": len(survey.frames),
+          "gps_available": survey.mission.gps_available, "gps_synthetic": survey.mission.gps_synthetic,
+          "guarantees": survey.mission.guarantees}]
+    for fr in survey.frames:
+        s1 = {k: v for k, v in (fr.stage1 or {}).items() if k != "bottom_line_native"}
+        L.append({"type": "frame", "frame_id": fr.frame_id, "orientation": fr.orientation, "stage1": s1,
+                  "stage_ms": {k: round(v, 2) for k, v in fr.stage_ms.items()}, "counts": fr.counts})
+        for ci, c in enumerate(fr.candidates):
+            for si, st in enumerate(c.trace):
+                L.append({"type": "step", "frame_id": fr.frame_id, "cand": ci, "step": si, "cls": c.cls_name,
+                          "bbox": list(c.bbox), **st.to_dict()})
+            L.append({"type": "verdict", "frame_id": fr.frame_id, "cand": ci, "cls": c.cls_name, "conf": round(c.conf, 4),
+                      "verdict": c.verdict.value if c.verdict else None,
+                      "score": c.evidence.evidence_score if c.evidence else None,
+                      "p_pot": c.evidence.p_pot if c.evidence else None, "lat": c.lat, "lon": c.lon})
+    m = survey.mission
+    L.append({"type": "mission", "counts": m.counts, "recovery_route": m.recovery_route, "review_queue": m.review_queue,
+              "inspection_route": m.inspection_route, "budget": m.budget, "repeat_merges": m.repeat_merges,
+              "resurvey": {k: v for k, v in (m.resurvey_plan or {}).items() if k != "lines"},
+              "resurvey_lines": [{k: L_[k] for k in ("id", "targets", "voi", "boat_min", "status")}
+                                 for L_ in (m.resurvey_plan or {}).get("lines", [])],
+              "human_approval_required": m.human_approval_required})
+    return "\n".join(json.dumps(x, default=str) for x in L) + "\n"
 
 
 EXPORTERS = {"geojson": to_geojson, "gpx": to_gpx, "kml": to_kml}     # need tracked + mission
 
 
-def export(fmt: str, survey: SurveyResult) -> str:
-    """Render a survey's mission in ``fmt`` ∈ {geojson, gpx, kml, csv, json}."""
+def export(fmt: str, survey: SurveyResult, public: bool = False, prov: Optional[dict] = None) -> str:
+    """Render a survey's mission in ``fmt`` ∈ {geojson, gpx, kml, csv, json, trace}. ``public=True``
+    generalises protected-site locations (``SENSITIVE_CLASSES``). Every format except CSV carries the
+    provenance stamp (CSV stays a clean table)."""
     fmt = fmt.lower()
+    if prov is None:
+        from .provenance import stamp
+        prov = stamp()
+    tracked, mission, note = survey.tracked, survey.mission, None
+    if public:
+        tracked, mission, n = redact_public(tracked, mission)
+        note = f"{_REDACT_NOTE} ({n} object(s) generalised)"
     if fmt in EXPORTERS:
-        return EXPORTERS[fmt](survey.tracked, survey.mission)
+        return EXPORTERS[fmt](tracked, mission, prov, note)
     if fmt == "csv":
-        return to_csv(survey.tracked)
+        return to_csv(tracked)
     if fmt == "json":
-        return to_json(survey)
+        return to_json(SurveyResult(survey.survey_id, survey.frames, tracked, mission) if public else survey, prov, note)
+    if fmt == "trace":
+        if public:
+            raise ValueError("the decision log carries exact positions - it is not shared publicly")
+        return to_trace(survey, prov)
     raise ValueError(f"unknown format: {fmt}")

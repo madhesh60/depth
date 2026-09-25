@@ -57,7 +57,8 @@ from src.agentic.types import SurveyResult
 from src.detection.calibration import load_calibration
 from src.detection.infer import configure_runtime, DEFAULT_ONNX
 from . import samples as samples_mod
-from .jobs import JobStore, REPORT_FORMATS
+from .jobs import JobStore, REPORT_FORMATS, PUBLIC_FORMATS
+from src.agentic.provenance import stamp as provenance_stamp, short as provenance_short
 from .metrics import Metrics
 from src.agentic.feedback import FeedbackStore
 from src.agentic import study as study_mod
@@ -282,7 +283,10 @@ def _run_survey(frames, gps: str, budget_minutes: Optional[float], nadir: Option
     except Exception as e:
         log.exception("survey twin failed")
         d["twin"] = {"available": False, "reason": f"twin error: {type(e).__name__}"}
-    reports = {fmt: export(fmt, result) for fmt in REPORT_FORMATS}
+    prov = provenance_stamp()
+    d["provenance"] = prov
+    reports = {fmt: export(fmt, result, prov=prov) for fmt in REPORT_FORMATS}
+    reports.update({f"public.{fmt}": export(fmt, result, public=True, prov=prov) for fmt in PUBLIC_FORMATS})
     _JOBS.persist(result.survey_id, {k: v for k, v in d.items() if k != "frames"}, reports)
     return d
 
@@ -484,6 +488,7 @@ def analyze(sample: Optional[str] = Query(None), nadir: Optional[str] = Query(No
     payload = _frame_payload(frame, result)
     payload["wall_ms"] = round((time.perf_counter() - t0) * 1000, 1)
     payload["guarantees"] = pipe.guarantees()
+    payload["provenance"] = provenance_stamp()
     payload["frame_ref"] = {"sample": sample} if (sample and file is None) else _frame_ref(frame_id)
     try:
         payload["twin"] = frame_twin(frame, result, nadir=nadir)          # 3D: measured geometry only
@@ -529,18 +534,25 @@ def survey(use_samples: bool = Query(False), gps: str = Query("synthetic"),
 
 
 _MEDIA = {"geojson": "application/geo+json", "gpx": "application/gpx+xml",
-          "kml": "application/vnd.google-earth.kml+xml", "csv": "text/csv", "json": "application/json"}
+          "kml": "application/vnd.google-earth.kml+xml", "csv": "text/csv", "json": "application/json", "trace": "application/x-ndjson"}
 
 
 @app.get("/api/report/{fmt}")
-def report(fmt: str, survey_id: str = Query(...)):
+def report(fmt: str, survey_id: str = Query(...), public: bool = Query(False)):
+    """Mission exports. ``public=1`` generalises protected-site (wreck) locations; ``trace`` is the agent
+    decision log (JSONL) and is never public."""
     if fmt not in _MEDIA:
         raise HTTPException(400, f"format must be one of {list(_MEDIA)}")
-    body = export(fmt, _SURVEYS[survey_id]) if survey_id in _SURVEYS else _JOBS.report(survey_id, fmt)
+    if public and fmt == "trace":
+        raise HTTPException(403, "the decision log carries exact positions - it is not shared publicly")
+    key = f"public.{fmt}" if public else fmt
+    body = (export(fmt, _SURVEYS[survey_id], public=public) if survey_id in _SURVEYS
+            else _JOBS.report(survey_id, key))
     if body is None:
         raise HTTPException(404, "unknown survey_id (run a survey first)")
+    ext = "trace.jsonl" if fmt == "trace" else fmt
     return Response(body, media_type=_MEDIA[fmt],
-                    headers={"Content-Disposition": f'attachment; filename="mission.{fmt}"'})
+                    headers={"Content-Disposition": f'attachment; filename="mission{".public" if public else ""}.{ext}"'})
 
 
 # ---- serve the zero-build frontend -------------------------------------------------------------

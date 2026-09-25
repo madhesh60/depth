@@ -369,7 +369,7 @@ async function runAnalyze() {
   $("#analyzeBtn").disabled = true;
   $("#analyzePlaceholder").hidden = true;
   toast("See → Prove → Decide …");
-  stepperRun(["see", "prove", "decide"]);
+  stepperRun(["stage1", "see", "prove", "decide"]);
   Log.reset(); Log.now({ stage: true, tool: "SEE", msg: "perceive — full-frame YOLO11 via cv2.dnn …", t: "run" });
 
   try {
@@ -379,9 +379,10 @@ async function runAnalyze() {
     const d = await fetch(url, opts).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); });
     state._analyze = d;
     renderAnalyze(d);
+    showProvenance(d.provenance);
     if (Twin.dim === "3d") showFrameTwin();
     loadMetrics();
-    stepperFinish(["see", "prove", "decide"]);
+    stepperFinish(["stage1", "see", "prove", "decide"]);
   } catch (e) {
     stepperReset();
     $("#analyzePlaceholder").hidden = false;
@@ -646,7 +647,7 @@ async function runSurvey() {
   const btn = $("#surveyBtn"); btn.disabled = true;
   $("#surveyPlaceholder").hidden = true; $("#missionBanner").hidden = true;
   toast("Running full loop over the survey …");
-  stepperRun(["see", "prove", "decide", "act"]);
+  stepperRun(["stage1", "see", "prove", "decide", "act"]);
   Log.reset(); Log.now({ stage: true, tool: "SURVEY", msg: "running See→Prove→Decide→Act over all sample frames …", t: "run" });
   const gps = $("#gpsMode").value;
   const budget = Math.max(1, Math.min(600, parseFloat($("#budgetMin").value) || 5));
@@ -660,9 +661,10 @@ async function runSurvey() {
     const d = await pollJob(job.job_id);
     state.survey = d;
     renderSurvey(d);
+    showProvenance(d.provenance);
     if (Twin.sv === "3d") showSurveyTwin();
     loadMetrics();
-    stepperFinish(["see", "prove", "decide", "act"]);
+    stepperFinish(["stage1", "see", "prove", "decide", "act"]);
   } catch (e) {
     stepperReset();
     $("#surveyPlaceholder").hidden = false;
@@ -777,13 +779,24 @@ function renderMap(d) {
 }
 
 function renderDownloads(surveyId) {
-  const fmts = [["geojson", "hazards + route (GIS)"], ["gpx", "waypoints (boat GPS)"], ["kml", "Google Earth"], ["csv", "spreadsheet"], ["json", "full audit trail"]];
-  $("#dlGrid").innerHTML = fmts.map(([f, desc]) => `<button class="dl-btn" data-fmt="${f}"><b>.${f}</b><span>${desc}</span></button>`).join("");
-  $$("#dlGrid .dl-btn").forEach(b => b.onclick = () => {
-    const a = document.createElement("a");
-    a.href = `${API}/api/report/${b.dataset.fmt}?survey_id=${encodeURIComponent(surveyId)}`;
-    a.download = `mission.${b.dataset.fmt}`; document.body.appendChild(a); a.click(); a.remove();
-  });
+  const fmts = [["geojson", "hazards + route (GIS)"], ["gpx", "waypoints + re-survey (boat GPS)"], ["kml", "Google Earth"], ["csv", "spreadsheet"], ["json", "full result + provenance"], ["trace", "agent decision log (JSONL)"]];
+  const draw = () => {
+    const pub = $("#pubShare").checked;
+    $("#dlGrid").innerHTML = fmts.map(([f, desc]) => `<button class="dl-btn${pub && f === "trace" ? " is-off" : ""}" data-fmt="${f}" title="${pub && f === "trace" ? "the decision log carries exact positions — never shared publicly" : ""}"><b>.${f === "trace" ? "trace.jsonl" : f}</b><span>${desc}${pub && f !== "trace" ? " · public" : ""}</span></button>`).join("");
+    $$("#dlGrid .dl-btn").forEach(b => b.onclick = () => {
+      const a = document.createElement("a");
+      a.href = `${API}/api/report/${b.dataset.fmt}?survey_id=${encodeURIComponent(surveyId)}${pub ? "&public=1" : ""}`;
+      a.download = `mission${pub ? ".public" : ""}.${b.dataset.fmt === "trace" ? "trace.jsonl" : b.dataset.fmt}`; document.body.appendChild(a); a.click(); a.remove();
+    });
+  };
+  $("#pubShare").onchange = draw; draw();
+}
+/* provenance of the last result: which model, thresholds, OpenCV build (COOL?) and code produced it */
+function showProvenance(p) {
+  const el = $("#provLine"); if (!el || !p) return;
+  const o = p.opencv || {};
+  el.innerHTML = `model <b>${escapeHtml(p.model || "?")}</b> ${escapeHtml((p.model_onnx_sha256 || "").slice(0, 10))} · calib ${escapeHtml((p.calibration_sha256 || "").slice(0, 10))} · OpenCV ${escapeHtml(o.version || "?")} <b>${o.is_cool_path ? "COOL" : "stock"}</b> · ${escapeHtml(p.code_commit || "?")}`;
+  el.title = JSON.stringify(p, null, 1);
 }
 function renderThumbs(d) {
   $("#thumbStrip").innerHTML = d.frames.filter(f => f.thumb_png)

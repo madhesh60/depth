@@ -134,7 +134,7 @@ tier (value of information); every call — including the ones it chose not to m
 | `GET /api/metrics` | rolling per-stage p50/p95 on this host + arch / EC2 type / COOL |
 | `POST /api/analyze` | one frame → Stage 1 + evidence cards + traces (+ `frame_ref` for labels) |
 | `POST /api/jobs/survey`, `GET /api/jobs/{id}` | background survey jobs (no proxy timeouts) with progress |
-| `GET /api/report/{fmt}` | mission exports (persisted — survive restarts) |
+| `GET /api/report/{fmt}` | mission exports (persisted) — geojson · gpx · kml · csv · json · **trace** (agent decision log, JSONL); `?public=1` generalises protected-site locations; every format but CSV carries the **provenance stamp** |
 | `POST /api/feedback`, `GET /api/feedback/stats` | human labels |
 | `/api/study/*`, `GET /api/effort` | timed study + effort curves |
 | `/api/audit/*` | blinded audit |

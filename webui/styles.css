@@ -374,6 +374,11 @@ kbd { font: 600 10px var(--mono); padding: 1px 5px; border-radius: 4px; border: 
 .muted { color: var(--txt-3); }
 
 /* ---------- pipeline dock ---------- */
+.pub-toggle { display: flex; align-items: center; gap: 7px; font-size: 10.5px; color: var(--txt-2); margin: 0 0 8px; cursor: pointer; }
+.pub-toggle input { accent-color: var(--accent); }
+.dl-btn.is-off { opacity: .35; pointer-events: none; }
+.prov-line { margin-left: auto; margin-right: 14px; font-size: 10px; color: var(--txt-3); max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prov-line b { color: var(--accent); font-weight: 600; }
 .dock { flex: 0 0 auto; height: 190px; border-top: 1px solid var(--border); background: var(--surface); display: flex; flex-direction: column; }
 .dock-stepper { display: flex; align-items: center; gap: 8px; padding: 13px 20px; border-bottom: 1px solid var(--border); }
 .dstep { display: flex; align-items: center; gap: 10px; }

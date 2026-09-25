@@ -48,3 +48,15 @@ following constraints are built into the design, not just promised.
 
 AGPL-3.0 (Ultralytics YOLO) — full source is public. Dataset sources retain their own licenses; see
 the [dataset card](dataset_card.md). Respect each source's attribution and share-alike terms.
+
+
+## Implemented safeguards (2026-09-25)
+
+- **Public share mode** (`/api/report/<fmt>?public=1`, "public share" toggle): wreck / structural
+  hazards (possible war graves, heritage sites) are generalised to ~1.1 km (0.01°) with an honest
+  error radius, and re-survey passes that would reveal them are dropped. Ghost-gear cleanup targets keep
+  full precision. Full precision stays with the survey owner.
+- **The agent decision log is never public** — it carries exact positions (HTTP 403).
+- **Provenance on every output** — model / calibration hashes, OpenCV build (COOL or stock), code
+  commit and host, so any published hazard can be traced to what produced it.
+- **Human approval** before any dispatch; LOW-RISK items are kept for audit, never deleted.
