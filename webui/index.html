@@ -129,6 +129,10 @@
           <button class="seg-btn is-active" data-view="overlay">Verdicts</button>
           <button class="seg-btn" data-view="frame">Raw</button>
         </div>
+        <div class="tb-seg seg dim-seg" role="group" aria-label="2D or 3D view">
+          <button class="dim-btn is-active" data-dim="2d">2D</button>
+          <button class="dim-btn" data-dim="3d" title="physics-grounded 3D twin: ground-range seabed, tracked sonar altitude, shadow-derived heights">3D twin</button>
+        </div>
         <div class="class-legend" id="classLegend" title="show / cut a detected class"></div>
         <div class="tb-spacer"></div>
         <button class="tb-btn" id="missedBtn" title="draw a box around a pot the detector missed — it becomes a training label (M)">＋ missed pot</button>
@@ -152,6 +156,7 @@
             <p>Pick a frame and run the loop. Each detection gets <b>evidence</b> (re-look view, acoustic shadow, relative height) and a <b>calibrated tier</b> with a stated promise — watch the agent fly to every find.</p>
           </div>
         </div>
+        <div class="twin-wrap" id="twinFrameWrap" hidden></div>
         <div class="viewer-bar">
           <div class="vb-grp">
             <button class="vb-btn" id="zoomOut" title="zoom out ( − )">−</button>
@@ -174,6 +179,11 @@
       <!-- survey map center -->
       <div class="survey-center" data-when="survey">
         <div class="mission-banner" id="missionBanner" hidden></div>
+        <div class="tb-seg seg sv-seg" role="group" aria-label="map or 3D survey twin">
+          <button class="sv-btn is-active" data-sv="map">Map</button>
+          <button class="sv-btn" data-sv="3d" title="3D survey twin: swaths on the track, hazards, routes, re-survey passes, replay">3D twin</button>
+        </div>
+        <div class="twin-wrap twin-survey" id="twinSurveyWrap" hidden></div>
         <div class="map-wrap" id="mapWrap">
           <div id="map"></div>
           <div class="map-note mono" id="mapNote"></div>
@@ -317,6 +327,8 @@
 
 <script src="vendor/leaflet/leaflet.js"
         integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="></script>
+<script type="importmap">{ "imports": { "three": "./vendor/three/three.module.min.js" } }</script>
+<script type="module" src="twin3d.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

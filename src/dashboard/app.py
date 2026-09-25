@@ -63,6 +63,7 @@ from src.agentic.feedback import FeedbackStore
 from src.agentic import study as study_mod
 from src.agentic import effort as effort_mod
 from src.detection import fp_audit
+from src.agentic.twin import frame_twin, survey_twin
 
 log = logging.getLogger("depth.api")
 REPO = Path(__file__).resolve().parents[2]
@@ -276,6 +277,11 @@ def _run_survey(frames, gps: str, budget_minutes: Optional[float], nadir: Option
         thumb = cv2.resize(render(frame_map[fr.frame_id], fr), (200, 200), interpolation=cv2.INTER_AREA)
         fd["thumb_png"] = _b64(thumb, 70)
     d["frame_refs"] = {fid: _frame_ref(fid) for fid, _ in frames}
+    try:
+        d["twin"] = survey_twin(frames, result, track, nadir=nadir)
+    except Exception as e:
+        log.exception("survey twin failed")
+        d["twin"] = {"available": False, "reason": f"twin error: {type(e).__name__}"}
     reports = {fmt: export(fmt, result) for fmt in REPORT_FORMATS}
     _JOBS.persist(result.survey_id, {k: v for k, v in d.items() if k != "frames"}, reports)
     return d
@@ -479,6 +485,11 @@ def analyze(sample: Optional[str] = Query(None), nadir: Optional[str] = Query(No
     payload["wall_ms"] = round((time.perf_counter() - t0) * 1000, 1)
     payload["guarantees"] = pipe.guarantees()
     payload["frame_ref"] = {"sample": sample} if (sample and file is None) else _frame_ref(frame_id)
+    try:
+        payload["twin"] = frame_twin(frame, result, nadir=nadir)          # 3D: measured geometry only
+    except Exception as e:                                              # the twin is a view; never fail analyze
+        log.exception("frame twin failed")
+        payload["twin"] = {"available": False, "reason": f"twin error: {type(e).__name__}"}
     _METRICS.record("analyze", frame_id, result.stage_ms, payload["wall_ms"], result.counts)
     return JSONResponse(payload)
 

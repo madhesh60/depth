@@ -40,12 +40,16 @@ pip install -r requirements.txt                    # torch-free runtime: OpenCV 
 python -m uvicorn src.dashboard.app:app --port 8000   # open http://localhost:8000
 ```
 
-The studio has four modes:
+The studio has four modes (plus a 3D twin view):
 * **Analyze** — pick a sample frame → *Run See → Prove → Decide*: the tracked seabed, verdict-coloured
   boxes, an evidence card per find (tier promise, P(pot), shadow, relative height, full agent trace),
   the agent's-eye re-look view; label finds, or draw a **missed pot** (`M`).
 * **Survey** — all samples as a background job → hazards on a map with error radii, recovery and
   inspection routes, **re-survey passes**, analyst + boat budgets, GeoJSON/GPX/KML/CSV/JSON.
+* **3D twin** (Analyze and Survey toggles) — a physics-grounded digital twin: the seabed in true
+  ground-range geometry, the sonar at its tracked altitude, finds with shadow-derived heights and the
+  acoustic ray triangle behind each height; the survey laid out along the track with a replay of the
+  boat sweeping its sonar fans. Orbit / fly / top cameras, wireframe, backscatter relief.
 * **Study** — the timed user study (manual review vs DEPTH cards) + the live effort curve.
 * **Audit** — the blinded false-alarm audit.
 

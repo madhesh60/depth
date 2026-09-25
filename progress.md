@@ -75,6 +75,24 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ## 4. Session log
 
+### 2026-09-25 (sweep 14) — Physics-grounded 3D digital twin (three.js, DepthWizard-class viewer)
+- **`src/agentic/twin.py`** builds two scenes from MEASURED geometry only: the **frame twin** (seabed =
+  Stage-1 slant→ground remap, sonar path = tracked altitude per ping, finds at their ping / ground
+  range, heights = shadow h/H × tracked altitude — only for CLEAR/WEAK shadows) and the **survey
+  twin** (each frame's swath ribbon on its side of the track, hazards at their geotags with error
+  rings, recovery / inspection routes, opposite-side re-survey passes, the track). Frames without
+  tracked geometry are not drawn (reason shown).
+- **`webui/twin3d.js`** (three.js r160 vendored, MIT, import map — still zero-build): orbit · fly
+  (WASD/QE) · top cameras, textured / wireframe, **backscatter relief** (labelled "not bathymetry";
+  markers ride the relief), vertical exaggeration, PNG snapshot. Clicking a find draws its
+  **acoustic ray triangle** (sonar → object top → end of shadow) with h, H and the shadow length;
+  cards ⇄ 3D selection is linked. **Replay**: the boat sweeps its port/starboard sonar fans along the
+  track and finds appear as it passes them.
+- UI: Analyze toolbar **2D | 3D twin**, Survey **Map | 3D twin**; the 2D gaze tour is suppressed in
+  3D; card selection now scrolls only the inspector (scrollIntoView scrolled the page).
+- Tests +4 (`test_twin.py`) incl. the invariant **every hazard's geotag lies on its own frame's
+  swath ribbon** and "height ⇔ real shadow". Browser-verified at 1440×900.
+
 ### 2026-09-25 (review sweep 13) — Documentation truth pass (I-10 / X-5)
 - **`architecture.md` rewritten as built** (was: ROI gate, Lambda/DynamoDB/Amplify/SageMaker): Stage 1
   canonicalisation → See → Prove → Decide (guaranteed tiers) → Act (geotag, stitching, merge, routes,
