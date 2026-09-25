@@ -65,8 +65,10 @@ def _reading(st: dict) -> str:
     out = []
     if st["edge"]["missed"] is not None and st["edge"]["missed"] > 2 * (st["edge"]["found"] or 0.01):
         out.append(f"**{st['edge']['missed']:.0%} of the missed pots touch the frame edge** vs "
-                   f"{st['edge']['found']:.0%} of the found ones — objects cut by the chunk boundary are the largest "
-                   f"single failure mode; overlapping neighbouring chunks at inference targets exactly these")
+                   f"{st['edge']['found']:.0%} of the found ones — objects cut by the frame edge are the largest "
+                   f"single failure mode. The edge is a chunk boundary OR a Roboflow crop (most of these frames are "
+                   f"augmented copies); seam inference across chunk boundaries did NOT recover them (STUDY-11b), which "
+                   f"points at crop edges — a dataset artefact v2b removes by keeping one un-cropped copy per frame")
     if (st["contrast"]["missed"] or 0) < (st["contrast"]["found"] or 0):
         out.append(f"missed pots are **lower-contrast** ({st['contrast']['missed']} vs {st['contrast']['found']}) and "
                    f"**farther in range** (row {st['row']['missed']} vs {st['row']['found']}) — range fall-off; "
@@ -145,7 +147,7 @@ def run(model: str = "EXP-001", split: str = "test", n: int = 12) -> dict:
          f"| size, longest side (px) | {stats['size']['missed']} | {stats['size']['found']} |",
          f"| local contrast (box ÷ ring) | {stats['contrast']['missed']} | {stats['contrast']['found']} |",
          f"| slant range (row, px) | {stats['row']['missed']} | {stats['row']['found']} |",
-         f"| **touches the frame edge** (cut by the chunk boundary) | {stats['edge']['missed']:.0%} | {stats['edge']['found']:.0%} |",
+         f"| **touches the frame edge** (chunk boundary or augmentation crop) | {stats['edge']['missed']:.0%} | {stats['edge']['found']:.0%} |",
          f"| degenerate label (≤ 4 px thin) | {stats['thin']['missed']:.0%} | {stats['thin']['found']:.0%} |", "",
          "**Reading (data-driven):** " + _reading(stats), "",
          f"## False alarms — the {len(pick_f)} most confident of {len(fas)}", "",
