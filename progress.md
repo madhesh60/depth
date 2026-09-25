@@ -75,6 +75,12 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ## 4. Session log
 
+### 2026-09-25 (sweep 16) — Failure gallery with measured failure modes (STUDY-11a)
+- `src/detection/failure_gallery.py` → `docs/failure_gallery.md` + two contact sheets (12 misses
+  across sizes, 12 most confident false alarms). **Finding:** 32% of missed pots touch the frame edge
+  (11% of found) — chunk-boundary cuts are the largest failure mode; misses are lower-contrast and
+  farther in range, and NOT smaller. The report's reading is generated from the numbers.
+
 ### 2026-09-25 (sweep 15) — Provenance stamps, agent decision log, protected-site redaction
 - **`src/agentic/provenance.py`**: every analyze result and every report carries a stamp — model +
   ONNX sha256, calibration sha256 (the promises in force), OpenCV version + `cv2` path (`/opt/cool`

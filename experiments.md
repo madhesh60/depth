@@ -108,6 +108,24 @@ Promote each into the log below with full results as it runs.
 
 ## Experiment log
 
+### STUDY-11a — Failure gallery: why EXP-001 misses pots (measured, not assumed)
+
+- Tool: `python -m src.detection.failure_gallery` → `docs/failure_gallery.md` (verification split,
+  92 unique frames, 138 pots, floor 0.05, match IoU ≥ 0.3).
+- **19 pots (14%) never reach a human.** Compared with the 119 found pots (medians / shares):
+
+| | missed | found |
+|---|--:|--:|
+| **touches the frame edge** (cut by the chunk boundary) | **32%** | 11% |
+| local contrast (box ÷ ring) | 1.17 | 1.34 |
+| slant range (row px) | 379 | 322.5 |
+| size (px) | 52 | 36 |
+
+- **Reading.** The largest single failure mode is **objects cut by the chunk boundary**; misses are
+  also lower-contrast and farther in range. They are *not* smaller on this split — the "small
+  object" explanation (EXP-001 error analysis on v1) does not carry over. Next: seam inference across
+  chunk boundaries (STUDY-11b) and range-gain-normalised training for EXP-002.
+
 ### STUDY-10 — Label-noise audit: how many "false alarms" are unlabelled real objects? — SET UP
 
 - Tool: `python -m src.detection.fp_audit build` + the **Audit** tab (blind, catch trials).
