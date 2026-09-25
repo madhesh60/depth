@@ -26,6 +26,11 @@ torch-free on **OpenCV 5**, CPU-only, on **AWS Graviton with COOL**.
 
 ## 2. System at a glance
 
+![DEPTH architecture](docs/img/architecture.svg)
+
+_Solid = built and tested; dashed amber = AWS, scripted in `infra/` and deployed on the AWS day;
+dashed violet = optional. Text version:_
+
 ```
                               ┌──────────── OFFLINE ─────────────────────────────────────────────────┐
  7 raw archives ─► v1 (4 cls) ─► v2b: sonar-only, 2 cls, 1 copy per Roboflow frame, val = held-out

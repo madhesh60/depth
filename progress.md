@@ -75,6 +75,13 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ## 4. Session log
 
+### 2026-09-26 (sweep 22) — Architecture diagram (required submission item)
+- `docs/img/architecture.svg`: OpenCV 5 stages on EC2 Graviton + COOL, CloudFront, S3, CloudWatch,
+  Budgets/SSM/IAM, optional Bedrock, the COOL benchmark, the offline data → training → calibration
+  path, the human loop and what leaves the machine. AWS parts drawn dashed and labelled "scripted,
+  deployed on the AWS day" (honest status). Embedded in README + `architecture.md` §2; every label
+  checked to fit its box in a browser render (101 text elements, 0 overflows).
+
 ### 2026-09-26 (sweep 21) — STUDY-12 made visible: "⊘ without Stage 1" on the survey map
 - `geo.stage1_counterfactual()` re-geotags every hazard of the current survey with Stage-1 geometry
   removed (slant range + frame-centre ping) — no re-inference; `/api/survey` + survey jobs return

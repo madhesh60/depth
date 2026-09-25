@@ -12,6 +12,8 @@ torch-free on **OpenCV 5**, CPU-only, built for **AWS Graviton + COOL**.
 **Competition:** OpenCV AI Competition 2026 (AWS · OpenCV Foundation) · **Team:** Syndicate (solo —
 Madhesh) · **Targets:** Agentic Vision · Best Use of COOL · **License:** AGPL-3.0
 
+![DEPTH architecture: OpenCV 5 agent (Stage 1 → See → Prove → Decide → Act) on EC2 Graviton + COOL, with the human loop, exports and AWS services](docs/img/architecture.svg)
+
 ---
 
 ## 1. Why this is different
