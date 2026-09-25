@@ -75,6 +75,13 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ## 4. Session log
 
+### 2026-09-26 (sweep 23) — Technical report draft (required submission item)
+- `docs/technical_report.md`: the rules' sections (problem, users, architecture, OpenCV 5
+  implementation, AWS deployment, evaluation, limitations, responsible use) + what did not work +
+  reproduce. Every number links the script-generated report it comes from; unmeasured items are
+  marked ⏳ pending and left empty (COOL on EC2, EXP-002, study, audit, live URL). The OpenCV-ops
+  table was checked against the code (`grep cv2.` per module). TODO.md updated.
+
 ### 2026-09-26 (sweep 22) — Architecture diagram (required submission item)
 - `docs/img/architecture.svg`: OpenCV 5 stages on EC2 Graviton + COOL, CloudFront, S3, CloudWatch,
   Budgets/SSM/IAM, optional Bedrock, the COOL benchmark, the offline data → training → calibration

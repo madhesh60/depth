@@ -30,17 +30,17 @@ Legend: `[x]` done · `[ ]` open · **(YOU)** needs a person / an account / a GP
 
 ## Submission package (by 21 Oct freeze; 22–25 Oct polish)
 
-- [ ] Technical report: problem → the two promises → architecture → OpenCV 5 + COOL → evaluation
+- [ ] Technical report — **draft written** ([`docs/technical_report.md`](docs/technical_report.md)); fill the ⏳ items (COOL runs, EXP-002, study, audit, live URL): problem → the two promises → architecture → OpenCV 5 + COOL → evaluation
       (guarantees, per-source, effort, audit, benchmark) → what didn't work → responsible use.
 - [ ] ≤ 5-min video: problem, live demo on AWS (Analyze → Survey → Study), guarantees + effort
       curve, COOL chart, limits.
-- [ ] Architecture diagram (from `architecture.md` §2), COOL benchmark chart + provenance JSONs.
-- [ ] Failure gallery: 12 misses, 12 false alarms (with audit tags).
+- [x] Architecture diagram (`docs/img/architecture.svg`). - [ ] COOL benchmark chart + provenance JSONs (after the EC2 runs).
+- [x] Failure gallery: 12 misses, 12 false alarms (`docs/failure_gallery.md`). - [ ] audit tags once the audit runs.
 - [ ] 24 h soak test of the live link; CloudWatch alarm to email; daily check during judging.
 
 ## Optional (only if ahead)
 
-- [ ] Bedrock mission brief written from the survey JSON only (never makes decisions).
+- [x] Mission brief (`brief.py`): template always; Bedrock writer built + tested with a fake client — enable on the AWS day (`infra/README.md`).
 - [ ] SQS + Graviton Spot worker scaling demo.
 - [ ] Real per-ping GPS demo on a PINGMapper recording.
 
