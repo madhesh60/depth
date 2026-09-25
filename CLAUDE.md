@@ -21,7 +21,9 @@ Runtime is torch-free **OpenCV 5** on CPU (built for AWS Graviton + COOL):
    `src/agentic/calibrate.py`): EXP-001 promises ≥ 65% of pots reach a human (held on test);
    no precision promise → nothing auto-confirmed. Value-of-information tool use, P(pot), budgets.
 5. **Act** — per-ping ground-range geotag, chunk stitching, repeat-sighting merge, recovery /
-   inspection routes, **opposite-side re-survey passes**, GeoJSON/GPX/KML/CSV/JSON.
+   inspection routes, **opposite-side re-survey passes**, GeoJSON/GPX/KML/CSV/JSON, provenance
+   stamps, agent decision log, **mission brief** (`brief.py`: template; optional Claude-on-Bedrock
+   writer whose every number must trace to the survey, else the template is served).
 6. **Human loop** — labels (✓ / ✕ / ＋missed → fine-tune set), timed **Study** (effort curve,
    break-even card time), blinded false-alarm **Audit** with catch trials.
 

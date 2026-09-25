@@ -115,7 +115,13 @@ tier (value of information); every call — including the ones it chose not to m
 * **opposite-side re-survey** — for each uncertain target, a pass on the far side with the target at
   mid-swath; aligned targets share a pass; passes ranked by Σ p(1−p) per metre; boat-time budget;
   each target predicts the bearing its shadow must flip to. Status always PLANNED.
-* **exports** — GeoJSON / GPX / KML / CSV / JSON, synthetic GPS always labelled.
+* **exports** — GeoJSON / GPX / KML / CSV / JSON, synthetic GPS always labelled; every format but CSV
+  carries the provenance stamp; `trace` = the agent decision log (JSONL, never public); `?public=1`
+  generalises protected-site (wreck) positions.
+* **mission brief** (`brief.py`) — a one-page hand-over written from a compact facts JSON *after* every
+  decision. Deterministic template always; optional Claude on Amazon Bedrock (`DEPTH_BRIEF_LLM=bedrock`)
+  whose text is accepted only if every number / ID is a survey fact and the mandatory caveats are
+  present — else the template is served. The LLM never sees coordinates and never changes a decision.
 
 ## 8. Human in the loop
 
@@ -134,7 +140,8 @@ tier (value of information); every call — including the ones it chose not to m
 | `GET /api/metrics` | rolling per-stage p50/p95 on this host + arch / EC2 type / COOL |
 | `POST /api/analyze` | one frame → Stage 1 + evidence cards + traces (+ `frame_ref` for labels) |
 | `POST /api/jobs/survey`, `GET /api/jobs/{id}` | background survey jobs (no proxy timeouts) with progress |
-| `GET /api/report/{fmt}` | mission exports (persisted) — geojson · gpx · kml · csv · json · **trace** (agent decision log, JSONL); `?public=1` generalises protected-site locations; every format but CSV carries the **provenance stamp** |
+| `GET /api/brief?survey_id=` | the mission brief + `writer` (template / llm), `grounding` report, `fallback_reason`, the facts it was written from |
+| `GET /api/report/{fmt}` | mission exports (persisted) — **brief** (markdown) · geojson · gpx · kml · csv · json · **trace** (agent decision log, JSONL); `?public=1` generalises protected-site locations; every format but CSV carries the **provenance stamp** |
 | `POST /api/feedback`, `GET /api/feedback/stats` | human labels |
 | `/api/study/*`, `GET /api/effort` | timed study + effort curves |
 | `/api/audit/*` | blinded audit |
@@ -178,10 +185,12 @@ src/detection/    infer.py · calibration.py · evaluate.py · export_onnx.py ·
                   onboard_model.py · fp_audit.py · frames.py · error_analysis.py · tiled_infer.py
 src/agentic/      agent.py · perception.py · shadow.py · tools.py · evidence.py · policy.py ·
                   guarantees.py · calibrate.py · geo.py · stitch.py · resurvey.py · mission.py ·
-                  pipeline.py · feedback.py · study.py · effort.py · types.py
+                  pipeline.py · feedback.py · study.py · effort.py · twin.py (3D twin) ·
+                  provenance.py · brief.py (mission brief) · types.py
 src/bench/        product_bench.py · fingerprint.py · compare.py (COOL benchmark)
 src/dashboard/    app.py · jobs.py · metrics.py · samples.py
-webui/            index.html · app.js · styles.css · samples/ (8 CC-BY-SA frames) · audit/ · vendor/leaflet
+webui/            index.html · app.js · twin3d.js (three.js twin) · styles.css · samples/ (8 CC-BY-SA
+                  frames) · audit/ · vendor/leaflet · vendor/three
 infra/            deploy_aws.sh · setup_cool_instance.sh · depth.service · bench_cool.sh
 models/<MODEL>/   calibration.json · effort_curve.json · fp_audit_val.json (weights git-ignored)
 DATASET/scripts/  audit_dataset · build_dataset_v1/v2/v2b · build_tiles · visualize_labels

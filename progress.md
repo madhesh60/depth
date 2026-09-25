@@ -75,6 +75,27 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ## 4. Session log
 
+### 2026-09-26 (sweep 19) — Mission brief: an LLM that writes, never decides
+- **`src/agentic/brief.py`**: a one-page hand-over for the crew / manager (bottom line, the promise,
+  first hour of review, routes, re-survey passes with their shadow-flip prediction, caveats). The
+  **template** writer is deterministic and ships in every survey's report set (`mission.brief.md`,
+  public variant too). The optional **Claude on Amazon Bedrock** writer (`DEPTH_BRIEF_LLM=bedrock`,
+  `AnthropicBedrockMantle`, default `anthropic.claude-opus-5`) sees only a compact facts JSON (no
+  coordinates) built **after** every decision is made.
+- **Grounding check** gates the LLM text: every number must be a survey fact (as given, rounded, or a
+  0–1 share as a percentage; number words count too), every hazard / pass ID must exist, the mandatory
+  caveats (human approval · synthetic GPS · assumed card time) must be present, ≤ 350 words. Any
+  failure — SDK missing, no credentials, API error, refusal, truncation, an ungrounded number — serves
+  the template, and the response says which writer ran and why. Limitation stated in the module: the
+  check proves each number came from the survey, not that it sits next to the right noun.
+- The template passes its own check (sample survey: 33 numbers traced). `GET /api/brief`,
+  `/api/report/brief`; UI **Mission brief** panel (writer tag, "✓ N numbers traced", copy) +
+  agent-log `write_brief` line; the 60-s demo ends on it.
+- Fix: the survey map could open at world zoom — `fitBounds` ran before the container had a size
+  (mode just switched / pane hidden) and Leaflet cached the 0-px size. Now the fit reads the element
+  and a `ResizeObserver` re-fits when the view is lost (a user's own zoom is kept). Browser-verified.
+- Tests +7 (`test_brief.py`, fake Bedrock client — no network) + API brief checks; suite 109 passed.
+
 ### 2026-09-26 (sweep 18) — "▶ 60-s demo": the judge path, guided
 - One click in the top bar drives the whole loop with a narration bar (7 steps, ~60 s): analyze a
   frame (Stage-1 seabed, evidence, calibrated tier) → 3D twin with the acoustic triangle of a find

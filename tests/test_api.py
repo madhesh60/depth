@@ -100,6 +100,12 @@ def test_analyze_and_report_path():
     rep = client.get(f"/api/report/geojson?survey_id={survey_id}")
     assert rep.status_code == 200 and "FeatureCollection" in rep.text
     assert client.get("/api/report/gpx?survey_id=does-not-exist").status_code == 404
+    md = client.get(f"/api/report/brief?survey_id={survey_id}")
+    assert md.status_code == 200 and md.text.startswith("# Mission brief") and "human approval" in md.text
+    assert md.headers["content-type"].startswith("text/markdown")
+    b = client.get(f"/api/brief?survey_id={survey_id}&writer=template").json()
+    assert b["writer"] == "template" and b["grounding"]["ok"] and b["facts"]["gps"] == "synthetic"
+    assert client.get("/api/brief?survey_id=does-not-exist").status_code == 404
 
     # the same survey as a background job: queue → poll → result → report
     import time
@@ -114,6 +120,11 @@ def test_analyze_and_report_path():
     assert rec["result"]["survey_id"] == job["survey_id"]
     assert rec["progress"]["done"] == rec["progress"]["total"] == job["frames"]
     assert client.get(f"/api/report/csv?survey_id={job['survey_id']}").status_code == 200
+    # evicted from memory → the brief is rebuilt from the persisted JSON report
+    from src.dashboard import app as app_mod
+    app_mod._SURVEYS.pop(job["survey_id"], None)
+    bp = client.get(f"/api/brief?survey_id={job['survey_id']}&public=1").json()
+    assert bp["grounding"]["ok"] and bp["facts"]["public"] is True and bp["facts"]["frames"] == job["frames"]
 
     # every analysed frame (analyze + both surveys) fed the live per-stage metrics
     m = client.get("/api/metrics").json()

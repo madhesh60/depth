@@ -385,6 +385,23 @@ kbd { font: 600 10px var(--mono); padding: 1px 5px; border-radius: 4px; border: 
 .demo-dots i { width: 7px; height: 7px; border-radius: 50%; background: var(--border-2); }
 .demo-dots i.on { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
 .demo-stop { grid-row: 1 / 3; grid-column: 3; appearance: none; cursor: pointer; font: 600 10.5px var(--mono); color: var(--txt-2); background: transparent; border: 1px solid var(--border-2); border-radius: 5px; padding: 5px 9px; }
+.brief { max-height: 300px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.12) transparent; padding-right: 4px; font-size: 12px; line-height: 1.55; color: var(--txt-2); }
+.brief h3 { font-size: 13px; color: var(--txt); margin: 0 0 2px; }
+.brief .brief-sub { font: 10px var(--mono); color: var(--txt-3); margin-bottom: 8px; }
+.brief h4 { font: 700 10px var(--mono); letter-spacing: .09em; text-transform: uppercase; color: var(--accent); margin: 12px 0 4px; }
+.brief p { margin: 0 0 6px; }
+.brief ul { margin: 0 0 6px 16px; }
+.brief li { margin: 2px 0; }
+.brief b { color: var(--txt); font-weight: 600; }
+.brief .hz { font-family: var(--mono); font-size: 11px; color: #ffd9a3; }
+.brief-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border); }
+.brief-foot[hidden] { display: none; }
+.brief-ground { font-size: 10px; color: var(--txt-3); }
+.brief-ground b.ok { color: #7ee2a0; } .brief-ground b.warn { color: #ffd9a3; }
+.writer-tag { font: 700 9.5px var(--mono); padding: 2px 6px; border-radius: 4px; border: 1px solid var(--border-2); color: var(--txt-2); }
+.writer-tag.llm { border-color: rgba(199,146,234,.6); color: #e3c6ff; }
+.mini-btn { appearance: none; cursor: pointer; font: 600 10px var(--mono); color: var(--txt-2); background: transparent; border: 1px solid var(--border-2); border-radius: 5px; padding: 3px 9px; }
+.mini-btn:hover { border-color: var(--accent); color: var(--accent); }
 .pub-toggle { display: flex; align-items: center; gap: 7px; font-size: 10.5px; color: var(--txt-2); margin: 0 0 8px; cursor: pointer; }
 .pub-toggle input { accent-color: var(--accent); }
 .dl-btn.is-off { opacity: .35; pointer-events: none; }

@@ -29,8 +29,8 @@ from typing import Callable, Optional
 
 log = logging.getLogger("depth.jobs")
 REPO = Path(__file__).resolve().parents[2]
-REPORT_FORMATS = ("geojson", "gpx", "kml", "csv", "json", "trace")
-PUBLIC_FORMATS = ("geojson", "gpx", "kml", "csv", "json")        # the decision log is never public
+REPORT_FORMATS = ("geojson", "gpx", "kml", "csv", "json", "trace", "brief")
+PUBLIC_FORMATS = ("geojson", "gpx", "kml", "csv", "json", "brief")        # the decision log is never public
 
 
 class JobStore:

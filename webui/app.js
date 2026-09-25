@@ -704,7 +704,7 @@ function renderSurvey(d) {
     ${(m.resurvey_plan && (m.resurvey_plan.lines || []).length) ? `<span>· <b>${m.resurvey_plan.lines.length} re-survey pass${m.resurvey_plan.lines.length > 1 ? "es" : ""}</b> (${m.resurvey_plan.boat_minutes_planned} min boat) — opposite side, mid-swath</span>` : ""}
     ${m.repeat_merges ? `<span>· ${m.repeat_merges} repeat sighting${m.repeat_merges > 1 ? "s" : ""} merged</span>` : ""}
     <span class="mb-tag" style="border-color:rgba(217,164,65,.5);color:#ffd9a3">✋ human approval required — nothing auto-dispatched</span>`;
-  renderMap(d); renderDownloads(d.survey_id, m); renderThumbs(d); renderHazards(d); renderEffort(d);
+  renderMap(d); renderDownloads(d.survey_id, m); renderThumbs(d); renderHazards(d); renderEffort(d); loadBrief(d.survey_id);
   Log.push([
     { stage: true, tool: "ACT", msg: `${cc.confirmed || 0} confirmed · ${cc.review || 0} review · ${cc.low_risk || 0} low-risk (kept for audit)`, t: "" },
     ...(m.budget && m.budget.cards_total != null ? [{ tool: "budget_plan", msg: `${m.budget.cards_affordable}/${m.budget.cards_total} review cards fit ${m.budget.minutes} min → ~${m.budget.expected_pots_in_budget} of ~${m.budget.expected_pots_in_queue} expected real pots`, t: "" }] : []),
@@ -798,19 +798,53 @@ function refitIfLost() {
    layout changes inside embedded panes */
 if (window.ResizeObserver) new ResizeObserver(() => refitIfLost()).observe(document.getElementById("map"));
 
-
 function renderDownloads(surveyId) {
-  const fmts = [["geojson", "hazards + route (GIS)"], ["gpx", "waypoints + re-survey (boat GPS)"], ["kml", "Google Earth"], ["csv", "spreadsheet"], ["json", "full result + provenance"], ["trace", "agent decision log (JSONL)"]];
+  const fmts = [["brief", "mission brief (markdown)"], ["geojson", "hazards + route (GIS)"], ["gpx", "waypoints + re-survey (boat GPS)"], ["kml", "Google Earth"], ["csv", "spreadsheet"], ["json", "full result + provenance"], ["trace", "agent decision log (JSONL)"]];
   const draw = () => {
     const pub = $("#pubShare").checked;
-    $("#dlGrid").innerHTML = fmts.map(([f, desc]) => `<button class="dl-btn${pub && f === "trace" ? " is-off" : ""}" data-fmt="${f}" title="${pub && f === "trace" ? "the decision log carries exact positions — never shared publicly" : ""}"><b>.${f === "trace" ? "trace.jsonl" : f}</b><span>${desc}${pub && f !== "trace" ? " · public" : ""}</span></button>`).join("");
+    $("#dlGrid").innerHTML = fmts.map(([f, desc]) => `<button class="dl-btn${pub && f === "trace" ? " is-off" : ""}" data-fmt="${f}" title="${pub && f === "trace" ? "the decision log carries exact positions — never shared publicly" : ""}"><b>.${({ trace: "trace.jsonl", brief: "brief.md" })[f] || f}</b><span>${desc}${pub && f !== "trace" ? " · public" : ""}</span></button>`).join("");
     $$("#dlGrid .dl-btn").forEach(b => b.onclick = () => {
       const a = document.createElement("a");
       a.href = `${API}/api/report/${b.dataset.fmt}?survey_id=${encodeURIComponent(surveyId)}${pub ? "&public=1" : ""}`;
-      a.download = `mission${pub ? ".public" : ""}.${b.dataset.fmt === "trace" ? "trace.jsonl" : b.dataset.fmt}`; document.body.appendChild(a); a.click(); a.remove();
+      a.download = `mission${pub ? ".public" : ""}.${({ trace: "trace.jsonl", brief: "brief.md" })[b.dataset.fmt] || b.dataset.fmt}`; document.body.appendChild(a); a.click(); a.remove();
     });
   };
-  $("#pubShare").onchange = draw; draw();
+  $("#pubShare").onchange = () => { draw(); loadBrief(surveyId); }; draw();
+}
+/* mission brief: the agent's hand-over. Written by the template or (when enabled) Claude on Bedrock —
+   either way every number is checked against the survey facts server-side before it is shown. */
+function mdLite(md) {
+  const inl = s => escapeHtml(s).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/\b(H\d{2,4}|RS\d{1,3})\b/g, '<span class="hz">$1</span>');
+  const out = []; let list = false;
+  const close = () => { if (list) { out.push("</ul>"); list = false; } };
+  md.split(/\r?\n/).forEach(line => {
+    const t = line.trim();
+    if (!t) { close(); return; }
+    if (t.startsWith("# ")) { close(); out.push(`<h3>${inl(t.slice(2))}</h3>`); }
+    else if (t.startsWith("## ")) { close(); out.push(`<h4>${inl(t.slice(3))}</h4>`); }
+    else if (/^[-*] /.test(t)) { if (!list) { out.push("<ul>"); list = true; } out.push(`<li>${inl(t.slice(2))}</li>`); }
+    else if (/^_.*_$/.test(t)) { close(); out.push(`<div class="brief-sub">${inl(t.slice(1, -1))}</div>`); }
+    else { close(); out.push(`<p>${inl(t)}</p>`); }
+  });
+  close(); return out.join("");
+}
+async function loadBrief(surveyId) {
+  const pub = $("#pubShare") && $("#pubShare").checked;
+  $("#briefMeta").textContent = "writing …";
+  try {
+    const r = await fetch(`${API}/api/brief?survey_id=${encodeURIComponent(surveyId)}${pub ? "&public=1" : ""}`);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const b = await r.json(); const g = b.grounding || {};
+    $("#briefBody").innerHTML = mdLite(b.text || "");
+    $("#briefMeta").innerHTML = `<span class="writer-tag ${b.writer === "llm" ? "llm" : ""}">${b.writer === "llm" ? "Claude · Bedrock" : "template"}</span>${pub ? " · public" : ""}`;
+    $("#briefGround").innerHTML = `<b class="${g.ok ? "ok" : "warn"}">${g.ok ? "✓" : "!"} ${g.numbers_checked} numbers traced to the survey</b> · ${g.words} words`
+      + (b.fallback_reason ? ` · <span title="${escapeHtml(b.fallback_reason)}">LLM fell back to the template</span>` : "");
+    $("#briefFoot").hidden = false;
+    $("#briefCopy").onclick = () => { navigator.clipboard && navigator.clipboard.writeText(b.text); $("#briefCopy").textContent = "copied ✓"; setTimeout(() => $("#briefCopy").textContent = "copy", 1400); };
+    Log.push([{ tool: "write_brief", msg: `mission brief by ${b.writer === "llm" ? b.model : "template"} · ${g.numbers_checked} numbers checked against the survey · ${g.ok ? "grounded" : "NOT grounded"}${b.fallback_reason ? " (LLM fell back: " + b.fallback_reason + ")" : ""}`, t: "" }]);
+  } catch (e) {
+    $("#briefMeta").textContent = "unavailable"; $("#briefBody").innerHTML = `<p class="empty-hint">brief unavailable (${escapeHtml(String(e.message || e))})</p>`;
+  }
 }
 /* provenance of the last result: which model, thresholds, OpenCV build (COOL?) and code produced it */
 function showProvenance(p) {
@@ -1250,7 +1284,8 @@ const Demo = {
       $('.sv-btn[data-sv="map"]').click(); mode("study");
       await say(6, "Impact is <b>measured, not assumed</b>: the timed study + effort curve report the <b>break-even card time</b> at the recall promise, and the agent's own forecast held on unseen data.", 6500);
       mode("survey");
-      await say(7, "Every report carries <b>provenance</b> (model, calibration, OpenCV build — COOL on Graviton) and an agent <b>decision log</b>. Nothing is dispatched without a human. ✓", 6000);
+      const bp = $("#briefBody"); if (bp) bp.closest(".panel").scrollIntoView({ block: "nearest", behavior: "smooth" });
+      await say(7, "The agent hands over a one-page <b>mission brief</b> — every number in it is machine-checked against the survey. Every report carries <b>provenance</b> (model, calibration, OpenCV build — COOL on Graviton) and a <b>decision log</b>. Nothing is dispatched without a human. ✓", 7000);
     } catch (e) { /* stopped */ }
     if (tok === this.token) this.stop();
   },

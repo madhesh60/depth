@@ -284,7 +284,15 @@
         </div>
       </section>
 
-      <!-- survey: downloads + hazards -->
+      <!-- survey: mission brief + downloads + hazards -->
+      <section class="panel" data-when="survey">
+        <div class="panel-head"><span class="panel-title">Mission brief</span><span class="panel-meta mono" id="briefMeta"></span></div>
+        <div id="briefBody" class="brief"><p class="empty-hint">Run a survey — the agent writes a one-page hand-over for the boat crew. Every number in it is traced back to the survey.</p></div>
+        <div class="brief-foot" id="briefFoot" hidden>
+          <span class="brief-ground mono" id="briefGround"></span>
+          <button class="mini-btn" id="briefCopy" title="copy the brief as markdown">copy</button>
+        </div>
+      </section>
       <section class="panel" data-when="survey">
         <div class="panel-head"><span class="panel-title">Reports</span><span class="panel-meta">open on any GPS / GIS</span></div>
         <label class="pub-toggle" title="wrecks can be war graves or protected heritage sites: a public share generalises their positions to ~1.1 km and drops re-survey passes that would reveal them">

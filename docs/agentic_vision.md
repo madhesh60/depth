@@ -60,7 +60,9 @@ human-readable trace entry.
 | `stitch_boundary` | same range, adjacent chunks, touching edges | counts a split object once; never changes a verdict |
 
 The rule core (`policy.py`) is the **sole decision authority** — deterministic, reproducible,
-human-gated. An LLM narrator could write the mission brief from the JSON without touching it.
+human-gated. An LLM may only *narrate*: `brief.py` lets Claude on Amazon Bedrock write the mission
+brief from a facts JSON built after every decision, and serves its text only if every number and ID
+traces back to the survey (§5).
 
 ---
 
@@ -130,6 +132,10 @@ shown as evidence with a relative height, never used to accept or reject.
 - **Honest geometry.** Orientation comes from a source rule (PINGMapper sonograms: nadir at the top);
   unknown sources are *not measured* rather than guessed. Geotags need real GPS; demo tracks are
   stamped `SYNTHETIC DEMO GPS`; unknown orientation ⇒ swath-wide error radius.
+- **Language models write, never decide.** The mission brief (`brief.py`) is written from a facts
+  JSON built after every tier, route and pass is fixed. If Claude on Amazon Bedrock writes it, the text
+  is machine-checked (every number and ID must be a survey fact; human-approval / synthetic-GPS /
+  assumed-card-time caveats must be present) and replaced by the deterministic template on any failure.
 - **Known limits (stated, not hidden):** one bay's crab pots and one sonar brand; calibration is a
   single recording (hence the separate verification split); labels are incomplete, so precision is a
   lower estimate; seconds-per-card is assumed until the user study.

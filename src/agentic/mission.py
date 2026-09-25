@@ -293,9 +293,10 @@ EXPORTERS = {"geojson": to_geojson, "gpx": to_gpx, "kml": to_kml}     # need tra
 
 
 def export(fmt: str, survey: SurveyResult, public: bool = False, prov: Optional[dict] = None) -> str:
-    """Render a survey's mission in ``fmt`` ∈ {geojson, gpx, kml, csv, json, trace}. ``public=True``
+    """Render a survey's mission in ``fmt`` ∈ {geojson, gpx, kml, csv, json, trace, brief}. ``public=True``
     generalises protected-site locations (``SENSITIVE_CLASSES``). Every format except CSV carries the
-    provenance stamp (CSV stays a clean table)."""
+    provenance stamp (CSV stays a clean table). ``brief`` is the deterministic template mission brief
+    (markdown); the optional LLM-written brief is served by ``/api/brief``, never baked into a report."""
     fmt = fmt.lower()
     if prov is None:
         from .provenance import stamp
@@ -310,6 +311,10 @@ def export(fmt: str, survey: SurveyResult, public: bool = False, prov: Optional[
         return to_csv(tracked)
     if fmt == "json":
         return to_json(SurveyResult(survey.survey_id, survey.frames, tracked, mission) if public else survey, prov, note)
+    if fmt == "brief":
+        from .brief import facts, template_brief
+        s = SurveyResult(survey.survey_id, survey.frames, tracked, mission) if public else survey
+        return template_brief(facts(s.to_dict(), prov, public))
     if fmt == "trace":
         if public:
             raise ValueError("the decision log carries exact positions - it is not shared publicly")

@@ -36,6 +36,20 @@ The pinned web stack in `setup_cool_instance.sh` was verified locally: a clean v
 `numpy` + `opencv-python-headless` (standing in for the COOL venv) plus the `--target` deps imports
 and serves the app (`/api/health` → model warm in 0.3 s; `/api/analyze` works).
 
+## Optional: Claude on Amazon Bedrock writes the mission brief
+
+Off by default — the deterministic template brief needs nothing. To let Claude write it (it writes,
+never decides; any ungrounded number ⇒ the template is served, see `src/agentic/brief.py`):
+
+1. Bedrock console → enable access to the Claude model in the region (a one-time account action).
+2. Allow the instance role to invoke Bedrock for that model (**not yet in `deploy_aws.sh`** — added on
+   the AWS day, scoped to the one model).
+3. `pip install --target /opt/depth/pydeps "anthropic[bedrock]"` (the COOL venv stays untouched).
+4. In the systemd unit: `DEPTH_BRIEF_LLM=bedrock`, optionally `DEPTH_BRIEF_MODEL=anthropic.claude-opus-5`
+   and `AWS_REGION=us-east-1`. Credentials come from the instance role (IMDSv2); no keys on disk.
+
+`GET /api/brief?survey_id=…` then reports `writer: "llm"` — or `"template"` with `fallback_reason`.
+
 ## The 3-way COOL benchmark (what the award measures)
 
 Same code, same frames (content sha256), same model (sha256), three machines:

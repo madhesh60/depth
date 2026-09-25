@@ -65,6 +65,7 @@ from src.agentic import study as study_mod
 from src.agentic import effort as effort_mod
 from src.detection import fp_audit
 from src.agentic.twin import frame_twin, survey_twin
+from src.agentic import brief as brief_mod
 
 log = logging.getLogger("depth.api")
 REPO = Path(__file__).resolve().parents[2]
@@ -534,7 +535,8 @@ def survey(use_samples: bool = Query(False), gps: str = Query("synthetic"),
 
 
 _MEDIA = {"geojson": "application/geo+json", "gpx": "application/gpx+xml",
-          "kml": "application/vnd.google-earth.kml+xml", "csv": "text/csv", "json": "application/json", "trace": "application/x-ndjson"}
+          "kml": "application/vnd.google-earth.kml+xml", "csv": "text/csv", "json": "application/json", "trace": "application/x-ndjson",
+          "brief": "text/markdown; charset=utf-8"}
 
 
 @app.get("/api/report/{fmt}")
@@ -550,9 +552,33 @@ def report(fmt: str, survey_id: str = Query(...), public: bool = Query(False)):
             else _JOBS.report(survey_id, key))
     if body is None:
         raise HTTPException(404, "unknown survey_id (run a survey first)")
-    ext = "trace.jsonl" if fmt == "trace" else fmt
+    ext = {"trace": "trace.jsonl", "brief": "brief.md"}.get(fmt, fmt)
     return Response(body, media_type=_MEDIA[fmt],
                     headers={"Content-Disposition": f'attachment; filename="mission{".public" if public else ""}.{ext}"'})
+
+
+@app.get("/api/brief")
+def mission_brief(survey_id: str = Query(...), public: bool = Query(False),
+                  writer: str = Query("auto", pattern="^(auto|template|llm)$")):
+    """The mission brief + how it was written. ``auto`` uses Claude on Amazon Bedrock when
+    ``DEPTH_BRIEF_LLM=bedrock`` (it writes, never decides; every number must be a survey fact or the
+    deterministic template is served instead — ``writer`` / ``fallback_reason`` / ``grounding`` say which)."""
+    if survey_id in _SURVEYS:
+        s = _SURVEYS[survey_id]
+        d, prov = s.to_dict(), provenance_stamp()
+        if public:
+            from src.agentic.mission import redact_public
+            tr, mi, _ = redact_public(s.tracked, s.mission)
+            d = SurveyResult(s.survey_id, s.frames, tr, mi).to_dict()
+    else:
+        raw = _JOBS.report(survey_id, "public.json" if public else "json")
+        if raw is None:
+            raise HTTPException(404, "unknown survey_id (run a survey first)")
+        d = json.loads(raw)
+        prov = d.get("provenance")
+    out = brief_mod.write(d, prov, public=public, writer=writer)
+    out["llm_enabled"] = brief_mod.llm_enabled()
+    return out
 
 
 # ---- serve the zero-build frontend -------------------------------------------------------------
