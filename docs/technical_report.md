@@ -94,6 +94,16 @@ studio has four modes:
 
 A guided 60-second demo walks through the whole path.
 
+**Integration — no DEPTH-specific code on the partner's side** ([`integrations.md`](integrations.md),
+[`mcp.md`](mcp.md)):
+
+- **MCP** (stdio, and Streamable HTTP at `/mcp` with a bearer token): any AI agent can run the loop and read the decision traces.
+- **OGC API – Features** at `/ogc`: QGIS and ArcGIS read the hazards, re-survey passes, routes and **approved work orders**.
+- **HMAC-signed webhooks**: mission-control and dispatch systems receive every survey and every decision.
+- **`<depth-hazards>` web component**: any web console can embed the hazard panel.
+
+Every channel can read and *ask*; only a named person approves, in the studio.
+
 **Model onboarding.** Every threshold lives in `models/<MODEL>/calibration.json`, so a new model plugs
 in with one command. `onboard_model` verifies the ONNX in `cv2.dnn`, gates weak models, calibrates on
 validation recordings and verifies on test. Training runs on Kaggle; the runtime never imports torch.

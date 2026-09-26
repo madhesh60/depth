@@ -126,7 +126,8 @@
   <text x="850" y="442" class="s">public share: protected-site (wreck) positions generalised</text>
   <text x="850" y="460" class="s">mission brief — every number traced to the survey</text>
   <text x="850" y="478" class="s">3D digital twin (three.js) · synthetic GPS always labelled</text>
-  <text x="850" y="500" class="xs mono">dashboard/app.py · webui/</text>
+  <text x="850" y="496" class="s b">MCP · OGC API – Features · signed webhooks · embed</text>
+  <text x="850" y="511" class="xs mono">dashboard/{app,mcp_server,ogc,integrations}.py · webui/</text>
   <path d="M1200,286 L1200,358" class="flow"/>
   <path d="M940,286 C940,330 560,318 560,358" class="flow"/>
 
