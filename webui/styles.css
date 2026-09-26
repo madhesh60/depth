@@ -548,3 +548,61 @@ kbd { font: 600 10px var(--mono); padding: 1px 5px; border-radius: 4px; border: 
 
 /* the HTML `hidden` attribute must always win over component display rules (toast, banners) */
 [hidden] { display: none !important; }
+
+/* =====================================================================================
+   Calm studio (v3): formal, uncluttered, laptop-first. Overrides earlier rules on purpose.
+   ===================================================================================== */
+:root { --dock-h: 190px; }
+body.dock-min { --dock-h: 46px; }
+/* top bar: one line, always */
+.topbar { gap: 14px; height: 50px; }
+.topbar, .topbar * { white-space: nowrap; }
+.brand-txt p { display: block; }
+.demo-btn { background: transparent; box-shadow: none; }
+.pill-live .dot { box-shadow: none; }
+/* dock: a slim status bar that can open into the agent log */
+.dock { height: var(--dock-h); transition: height .18s ease; }
+.dock-stepper { padding: 9px 20px; gap: 8px; }
+.dock-toggle { flex: 0 0 auto; margin-left: 14px; appearance: none; cursor: pointer; font: 600 10.5px var(--mono); letter-spacing: .04em; color: var(--txt-2); background: var(--surface-2); border: 1px solid var(--border-2); border-radius: 6px; padding: 5px 10px; }
+.dock-toggle:hover { color: var(--accent); border-color: var(--accent); }
+body.dock-min .dock-log { display: none; }
+body.dock-min .dock-stepper { border-bottom: 0; }
+.run-toast { bottom: calc(var(--dock-h) + 12px); }
+.demo-bar { bottom: calc(var(--dock-h) + 16px); }
+/* canvas toolbar: wrap instead of clipping */
+.canvas-toolbar { flex-wrap: wrap; row-gap: 8px; }
+/* panels: one consistent, quiet rhythm */
+.panel-title { letter-spacing: .08em; }
+.evidence-panel .panel-head, .panel-head { align-items: baseline; }
+/* responsive columns */
+@media (min-width: 1500px) { .workspace { grid-template-columns: 290px 1fr 380px; } }
+@media (max-width: 1280px) {
+  .brand-txt p { display: none; }
+  .brand-sub { display: none; }
+  .mode-btn { padding: 6px 12px; }
+  .dtxt span { display: none; }
+}
+@media (max-width: 1100px) {
+  .workspace { grid-template-columns: 216px 1fr 292px; }
+  .pill-live { display: none; }
+  .mode-btn { padding: 6px 10px; font-size: 12px; }
+  .sample-grid { gap: 6px; }
+}
+@media (max-width: 980px) {
+  .workspace { grid-template-columns: 188px 1fr 272px; }
+  .sample-grid { grid-template-columns: 1fr; }
+  .status-pills .pill:not(#pillModel) { display: none; }
+  .rail { padding: 10px; }
+}
+/* mission plan as stat tiles (label · value · context), status tags with icon + label */
+.mission-banner.mission-kpis { display: flex; flex-direction: column; align-items: stretch; gap: 10px; padding: 0; border: 0; background: transparent; color: var(--txt-2); }
+.kpi-strip { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border: 1px solid var(--border); border-radius: 8px; background: var(--surface); overflow: hidden; }
+.kpi-t { padding: 11px 14px 12px; border-right: 1px solid var(--border); min-width: 0; }
+.kpi-t:last-child { border-right: 0; }
+.kpi-l { font-size: 11px; color: var(--txt-3); }
+.kpi-v { font: 600 22px/1.15 var(--sans); color: var(--txt); margin-top: 2px; }
+.kpi-s { font-size: 11px; color: var(--txt-3); margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mb-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.mb-tags .mb-tag { border-radius: 5px; font-size: 10.5px; color: var(--txt-2); background: var(--surface); }
+.mb-tags .mb-gate { color: #ffe2b8; border-color: rgba(217,164,65,.45); }
+@media (max-width: 1100px) { .kpi-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); } .kpi-t:nth-child(2) { border-right: 0; } .kpi-t:nth-child(-n+2) { border-bottom: 1px solid var(--border); } }

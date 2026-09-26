@@ -32,6 +32,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   wireTwin();
   $("#demoBtn").onclick = () => (Demo.on ? Demo.stop() : Demo.run());
   $("#cfBtn").onclick = () => CF.toggle();
+  Dock.init();
   Appr.start();
   $("#demoStop").onclick = () => Demo.stop();
   wireAudit();
@@ -356,6 +357,7 @@ const Log = (() => {
   function idle() { el().innerHTML = `<li class="log-idle">idle — run the loop to stream the agent's tool calls</li>`; }
   function push(entries) { queue.push(...entries); if (!timer) drain(); }
   function now(entry) {
+    const idleLi = el().querySelector(".log-idle"); if (idleLi) idleLi.remove();
     const li = document.createElement("li");
     li.className = "log-line" + (entry.stage ? " is-stage" : "") + (entry.verdict ? ` v-${entry.verdict}` : "");
     li.innerHTML = `<span class="log-t">${escapeHtml(entry.t || "")}</span><span class="log-tool">${escapeHtml(entry.tool || "")}</span><span class="log-msg">${escapeHtml(entry.msg || "")}</span>`;
@@ -698,15 +700,19 @@ async function pollJob(jobId) {
 function renderSurvey(d) {
   $("#surveyPlaceholder").hidden = true;
   const m = d.mission, cc = m.counts || {};
-  const gpsTag = !m.gps_available ? `<span class="mb-tag">no GPS — table only</span>`
-    : m.gps_synthetic ? `<span class="mb-tag mb-synthetic">⚠ synthetic demo GPS</span>` : `<span class="mb-tag mb-real">real GPS</span>`;
-  const mb = $("#missionBanner"); mb.hidden = false; mb.className = "mission-banner";
-  mb.innerHTML = `<b>🧭 Mission plan ready</b>
-    <span>${cc.confirmed || 0} confirmed → <b>${m.recovery_route.length}-stop recovery route</b>${m.route_length_m != null ? ` (${m.route_length_m} m)` : ""}</span>
-    <span>· ${cc.review || 0} REVIEW → <b>${(m.inspection_route || []).length}-stop inspection route</b>${m.inspection_length_m != null ? ` (${m.inspection_length_m} m)` : ""}</span>${gpsTag}
-    ${(m.resurvey_plan && (m.resurvey_plan.lines || []).length) ? `<span>· <b>${m.resurvey_plan.lines.length} re-survey pass${m.resurvey_plan.lines.length > 1 ? "es" : ""}</b> (${m.resurvey_plan.boat_minutes_planned} min boat) — opposite side, mid-swath</span>` : ""}
-    ${m.repeat_merges ? `<span>· ${m.repeat_merges} repeat sighting${m.repeat_merges > 1 ? "s" : ""} merged</span>` : ""}
-    <span class="mb-tag" style="border-color:rgba(217,164,65,.5);color:#ffd9a3">✋ human approval required — nothing auto-dispatched</span>`;
+  const gpsTag = !m.gps_available ? `<span class="mb-tag">○ No GPS — table only</span>`
+    : m.gps_synthetic ? `<span class="mb-tag mb-synthetic">⚠ Synthetic demo GPS — not real positions</span>` : `<span class="mb-tag mb-real">● Real GPS</span>`;
+  const rp = m.resurvey_plan || {}, passes = (rp.lines || []).length, insp = (m.inspection_route || []).length;
+  const total = (cc.confirmed || 0) + (cc.review || 0) + (cc.low_risk || 0);
+  const tile = (label, value, sub) => `<div class="kpi-t"><div class="kpi-l">${label}</div><div class="kpi-v">${value}</div><div class="kpi-s">${sub}</div></div>`;
+  const mb = $("#missionBanner"); mb.hidden = false; mb.className = "mission-banner mission-kpis";
+  mb.innerHTML = `<div class="kpi-strip">
+      ${tile("Hazards", total, `${cc.review || 0} for review · ${cc.confirmed || 0} confirmed`)}
+      ${tile("Inspection stops", insp, m.inspection_length_m != null ? `${m.inspection_length_m} m · budgeted cards` : "no GPS — frame order")}
+      ${tile("Re-survey passes", passes, passes ? `${rp.boat_minutes_planned} boat-min · opposite side` : "none planned")}
+      ${tile("Recovery stops", m.recovery_route.length, m.recovery_route.length ? `${m.route_length_m} m · confirmed finds` : "none — nothing is auto-confirmed")}
+    </div>
+    <div class="mb-tags">${gpsTag}${m.repeat_merges ? `<span class="mb-tag">◎ ${m.repeat_merges} repeat sighting${m.repeat_merges > 1 ? "s" : ""} merged</span>` : ""}<span class="mb-tag mb-gate">● Human approval required — nothing is dispatched automatically</span></div>`;
   renderMap(d); renderDownloads(d.survey_id, m); renderThumbs(d); renderHazards(d); renderEffort(d); loadBrief(d.survey_id);
   Log.push([
     { stage: true, tool: "ACT", msg: `${cc.confirmed || 0} confirmed · ${cc.review || 0} review · ${cc.low_risk || 0} low-risk (kept for audit)`, t: "" },
@@ -875,6 +881,22 @@ async function loadBrief(surveyId) {
     $("#briefMeta").textContent = "unavailable"; $("#briefBody").innerHTML = `<p class="empty-hint">brief unavailable (${escapeHtml(String(e.message || e))})</p>`;
   }
 }
+/* ------------------------------------------------------------------ DOCK: slim status bar <-> agent log */
+const Dock = {
+  set(min) {
+    document.body.classList.toggle("dock-min", min);
+    $("#dockToggle").textContent = min ? "Agent log ▴" : "Agent log ▾";
+    $("#dockToggle").setAttribute("aria-expanded", String(!min));
+    localStorage.setItem("depth.dockMin", min ? "1" : "0");
+    setTimeout(() => { if (state.map) state.map.invalidateSize(); window.dispatchEvent(new Event("resize")); }, 220);
+  },
+  init() {
+    const saved = localStorage.getItem("depth.dockMin");
+    this.set(saved != null ? saved === "1" : window.innerHeight < 860);    // short screens start slim
+    $("#dockToggle").onclick = () => this.set(!document.body.classList.contains("dock-min"));
+  },
+};
+
 /* ------------------------------------------------------------------ CONNECT (integrations) */
 const Connect = {
   info: null, lastSecret: null,

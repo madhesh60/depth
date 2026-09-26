@@ -75,6 +75,16 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ## 4. Session log
 
+### 2026-09-26 (sweep 26) — Calm studio: formal, uncluttered, laptop-first
+- **Pipeline dock → slim status bar** (46 px) with an "Agent log" toggle; short screens start slim,
+  the choice is remembered; toasts / the demo bar follow its height (`--dock-h`). On a 904×746 pane
+  the sonar viewer went from ~300 px to 542 px tall.
+- **Top bar never wraps** (subtitle / studio tag / live pill drop out on narrower screens); canvas
+  toolbar wraps instead of clipping; responsive columns at 1500 / 1280 / 1100 / 980 px.
+- **Mission plan as stat tiles** (Hazards · Inspection stops · Re-survey passes · Recovery stops —
+  label, value, context) with status tags that carry an icon + label; emoji removed; quieter glows.
+- Fix: the "idle" line stayed in the agent log after entries arrived.
+
 ### 2026-09-26 (sweep 25) — Console integrations: OGC API – Features, signed webhooks, drop-in panel, Connect tab
 - **`src/dashboard/ogc.py`** — OGC API – Features (Part 1 Core + GeoJSON, Part 3 queryables) at
   `/ogc`: `hazards` (tier, calibrated P(pot), review rank, evidence, error radius, **approval
