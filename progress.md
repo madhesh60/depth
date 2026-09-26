@@ -75,6 +75,25 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ## 4. Session log
 
+### 2026-09-26 (sweep 24) — DEPTH as an MCP server + human-approval requests
+- **`src/dashboard/mcp_server.py`** (official MCP SDK 1.28.1): 13 tools (status, samples, analyze a
+  frame, overlay image, run a survey, review queue, a hazard with its decision trace, re-survey plan,
+  Stage-1 counterfactual, mission brief, exports, **request_human_approval**, approval status), a
+  resource and a prompt. Two transports: **stdio** (`python -m src.dashboard.mcp_server` — Claude
+  Desktop / Code) and **Streamable HTTP at `/mcp`** on the DEPTH server (stateless + JSON, so it works
+  behind CloudFront), bearer token (`DEPTH_MCP_TOKEN`) + DNS-rebinding allow-list.
+- **Agents ask, people decide:** `src/agentic/approvals.py` (append-only event log). No tool can
+  approve, dispatch, label or change a threshold; unknown target IDs are refused; a named person
+  decides in the studio's new **Approvals** panel (optional `DEPTH_APPROVER_PIN`). REST:
+  `GET/POST /api/approvals`, `POST /api/approvals/{id}/decide`.
+- Bug found by the stdio test: importing the app inside the first tool call deadlocked on Windows
+  while the transport's reader thread was blocked on stdin → the app is pre-imported before the loop.
+- Infra: `mcp` + its pinned tree in the `pip --target` list, a random MCP token generated into
+  root-only `/etc/depth/mcp.env`, unit reads it; `*` host allow-list is refused without a token.
+- Verified: tests (official client over stdio; JSON-RPC over HTTP incl. 401/421), and live: the
+  official Streamable-HTTP client ran a survey and filed a request that a person approved in the
+  studio. Docs: `docs/mcp.md`.
+
 ### 2026-09-26 (sweep 23) — Technical report draft (required submission item)
 - `docs/technical_report.md`: the rules' sections (problem, users, architecture, OpenCV 5
   implementation, AWS deployment, evaluation, limitations, responsible use) + what did not work +

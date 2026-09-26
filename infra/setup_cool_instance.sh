@@ -49,8 +49,20 @@ echo "== [4/5] web deps -> $APP/pydeps (COOL venv untouched)"
   fastapi==0.127.0 starlette==0.50.0 pydantic==2.13.4 pydantic-core==2.46.4 annotated-types==0.7.0 \
   typing-inspection==0.4.2 anyio==4.9.0 sniffio==1.3.1 idna==3.10 exceptiongroup==1.3.1 \
   uvicorn==0.40.0 h11==0.14.0 click==8.5.0 python-multipart==0.0.21 annotated-doc==0.0.4 \
-  typing-extensions==4.15.0
-PYTHONPATH="$APP:$APP/pydeps" "$COOL_PY" -c "import fastapi, uvicorn, cv2, numpy; print('deps ok | cv2', cv2.__version__, cv2.__file__)"
+  typing-extensions==4.15.0 \
+  mcp==1.28.1 httpx==0.28.1 httpcore==1.0.7 certifi==2025.1.31 httpx-sse==0.4.3 sse-starlette==3.4.5 \
+  pydantic-settings==2.14.1 python-dotenv==1.0.1 jsonschema==4.23.0 jsonschema-specifications==2024.10.1 \
+  referencing==0.36.2 rpds-py==0.23.1 attrs==25.3.0 pyjwt==2.13.0
+# (mcp declares pyjwt[crypto]; the server path imports neither jwt nor cryptography - checked locally)
+PYTHONPATH="$APP:$APP/pydeps" "$COOL_PY" -c "import fastapi, uvicorn, cv2, numpy, mcp.server.fastmcp; print('deps ok | cv2', cv2.__version__, cv2.__file__)"
+
+# MCP bearer token (remote agents connect to https://<cloudfront>/mcp with it). Generated once,
+# root-only, never in the unit file or the repo. Read it later with: sudo cat /etc/depth/mcp.env
+mkdir -p /etc/depth
+if [ ! -s /etc/depth/mcp.env ]; then
+  ( umask 077; printf 'DEPTH_MCP_TOKEN=%s\n' "$(head -c 24 /dev/urandom | od -An -tx1 | tr -d ' \n')" > /etc/depth/mcp.env )
+fi
+chmod 600 /etc/depth/mcp.env
 mkdir -p "$APP/runs/jobs" /var/log/depth
 chown -R depth:depth "$APP/runs" /var/log/depth
 

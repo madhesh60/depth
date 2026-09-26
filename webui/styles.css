@@ -409,6 +409,24 @@ kbd { font: 600 10px var(--mono); padding: 1px 5px; border-radius: 4px; border: 
 .writer-tag.llm { border-color: rgba(199,146,234,.6); color: #e3c6ff; }
 .mini-btn { appearance: none; cursor: pointer; font: 600 10px var(--mono); color: var(--txt-2); background: transparent; border: 1px solid var(--border-2); border-radius: 5px; padding: 3px 9px; }
 .mini-btn:hover { border-color: var(--accent); color: var(--accent); }
+.appr-who { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 10.5px; color: var(--txt-3); }
+.appr-name { flex: 1; min-width: 0; background: var(--surface-2); border: 1px solid var(--border-2); border-radius: 5px; color: var(--txt); font: 12px var(--sans); padding: 5px 8px; }
+.appr-name:focus { outline: none; border-color: var(--accent); }
+.appr-list { display: flex; flex-direction: column; gap: 8px; max-height: 260px; overflow-y: auto; scrollbar-width: thin; }
+.appr { border: 1px solid var(--border-2); border-radius: 6px; padding: 9px 10px; background: var(--surface-2); }
+.appr-top { display: flex; align-items: center; gap: 8px; font: 600 10.5px var(--mono); color: var(--txt-2); }
+.appr-top .act { color: var(--accent); text-transform: uppercase; letter-spacing: .06em; }
+.appr-top .st { margin-left: auto; padding: 1px 6px; border-radius: 4px; border: 1px solid var(--border-2); }
+.appr-top .st.pending { color: #ffd9a3; border-color: rgba(217,164,65,.5); }
+.appr-top .st.approved { color: #7ee2a0; border-color: rgba(46,160,67,.5); }
+.appr-top .st.declined { color: var(--txt-3); }
+.appr-why { font-size: 11.5px; color: var(--txt-2); margin: 5px 0 4px; line-height: 1.45; }
+.appr-meta { font: 10px var(--mono); color: var(--txt-3); }
+.appr-btns { display: flex; gap: 6px; margin-top: 7px; }
+.appr-btns button { appearance: none; cursor: pointer; font: 600 10.5px var(--sans); padding: 4px 11px; border-radius: 5px; border: 1px solid var(--border-2); background: transparent; color: var(--txt-2); }
+.appr-btns .ok { border-color: rgba(46,160,67,.6); color: #9be8b3; }
+.appr-btns .ok:hover { background: rgba(46,160,67,.14); }
+.appr-btns .no:hover { border-color: var(--danger); color: #f3a6a1; }
 .pub-toggle { display: flex; align-items: center; gap: 7px; font-size: 10.5px; color: var(--txt-2); margin: 0 0 8px; cursor: pointer; }
 .pub-toggle input { accent-color: var(--accent); }
 .dl-btn.is-off { opacity: .35; pointer-events: none; }

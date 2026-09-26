@@ -288,6 +288,12 @@
         </div>
       </section>
 
+      <!-- approvals: agents (studio, MCP, partner consoles) ask - a named person decides here -->
+      <section class="panel" data-when="survey">
+        <div class="panel-head"><span class="panel-title">Approvals</span><span class="panel-meta mono" id="apprMeta"></span></div>
+        <div class="appr-who"><label for="apprName">Approver</label><input id="apprName" class="appr-name" maxlength="60" placeholder="your name" autocomplete="name" /></div>
+        <div id="apprList" class="appr-list"><p class="empty-hint">No requests. Agents (this studio, MCP clients, partner consoles) can only <b>ask</b> — a person decides here.</p></div>
+      </section>
       <!-- survey: mission brief + downloads + hazards -->
       <section class="panel" data-when="survey">
         <div class="panel-head"><span class="panel-title">Mission brief</span><span class="panel-meta mono" id="briefMeta"></span></div>

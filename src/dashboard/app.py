@@ -66,6 +66,8 @@ from src.agentic import effort as effort_mod
 from src.detection import fp_audit
 from src.agentic.twin import frame_twin, survey_twin
 from src.agentic import brief as brief_mod
+from src.agentic.approvals import ApprovalStore, ApprovalError
+from .mcp_server import ENDPOINT as MCP_ENDPOINT
 
 log = logging.getLogger("depth.api")
 REPO = Path(__file__).resolve().parents[2]
@@ -89,6 +91,7 @@ _JOBS = JobStore(max_jobs=50, workers=1)
 _RUNTIME = configure_runtime()
 _METRICS = Metrics()
 _FEEDBACK = FeedbackStore()
+_APPROVALS = ApprovalStore()
 _STUDY: "OrderedDict[str, dict]" = OrderedDict()          # active study sessions (plan + the cards shown)
 _UPLOADS: "OrderedDict[str, np.ndarray]" = OrderedDict()     # recent uploaded frames (feedback persists them)
 MAX_UPLOAD_CACHE = 64
@@ -126,7 +129,14 @@ def _warm_in_background() -> None:
 async def lifespan(_app: FastAPI):
     if os.environ.get("DEPTH_LAZY_MODEL", "0") != "1":
         threading.Thread(target=_warm_in_background, name="depth-warmup", daemon=True).start()
-    yield
+    async with MCP_ENDPOINT.new_manager().run():       # /mcp: a fresh stateless manager per lifespan
+        yield
+    MCP_ENDPOINT.manager = None
+
+
+def _notify(event: str, payload: dict) -> None:
+    """Integration hook for DEPTH events (survey.completed, approval.requested, approval.decided)."""
+    log.info("event %s %s", event, payload.get("id") or payload.get("survey_id"))
 
 
 app = FastAPI(title="DEPTH — See→Prove→Decide→Act", version="2.0.0", lifespan=lifespan)
@@ -584,6 +594,46 @@ def mission_brief(survey_id: str = Query(...), public: bool = Query(False),
     out = brief_mod.write(d, prov, public=public, writer=writer)
     out["llm_enabled"] = brief_mod.llm_enabled()
     return out
+
+
+# ---- human-approval requests: agents ask, people decide (src/agentic/approvals.py) ---------------
+@app.get("/api/approvals")
+def approvals(status: Optional[str] = Query(None, pattern="^(pending|approved|declined)$"),
+              survey_id: Optional[str] = Query(None)):
+    return {"requests": _APPROVALS.list(status=status, survey_id=survey_id), "counts": _APPROVALS.counts()}
+
+
+@app.post("/api/approvals")
+def approval_request(body: dict = Body(...)):
+    """File a request (from the studio, a partner console, or an agent). It only ASKS."""
+    try:
+        r = _APPROVALS.request(body.get("survey_id", ""), body.get("action", ""), body.get("targets") or [],
+                               body.get("rationale", ""), requested_by=body.get("requested_by", "api"), channel="api")
+    except ApprovalError as e:
+        raise HTTPException(400, str(e))
+    _notify("approval.requested", r)
+    return r
+
+
+@app.post("/api/approvals/{rid}/decide")
+def approval_decide(rid: str, body: dict = Body(...)):
+    """A person's decision, made in the DEPTH studio. Needs ``DEPTH_APPROVER_PIN`` when that is set."""
+    try:
+        r = _APPROVALS.decide(rid, body.get("decision", ""), body.get("by", ""), body.get("note", ""), body.get("pin"))
+    except PermissionError as e:
+        raise HTTPException(403, str(e))
+    except KeyError:
+        raise HTTPException(404, "unknown request id")
+    except ApprovalError as e:
+        raise HTTPException(409 if "already" in str(e) else 400, str(e))
+    _notify("approval.decided", r)
+    return r
+
+
+# ---- MCP (Streamable HTTP) - the same tools as `python -m src.dashboard.mcp_server` (stdio) -------
+from starlette.routing import Route  # noqa: E402
+app.router.routes.append(Route("/mcp", endpoint=MCP_ENDPOINT))
+app.router.routes.append(Route("/mcp/", endpoint=MCP_ENDPOINT))
 
 
 # ---- serve the zero-build frontend -------------------------------------------------------------

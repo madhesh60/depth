@@ -32,6 +32,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   wireTwin();
   $("#demoBtn").onclick = () => (Demo.on ? Demo.stop() : Demo.run());
   $("#cfBtn").onclick = () => CF.toggle();
+  Appr.start();
   $("#demoStop").onclick = () => Demo.stop();
   wireAudit();
   await Promise.all([loadHealth(), loadSamples(), loadMetrics(), loadLabelStats()]);
@@ -873,6 +874,38 @@ async function loadBrief(surveyId) {
     $("#briefMeta").textContent = "unavailable"; $("#briefBody").innerHTML = `<p class="empty-hint">brief unavailable (${escapeHtml(String(e.message || e))})</p>`;
   }
 }
+/* approvals inbox: requests from this studio, MCP agents and partner consoles; a NAMED person decides */
+const Appr = {
+  timer: null,
+  async load() {
+    try {
+      const r = await fetch(`${API}/api/approvals`).then(x => x.json());
+      const c = r.counts || {}, list = r.requests || [];
+      $("#apprMeta").textContent = `${c.pending || 0} pending · ${c.approved || 0} approved · ${c.declined || 0} declined`;
+      if (!list.length) return;
+      $("#apprList").innerHTML = list.slice(0, 30).map(q => `<div class="appr" data-id="${escapeHtml(q.id)}">
+        <div class="appr-top"><span class="act">${escapeHtml(q.action)}</span><span>${escapeHtml(q.targets.slice(0, 6).join(", "))}${q.targets.length > 6 ? " …" : ""}</span><span class="st ${q.status}">${q.status}</span></div>
+        <div class="appr-why">${escapeHtml(q.rationale)}</div>
+        <div class="appr-meta">${escapeHtml(q.id)} · asked by ${escapeHtml(q.requested_by)} via ${escapeHtml(q.channel)} · ${new Date(q.t * 1000).toLocaleString()}${q.decision ? ` · ${q.status} by <b>${escapeHtml(q.decision.by)}</b>` : ""}</div>
+        ${q.status === "pending" ? `<div class="appr-btns"><button class="ok" data-d="approved">Approve</button><button class="no" data-d="declined">Decline</button></div>` : ""}
+      </div>`).join("");
+      $$("#apprList .appr-btns button").forEach(b => b.onclick = () => this.decide(b.closest(".appr").dataset.id, b.dataset.d));
+    } catch (e) { $("#apprMeta").textContent = "unavailable"; }
+  },
+  async decide(id, decision) {
+    const by = ($("#apprName").value || "").trim();
+    if (!by) { $("#apprName").focus(); $("#apprName").placeholder = "name required to decide"; return; }
+    localStorage.setItem("depth.approver", by);
+    const r = await fetch(`${API}/api/approvals/${encodeURIComponent(id)}/decide`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ decision, by }) });
+    const body = await r.json().catch(() => ({}));
+    Log.push([{ tool: "human_gate", msg: r.ok ? `${id} ${decision} by ${by}` : `${id}: ${body.detail || r.status}`, t: "" }]);
+    this.load();
+  },
+  start() {
+    $("#apprName").value = localStorage.getItem("depth.approver") || "";
+    this.load(); clearInterval(this.timer); this.timer = setInterval(() => { if (!document.hidden) this.load(); }, 8000);
+  },
+};
 /* provenance of the last result: which model, thresholds, OpenCV build (COOL?) and code produced it */
 function showProvenance(p) {
   const el = $("#provLine"); if (!el || !p) return;
