@@ -147,10 +147,11 @@ function wireModes() {
   $$(".mode-btn[data-mode]").forEach(b => b.onclick = () => {
     cancelTour();
     $$(".mode-btn").forEach(x => x.classList.toggle("is-active", x === b));
-    $("#workspace").dataset.mode = b.dataset.mode;
+    $("#workspace").dataset.mode = b.dataset.mode; document.body.dataset.mode = b.dataset.mode;
     if (b.dataset.mode === "survey" && state.map) setTimeout(refitIfLost, 80);
     if (b.dataset.mode === "study") { loadStudySummary(); }
     if (b.dataset.mode === "audit") { loadAuditSummary(); }
+    if (b.dataset.mode === "connect") { Connect.load(); }
   });
 }
 
@@ -874,6 +875,95 @@ async function loadBrief(surveyId) {
     $("#briefMeta").textContent = "unavailable"; $("#briefBody").innerHTML = `<p class="empty-hint">brief unavailable (${escapeHtml(String(e.message || e))})</p>`;
   }
 }
+/* ------------------------------------------------------------------ CONNECT (integrations) */
+const Connect = {
+  info: null, lastSecret: null,
+  code(txt, multi) {
+    const id = "cx" + Math.random().toString(36).slice(2, 8);
+    return `<div class="cx-code">${multi ? `<pre id="${id}">${escapeHtml(txt)}</pre>` : `<code id="${id}">${escapeHtml(txt)}</code>`}<button class="cx-copy" data-copy="${id}">copy</button></div>`;
+  },
+  wireCopy(root) {
+    root.querySelectorAll(".cx-copy[data-copy]").forEach(b => b.onclick = () => {
+      const t = document.getElementById(b.dataset.copy).textContent;
+      (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(() => { b.textContent = "copied ✓"; setTimeout(() => b.textContent = "copy", 1300); }).catch(() => {});
+    });
+  },
+  async load() {
+    try { this.info = await fetch(`${API}/api/integrations`).then(r => r.json()); } catch (e) { return; }
+    const i = this.info, base = i.base_url;
+    $("#cxBase").textContent = `base URL  ${base}   ·   OpenAPI ${i.openapi}`;
+    const tools = ["depth_status", "analyze_frame", "run_survey", "get_review_queue", "get_hazard", "get_resurvey_plan",
+      "get_stage1_counterfactual", "get_mission_brief", "export_report", "request_human_approval", "get_approval_status"];
+    $("#cxMcpBody").innerHTML = `
+      <div class="cx-row"><span>Endpoint</span>${this.code(i.mcp.url)}</div>
+      <div class="cx-row"><span>Auth</span><div>${i.mcp.token_required
+        ? `<span class="cx-ok">bearer token required</span> <span class="cx-note">(DEPTH_MCP_TOKEN, from the operator)</span>`
+        : `<span class="cx-warn">no token set</span> <span class="cx-note">— localhost only; set DEPTH_MCP_TOKEN before exposing it</span>`}</div></div>
+      <div class="cx-row"><span>Claude Code</span>${this.code(`claude mcp add --transport http depth ${i.mcp.url}` + (i.mcp.token_required ? ` --header "Authorization: Bearer <token>"` : ""))}</div>
+      <div class="cx-row"><span>Local (stdio)</span>${this.code(`claude mcp add depth -e DEPTH_LAZY_MODEL=1 -- ${i.mcp.stdio}`)}</div>
+      <div class="cx-row"><span>Tools</span><div class="cx-chips">${tools.map(t => `<span>${t}</span>`).join("")}</div></div>
+      <p class="cx-note">Agents run the loop and read every decision trace. They cannot approve, dispatch, label or change a threshold — <code>request_human_approval</code> only asks.</p>`;
+    const cols = await Promise.all(i.ogc.collections.map(c => fetch(`${API}/ogc/collections/${c}/items?survey_id=latest&limit=1`)
+      .then(r => r.ok ? r.json() : null).catch(() => null)));
+    $("#cxOgcBody").innerHTML = `
+      <div class="cx-row"><span>Landing page</span>${this.code(i.ogc.landing)}</div>
+      <div class="cx-row"><span>Collections</span><div class="cx-chips">${i.ogc.collections.map((c, k) =>
+        `<a href="${API}/ogc/collections/${c}/items?survey_id=latest" target="_blank" rel="noopener">${c}${cols[k] ? ` · ${cols[k].numberMatched}` : ""}</a>`).join("")}</div></div>
+      <div class="cx-row"><span>QGIS</span><ol class="cx-steps"><li>Layer ▸ Add Layer ▸ Add WFS / OGC API – Features Layer</li>
+        <li>New connection ▸ URL = the landing page ▸ version “OGC API – Features”</li><li>Connect ▸ choose <b>hazards</b> or <b>work_orders</b> ▸ Add</li></ol></div>
+      <div class="cx-row"><span>ArcGIS Pro</span><div>Insert ▸ Connections ▸ Server ▸ New OGC API Server ▸ the landing page</div></div>
+      <p class="cx-note">Filters: <code>survey_id=latest|&lt;id&gt;</code>, <code>bbox</code>, <code>limit</code> / <code>offset</code>, <code>public=true</code> (wreck positions generalised${i.ogc.public_forced ? " — forced on this server" : ""}). Synthetic demo positions carry <code>gps_synthetic: true</code>.</p>`;
+    this.loadHooks();
+    const snippet = `<script src="${base}/embed/depth-embed.js" defer></script>\n<depth-hazards api="${base}" survey="latest" limit="6" theme="light"></depth-hazards>`;
+    $("#cxEmbedBody").innerHTML = `<div class="cx-split"><div>${this.code(snippet, true)}
+        <p class="cx-note" style="margin-top:8px">Attributes: <code>survey</code> (id | latest) · <code>limit</code> · <code>theme</code> (light | dark) · <code>public</code> · <code>refresh</code> (seconds). A console on another origin must be listed in <code>DEPTH_CORS_ORIGINS</code>${i.cors_origins && i.cors_origins.length ? ` (now: ${escapeHtml(i.cors_origins.join(", "))})` : " (none set)"}.</p></div>
+        <div class="cx-embed-preview"><depth-hazards api="${API || location.origin}" survey="latest" limit="6" theme="light" refresh="0"></depth-hazards></div></div>`;
+    if (!customElements.get("depth-hazards")) { const s = document.createElement("script"); s.src = "embed/depth-embed.js"; document.head.appendChild(s); }
+    ["#cxMcpBody", "#cxOgcBody", "#cxEmbedBody"].forEach(sel => this.wireCopy($(sel)));
+  },
+  async loadHooks() {
+    const r = await fetch(`${API}/api/integrations/webhooks`);
+    if (r.status === 403) { $("#cxHooksBody").innerHTML = `<p class="cx-note">Webhook management needs the operator's admin token (DEPTH_ADMIN_TOKEN).</p>`; return; }
+    const w = await r.json();
+    const verify = [
+      "import hmac, hashlib, time",
+      "",
+      "def verify(secret: str, header: str, body: bytes) -> bool:",
+      "    parts = dict(p.split('=', 1) for p in header.split(','))   # X-DEPTH-Signature",
+      "    t = int(parts['t'])",
+      "    mac = hmac.new(secret.encode(), f'{t}.'.encode() + body, hashlib.sha256).hexdigest()",
+      "    return abs(time.time() - t) < 300 and hmac.compare_digest(mac, parts['v1'])"].join("\n");
+    const hooks = w.webhooks.length ? w.webhooks.map(h => `<tr><td class="mono">${escapeHtml(h.url)}<div class="cx-note">${escapeHtml(h.id)} · secret ${escapeHtml(h.secret)}</div></td>
+        <td class="mono">${escapeHtml(h.events.join(", "))}</td>
+        <td style="white-space:nowrap"><button class="cx-copy" data-test="${escapeHtml(h.id)}">send test</button> <button class="cx-copy" data-del="${escapeHtml(h.id)}">remove</button></td></tr>`).join("")
+      : `<tr><td colspan="3" class="cx-note">No webhooks yet.</td></tr>`;
+    const dels = w.deliveries.length ? w.deliveries.slice(0, 8).map(d => `<tr><td class="mono">${escapeHtml(d.event)} → ${escapeHtml(d.url)}</td>
+        <td class="${d.status === "delivered" ? "cx-ok" : "cx-warn"}">${escapeHtml(d.status)}${d.code ? " · " + d.code : ""}${d.error ? `<div class="cx-note">${escapeHtml(d.error)}</div>` : ""}</td>
+        <td class="mono">${d.ms ?? "–"}</td></tr>`).join("")
+      : `<tr><td colspan="3" class="cx-note">No deliveries yet.</td></tr>`;
+    $("#cxHooksBody").innerHTML = `
+      ${this.lastSecret ? `<div class="cx-secret">Signing secret for <b>${escapeHtml(this.lastSecret.id)}</b> — shown once, store it now:${this.code(this.lastSecret.secret)}</div>` : ""}
+      <div class="cx-split"><div>
+        <form class="cx-form" id="cxHookForm"><input type="url" id="cxHookUrl" placeholder="https://ops.example.org/depth-events" required />
+          <button class="cx-btn" type="submit">Add webhook</button>
+          <div class="cx-evs">${w.events.filter(e => e !== "ping").map(e => `<label><input type="checkbox" value="${e}" checked /> ${e}</label>`).join("")}</div></form>
+        <table class="cx-table" style="margin-top:12px"><thead><tr><th>Webhook</th><th>Events</th><th></th></tr></thead><tbody>${hooks}</tbody></table>
+        <table class="cx-table" style="margin-top:12px"><thead><tr><th>Recent deliveries</th><th>Status</th><th>ms</th></tr></thead><tbody>${dels}</tbody></table></div>
+        <div><div class="cx-note" style="margin-bottom:6px">Verify a delivery on your side (header <code>X-DEPTH-Signature: t=…,v1=…</code>):</div>${this.code(verify, true)}
+          <p class="cx-note" style="margin-top:8px">URLs that resolve to private, loopback or link-local addresses are refused (DEPTH_WEBHOOK_ALLOW_PRIVATE=1 for on-premise consoles). 3 attempts with back-off.</p></div></div>`;
+    this.wireCopy($("#cxHooksBody"));
+    $("#cxHookForm").onsubmit = async e => {
+      e.preventDefault();
+      const events = [...$$("#cxHookForm .cx-evs input:checked")].map(x => x.value);
+      const r2 = await fetch(`${API}/api/integrations/webhooks`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: $("#cxHookUrl").value, events }) });
+      const b = await r2.json();
+      if (!r2.ok) { alert(b.detail || r2.status); return; }
+      this.lastSecret = { id: b.id, secret: b.secret }; this.loadHooks();
+    };
+    $$("#cxHooksBody [data-test]").forEach(b => b.onclick = async () => { b.textContent = "sending…"; await fetch(`${API}/api/integrations/webhooks/${b.dataset.test}/test`, { method: "POST" }); this.loadHooks(); });
+    $$("#cxHooksBody [data-del]").forEach(b => b.onclick = async () => { await fetch(`${API}/api/integrations/webhooks/${b.dataset.del}`, { method: "DELETE" }); this.lastSecret = null; this.loadHooks(); });
+  },
+};
 /* approvals inbox: requests from this studio, MCP agents and partner consoles; a NAMED person decides */
 const Appr = {
   timer: null,

@@ -75,6 +75,26 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ## 4. Session log
 
+### 2026-09-26 (sweep 25) — Console integrations: OGC API – Features, signed webhooks, drop-in panel, Connect tab
+- **`src/dashboard/ogc.py`** — OGC API – Features (Part 1 Core + GeoJSON, Part 3 queryables) at
+  `/ogc`: `hazards` (tier, calibrated P(pot), review rank, evidence, error radius, **approval
+  status**), `resurvey_passes`, `routes`, `work_orders` (what a person approved). Paging, bbox,
+  `survey_id=latest`, `public=true` (wrecks generalised, revealing passes dropped;
+  `DEPTH_OGC_PUBLIC=1` forces it). Spans in-memory + persisted surveys. Checked with OWSLib (an
+  independent OGC client) against the live server.
+- **`src/dashboard/integrations.py`** — webhooks for `survey.completed` / `approval.requested` /
+  `approval.decided` (work orders carry positions): HMAC-SHA256 `t=…,v1=…` signatures, 3 attempts with
+  back-off, delivery log; SSRF guard (private / loopback / link-local refused at registration and
+  delivery); admin token for management.
+- **`webui/embed/depth-embed.js`** — `<depth-hazards>` web component (Shadow DOM, no deps, light /
+  dark): KPIs, a to-scale mini-map, the review queue with approval status.
+- Studio **Connect** tab: MCP / OGC / webhooks / embed with live URLs, copy buttons, QGIS + ArcGIS
+  steps, webhook management + delivery log + a verification snippet, and a live embed preview.
+  Connect mode is full width, scrolls, and hides the pipeline dock.
+- Found by the tests: the survey event's own links were overwritten by the generic ones (now merged).
+- Tests +5 (`test_integrations.py`: OGC conformance points + redaction + work orders; a real local
+  receiver verifies the signature; SSRF + admin guards; survey.completed). Docs: `docs/integrations.md`.
+
 ### 2026-09-26 (sweep 24) — DEPTH as an MCP server + human-approval requests
 - **`src/dashboard/mcp_server.py`** (official MCP SDK 1.28.1): 13 tools (status, samples, analyze a
   frame, overlay image, run a survey, review queue, a hazard with its decision trace, re-survey plan,

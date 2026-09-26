@@ -42,7 +42,7 @@ from typing import Callable, Optional
 
 import cv2
 import numpy as np
-from fastapi import Body, FastAPI, File, UploadFile, Query, HTTPException
+from fastapi import Body, FastAPI, File, UploadFile, Query, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -68,6 +68,7 @@ from src.agentic.twin import frame_twin, survey_twin
 from src.agentic import brief as brief_mod
 from src.agentic.approvals import ApprovalStore, ApprovalError
 from .mcp_server import ENDPOINT as MCP_ENDPOINT
+from .integrations import Webhooks, WebhookError, EVENTS as WEBHOOK_EVENTS
 
 log = logging.getLogger("depth.api")
 REPO = Path(__file__).resolve().parents[2]
@@ -92,6 +93,8 @@ _RUNTIME = configure_runtime()
 _METRICS = Metrics()
 _FEEDBACK = FeedbackStore()
 _APPROVALS = ApprovalStore()
+_WEBHOOKS = Webhooks()
+PUBLIC_URL = os.environ.get("DEPTH_PUBLIC_URL", "").rstrip("/")     # e.g. https://<cloudfront-domain>
 _STUDY: "OrderedDict[str, dict]" = OrderedDict()          # active study sessions (plan + the cards shown)
 _UPLOADS: "OrderedDict[str, np.ndarray]" = OrderedDict()     # recent uploaded frames (feedback persists them)
 MAX_UPLOAD_CACHE = 64
@@ -135,8 +138,39 @@ async def lifespan(_app: FastAPI):
 
 
 def _notify(event: str, payload: dict) -> None:
-    """Integration hook for DEPTH events (survey.completed, approval.requested, approval.decided)."""
-    log.info("event %s %s", event, payload.get("id") or payload.get("survey_id"))
+    """DEPTH events -> signed webhooks (src/dashboard/integrations.py). Approval events carry the
+    targets' positions so a console can act on an approved work order without calling back."""
+    data = dict(payload)
+    if event.startswith("approval.") and data.get("survey_id") in _SURVEYS:
+        s = _SURVEYS[data["survey_id"]]
+        idx = {t.oid: t for t in s.tracked}
+        data["targets_detail"] = [{"id": i, "class": idx[i].cls_name, "lat": idx[i].lat, "lon": idx[i].lon,
+                                   "error_m": idx[i].geo_error_m, "p_pot": idx[i].p_pot} for i in data.get("targets", []) if i in idx]
+        data["gps_synthetic"] = s.mission.gps_synthetic
+    data["links"] = {"approvals": f"{PUBLIC_URL}/api/approvals",
+                     "hazards": f"{PUBLIC_URL}/ogc/collections/hazards/items?survey_id={data.get('survey_id', 'latest')}",
+                     **(data.get("links") or {})}
+    try:
+        n = _WEBHOOKS.emit(event, data)
+        log.info("event %s %s -> %d webhook(s)", event, payload.get("id") or payload.get("survey_id"), n)
+    except Exception:                                   # integrations never break the product
+        log.exception("webhook emit failed")
+
+
+def _survey_event(d: dict) -> dict:
+    m, sid = d["mission"], d["survey_id"]
+    rp, cf = m.get("resurvey_plan") or {}, d.get("stage1_counterfactual") or {}
+    idx = {t["oid"]: t for t in d["tracked"]}
+    return {"survey_id": sid, "frames": len(d.get("frames") or []), "counts": m["counts"],
+            "gps": "none" if not m["gps_available"] else ("synthetic" if m["gps_synthetic"] else "real"),
+            "recall_promise": (m.get("guarantees") or {}).get("recall_promise"),
+            "review_top": [{"id": i, "p_pot": idx[i].get("p_pot"), "lat": idx[i].get("lat"), "lon": idx[i].get("lon")}
+                           for i in (m.get("review_queue") or [])[:5] if i in idx],
+            "resurvey_passes": len(rp.get("lines") or []), "boat_minutes": rp.get("boat_minutes_planned"),
+            "human_approval_required": True,
+            "links": {"brief": f"{PUBLIC_URL}/api/brief?survey_id={sid}",
+                      "geojson": f"{PUBLIC_URL}/api/report/geojson?survey_id={sid}",
+                      "ogc_hazards": f"{PUBLIC_URL}/ogc/collections/hazards/items?survey_id={sid}"}}
 
 
 app = FastAPI(title="DEPTH — See→Prove→Decide→Act", version="2.0.0", lifespan=lifespan)
@@ -304,6 +338,7 @@ def _run_survey(frames, gps: str, budget_minutes: Optional[float], nadir: Option
     reports = {fmt: export(fmt, result, prov=prov) for fmt in REPORT_FORMATS}
     reports.update({f"public.{fmt}": export(fmt, result, public=True, prov=prov) for fmt in PUBLIC_FORMATS})
     _JOBS.persist(result.survey_id, {k: v for k, v in d.items() if k != "frames"}, reports)
+    _notify("survey.completed", _survey_event(d))
     return d
 
 
@@ -628,6 +663,67 @@ def approval_decide(rid: str, body: dict = Body(...)):
         raise HTTPException(409 if "already" in str(e) else 400, str(e))
     _notify("approval.decided", r)
     return r
+
+
+# ---- integrations: signed webhooks + the Connect page's overview -----------------------------------
+def _admin(request: Request) -> None:
+    """Webhook management needs ``X-DEPTH-Admin: $DEPTH_ADMIN_TOKEN`` when that token is set."""
+    want = os.environ.get("DEPTH_ADMIN_TOKEN")
+    if want and request.headers.get("x-depth-admin") != want:
+        raise HTTPException(403, "admin token required (X-DEPTH-Admin)")
+
+
+@app.get("/api/integrations")
+def integrations(request: Request):
+    base = PUBLIC_URL or str(request.base_url).rstrip("/")
+    return {"base_url": base,
+            "mcp": {"url": f"{base}/mcp", "transport": "streamable-http", "token_required": bool(os.environ.get("DEPTH_MCP_TOKEN")),
+                    "stdio": "python -m src.dashboard.mcp_server"},
+            "ogc": {"landing": f"{base}/ogc", "collections": ["hazards", "resurvey_passes", "routes", "work_orders"],
+                    "public_forced": os.environ.get("DEPTH_OGC_PUBLIC", "0") == "1"},
+            "webhooks": {"events": list(WEBHOOK_EVENTS), "count": len(_WEBHOOKS.list()),
+                         "admin_token_required": bool(os.environ.get("DEPTH_ADMIN_TOKEN"))},
+            "embed": {"script": f"{base}/embed/depth-embed.js"},
+            "openapi": f"{base}/openapi.json", "docs": f"{base}/docs",
+            "cors_origins": _cors}
+
+
+@app.get("/api/integrations/webhooks")
+def webhooks_list(request: Request):
+    _admin(request)
+    return {"webhooks": _WEBHOOKS.list(), "deliveries": list(_WEBHOOKS.deliveries)[:30], "events": list(WEBHOOK_EVENTS)}
+
+
+@app.post("/api/integrations/webhooks")
+def webhooks_add(request: Request, body: dict = Body(...)):
+    _admin(request)
+    try:
+        return _WEBHOOKS.add(body.get("url", ""), body.get("events"), body.get("description", ""))
+    except WebhookError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.delete("/api/integrations/webhooks/{hid}")
+def webhooks_remove(hid: str, request: Request):
+    _admin(request)
+    if not _WEBHOOKS.remove(hid):
+        raise HTTPException(404, "unknown webhook")
+    return {"removed": hid}
+
+
+@app.post("/api/integrations/webhooks/{hid}/test")
+def webhooks_test(hid: str, request: Request):
+    _admin(request)
+    try:
+        return _WEBHOOKS.send_now(hid)
+    except KeyError:
+        raise HTTPException(404, "unknown webhook")
+
+
+# ---- OGC API - Features: any GIS / operations console reads hazards, passes, routes, work orders -----
+from . import ogc as ogc_mod  # noqa: E402
+_OGC_SURVEYS = ogc_mod.SurveyIndex(lambda: _SURVEYS, _JOBS.persist_dir)
+app.include_router(ogc_mod.make_router(_OGC_SURVEYS, lambda: _APPROVALS))
 
 
 # ---- MCP (Streamable HTTP) - the same tools as `python -m src.dashboard.mcp_server` (stdio) -------

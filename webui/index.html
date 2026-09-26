@@ -30,6 +30,7 @@
       <button class="mode-btn" data-mode="survey" role="tab">Survey</button>
       <button class="mode-btn" data-mode="study" role="tab" title="timed user study: manual review vs DEPTH cards">Study</button>
       <button class="mode-btn" data-mode="audit" role="tab" title="blinded audit: are the detector's false alarms really false?">Audit</button>
+      <button class="mode-btn" data-mode="connect" role="tab" title="connect AI agents (MCP), GIS / operations consoles (OGC API), webhooks, embeds">Connect</button>
     </nav>
 
     <button class="demo-btn" id="demoBtn" title="a guided 60-second walk through the whole loop — any key or click stops it">▶ 60-s demo</button>
@@ -257,6 +258,37 @@
         </div>
         <div class="study-screen" id="studyDone" hidden>
           <div class="st-card" id="stDoneCard"></div>
+        </div>
+      </div>
+      <!-- connect: standard interfaces for agents, GIS and operations consoles -->
+      <div class="connect scrollable" data-when="connect" id="connectPage">
+        <div class="cx-head">
+          <h2>Connect DEPTH to your systems</h2>
+          <p>Standard interfaces — no DEPTH-specific code on your side. AI agents, GIS and operations consoles can all
+             <b>read</b> DEPTH's results and <b>ask</b> for actions; only a named person in this studio approves.</p>
+          <div class="cx-base mono" id="cxBase"></div>
+        </div>
+        <div class="cx-grid">
+          <section class="cx-card" id="cxMcp">
+            <div class="cx-kicker">AI agents</div><h3>Model Context Protocol</h3>
+            <p class="cx-lead">Claude Desktop, Claude Code, IDE agents and partner agents run the sonar agent and file approval requests.</p>
+            <div class="cx-body" id="cxMcpBody"></div>
+          </section>
+          <section class="cx-card" id="cxOgc">
+            <div class="cx-kicker">GIS &amp; operations consoles</div><h3>OGC API – Features</h3>
+            <p class="cx-lead">QGIS, ArcGIS Pro, OpenLayers and any GeoJSON client read hazards, re-survey passes, routes and approved work orders.</p>
+            <div class="cx-body" id="cxOgcBody"></div>
+          </section>
+          <section class="cx-card cx-wide" id="cxHooks">
+            <div class="cx-kicker">Mission control · dispatch · ticketing</div><h3>Signed webhooks</h3>
+            <p class="cx-lead">DEPTH pushes <code>survey.completed</code>, <code>approval.requested</code> and <code>approval.decided</code> (an approved work order, with positions). Every delivery is HMAC-SHA256 signed.</p>
+            <div class="cx-body" id="cxHooksBody"></div>
+          </section>
+          <section class="cx-card cx-wide" id="cxEmbed">
+            <div class="cx-kicker">Any web console</div><h3>Drop-in hazard panel</h3>
+            <p class="cx-lead">One script tag and one element. Shadow DOM, no dependencies, light or dark.</p>
+            <div class="cx-body" id="cxEmbedBody"></div>
+          </section>
         </div>
       </div>
     </main>

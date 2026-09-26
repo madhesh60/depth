@@ -148,6 +148,8 @@ tier (value of information); every call — including the ones it chose not to m
 | `GET /api/metrics` | rolling per-stage p50/p95 on this host + arch / EC2 type / COOL |
 | `POST /api/analyze` | one frame → Stage 1 + evidence cards + traces (+ `frame_ref` for labels) |
 | `POST /api/jobs/survey`, `GET /api/jobs/{id}` | background survey jobs (no proxy timeouts) with progress |
+| `GET /ogc/…` | OGC API – Features: `hazards`, `resurvey_passes`, `routes`, `work_orders` (paging, bbox, `survey_id`, `public`) |
+| `/api/integrations[/webhooks]` | integration overview; signed webhook registry, test sends, delivery log (admin token) |
 | `POST /mcp` | MCP (Streamable HTTP, stateless, JSON) — the same 13 tools as `python -m src.dashboard.mcp_server` (stdio); bearer `DEPTH_MCP_TOKEN` |
 | `GET/POST /api/approvals` · `POST /api/approvals/{id}/decide` | human-approval requests: agents ask, a named person decides (append-only log) |
 | `GET /api/brief?survey_id=` | the mission brief + `writer` (template / llm), `grounding` report, `fallback_reason`, the facts it was written from |
