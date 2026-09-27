@@ -115,14 +115,24 @@ async function loadSamples() {
   state.samples.forEach(s => {
     const card = document.createElement("button");
     card.className = "sample-card"; card.dataset.id = s.id;
+    const parts = String(s.kind || "").split(" · ");   // "crab-pot sonogram · 6 labelled pots"
+    const thumb = document.createElement("div");
+    thumb.className = "sc-thumb";
     const img = document.createElement("img");
     img.alt = s.name; img.loading = "lazy";
     img.src = `${API}/api/sample_thumb/${encodeURIComponent(s.id)}`;
     img.onerror = () => img.replaceWith(sonarGlyph());
+    thumb.appendChild(img);
+    if (parts[1]) {                                    // pot count → a quiet badge, not a third wrapping line
+      const badge = document.createElement("span");
+      badge.className = "sc-count";
+      badge.textContent = parts[1].replace("labelled ", "");
+      thumb.appendChild(badge);
+    }
     const meta = document.createElement("div");
     meta.className = "sc-meta";
-    meta.innerHTML = `<div class="sc-name">${escapeHtml(s.name)}</div><div class="sc-kind">${escapeHtml(s.kind)}</div>`;
-    card.append(img, meta);
+    meta.innerHTML = `<div class="sc-name">${escapeHtml(s.name)}</div><div class="sc-kind">${escapeHtml(parts[0] || s.kind)}</div>`;
+    card.append(thumb, meta);
     card.onclick = () => selectSample(s.id, card);
     grid.appendChild(card);
   });
@@ -1272,10 +1282,10 @@ async function loadEffort(fromSliders) {
   const pl = (c, col, dash) => `<polyline fill="none" stroke="${col}" stroke-width="${dash ? 1.2 : 2}" ${dash ? 'stroke-dasharray="3 3"' : ""} points="${c[0].map((x, i) => X(x).toFixed(1) + "," + Y(c[1][i]).toFixed(1)).join(" ")}"/>`;
   const R = C.promise || 0, mt = C.minutes_to_promise;
   const grid = [0.25, 0.5, 0.75, 1].map(v => `<line class="gr" x1="${P.l}" x2="${W - P.r}" y1="${Y(v)}" y2="${Y(v)}"/><text x="2" y="${Y(v) + 3}">${Math.round(v * 100)}%</text>`).join("");
-  const mk = (m, col) => m == null ? "" : `<circle cx="${X(m)}" cy="${Y(R)}" r="4.5" fill="${col}" stroke="#10161d" stroke-width="2"/>`;
+  const mk = (m, col) => m == null ? "" : `<circle cx="${X(m)}" cy="${Y(R)}" r="4.5" fill="${col}" stroke="#0e141b" stroke-width="2"/>`;
   $("#effChart").innerHTML = `<svg class="eff-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="share of pots found versus analyst minutes">
     ${grid}<line class="ax" x1="${P.l}" x2="${W - P.r}" y1="${H - P.b}" y2="${H - P.b}"/>
-    <line x1="${P.l}" x2="${W - P.r}" y1="${Y(R)}" y2="${Y(R)}" stroke="#5a6874" stroke-dasharray="2 3"/>
+    <line x1="${P.l}" x2="${W - P.r}" y1="${Y(R)}" y2="${Y(R)}" stroke="#6a7885" stroke-dasharray="2 3"/>
     <text x="${P.l + 3}" y="${Y(R) - 3}">promise ≥ ${Math.round(R * 100)}%</text>
     ${pl(C.detector_list, EFF.list)}${pl(C.manual, EFF.man)}${pl(C.forecast, EFF.depth, true)}${pl(C.depth, EFF.depth)}
     ${mk(mt.manual, EFF.man)}${mk(mt.depth, EFF.depth)}

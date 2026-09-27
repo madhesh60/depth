@@ -42,3 +42,5 @@ NEEDTOIMPROVE.md
 _to_delete/
 # per-run Kaggle data.yaml path overrides (regenerable)
 data_exp*.yaml
+# local UI screenshot / CDP verification scratch (not a deliverable)
+.shots/

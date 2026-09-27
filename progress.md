@@ -75,6 +75,27 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ## 4. Session log
 
+### 2026-09-27 (sweep 27) — Peak design pass: one calm light model across the studio
+- **Depth, not flatness.** Added a single elevation system (`--sh-1/2/3`, `--hair` top-light,
+  `--ring` focus) and applied it consistently: rails → raised panels → cards → buttons now read on
+  separate planes instead of one dark sheet. Refined the ink ramp (deeper `--bg`, cleaner
+  `--surface*`, brighter `--txt-2/3` for legible labels) and added an `--inset` well + `--accent-line`
+  / `--accent-glow`. **Every semantic hue was held fixed** (verdict greens/ambers, accent cyan,
+  re-survey violet, missed-pot pink) so `styles.css`, `app.js` and `twin3d.js` stay in lockstep; the
+  two stale neutral hexes left in the effort chart were re-synced to the new tokens.
+- **Signature pipeline dock.** The See→Prove→Decide→Act stepper now has illuminated nodes and
+  gradient "flow" connectors (done→next reads green→cyan), an accent hairline along the dock top, and
+  a soft upward shadow — the literal pipeline is now the strongest visual in the frame.
+- **Consistent chrome.** Segmented controls (Verdicts/Raw, 2D/3D) unified with the mode-tabs'
+  inset-track style; primary button given a premium accent (inner highlight + glow); accessible 3 px
+  focus ring; sample cards lift on hover and show a selected-ring.
+- **Neatness fix.** Sample-card pot count moved to a quiet badge on the thumbnail (`sc-count`), so the
+  kind line no longer wraps to three ragged lines. Evidence cards, Connect cards, the KPI strip and
+  the hazard table (zebra + row hover) all sit on the same system.
+- **Verified on pixels, not vibes.** Drove headless Chrome over the DevTools Protocol to screenshot
+  real Analyze / Survey / Connect states (not mockups); 123/123 tests pass, CSS braces balanced, no
+  stale palette hexes, `node --check` clean on both JS files. Files: `webui/styles.css`, `webui/app.js`.
+
 ### 2026-09-26 (sweep 26) — Calm studio: formal, uncluttered, laptop-first
 - **Pipeline dock → slim status bar** (46 px) with an "Agent log" toggle; short screens start slim,
   the choice is remembered; toasts / the demo bar follow its height (`--dock-h`). On a 904×746 pane
