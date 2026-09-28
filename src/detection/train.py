@@ -15,10 +15,19 @@ EXP-002 recipe (review I-3 — the recall ceiling is the binding constraint: EXP
   (break range geometry), along-track flip only, mild brightness (gain), scale + translate for size.
   NOTE: ultralytics ``copy_paste`` is a no-op for box-only labels (it returns early without masks),
   so it is not used — the offline, range-preserving copy-paste in ``build_tiles.py`` replaces it.
-* **after training:** ``best.pt`` → ONNX (opset 12, static ``imgsz``) → verified through ``cv2.dnn``
-  (the deploy path) → ``model_meta.json`` (names, imgsz, data, args, best epoch, val metrics, sha256)
-  → ``<name>_complete.zip`` ready to download. Locally, ONE command plugs it in:
-  ``python -m src.detection.onboard_model --zip <name>_complete.zip``.
+* **checkpoint selection for the product, not the leaderboard:** ultralytics keeps the epoch with
+  the best ``0.9·mAP50-95 + 0.1·mAP50`` over *both* classes — box tightness, dominated by the easy wreck
+  class. DEPTH needs *ghost gear found* at a loose match (IoU ≥ 0.3). So every epoch is saved and,
+  after training, each checkpoint is validated on the held-out recordings and the one with the best
+  **ghost-gear AP@0.5** is kept as ``best_depth.pt`` (tie-break: all-class mAP50). The per-epoch table
+  and ultralytics' own pick are both recorded. (The val recordings also host the calibration later;
+  the promise is still verified once on test, so this selection cannot inflate it.)
+* **after training:** ``best_depth.pt`` → ONNX (opset 12, static ``imgsz``) → verified through
+  ``cv2.dnn`` (the deploy path) → ``model_meta.json`` (names, imgsz, data, args, selection, val
+  metrics, sha256) → ``<name>_complete.zip`` (per-epoch checkpoints excluded) ready to download.
+  Locally, ONE command plugs it in: ``python -m src.detection.onboard_model --zip <name>_complete.zip``.
+* **Kaggle-safe defaults:** no image cache (``--cache none``: a disk cache of ~9 k tiles at 1024 px
+  is ~27 GB and would overflow Kaggle's ~20 GB working disk hours into the run).
 
 Usage (Kaggle T4 — see docs/exp002_kaggle.md):
     python src/detection/train.py --data /kaggle/working/v2b_tiles/data.yaml --name EXP-002
@@ -59,7 +68,9 @@ def parse_args():
     p.add_argument("--no-cos-lr", action="store_true")
     p.add_argument("--fraction", type=float, default=1.0, help="train on a fraction (smoke tests)")
     p.add_argument("--workers", type=int, default=4)
-    p.add_argument("--cache", default="disk", help="ram | disk | none")
+    p.add_argument("--cache", default="none", help="none | ram | disk (disk/ram at 1024 px can exhaust Kaggle)")
+    p.add_argument("--select", default="ghost_ap50", choices=["ghost_ap50", "fitness"],
+                   help="checkpoint to export: best ghost-gear AP@0.5 on val (default) or ultralytics' fitness")
     p.add_argument("--device", default=None, help="0 | cpu | auto")
     p.add_argument("--name", default="EXP-002", help="run name under runs/")
     p.add_argument("--seed", type=int, default=42)
@@ -110,6 +121,34 @@ def _best_epoch(run: Path) -> dict:
             "val_recall": round(float(best["metrics/recall(B)"]), 4)}
 
 
+def select_checkpoint(run: Path, data: Path, names: list[str], imgsz: int, device, batch: int = 16) -> dict:
+    """Validate every saved checkpoint on the held-out val split; return the table and the pick
+    (best ghost-gear AP@0.5, tie-break all-class mAP50). Writes ``selection.csv`` next to the run."""
+    import re as _re
+    from ultralytics import YOLO
+    wdir = run / "weights"
+    g = names.index("ghost_gear") if "ghost_gear" in names else 0
+    cks = sorted(wdir.glob("epoch*.pt"), key=lambda p: int(_re.sub(r"\D", "", p.stem) or 0))
+    cks += [p for p in (wdir / "best.pt", wdir / "last.pt") if p.exists()]
+    rows = []
+    for ck in cks:
+        m = YOLO(str(ck)).val(data=str(data), imgsz=imgsz, batch=batch, conf=0.001, iou=0.6, split="val",
+                              device=device, plots=False, verbose=False, project=str(run / "select"),
+                              name=ck.stem, exist_ok=True)
+        idx = list(getattr(m.box, "ap_class_index", []))
+        ghost = float(m.box.ap50[idx.index(g)]) if g in idx else 0.0
+        rows.append({"checkpoint": ck.name, "ghost_ap50": round(ghost, 4), "map50": round(float(m.box.map50), 4),
+                     "map50_95": round(float(m.box.map), 4)})
+        print(f"  {ck.name:>12}: ghost_gear AP50 {ghost:.4f} | mAP50 {m.box.map50:.4f}")
+    shutil.rmtree(run / "select", ignore_errors=True)
+    (run / "selection.csv").write_text("checkpoint,ghost_ap50,map50,map50_95\n" + "\n".join(
+        f"{r['checkpoint']},{r['ghost_ap50']},{r['map50']},{r['map50_95']}" for r in rows) + "\n")
+    pick = max(rows, key=lambda r: (r["ghost_ap50"], r["map50"])) if rows else None
+    ub = next((r for r in rows if r["checkpoint"] == "best.pt"), None)
+    return {"criterion": "best ghost_gear AP@0.5 on the held-out val recordings (tie-break mAP50)",
+            "picked": pick, "ultralytics_best": ub, "table": rows}
+
+
 def main():
     a = parse_args()
     data = Path(a.data).resolve()                      # absolute: ultralytics resolves relative paths vs CWD
@@ -130,6 +169,7 @@ def main():
         project=str(REPO / "runs"), name=a.name, exist_ok=True,
         cos_lr=not a.no_cos_lr, lr0=a.lr0, close_mosaic=a.close_mosaic, fraction=a.fraction,
         workers=a.workers, cache=(False if a.cache == "none" else a.cache), plots=True,
+        save_period=(1 if a.select == "ghost_ap50" else -1),
         **SONAR_AUG,
     )
     run = REPO / "runs" / a.name
@@ -141,7 +181,22 @@ def main():
         "ultralytics": ultralytics.__version__, "python": platform.python_version(),
         "created": time.strftime("%Y-%m-%dT%H:%M:%S"), "notes": a.notes,
     }
-    print("best epoch:", json.dumps(meta["best"]))
+    print("ultralytics' best epoch (fitness):", json.dumps(meta["best"]))
+    if a.select == "ghost_ap50" and best.exists():
+        print("\nselecting the checkpoint for DEPTH (ghost-gear AP@0.5 on the held-out val recordings) ...")
+        sel = select_checkpoint(run, data, names, a.imgsz, a.device)
+        meta["selection"] = sel
+        if sel["picked"]:
+            from ultralytics.utils.torch_utils import strip_optimizer
+            src = run / "weights" / sel["picked"]["checkpoint"]
+            chosen = run / "weights" / "best_depth.pt"
+            shutil.copy2(src, chosen)
+            strip_optimizer(str(chosen))
+            best = chosen
+            print(f"picked {sel['picked']['checkpoint']}: ghost_gear AP50 {sel['picked']['ghost_ap50']} "
+                  f"(ultralytics best.pt: {(sel['ultralytics_best'] or {}).get('ghost_ap50')})")
+        for ep in (run / "weights").glob("epoch*.pt"):             # 30+ × ~40 MB: not shipped
+            ep.unlink()
 
     if not a.no_export and best.exists():
         from src.detection.export_onnx import export, verify

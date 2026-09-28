@@ -13,7 +13,8 @@ Legend: `[x]` done · `[ ]` open · **(YOU)** needs a person / an account / a GP
       pick it up automatically.
 - [ ] **(YOU) EXP-002 on Kaggle** — the recall ceiling (0.72) is the binding limit. Follow
       `docs/exp002_kaggle.md` (upload v2b once, paste the cells, Save & Run All). Then locally:
-      `python -m src.detection.onboard_model --zip EXP-002_complete.zip --max-ms 700`. Also the 640-px twin
+      `python -m src.detection.onboard_model --zip EXP-002_complete.zip --max-ms 700`. **Ready:** upload
+      `runs/kaggle_upload/depth-v2b.zip`, import `notebooks/exp002_kaggle.ipynb`, GPU T4 ×2. Also the 640-px twin
       EXP-002s (STUDY-13: resolution must be chosen on held-out recordings). Optional EXP-002p (+copy-paste).
 - [ ] **(YOU) AWS day** — `aws login`; subscribe to the COOL Graviton listing (note the AMI id);
       upload `best.onnx` to S3; `infra/deploy_aws.sh` (dry run → `APPLY=1`); check

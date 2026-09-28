@@ -219,6 +219,10 @@ def main():
          f"- classes `{names}` · input {imgsz}px · ONNX sha256 `{sha[:16]}…` · {msg}",
          f"- trained: best epoch {meta.get('best', {}).get('epoch')} of {meta.get('best', {}).get('epochs_run')} "
          f"(val mAP50 {meta.get('best', {}).get('val_mAP50')}), {meta.get('train_minutes')} min; data `{Path(meta.get('data', '')).parent.name}`",
+         (f"- **exported checkpoint:** `{meta['selection']['picked']['checkpoint']}` — "
+          f"{meta['selection']['criterion']}: ghost_gear AP50 {meta['selection']['picked']['ghost_ap50']} "
+          f"(ultralytics' fitness pick: {(meta['selection'].get('ultralytics_best') or {}).get('ghost_ap50')})"
+          if (meta.get("selection") or {}).get("picked") else "- exported checkpoint: ultralytics' best.pt (fitness)"),
          "", "## Guarantees (calibrated on held-out val recordings, verified once on test)", "",
          "| | EXP-001 (v1 val/test) | " + name + " (v2b val/test) |", "|---|--:|--:|",
          f"| recall ceiling at the detector floor (calibration) | {ogt.get('recall_ceiling')} | {gtee.get('recall_ceiling')} |",

@@ -58,3 +58,21 @@ def test_auc_gain_guard_on_degenerate_frames():
                                     "rl_mosaic": 0.0, "rl_mosaic_clahe": 0.0, "shadow": "none",
                                     "shadow_contrast": 0.0, "shadow_run": 0}]} for _ in range(5)]
     assert auc_gain_ci(frames, "agent_single", reps=20) == (0.0, 0.0, 0.0)
+
+
+def test_kaggle_safe_defaults(monkeypatch):
+    """No image cache (a 1024-px disk cache would overflow Kaggle's disk); ghost-gear-first selection."""
+    import src.detection.train as tr
+    monkeypatch.setattr(sys, "argv", ["train.py"])
+    a = tr.parse_args()
+    assert a.cache == "none" and a.select == "ghost_ap50" and a.imgsz == 1024 and a.patience == 8
+
+
+def test_notebook_pins_the_tested_ultralytics():
+    import json
+    repo = Path(__file__).resolve().parents[1]
+    pin = next(l.split("==")[1].strip() for l in (repo / "requirements-train.txt").read_text().splitlines()
+               if l.startswith("ultralytics=="))
+    nb = json.loads((repo / "notebooks" / "exp002_kaggle.ipynb").read_text(encoding="utf-8"))
+    src = "".join("".join(c["source"]) for c in nb["cells"])
+    assert f"ultralytics=={pin}" in src and "--cache\", \"none\"" in src and "EXP-002s" in src

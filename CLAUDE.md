@@ -85,6 +85,7 @@ pytest -q                                                  # test suite
 python -m src.agentic.calibrate                            # guaranteed tiers (val) → verified once (test)
 python -m src.detection.evaluate [--model M --test-split S]  # deploy-faithful detector eval
 python -m src.detection.onboard_model --zip EXP-002_complete.zip   # plug in a Kaggle-trained model
+python notebooks/make_exp002_notebook.py                    # regenerate the Kaggle notebook (exp002_kaggle.ipynb)
 python -m src.agentic.effort                               # analyst-effort curve
 python -m src.bench.product_bench --label <host>            # benchmark this machine
 python -m src.agentic.feedback stats|export                 # human labels → fine-tune set
