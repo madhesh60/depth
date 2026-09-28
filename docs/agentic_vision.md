@@ -207,7 +207,7 @@ and every survey exports its decision log (`mission.trace.jsonl`).
 | Orchestration & autonomy | 25% | stated objective; value-of-information tool use; analyst **and boat** budgets; stitching; repeat-sighting merge; routes; opposite-side re-survey planning (§3, §6) |
 | Task success | 20% | a recall promise that **held on unseen test** (86%); honest "no auto-confirm"; forecast held; effort measured, not assumed (§4, §6) |
 | Failure handling & human control | 15% | bounded LOW-RISK tier, budgeted REVIEW queue, human-approval gate, missed-pot labels, blinded audit (§5, §6) |
-| User experience | 10% | studio with four modes (Analyze · Survey · Study · Audit): guarantee badges, evidence cards, seabed overlay, map + routes + re-survey passes, live effort curve, downloads |
+| User experience | 10% | calm studio with five modes (Analyze · Survey · Study · Audit · Connect) and a guided 60-s demo: guarantee badges, evidence cards, seabed overlay, map + routes + re-survey passes, person-confirmed recovery route, 3D twin, live effort curve, downloads |
 
 **Reproduce:** `python -m src.agentic.calibrate` (fit + verify + report + `calibration.json`) ·
 `python -m src.agentic.pipeline --survey <dir>` · `python -m src.agentic.effort` · `pytest -q`.

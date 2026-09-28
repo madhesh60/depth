@@ -54,7 +54,8 @@ dashed violet = optional. Text version:_
  HUMAN LOOP  labels (✓ / ✕ / ＋missed) ─► fine-tune set     src/agentic/feedback.py
              timed study (manual vs cards) ─► effort curve  src/agentic/{study,effort}.py
              blinded false-alarm audit ─► audited precision src/detection/fp_audit.py
- SERVE   FastAPI (jobs, limits, metrics) + zero-build studio (Analyze · Survey · Study · Audit)   src/dashboard/, webui/
+ SERVE   FastAPI (jobs, limits, rate limits, metrics) + zero-build studio (Analyze · Survey · Study · Audit · Connect)
+         + MCP (/mcp) · OGC API – Features (/ogc) · signed webhooks · <depth-hazards> embed   src/dashboard/, webui/
  CLOUD   CloudFront ─► EC2 c8g (Graviton4) · COOL AMI · systemd ─► S3 · CloudWatch · Budgets · SSM   infra/
 ```
 

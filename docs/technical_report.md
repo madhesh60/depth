@@ -86,13 +86,14 @@ The **runtime** processes each frame through five stages, all OpenCV 5 on CPU:
    - **opposite-side re-survey passes**: each uncertain target predicts the bearing its shadow must flip to, a test that speckle cannot pass;
    - GeoJSON / GPX / KML / CSV / JSON exports with a **provenance stamp**, an agent **decision log** (JSONL) and a **mission brief**.
 
-**Serving.** FastAPI with a background job queue, upload limits and per-stage metrics. A zero-build web
-studio has four modes:
+**Serving.** FastAPI with a background job queue, upload limits, per-client rate limits and per-stage
+metrics. A zero-build web studio has five modes:
 
 - **Analyze:** one frame with its evidence and the agent's-eye view.
-- **Survey:** map, routes, re-survey passes, the "without Stage 1" counterfactual, and the **3D digital twin** (three.js: seabed in true ground range, the sonar at its tracked altitude, the acoustic triangle each height is measured from).
+- **Survey:** the shipped samples (synthetic GPS) or a **raw recording with real per-ping GPS**; map, routes, re-survey passes, the "without Stage 1" counterfactual, the person-confirmed recovery route, approvals, the mission brief, and the **3D digital twin** (three.js: seabed in true ground range, the sonar at its tracked altitude, the acoustic triangle each height is measured from).
 - **Study:** timed user study.
 - **Audit:** blinded false-alarm audit.
+- **Connect:** MCP, OGC API – Features, signed webhooks and the drop-in panel, with live URLs.
 
 A guided 60-second demo walks through the whole path.
 
