@@ -75,6 +75,14 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ## 4. Session log
 
+### 2026-09-28 (sweep 30) — Reproducibility: model fetch + CI
+- `python -m src.detection.fetch_model`: downloads the detector to `models/<MODEL>/best.onnx` and keeps
+  it only if its SHA-256 matches the published hash (the one every provenance stamp carries); EXP-001's
+  release entry is pinned (37,932,951 bytes, `55f827db…`). Tests +3.
+- `.github/workflows/tests.yml`: pinned deps on Ubuntu 24.04 / Python 3.10, fetch the model (tests that
+  need it skip until the release exists), print the OpenCV build, `pytest -q`. README badge.
+- **Pending the owner's OK:** publishing `best.onnx` as the GitHub Release `exp001-v1` (public).
+
 ### 2026-09-28 (sweep 29) — Public-demo protection
 - `src/dashboard/ratelimit.py`: per-client sliding-window limits (infer 30 / survey 6 / decide 60 /
   MCP 60 / other writes 60 per minute; 429 + Retry-After; reads never limited); the client is the

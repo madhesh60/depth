@@ -1,5 +1,7 @@
 # DEPTH — See · Prove · Decide · Act
 
+[![tests](https://github.com/madhesh60/depth/actions/workflows/tests.yml/badge.svg)](https://github.com/madhesh60/depth/actions/workflows/tests.yml)
+
 > **DEPTH** = **D**etect · **E**vidence · **P**rove · **T**riage · **H**azard-map — the pipeline
 > stages spell the name.
 
@@ -43,6 +45,7 @@ filter (STUDY-03/04), re-look vs plain confidence (STUDY-07), range-gain detecto
 
 ```bash
 pip install -r requirements.txt                    # torch-free runtime: OpenCV 5.0.0.93, FastAPI
+python -m src.detection.fetch_model                # the trained detector (38 MB, SHA-256 checked)
 python -m uvicorn src.dashboard.app:app --port 8000   # open http://localhost:8000
 ```
 

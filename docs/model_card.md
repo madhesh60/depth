@@ -57,4 +57,6 @@ deployed path.)
 - Trained on one bay / one sonar brand — generalisation unproven.
 - False negatives on ghost gear have real ecological cost → we run `fishing_gear` hot (recall-first)
   and route uncertainty to humans rather than dropping it.
-- License: **AGPL-3.0** (Ultralytics YOLO). Weights hosting + hash: see release notes.
+- License: **AGPL-3.0** (Ultralytics YOLO). Weights: GitHub Release `exp001-v1` (`best.onnx`, 37,932,951
+  bytes, SHA-256 `55f827db9bd5cbf89a87d50c767ecbf17594b9c8c654a428a80118ab3537c19e`) —
+  `python -m src.detection.fetch_model` downloads it and refuses any file whose hash differs.
