@@ -35,10 +35,11 @@
   <text x="44" y="156" class="s">Analyze · Survey · Study · Audit</text>
   <text x="44" y="174" class="xs">3D twin · map · reports</text>
 
-  <rect x="28" y="214" width="170" height="70" class="box"/>
+  <rect x="28" y="214" width="170" height="92" class="box"/>
   <text x="44" y="238" class="t b">Sonar frames</text>
   <text x="44" y="256" class="s">PINGMapper sonograms,</text>
   <text x="44" y="272" class="s">uploads, 8 shipped samples</text>
+  <text x="44" y="292" class="s b">raw Humminbird + real GPS</text>
 
   <!-- CloudFront -->
   <rect x="236" y="96" width="130" height="92" class="aws"/>

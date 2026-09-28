@@ -26,6 +26,8 @@ Graviton + COOL**.
 | OpenCV output changes the agent's actions: without Stage 1, **193 of 264** pins leave their own error circle and 13 of 63 re-survey passes regroup; the shadow changes no decision (evidence only) | [`causal_trace.md`](causal_trace.md) |
 | Break-even analyst time: DEPTH meets the promise faster than manual review if a card takes **< 7.95 s** | [`effort_curve.md`](effort_curve.md) |
 | Full product path **238 ms/frame p50** on a laptop CPU; one survey-hour of sonar in **43 s** | [`cool_benchmark.md`](cool_benchmark.md) |
+| A **raw sonar recording with real GPS** is read directly and checked against physics (GPS speed vs the speed field r = 0.95; course vs heading 2.4°), with a **measured range scale** (2.19 cm/sample ± 14.5%) → pins and heights in real metres | [`raw_recording.md`](raw_recording.md) |
+| A person's decision makes the agent **re-plan** the recovery route, queue, budget and passes; an impact ledger measures the reviewed precision | [`agentic_vision.md`](agentic_vision.md) |
 
 ---
 
@@ -195,7 +197,17 @@ On the verification split, 19 of 138 pots (14%) never reach a human
 
 We tried seam inference across chunk boundaries (STUDY-11b): **no recall gain, not shipped**
 ([`seam_inference.md`](seam_inference.md)). Most of these edges are augmentation crops, which dataset
-v2b removes.
+v2b removes. We also tried a larger input with a flipped second view (STUDY-13,
+[`scale_tta.md`](scale_tta.md)): +0.10 AP on the calibration recording, but **−0.06 AP on unseen data**.
+Not shipped.
+
+**Real, out-of-domain water (STUDY-14, [`raw_recording.md`](raw_recording.md)).** We ran the full agent on a
+raw Humminbird recording with real per-ping GPS: the Colorado River at Horseshoe Bend, 150.6 s, with no
+known crab pots.
+
+- It produced **8 review cards**, which is **191 cards per hour of sonar** at the detector floor.
+- Every card is a false alarm or an unknown object, so this is the review load the model would put on an analyst there.
+- All pins were placed from their own ping's GPS with a 3.0–6.7 m error radius.
 
 ### 4.6 Runtime and COOL
 
@@ -252,8 +264,8 @@ on Spot → S3.
 - **Recall ceiling.** EXP-001's ceiling caps the promise at 65%; EXP-002 (v2b, 1024 px, tiles) is the lever. The Kaggle kit is ready ([`exp002_kaggle.md`](exp002_kaggle.md)).
 - **Calibration.** Calibration uses a single recording, whose frames are correlated. That is why the promise is verified on a separate split.
 - **Labels.** Labels are incomplete, so precision is a lower estimate (the audit will quantify this).
-- **GPS.** The public frames carry no GPS. The demo track is synthetic and labelled as such everywhere, including the counterfactual's metres, which use the demo range scale.
-- **Heights.** Heights are relative (h/H). Metres need a measured altitude in metres.
+- **GPS.** The public crab-pot frames carry no GPS, so their demo track is synthetic and labelled as such everywhere, including the counterfactual's metres. The raw-recording path has **real** per-ping GPS and a measured range scale, but that recording is a river with no known pots: it measures false alarms, not recall.
+- **Heights.** On crab-pot frames heights are relative (h/H). On raw recordings they are in metres from the sonar's measured depth. The range scale there is measured, but 5 of 11 chunks were bottom-track false picks (reported), and its uncertainty (± 14.5%) is carried into every error radius.
 - **Effort.** Analyst seconds per card are assumed until the study measures them.
 
 ## 7. Responsible use
@@ -284,11 +296,13 @@ Log: [`experiments.md`](../experiments.md).
 ## 9. Reproduce
 
 ```bash
-pip install -r requirements-dev.txt && pytest -q             # 133 tests (CI: .github/workflows/tests.yml)
+pip install -r requirements-dev.txt && pytest -q             # 144 tests (CI: .github/workflows/tests.yml)
 python -m src.detection.fetch_model                          # the detector, SHA-256 checked
 python -m uvicorn src.dashboard.app:app --port 8000          # studio → "▶ 60-s demo"
 python -m src.agentic.calibrate                              # fit + verify the guarantees
 python -m src.detection.evaluate                             # deploy-faithful detector eval
 python -m src.agentic.study_causal --frames <v1>/test/images --limit 80   # STUDY-12
+python -m src.detection.study_scale_tta                      # STUDY-13
+python -m src.cv_pipeline.humminbird fetch && python -m src.cv_pipeline.humminbird report   # STUDY-14
 python -m src.bench.product_bench --label <host>             # benchmark this machine
 ```

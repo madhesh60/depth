@@ -75,6 +75,21 @@ now **measures geometry** the later stages need, ~5 ms per 640² frame:
 Validation without labels on 107 un-augmented originals (STUDY-08): port vs starboard on the same
 pings agree to a median **1.6 px** (null 5.3 px); consecutive chunks 1.2 px; 97% tracked.
 
+**Raw recordings** (`src/cv_pipeline/humminbird.py`, STUDY-14 → `docs/raw_recording.md`). A defensive
+reader for Humminbird `.DAT` + `B00x.SON/IDX`:
+
+* **Header walking and bounds.** It walks the tag-structured ping headers (the length is derived,
+  never assumed) and bounds-checks every offset and count.
+* **Corrupt input.** A corrupt ping is skipped with a recorded issue.
+* **What it yields.** Per-ping GPS (Humminbird Mercator, as in PINGMapper), heading, speed, **depth**
+  and 8-bit returns, plus 500-ping sonograms in the training layout.
+* **Physics checks** against the PINGMapper sample:
+  * GPS speed = 0.1 × the speed field, r = 0.95;
+  * course vs heading median 2.4°;
+  * the depth field is in decimetres.
+* **Measured range scale.** It is the sonar depth (m) ÷ the Stage-1 altitude (samples), 2.19 cm/sample
+  ± 14.5%. The uncertainty is the larger of the robust spread and the gap to beam physics.
+
 ## 4. See — the detector (`src/detection/infer.py`, `calibration.py`)
 
 YOLO11s exported to ONNX and run by **`cv2.dnn`** (OpenCV 5 new engine with fallback), letterbox →
@@ -111,7 +126,12 @@ tier (value of information); every call — including the ones it chose not to m
 ## 7. Act — survey level (`src/agentic/pipeline.py`, `resurvey.py`, `mission.py`, `geo.py`)
 
 * **geotag** — no GPS ⇒ no coordinates (honest). With a track: each object gets its **own ping**
-  (along-track offset from the frame-centre fix) and its **ground** range; error radius shown.
+  (along-track offset from the frame-centre fix) and its **ground** range; error radius shown. With a
+  **real recording**:
+  * the position comes from the object's own ping GPS fix and heading;
+  * the distance is the Stage-1 ground range × the measured scale;
+  * the error radius is 3 m GPS (assumed) + range × (scale uncertainty + sin 6°, the measured p90 heading error);
+  * heights are in metres, from the sonar's measured depth.
 * **chunk stitching** — an object cut by a chunk boundary is one hazard.
 * **repeat-sighting merge** — different-frame, same-class detections whose error circles overlap
   (tight gate; closest first; never two detections of one frame) → one hazard with `sightings`.
@@ -148,7 +168,9 @@ tier (value of information); every call — including the ones it chose not to m
 | `GET /api/health` | OpenCV version + `cv2.__file__` (COOL provenance), model state, calibration summary, limits, jobs |
 | `GET /api/metrics` | rolling per-stage p50/p95 on this host + arch / EC2 type / COOL |
 | `POST /api/analyze` | one frame → Stage 1 + evidence cards + traces (+ `frame_ref` for labels) |
-| `POST /api/jobs/survey`, `GET /api/jobs/{id}` | background survey jobs (no proxy timeouts) with progress |
+| `POST /api/jobs/survey`, `GET /api/jobs/{id}` | background survey jobs (no proxy timeouts) with progress; `gps=synthetic \| none \| recording` (the raw recording with real GPS) |
+| `GET /api/recording` | the raw recording available as a survey source, with its physics checks and measured range scale |
+| `POST /api/survey/{id}/decide` | a named person's confirm / reject / recovered / not_found / undo → the agent re-plans |
 | `GET /ogc/…` | OGC API – Features: `hazards`, `resurvey_passes`, `routes`, `work_orders` (paging, bbox, `survey_id`, `public`) |
 | `/api/integrations[/webhooks]` | integration overview; signed webhook registry, test sends, delivery log (admin token) |
 | `POST /mcp` | MCP (Streamable HTTP, stateless, JSON) — the same 13 tools as `python -m src.dashboard.mcp_server` (stdio); bearer `DEPTH_MCP_TOKEN` |
@@ -159,10 +181,18 @@ tier (value of information); every call — including the ones it chose not to m
 | `/api/study/*`, `GET /api/effort` | timed study + effort curves |
 | `/api/audit/*` | blinded audit |
 
-Hardening: plain-`def` endpoints (thread pool) with one `cv2.dnn` lock held per frame; images only,
-≤ 20 MB, ≤ 50 frames; CORS off unless configured; model warmed at startup; Leaflet vendored
-(SRI-checked); keyless basemaps with an offline grid fallback. UI: a zero-build panelled studio with
-four modes (Analyze · Survey · Study · Audit).
+Hardening:
+
+* **Inference:** plain-`def` endpoints (thread pool), with one `cv2.dnn` lock held per frame.
+* **Uploads:** images only, ≤ 20 MB, ≤ 50 frames.
+* **Load:** per-client rate limits on the expensive endpoints (`ratelimit.py`, 429 + Retry-After) and a
+  survey-queue cap (503).
+* **Access:** CORS off unless configured; bearer token on `/mcp`; admin token for webhooks.
+* **Startup:** the model is warmed at startup.
+* **Map:** Leaflet vendored (SRI-checked); keyless basemaps with an offline grid fallback.
+
+UI: a zero-build panelled studio with five modes (Analyze · Survey · Study · Audit · Connect). The
+pipeline dock collapses to a slim status bar.
 
 ## 10. Cloud + COOL (`infra/`)
 
@@ -186,33 +216,46 @@ workers (Spot) → S3.
 | v1 (4 classes, 29k images) | trained EXP-001 (the deployed model); its unseen crab-pot sonograms (v1 val Rec19, v1 test) host EXP-001's calibration/verification |
 | **v2b** (2 classes, sonar only, deduped) | EXP-002: val = held-out recordings Rec10/12/16; test = 214 unique crab-pot frames; `test_official398` (GhostVision head-to-head); `test_xsonar` (orange Contact crops) |
 
-EXP-002 (1024 px, full + tiles, optional sonar-aware copy-paste) is built and round-trip tested; the
-GPU run is on Kaggle ([`docs/exp002_kaggle.md`](docs/exp002_kaggle.md)).
+EXP-002 (1024 px and a 640-px twin, full + tiles, optional sonar-aware copy-paste) is built and
+round-trip tested. The GPU run is on Kaggle ([`docs/exp002_kaggle.md`](docs/exp002_kaggle.md)). Onboarding
+times each model against EXP-001 (`--max-ms`); STUDY-13 showed resolution must be chosen on held-out
+recordings.
+
+| external data | role |
+|---|---|
+| PINGMapper sample `Test-Small-DS` (R01224, Humminbird 9xx, Colorado River, 150.6 s) | the raw-recording path with real GPS (STUDY-14). Fetched and hash-pinned, never redistributed. |
+
+Weights: `python -m src.detection.fetch_model` (GitHub Release `exp001-v1`, SHA-256 checked).
 
 ## 12. Code map
 
 ```
-src/cv_pipeline/  canonical.py (Stage 1) · orientation.py · study_canonical.py (STUDY-08)
-                  pipeline.py (retired ROI gate, STUDY-01 record)
+src/cv_pipeline/  canonical.py (Stage 1) · humminbird.py (raw recordings, STUDY-14) · orientation.py ·
+                  study_canonical.py (STUDY-08) · pipeline.py (retired ROI gate, STUDY-01 record)
 src/detection/    infer.py · calibration.py · evaluate.py · export_onnx.py · train.py ·
-                  onboard_model.py · fp_audit.py · frames.py · error_analysis.py · tiled_infer.py
+                  onboard_model.py · fetch_model.py · fp_audit.py · frames.py · error_analysis.py ·
+                  tiled_infer.py · failure_gallery.py · seam.py · study_seam.py (11b) · study_scale_tta.py (13)
 src/agentic/      agent.py · perception.py · shadow.py · tools.py · evidence.py · policy.py ·
                   guarantees.py · calibrate.py · geo.py · stitch.py · resurvey.py · mission.py ·
-                  pipeline.py · feedback.py · study.py · effort.py · twin.py (3D twin) ·
+                  pipeline.py · approvals.py · feedback.py · study.py · effort.py · twin.py (3D twin) ·
                   provenance.py · brief.py (mission brief) · study_causal.py (STUDY-12) · types.py
 src/bench/        product_bench.py · fingerprint.py · compare.py (COOL benchmark)
-src/dashboard/    app.py · jobs.py · metrics.py · samples.py
-webui/            index.html · app.js · twin3d.js (three.js twin) · styles.css · samples/ (8 CC-BY-SA
-                  frames) · audit/ · vendor/leaflet · vendor/three
+src/dashboard/    app.py · jobs.py · metrics.py · samples.py · mcp_server.py · ogc.py · integrations.py ·
+                  ratelimit.py
+webui/            index.html · app.js · twin3d.js (three.js twin) · styles.css · embed/depth-embed.js ·
+                  samples/ (8 CC-BY-SA frames) · audit/ · vendor/leaflet · vendor/three
 infra/            deploy_aws.sh · setup_cool_instance.sh · depth.service · bench_cool.sh
-models/<MODEL>/   calibration.json · effort_curve.json · fp_audit_val.json (weights git-ignored)
+models/<MODEL>/   calibration.json · effort_curve.json · fp_audit_val.json (weights: fetch_model)
 DATASET/scripts/  audit_dataset · build_dataset_v1/v2/v2b · build_tiles · visualize_labels
+.github/          workflows/tests.yml (CI)
 ```
 
 ## 13. Known limits (stated in the product)
 
 * Recall ceiling of EXP-001 (0.72–0.86 by recording) caps the promise at 65% → EXP-002.
 * No precision promise yet → every find goes to a human.
-* Synthetic GPS in the demo (the HF frames carry none); metres of height need a range scale.
+* Synthetic GPS for the shipped crab-pot frames (the HF frames carry none). The raw recording has
+  real GPS and a measured scale, but it is a river with no known pots (a false-alarm measurement, not a
+  recall one).
 * Minutes saved and label noise are **pending human measurements** (Study, Audit).
 * COOL numbers pending the EC2 runs; the local reference is x86.

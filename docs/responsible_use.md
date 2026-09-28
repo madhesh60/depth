@@ -20,7 +20,12 @@ following constraints are built into the design, not just promised.
   object.
 - Demonstration tracks are clearly labelled **"SYNTHETIC DEMO GPS — not real coordinates"** in the
   UI and every export.
-- Reported geo error is a coarse, honest estimate that grows with across-track range.
+- Reported geo error is a coarse, honest estimate that grows with across-track range. On a **real
+  recording** it is built from stated parts:
+  - GPS, 3 m (assumed consumer grade);
+  - the measured range-scale uncertainty;
+  - the measured heading error.
+- Metres of height appear only where the sonar's own depth sounding provides a measured altitude.
 
 ## Sensitive locations
 
@@ -32,6 +37,9 @@ following constraints are built into the design, not just promised.
 ## Data & privacy
 
 - No personal data is processed — inputs are seabed sonar frames.
+- Raw recordings are untrusted binary input. The reader bounds-checks every length and offset, caps
+  file and sample sizes, and skips corrupt pings with a recorded issue. Nothing in a recording is
+  executed. The PINGMapper sample is fetched with every file SHA-256 pinned and is never redistributed.
 - Uploaded frames should be auto-deleted after a short retention window (e.g. 7 days via an S3
   lifecycle rule) on any hosted deployment; the demo holds results in memory only.
 
@@ -50,7 +58,7 @@ AGPL-3.0 (Ultralytics YOLO) — full source is public. Dataset sources retain th
 the [dataset card](dataset_card.md). Respect each source's attribution and share-alike terms.
 
 
-## Implemented safeguards (2026-09-25)
+## Implemented safeguards (2026-09-25, extended 2026-09-28)
 
 - **Public share mode** (`/api/report/<fmt>?public=1`, "public share" toggle): wreck / structural
   hazards (possible war graves, heritage sites) are generalised to ~1.1 km (0.01°) with an honest

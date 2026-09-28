@@ -40,6 +40,7 @@ and serves the app (`/api/health` → model warm in 0.3 s; `/api/analyze` works)
 
 | protection | how |
 |---|---|
+| raw recording with real GPS (optional) | the setup script fetches the PINGMapper sample (~11 MB, every file SHA-256 pinned); if it fails, the "Raw recording" survey source is simply hidden |
 | per-client rate limits on analyze / survey / decide / MCP | `src/dashboard/ratelimit.py`; the client is the first `X-Forwarded-For` hop (`DEPTH_TRUST_PROXY=1` in the unit — CloudFront) |
 | survey queue cap | 503 when `DEPTH_MAX_QUEUED_JOBS` (4) jobs are queued / running |
 | MCP bearer token | `/etc/depth/mcp.env` (`DEPTH_MCP_TOKEN`), root-only, generated once |

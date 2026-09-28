@@ -50,7 +50,7 @@ claude mcp add --transport http depth https://<cloudfront-domain>/mcp --header "
 | `list_samples` | the shipped CC-BY-SA sonar frames | no |
 | `analyze_frame` | full Stage 1 → See → Prove → Decide on one frame (a sample id or a base64 image) | no |
 | `frame_overlay` | the analysed frame as an image (seabed track, boxes by tier) | no |
-| `run_survey` | a whole survey; returns a `survey_id` and the plan summary | runs compute |
+| `run_survey` | a whole survey — the shipped samples (`gps=synthetic` / `none`) or the server's raw recording with real per-ping GPS (`gps=recording`); returns a `survey_id` and the plan summary | runs compute |
 | `get_review_queue` | REVIEW cards by calibrated P(pot), with evidence | no |
 | `get_hazard` | one hazard in full, including the agent's **decision trace** | no |
 | `get_resurvey_plan` | opposite-side passes with shadow-flip predictions | no |

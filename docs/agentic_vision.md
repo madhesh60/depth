@@ -144,6 +144,12 @@ shown as evidence with a relative height, never used to accept or reject.
 
 ## 6. Closing the loop — measure the sonar, act physically, learn from people
 
+**Real sonar, real positions (STUDY-14).** The same loop runs on a raw Humminbird recording
+(`src/cv_pipeline/humminbird.py`). Each pin comes from its own ping's GPS fix and heading. Its
+distance is the Stage-1 ground range × a range scale **measured** from the sonar's depth ÷ the
+Stage-1 altitude. So on real data Stage 1 decides *where* and *how far* in metres
+([`raw_recording.md`](raw_recording.md)).
+
 **Person-confirmed loop (perception → decision → person → re-plan → action).** EXP-001 supports no
 precision promise, so the agent auto-confirms nothing; the recovery route is built from what a named
 person confirms. Every ✓ / ✕ on a card, and every *recovered* / *not found* from a crew, makes the

@@ -5,10 +5,15 @@ COOL**). The product is named **DEPTH** (Detect · Evidence · Prove · Triage �
 stays `depth`. Proposal of record: [AGENT.md](AGENT.md) — the **as-built design is
 [architecture.md](architecture.md)** and supersedes the proposal where they differ.
 
-## What this is (as built, 2026-09-25)
+## What this is (as built, 2026-09-28)
 
-Side-scan sonar frames → a human-approved cleanup plan for ghost fishing gear / wreck debris.
-Runtime is torch-free **OpenCV 5** on CPU (built for AWS Graviton + COOL):
+Side-scan sonar frames — or a **raw Humminbird recording** with real per-ping GPS — → a human-approved
+cleanup plan for ghost fishing gear / wreck debris. Runtime is torch-free **OpenCV 5** on CPU (built
+for AWS Graviton + COOL):
+
+0. **Input** — sonogram images, or a raw recording (`src/cv_pipeline/humminbird.py`: defensive
+   `.DAT`/`.SON`/`.IDX` reader, per-ping GPS / heading / speed / depth, physics checks; the range
+   scale is MEASURED as sonar depth ÷ Stage-1 altitude — STUDY-14, `docs/raw_recording.md`).
 
 1. **Stage 1 — sonar canonicalisation** (`src/cv_pipeline/canonical.py`): palette→luminance,
    orientation by source rule (never guessed), **bottom tracking** (sonar altitude px per ping),
@@ -20,7 +25,8 @@ Runtime is torch-free **OpenCV 5** on CPU (built for AWS Graviton + COOL):
 4. **Decide** — **guaranteed tiers** fit on held-out recordings (Clopper–Pearson / LTT,
    `src/agentic/calibrate.py`): EXP-001 promises ≥ 65% of pots reach a human (held on test);
    no precision promise → nothing auto-confirmed. Value-of-information tool use, P(pot), budgets.
-5. **Act** — per-ping ground-range geotag, chunk stitching, repeat-sighting merge, recovery /
+5. **Act** — per-ping ground-range geotag (real recordings: the object's own ping fix + the measured
+   scale; heights in metres from the sonar's measured depth), chunk stitching, repeat-sighting merge, recovery /
    inspection routes, **opposite-side re-survey passes**, GeoJSON/GPX/KML/CSV/JSON, provenance
    stamps, agent decision log, **mission brief** (`brief.py`: template; optional Claude-on-Bedrock
    writer whose every number must trace to the survey, else the template is served).
@@ -28,6 +34,9 @@ Runtime is torch-free **OpenCV 5** on CPU (built for AWS Graviton + COOL):
    the agent re-plans routes, queue, budget and passes; impact ledger), labels (✓ / ✕ / ＋missed →
    fine-tune set), timed **Study** (effort curve,
    break-even card time), blinded false-alarm **Audit** with catch trials.
+7. **Connect** — MCP server (stdio + Streamable HTTP `/mcp`, bearer token; agents can only *ask* —
+   `approvals.py`), OGC API – Features (`/ogc`), HMAC-signed webhooks, `<depth-hazards>` web
+   component, per-client rate limits (`ratelimit.py`). Docs: `docs/mcp.md`, `docs/integrations.md`.
 
 Every runtime threshold comes from **`models/<MODEL>/calibration.json`** (`$DEPTH_MODEL`, default
 `EXP-001`): class names, input size, per-class floors, guaranteed class, tiers. Never hard-code a
@@ -60,6 +69,11 @@ Details: [infra/README.md](infra/README.md).
   `path` against the working directory).
 - `03_yolo_ready_dataset_v2b_tiles/` — `build_tiles.py` output: full frames + 2×2 tiles (+ optional
   `--paste N` sonar-aware copy-paste); val/test point at v2b's full frames.
+- `external/pingmapper_sample/` — PINGMapper's sample data (MIT code; Zenodo 10.5281/zenodo.6604666 holds
+  Git-LFS pointers, the objects come from the author's repo, every file SHA-256 pinned in
+  `humminbird.SAMPLE_FILES`): `Test-Small-DS` = recording R01224, Humminbird 9xx, Colorado River at
+  Horseshoe Bend, 150.6 s, real per-ping GPS. Fetched, never redistributed. (`Test-Large-DS`, the
+  1-h Solix Pearl River recording, is ~216 MB and not downloaded.)
 - The raw crab-pot archive is Roboflow-augmented (crops/rotations): measure pixel geometry only on
   single-copy originals; always evaluate on **unique frames** (`src/detection/frames.py`).
 
@@ -77,6 +91,9 @@ python -m src.agentic.feedback stats|export                 # human labels → f
 python -m src.detection.fp_audit build|summary              # blinded false-alarm audit
 python -m src.agentic.study_causal [--frames DIR]           # STUDY-12 counterfactual trace
 python -m src.dashboard.mcp_server                          # MCP over stdio (HTTP: /mcp on the server)
+python -m src.detection.fetch_model                         # the detector weights (SHA-256 checked)
+python -m src.cv_pipeline.humminbird fetch|validate|report  # raw recording with real GPS (STUDY-14)
+python -m src.detection.study_scale_tta                     # STUDY-13 (input size + flip TTA)
 ```
 
 ## Environment
@@ -90,16 +107,20 @@ profile `hackathon`, us-east-1); login + the MCP wizard are deferred to the AWS 
 ## Repo layout
 
 ```
-src/cv_pipeline/  canonical.py (Stage 1) · orientation.py · study_canonical.py · pipeline.py (STUDY-01 record)
-src/detection/    infer · calibration · evaluate · export_onnx · train · onboard_model · fp_audit · frames
+src/cv_pipeline/  canonical.py (Stage 1) · humminbird.py (raw recordings) · orientation.py ·
+                  study_canonical.py · pipeline.py (STUDY-01 record)
+src/detection/    infer · calibration · evaluate · export_onnx · train · onboard_model · fetch_model ·
+                  fp_audit · frames · failure_gallery · seam / study_seam (11b) · study_scale_tta (13)
 src/agentic/      agent · perception · shadow · tools · policy · guarantees · calibrate · geo · stitch ·
-                  resurvey · mission · pipeline · feedback · study · effort · types
+                  resurvey · mission (plan_mission / apply_human) · pipeline · approvals · brief · twin ·
+                  provenance · feedback · study · effort · study_causal (12) · types
 src/bench/        product_bench · fingerprint · compare (COOL benchmark)
-src/dashboard/    app (FastAPI) · jobs · metrics · samples
-webui/            zero-build studio · samples/ (8 CC-BY-SA frames) · audit/ crops · vendor/leaflet
+src/dashboard/    app (FastAPI) · jobs · metrics · samples · mcp_server · ogc · integrations · ratelimit
+webui/            zero-build studio · twin3d.js · embed/depth-embed.js · samples/ (8 CC-BY-SA frames) ·
+                  audit/ crops · vendor/leaflet · vendor/three
 infra/            deploy_aws.sh · setup_cool_instance.sh · depth.service · bench_cool.sh
-models/<MODEL>/   calibration.json · effort_curve.json · fp_audit_val.json (weights git-ignored)
-tests/            pytest suite
+models/<MODEL>/   calibration.json · effort_curve.json · fp_audit_val.json (weights: fetch_model)
+tests/            pytest suite (CI: .github/workflows/tests.yml)
 ```
 
 ## Git & delivery workflow

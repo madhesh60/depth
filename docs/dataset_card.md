@@ -7,13 +7,19 @@ Honest provenance for the training data. The data itself is git-ignored (S3); th
 
 | Source | Sensor | Content | License |
 |---|---|---|---|
-| PINGEcosystem crab-pot | **side-scan sonar** | derelict crab-pots (the real target) | CC-BY-SA-4.0 (confirm GPL note) |
+| PINGEcosystem crab-pot | **side-scan sonar** | derelict crab-pots (the real target) | card metadata CC-BY-SA-4.0, card text "GPL"; now gated — asked the authors (`docs/outreach.md`) |
 | UATD | **forward-looking sonar** | placed test objects (cylinder, tyre, cage…) | CC-BY-4.0 |
 | SeabedObjects-KLSG | side-scan sonar | shipwrecks | research use |
 | AI4Shipwrecks | side-scan sonar | shipwrecks | check page before publishing |
 | Marine PULSE | side-scan sonar | seabed surface, pipelines, platforms | check page |
 | ICRA19 ("bio") | **optical camera** (JAMSTEC) | fish / plants / sea life | JAMSTEC-derived, research use |
 | TrashCan | **optical camera** (JAMSTEC) | debris in video | JAMSTEC-derived, research use |
+
+**Evaluation-only external data (not used for training, not redistributed):**
+
+| Source | Sensor | Content | License / terms |
+|---|---|---|---|
+| PINGMapper sample `Test-Small-DS` (Bodine et al.; Zenodo 10.5281/zenodo.6604666 archives the Git-LFS pointers) | raw Humminbird 9xx side-imaging, 455 kHz | recording R01224, Colorado River at Horseshoe Bend (AZ), 150.6 s, **real per-ping GPS**, no labels, no known pots | code MIT; record "other-open"; fetched from the author's repository with every file SHA-256 pinned (`python -m src.cv_pipeline.humminbird fetch`) |
 
 > Three sensor modalities (side-scan, forward-looking, optical) look nothing alike. Mixing them
 > lets a model learn shortcuts (e.g. "optical photo → natural_formation"), which is exactly why v2
