@@ -205,6 +205,15 @@ v2b removes.
 | full product path, 1 thread | laptop x86 | 523 ms | 1.9 | 89 s |
 | **⏳ pending:** x86 stock · Graviton stock · **Graviton COOL** | EC2 c7i / c8g | — | — | — |
 
+**Proposal targets vs delivered.** Stated plainly, because judges compare the two:
+
+| proposal target | delivered | reading |
+|---|---|---|
+| mAP@0.5 ≥ 0.70 | all classes 0.827, but inflated by easy classes; **crab pots on sonar 0.473** | not met on the class that matters. EXP-002 is the lever; the promise below makes the shortfall safe to use. |
+| < 300 ms per frame | 238 ms p50 / 397 ms p95 (laptop, full product path) | met at p50, not at p95. Graviton + COOL numbers pending. |
+| ≥ 5 FPS | 3.9 FPS | not met. It is also the wrong yardstick for side-scan: one frame per ~43 s per channel arrives from the boat. What matters is survey-hours processed: **43 s of compute per hour of sonar (80× faster than real time)**. |
+| (not in the proposal) | ≥ 65% of pots reach a person, verified on unseen data (86%) | added: a promise instead of an average |
+
 The 3-way benchmark ([`infra/README.md`](../infra/README.md)) uses the same code, the same frames and
 the same model (all sha256-pinned), with threads pinned per run. A run counts as COOL only if
 `cv2.__file__` resolves under `/opt/cool`. It times the **product workload per stage** plus a
@@ -266,13 +275,17 @@ Details: [`responsible_use.md`](responsible_use.md) · [`model_card.md`](model_c
 - **STUDY-07** — re-look vs confidence: no gain on unseen data. The old test-tuned "CONFIRMED 0.737" is 0.58 on unseen data, and was retired.
 - **STUDY-08** — range-gain detector input: no gain for EXP-001.
 - **STUDY-11b** — seam inference: no recall gain.
+- **STUDY-13** — a larger input and a flipped second view: +0.10 AP on the calibration recording, but
+  **−0.06 AP on unseen data**. Not shipped. It also changed the EXP-002 plan, which now trains 640 and
+  1024 px and lets the held-out recordings and a speed gate choose.
 
 Log: [`experiments.md`](../experiments.md).
 
 ## 9. Reproduce
 
 ```bash
-pip install -r requirements.txt && pytest -q                 # 113 tests
+pip install -r requirements-dev.txt && pytest -q             # 133 tests (CI: .github/workflows/tests.yml)
+python -m src.detection.fetch_model                          # the detector, SHA-256 checked
 python -m uvicorn src.dashboard.app:app --port 8000          # studio → "▶ 60-s demo"
 python -m src.agentic.calibrate                              # fit + verify the guarantees
 python -m src.detection.evaluate                             # deploy-faithful detector eval

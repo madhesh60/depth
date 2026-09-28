@@ -75,6 +75,15 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ## 4. Session log
 
+### 2026-09-28 (sweep 31) — Submission documents: video script, proposal-vs-delivered, outreach
+- `docs/video_script.md`: a ≤ 5:00 storyboard around one sentence ("a promise, a proof and a plan"),
+  every number on screen from a regenerated report; the COOL segment has placeholders until the EC2 runs.
+- Technical report: **proposal targets vs delivered** stated plainly (crab-pot AP 0.473 < 0.70; 3.9 FPS
+  < 5, and why survey-hours are the right yardstick: 43 s per hour of sonar); STUDY-13 added; test count
+  + fetch step updated.
+- `docs/outreach.md`: two email drafts (quote + a recording with real GPS) and who to send them to —
+  for the owner to send; nothing is sent from here.
+
 ### 2026-09-28 (sweep 30) — Reproducibility: model fetch + CI
 - `python -m src.detection.fetch_model`: downloads the detector to `models/<MODEL>/best.onnx` and keeps
   it only if its SHA-256 matches the published hash (the one every provenance stamp carries); EXP-001's
