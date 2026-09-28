@@ -51,10 +51,24 @@ def _nearest_neighbour(points: list[TrackedObject]) -> list[TrackedObject]:
     return route
 
 
+HUMAN_DECISIONS = ("confirm", "reject", "recovered", "not_found", "undo")
+_CLOSED = ("rejected", "not_found", "recovered")         # a person closed it: off every route and queue
+
+
+def to_recover(t: TrackedObject) -> bool:
+    """On the recovery route: auto-CONFIRMED under the precision promise, or confirmed by a person —
+    and not yet recovered / rejected / not found."""
+    return t.human not in _CLOSED and (t.verdict is Verdict.CONFIRMED or t.human == "confirmed")
+
+
+def undecided_review(t: TrackedObject) -> bool:
+    return t.verdict is Verdict.REVIEW and t.human is None
+
+
 def build_mission(tracked: list[TrackedObject], gps_available: bool,
                   gps_synthetic: bool = False) -> MissionPlan:
-    confirmed = [t for t in tracked if t.verdict is Verdict.CONFIRMED]
-    review = [t for t in tracked if t.verdict is Verdict.REVIEW]
+    confirmed = [t for t in tracked if to_recover(t)]
+    review = [t for t in tracked if undecided_review(t)]
 
     if gps_available:
         ordered = _nearest_neighbour(confirmed)
@@ -76,8 +90,9 @@ def build_mission(tracked: list[TrackedObject], gps_available: bool,
 
 
 def review_queue(tracked: list[TrackedObject]) -> list[TrackedObject]:
-    """REVIEW cards, most-likely-real first: calibrated P(pot), then evidence score, then confidence."""
-    rev = [t for t in tracked if t.verdict is Verdict.REVIEW]
+    """Undecided REVIEW cards, most-likely-real first: calibrated P(pot), then evidence score, then
+    confidence. Cards a person already decided leave the queue."""
+    rev = [t for t in tracked if undecided_review(t)]
     return sorted(rev, key=lambda t: (-(t.p_pot if t.p_pot is not None else -1.0),
                                       -t.evidence_score, -t.conf, t.oid))
 
@@ -118,6 +133,80 @@ def plan_budget(queue: list[TrackedObject], minutes: float,
     }
 
 
+def impact_ledger(tracked: list[TrackedObject], log: list) -> dict:
+    """What people decided and what crews did — and the precision of the agent's REVIEW queue as
+    measured by those decisions (Clopper-Pearson 95% interval: a live, audited number)."""
+    from .guarantees import cp_lower, cp_upper
+    n = {k: sum(t.human == k for t in tracked) for k in ("confirmed", "rejected", "recovered", "not_found")}
+    real = n["confirmed"] + n["recovered"]
+    judged = real + n["rejected"] + n["not_found"]
+    return {**{f"person_{k}": v for k, v in n.items()},
+            "open_review": sum(undecided_review(t) for t in tracked),
+            "on_recovery_route": sum(to_recover(t) for t in tracked),
+            "decisions": len(log),
+            "reviewed_precision": round(real / judged, 3) if judged else None,
+            "reviewed_precision_ci95": [round(cp_lower(real, judged), 3), round(cp_upper(real, judged), 3)] if judged else None,
+            "note": "precision of the cards people have decided so far - not a promise for the rest of the queue"}
+
+
+def plan_mission(tracked: list[TrackedObject], track: Optional[dict], guarantees: dict,
+                 budget_minutes: Optional[float] = None, sec_per_card: float = DEFAULT_SEC_PER_CARD,
+                 boat_minutes: Optional[float] = None, repeat_merges: int = 0,
+                 human_log: Optional[list] = None) -> MissionPlan:
+    """The whole Act plan from the current state of the hazards — used for the first plan AND after
+    every person's decision (the agent re-plans; it never overrides a person)."""
+    from .resurvey import plan_resurvey
+    gps_available = bool(track)
+    gps_synthetic = gps_available and any(f.synthetic for f in track.values())
+    mission = build_mission(tracked, gps_available, gps_synthetic)
+    mission.repeat_merges = repeat_merges
+    queue = review_queue(tracked)
+    mission.review_queue = [t.oid for t in queue]
+    mission.guarantees = guarantees
+    if budget_minutes is not None:
+        mission.budget = plan_budget(queue, budget_minutes, sec_per_card)
+    plan_inspection(mission, tracked, mission.budget.get("review_ids") if mission.budget else mission.review_queue)
+    if gps_available:                        # the physical second look: opposite side, mid-swath
+        mission.resurvey_plan = plan_resurvey([t for t in tracked if t.human is None], track, boat_minutes)
+    mission.human_log = list(human_log or [])
+    mission.impact = impact_ledger(tracked, mission.human_log)
+    return mission
+
+
+def apply_human(survey: SurveyResult, oid: str, decision: str, by: str, note: str = "") -> TrackedObject:
+    """Record a PERSON's decision on one hazard and re-plan. The agent's verdict is kept as it was;
+    the decision is its own field and its own log line. Rules: confirm / reject an undecided card
+    (or an auto-CONFIRMED one); recovered / not_found only after it was on the recovery route; undo
+    re-opens it."""
+    import time as _t
+    if decision not in HUMAN_DECISIONS:
+        raise ValueError(f"decision must be one of {list(HUMAN_DECISIONS)}")
+    by = (by or "").strip()
+    if not by:
+        raise ValueError("the person's name is required")
+    t = next((x for x in survey.tracked if x.oid == oid), None)
+    if t is None:
+        raise KeyError(oid)
+    if decision in ("confirm", "reject") and t.human is not None:
+        raise ValueError(f"{oid} is already {t.human} - undo first")
+    if decision in ("recovered", "not_found") and not to_recover(t):
+        raise ValueError(f"{oid} is not on the recovery route (confirm it first)")
+    if decision == "undo" and t.human is None:
+        raise ValueError(f"{oid} has no decision to undo")
+    before = t.human
+    t.human = {"confirm": "confirmed", "reject": "rejected", "recovered": "recovered",
+               "not_found": "not_found", "undo": None}[decision]
+    t.human_by = by[:60] if t.human else None
+    log = list(survey.mission.human_log) + [{"t": round(_t.time(), 1), "hazard": oid, "decision": decision,
+                                             "before": before, "after": t.human, "by": by[:60], "note": (note or "")[:300],
+                                             "agent_verdict": t.verdict.value, "p_pot": t.p_pot}]
+    a = survey.plan_args or {}
+    survey.mission = plan_mission(survey.tracked, survey.track, survey.mission.guarantees,
+                                  a.get("budget_minutes"), a.get("sec_per_card", DEFAULT_SEC_PER_CARD),
+                                  a.get("boat_minutes"), survey.mission.repeat_merges, log)
+    return t
+
+
 # ---- exporters --------------------------------------------------------------------------------
 def _by_id(tracked: list[TrackedObject]) -> dict[str, TrackedObject]:
     return {t.oid: t for t in tracked}
@@ -155,7 +244,8 @@ def to_geojson(tracked: list[TrackedObject], mission: MissionPlan, prov: Optiona
                            "conf": t.conf, "evidence_score": t.evidence_score,
                            "height_m": t.height_m, "height_rel_alt": t.height_rel,
                            "shadow": t.shadow_quality, "also_in": t.also_in, "p_pot": t.p_pot,
-                           "geo_error_m": t.geo_error_m, "frame": t.frame_id},
+                           "geo_error_m": t.geo_error_m, "frame": t.frame_id,
+                           "person_decision": t.human, "decided_by": t.human_by},
         })
     idx = _by_id(tracked)
     coords = [[idx[i].lon, idx[i].lat] for i in mission.recovery_route if idx.get(i) and idx[i].lat is not None]
@@ -285,7 +375,9 @@ def to_trace(survey: SurveyResult, prov: Optional[dict] = None) -> str:
               "resurvey": {k: v for k, v in (m.resurvey_plan or {}).items() if k != "lines"},
               "resurvey_lines": [{k: L_[k] for k in ("id", "targets", "voi", "boat_min", "status")}
                                  for L_ in (m.resurvey_plan or {}).get("lines", [])],
-              "human_approval_required": m.human_approval_required})
+              "human_approval_required": m.human_approval_required, "impact": m.impact})
+    for h in m.human_log:
+        L.append({"type": "human", **h})
     return "\n".join(json.dumps(x, default=str) for x in L) + "\n"
 
 

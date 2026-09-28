@@ -628,3 +628,9 @@ body.dock-min .dock-stepper { border-bottom: 0; }
 .mb-tags .mb-tag { border-radius: 5px; font-size: 10.5px; color: var(--txt-2); background: var(--surface); }
 .mb-tags .mb-gate { color: #ffe2b8; border-color: rgba(217,164,65,.45); }
 @media (max-width: 1100px) { .kpi-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); } .kpi-t:nth-child(2) { border-right: 0; } .kpi-t:nth-child(-n+2) { border-bottom: 1px solid var(--border); } }
+/* person decisions in the hazard table */
+.rev-btns { display: inline-flex; gap: 4px; align-items: center; flex-wrap: nowrap; }
+.rev-btns button[data-d] { font-size: 10.5px; }
+.h-chip { font: 600 10.5px var(--mono); padding: 1px 6px; border-radius: 4px; border: 1px solid var(--border-2); color: var(--txt-2); white-space: nowrap; }
+.h-chip.h-confirmed, .h-chip.h-recovered { color: #9be8b3; border-color: rgba(46,160,67,.55); }
+.h-chip.h-rejected, .h-chip.h-not_found { color: var(--txt-3); }

@@ -97,6 +97,8 @@ def build_features(cid: str, surveys: list[dict], approvals, public: bool) -> li
                     "protected_site_generalised": bool(public and t["oid"] in sens),
                     "approval": {"id": a["id"], "action": a["action"], "status": a["status"]} if a else None,
                     "frame": t.get("frame_id"), "gps_synthetic": synth,
+                    "person_decision": t.get("human"), "decided_by": t.get("human_by"),
+                    "on_recovery_route": t["oid"] in set(m.get("recovery_route") or []),
                     "human_approval_required": True}))
         elif cid == "resurvey_passes":
             for L in (m.get("resurvey_plan") or {}).get("lines") or []:

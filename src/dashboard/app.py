@@ -631,6 +631,43 @@ def mission_brief(survey_id: str = Query(...), public: bool = Query(False),
     return out
 
 
+# ---- a person's decision on a hazard -> the agent re-plans (routes, queue, budget, passes) ----------
+@app.post("/api/survey/{survey_id}/decide")
+def survey_decide(survey_id: str, body: dict = Body(...)):
+    """confirm / reject a card, mark a route stop recovered / not_found, or undo. Made by a named
+    person in the studio (``DEPTH_APPROVER_PIN`` when set). The agent's own verdict is never
+    overwritten; the plan is rebuilt around the decision and every decision is logged."""
+    want = os.environ.get("DEPTH_APPROVER_PIN")
+    if want and body.get("pin") != want:
+        raise HTTPException(403, "approver PIN required - decisions are made by a person in the DEPTH studio")
+    s = _SURVEYS.get(survey_id)
+    if s is None:
+        raise HTTPException(409, "this survey is no longer in memory - re-run it to decide on its hazards")
+    from src.agentic.mission import apply_human
+    try:
+        t = apply_human(s, str(body.get("hazard_id", "")), str(body.get("decision", "")), str(body.get("by", "")),
+                        str(body.get("note", "")))
+    except KeyError:
+        raise HTTPException(404, "unknown hazard_id")
+    except ValueError as e:
+        raise HTTPException(409 if "already" in str(e) or "not on the" in str(e) or "no decision" in str(e) else 400, str(e))
+    d = s.to_dict()
+    d.pop("frames", None)
+    try:                                              # the persisted copy follows (OGC, reports)
+        prov = provenance_stamp()
+        old = json.loads(_JOBS.report(survey_id, "json") or "{}")
+        keep = {k: old[k] for k in ("twin", "frame_refs", "stage1_counterfactual") if k in old}
+        _JOBS.persist(survey_id, {**d, **keep, "provenance": prov},
+                      {fmt: export(fmt, s, prov=prov) for fmt in REPORT_FORMATS} |
+                      {f"public.{fmt}": export(fmt, s, public=True, prov=prov) for fmt in PUBLIC_FORMATS})
+    except Exception:
+        log.exception("persist after decision failed")
+    _notify("survey.replanned", {"survey_id": survey_id, "hazard_id": t.oid, "decision": body.get("decision"),
+                                 "by": t.human_by, "recovery_route": s.mission.recovery_route,
+                                 "route_length_m": s.mission.route_length_m, "impact": s.mission.impact})
+    return {"hazard": t.to_dict(), "tracked": d["tracked"], "mission": d["mission"]}
+
+
 # ---- human-approval requests: agents ask, people decide (src/agentic/approvals.py) ---------------
 @app.get("/api/approvals")
 def approvals(status: Optional[str] = Query(None, pattern="^(pending|approved|declined)$"),

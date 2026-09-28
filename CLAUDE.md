@@ -24,7 +24,9 @@ Runtime is torch-free **OpenCV 5** on CPU (built for AWS Graviton + COOL):
    inspection routes, **opposite-side re-survey passes**, GeoJSON/GPX/KML/CSV/JSON, provenance
    stamps, agent decision log, **mission brief** (`brief.py`: template; optional Claude-on-Bedrock
    writer whose every number must trace to the survey, else the template is served).
-6. **Human loop** — labels (✓ / ✕ / ＋missed → fine-tune set), timed **Study** (effort curve,
+6. **Human loop** — **person-confirmed loop** (a named person's ✓ / ✕ / recovered / not found →
+   the agent re-plans routes, queue, budget and passes; impact ledger), labels (✓ / ✕ / ＋missed →
+   fine-tune set), timed **Study** (effort curve,
    break-even card time), blinded false-alarm **Audit** with catch trials.
 
 Every runtime threshold comes from **`models/<MODEL>/calibration.json`** (`$DEPTH_MODEL`, default

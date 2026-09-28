@@ -2,7 +2,7 @@
 integrations.py — signed webhooks: DEPTH pushes events to a partner's operations console / ERP /
 ticketing system (an ocean institute's mission control, a cleanup NGO's dispatch board).
 
-Events: ``survey.completed`` · ``approval.requested`` · ``approval.decided`` (an approved decision is a
+Events: ``survey.completed`` · ``survey.replanned`` (a person decided a hazard; new route) · ``approval.requested`` · ``approval.decided`` (an approved decision is a
 work order: targets with positions) · ``ping``.
 
 Every delivery is a JSON POST signed like Stripe / GitHub webhooks, so the receiver can prove it came
@@ -41,7 +41,7 @@ from urllib.parse import urlparse
 
 log = logging.getLogger("depth.integrations")
 REPO = Path(__file__).resolve().parents[2]
-EVENTS = ("survey.completed", "approval.requested", "approval.decided", "ping")
+EVENTS = ("survey.completed", "survey.replanned", "approval.requested", "approval.decided", "ping")
 BACKOFF_S = (1.0, 4.0)
 
 

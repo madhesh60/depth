@@ -97,6 +97,9 @@ def facts(survey: dict, prov: Optional[dict] = None, public: bool = False) -> di
                                  "shadow_must_point_deg": lines[0]["predictions"][0]["shadow_must_point"]}
                                 if lines and lines[0].get("predictions") else None)} if rp else None),
         "protected_sites": sum(1 for t in tracked if t["cls_name"] in SENSITIVE_CLASSES),
+        "people": ({k: (m.get("impact") or {}).get(k) for k in ("decisions", "person_confirmed", "person_rejected",
+                                                              "person_recovered", "person_not_found", "reviewed_precision")}
+                   if (m.get("impact") or {}).get("decisions") else None),
         "public": public,
     }
     return F
@@ -159,8 +162,14 @@ def template_brief(F: dict) -> str:
     else:
         if ir["stops"]:
             L.append(f"- **Inspection route:** {ir['stops']} stops, {_n(ir['length_m'])} m (the cards above, nearest-first).")
-        L.append(f"- **Recovery route:** {rr['stops']} stops, {_n(rr['length_m'])} m." if rr["stops"]
-                 else "- **Recovery route:** none yet — nothing is confirmed until a human approves it.")
+        L.append(f"- **Recovery route:** {rr['stops']} stop{'' if rr['stops'] == 1 else 's'}, {_n(rr['length_m'])} m "
+                 f"(confirmed finds only)." if rr["stops"]
+                 else "- **Recovery route:** none yet — nothing is confirmed until a person confirms it.")
+    pp = F.get("people")
+    if pp:
+        L.append(f"- **People have decided {pp['decisions']} times:** {pp['person_confirmed']} confirmed, "
+                 f"{pp['person_rejected']} rejected, {pp['person_recovered']} recovered, {pp['person_not_found']} not found"
+                 + (f" — {_pct(pp['reviewed_precision'])} of the cards judged so far were real." if pp.get("reviewed_precision") is not None else "."))
     if rs and rs.get("passes"):
         L.append(f"- **Re-survey:** {rs['passes']} pass{'' if rs['passes'] == 1 else 'es'}, {_n(rs['boat_minutes'])} boat-minutes, covering "
                  f"{rs['targets_covered']} of {rs['targets_total']} uncertain targets from the other side.")

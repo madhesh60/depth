@@ -23,9 +23,9 @@ import numpy as np
 
 from .agent import ReLookAgent, render
 from .geo import PingFix, geotag, synthetic_track, DEFAULT_M_PER_PX
-from .mission import build_mission, export, review_queue, plan_budget, plan_inspection, DEFAULT_SEC_PER_CARD
+from .mission import export, plan_mission, DEFAULT_SEC_PER_CARD
 from .stitch import stitch_boundaries
-from .resurvey import merge_repeat_sightings, plan_resurvey
+from .resurvey import merge_repeat_sightings
 from .types import Candidate, FrameResult, MissionPlan, SurveyResult, TrackedObject, Verdict
 
 REPO = Path(__file__).resolve().parents[2]
@@ -69,7 +69,6 @@ class AgenticPipeline:
         """``frame_lock`` (optional context manager) is held per frame, not per survey, so a server
         can interleave single-frame requests with a long survey on one shared network."""
         gps_available = bool(track)
-        gps_synthetic = gps_available and any(f.synthetic for f in track.values())
 
         frame_results: list[FrameResult] = []
         for frame_id, image in frames:
@@ -105,20 +104,14 @@ class AgenticPipeline:
         merges = 0
         if gps_available:
             tracked, merges = merge_repeat_sightings(tracked)
-        mission = build_mission(tracked, gps_available, gps_synthetic)
-        mission.repeat_merges = merges
-        queue = review_queue(tracked)
-        mission.review_queue = [t.oid for t in queue]
-        mission.guarantees = self.guarantees()
-        if budget_minutes is not None:
-            mission.budget = plan_budget(queue, budget_minutes, sec_per_card)
-        plan_inspection(mission, tracked, mission.budget.get("review_ids") if mission.budget
-                        else mission.review_queue)
-        if gps_available:                        # the physical second look: opposite side, mid-swath
-            mission.resurvey_plan = plan_resurvey(tracked, track, boat_minutes)
+        mission = plan_mission(tracked, track if gps_available else None, self.guarantees(),
+                               budget_minutes, sec_per_card, boat_minutes, merges)
         if progress_cb:
             progress_cb("mission", mission.to_dict())
-        return SurveyResult(survey_id=survey_id, frames=frame_results, tracked=tracked, mission=mission)
+        return SurveyResult(survey_id=survey_id, frames=frame_results, tracked=tracked, mission=mission,
+                            track=track if gps_available else None,
+                            plan_args={"budget_minutes": budget_minutes, "sec_per_card": sec_per_card,
+                                       "boat_minutes": boat_minutes})
 
 
 _VERDICT_RANK = {Verdict.CONFIRMED: 2, Verdict.REVIEW: 1, Verdict.REJECTED: 0}

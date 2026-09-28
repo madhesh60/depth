@@ -144,6 +144,15 @@ shown as evidence with a relative height, never used to accept or reject.
 
 ## 6. Closing the loop — measure the sonar, act physically, learn from people
 
+**Person-confirmed loop (perception → decision → person → re-plan → action).** EXP-001 supports no
+precision promise, so the agent auto-confirms nothing; the recovery route is built from what a named
+person confirms. Every ✓ / ✕ on a card, and every *recovered* / *not found* from a crew, makes the
+agent re-plan the recovery route, the review queue, the analyst budget and the re-survey passes
+(`mission.apply_human` → `plan_mission`). The agent's own verdict stays as it was, and each decision is
+logged next to it, in the decision log, the GeoJSON, the OGC layer and the brief. The **impact
+ledger** turns the decisions into a live measured number: the precision of the cards reviewed so far,
+with a Clopper–Pearson 95% interval.
+
 **The agent measures before it judges (Stage 1, STUDY-08).** Before detection it tracks the seabed
 in every frame: the sonar's altitude per ping (validated with no labels — port and starboard, which
 see the same pings, agree to a median 1.6 px). That measured altitude drives the relative height on

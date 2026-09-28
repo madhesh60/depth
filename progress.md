@@ -75,6 +75,25 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ## 4. Session log
 
+### 2026-09-28 (sweep 27) — Person-confirmed loop: the plan finally has a recovery route
+- **Gap closed:** EXP-001 never auto-confirms, and a ✓ only saved a training label, so every demo
+  ended with a **0-stop recovery route**. The ✓ button also said "approved for recovery" while
+  nothing changed — the UI over-claimed.
+- `mission.apply_human` + `plan_mission` (one planner for the first plan AND every re-plan): a named
+  person's confirm / reject, and the crew's recovered / not found (only for route stops), rebuild
+  the recovery route, queue, analyst budget, inspection route and re-survey passes. Undo supported.
+  The agent's verdict is never overwritten (`TrackedObject.human`, `human_by`); every decision is
+  logged (`mission.human_log` → trace export `"type": "human"`).
+- **Impact ledger** (`mission.impact`): confirmed / rejected / recovered / not found, open queue,
+  and the **reviewed precision with a Clopper–Pearson 95% CI**.
+- `POST /api/survey/{id}/decide` (approver PIN when set; persisted copy + OGC follow; webhook
+  `survey.replanned`). OGC hazards carry `person_decision` / `on_recovery_route`; the brief reports
+  what people decided and stays grounded.
+- UI: ✓ / ✕ on review cards, recovered / not found / undo on route stops, decisions signed with the
+  approver's name; map markers + KPI tile + table header show the ledger; re-plans keep the map view.
+  Browser-verified: 3 confirmations → a 3-stop, 652 m numbered recovery route.
+- Tests +5 (`test_human_loop.py`); suite 128 passed.
+
 ### 2026-09-27 (sweep 27) — Peak design pass: one calm light model across the studio
 - **Depth, not flatness.** Added a single elevation system (`--sh-1/2/3`, `--hair` top-light,
   `--ring` focus) and applied it consistently: rails → raised panels → cards → buttons now read on

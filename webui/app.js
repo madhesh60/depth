@@ -707,7 +707,7 @@ async function pollJob(jobId) {
   throw new Error("timed out waiting for the survey job");
 }
 
-function renderSurvey(d) {
+function renderSurvey(d, opts = {}) {
   $("#surveyPlaceholder").hidden = true;
   const m = d.mission, cc = m.counts || {};
   const gpsTag = !m.gps_available ? `<span class="mb-tag">○ No GPS — table only</span>`
@@ -720,11 +720,13 @@ function renderSurvey(d) {
       ${tile("Hazards", total, `${cc.review || 0} for review · ${cc.confirmed || 0} confirmed`)}
       ${tile("Inspection stops", insp, m.inspection_length_m != null ? `${m.inspection_length_m} m · budgeted cards` : "no GPS — frame order")}
       ${tile("Re-survey passes", passes, passes ? `${rp.boat_minutes_planned} boat-min · opposite side` : "none planned")}
-      ${tile("Recovery stops", m.recovery_route.length, m.recovery_route.length ? `${m.route_length_m} m · confirmed finds` : "none — nothing is auto-confirmed")}
+      ${tile("Recovery stops", m.recovery_route.length, (m.impact && m.impact.decisions)
+        ? `${m.impact.person_confirmed} confirmed by people · ${m.impact.person_recovered} recovered`
+        : (m.recovery_route.length ? `${m.route_length_m} m · confirmed finds` : "none yet — a person confirms"))}
     </div>
     <div class="mb-tags">${gpsTag}${m.repeat_merges ? `<span class="mb-tag">◎ ${m.repeat_merges} repeat sighting${m.repeat_merges > 1 ? "s" : ""} merged</span>` : ""}<span class="mb-tag mb-gate">● Human approval required — nothing is dispatched automatically</span></div>`;
-  renderMap(d); renderDownloads(d.survey_id, m); renderThumbs(d); renderHazards(d); renderEffort(d); loadBrief(d.survey_id);
-  Log.push([
+  renderMap(d, opts.keepView); renderDownloads(d.survey_id, m); renderThumbs(d); renderHazards(d); renderEffort(d); loadBrief(d.survey_id);
+  if (!opts.keepView) Log.push([
     { stage: true, tool: "ACT", msg: `${cc.confirmed || 0} confirmed · ${cc.review || 0} review · ${cc.low_risk || 0} low-risk (kept for audit)`, t: "" },
     ...(m.budget && m.budget.cards_total != null ? [{ tool: "budget_plan", msg: `${m.budget.cards_affordable}/${m.budget.cards_total} review cards fit ${m.budget.minutes} min → ~${m.budget.expected_pots_in_budget} of ~${m.budget.expected_pots_in_queue} expected real pots`, t: "" }] : []),
     { tool: "plan_route", msg: `${m.recovery_route.length}-stop nearest-neighbour recovery route${m.route_length_m != null ? " · " + m.route_length_m + " m" : ""}`, t: "" },
@@ -734,7 +736,7 @@ function renderSurvey(d) {
   ]);
 }
 
-function renderMap(d) {
+function renderMap(d, keepView) {
   const m = d.mission, geoObjs = d.tracked.filter(t => t.lat != null && t.lon != null), note = $("#mapNote");
   if (!m.gps_available || !geoObjs.length) { $("#mapWrap").style.display = "none"; $("#cfBtn").hidden = $("#cfSum").hidden = true; CF.clear(); return; }
   $("#mapWrap").style.display = "";
@@ -761,9 +763,12 @@ function renderMap(d) {
   state.mapLayers.forEach(l => state.map.removeLayer(l)); state.mapLayers = [];
   const byId = Object.fromEntries(d.tracked.map(t => [t.oid, t])), latlngs = [];
   geoObjs.forEach(t => {
-    const color = VCOLOR[t.verdict] || "#8ba6c2";
-    const mk = L.circleMarker([t.lat, t.lon], { radius: t.verdict === "confirmed" ? 8 : 6, color: "#02121d", weight: 1.5, fillColor: color, fillOpacity: .95 })
-      .bindPopup(`<b>${t.oid}</b> · ${t.verdict}<br/>${t.cls_name} · conf ${t.conf}<br/>evidence ${t.evidence_score} · ${t.shadow_quality} shadow${t.height_m != null || t.height_rel ? ` · h ${heightText(t.height_m, t.height_rel, 1)}` : ""}<br/>${t.lat.toFixed(5)}, ${t.lon.toFixed(5)} ±${t.geo_error_m ?? "?"} m`);
+    const hc = { confirmed: "#2ea043", recovered: "#2ea043", rejected: "#5f6f7d", not_found: "#5f6f7d" }[t.human];
+    const color = hc || VCOLOR[t.verdict] || "#8ba6c2";
+    const onRoute = t.human === "confirmed" || (t.verdict === "confirmed" && !t.human);
+    const mk = L.circleMarker([t.lat, t.lon], { radius: onRoute ? 8 : (t.human === "rejected" || t.human === "not_found") ? 4 : 6,
+        color: onRoute ? "#d8ffe4" : "#02121d", weight: onRoute ? 2 : 1.5, fillColor: color, fillOpacity: (t.human === "rejected" || t.human === "not_found") ? .5 : .95 })
+      .bindPopup(`<b>${t.oid}</b> · ${t.verdict}<br/>${t.cls_name} · conf ${t.conf}<br/>evidence ${t.evidence_score} · ${t.shadow_quality} shadow${t.height_m != null || t.height_rel ? ` · h ${heightText(t.height_m, t.height_rel, 1)}` : ""}<br/>${t.lat.toFixed(5)}, ${t.lon.toFixed(5)} ±${t.geo_error_m ?? "?"} m${t.human ? `<br/><b>person: ${t.human}</b> (${escapeHtml(t.human_by || "")})` : ""}`);
     if (t.geo_error_m) {
       const ring = L.circle([t.lat, t.lon], { radius: t.geo_error_m, color, weight: 1, opacity: .55, fillOpacity: .06, dashArray: "3 4", interactive: false });
       ring.addTo(state.map); state.mapLayers.push(ring);
@@ -797,7 +802,7 @@ function renderMap(d) {
     state.mapLayers.push(arrow);
   });
   state.mapBounds = L.latLngBounds(latlngs).pad(0.25);
-  fitMap(); setTimeout(fitMap, 80);
+  if (!keepView) { fitMap(); setTimeout(fitMap, 80); }
   const cf = d.stage1_counterfactual;
   $("#cfBtn").hidden = !(cf && cf.available);
   CF.draw(d);
@@ -1043,7 +1048,11 @@ function renderHazards(d) {
   const rows = d.tracked;
   const rank = Object.fromEntries((d.mission.review_queue || []).map((id, i) => [id, i]));
   rows.sort((a, b) => (VERDICTS.indexOf(a.verdict) - VERDICTS.indexOf(b.verdict)) || ((rank[a.oid] ?? 1e9) - (rank[b.oid] ?? 1e9)));
-  $("#hazCount").textContent = `${rows.length} hazards · REVIEW ordered by P(pot) · LOW-RISK kept for audit`;
+  const imp = d.mission.impact || {};
+  $("#hazCount").textContent = `${rows.length} hazards · REVIEW ordered by P(pot)` + (imp.decisions
+    ? ` · people ✓${imp.person_confirmed} ✕${imp.person_rejected} ⚓${imp.person_recovered}` + (imp.reviewed_precision != null
+      ? ` · reviewed precision ${Math.round(imp.reviewed_precision * 100)}% (95% CI ${Math.round(imp.reviewed_precision_ci95[0] * 100)}–${Math.round(imp.reviewed_precision_ci95[1] * 100)}%)` : "")
+    : " · LOW-RISK kept for audit");
   const body = $("#hazBody"); body.innerHTML = "";
   rows.forEach(t => {
     const tr = document.createElement("tr"); tr.dataset.oid = t.oid;
@@ -1057,17 +1066,34 @@ function renderHazards(d) {
   });
   $$("#hazBody .rev-btns button").forEach(b => b.onclick = async e => {
     const tr = e.target.closest("tr"), t = rows.find(x => x.oid === tr.dataset.oid);
-    const ok = b.classList.contains("ok");
-    const res = t && await sendLabel({ bbox: t.bbox, cls_name: t.cls_name, decision: ok ? "confirm" : "reject",
-      verdict_before: t.verdict, conf: t.conf, p_pot: t.p_pot, source: "survey",
-      frame_id: t.frame_id, frame_ref: (d.frame_refs || {})[t.frame_id] });
-    tr.classList.add("rev-done");
-    e.target.closest("td").innerHTML = `<span class="muted">${ok ? "✓ approved" : "✕ rejected"}${res ? " · label saved" : ""}</span>`;
+    if (t) await decideHazard(d, t, b.dataset.d);
   });
 }
 function reviewCell(t) {
+  const HUM = { confirmed: "✓ confirmed", rejected: "✕ rejected", recovered: "⚓ recovered", not_found: "○ not found" };
+  const onRoute = t.human === "confirmed" || (t.verdict === "confirmed" && !t.human);
+  if (t.human && !onRoute) return `<span class="rev-btns"><span class="h-chip h-${t.human}" title="by ${escapeHtml(t.human_by || "")}">${HUM[t.human]}</span><button data-d="undo" title="re-open this card">undo</button></span>`;
+  if (onRoute) return `<span class="rev-btns">${t.human ? `<span class="h-chip h-confirmed" title="by ${escapeHtml(t.human_by || "")}">✓</span>` : ""}<button class="ok" data-d="recovered" title="the crew brought it up">recovered</button><button data-d="not_found" title="the crew went - nothing there">not found</button>${t.human ? `<button data-d="undo" title="re-open">undo</button>` : ""}</span>`;
   if (t.verdict !== "review") return `<span class="muted">—</span>`;
-  return `<span class="rev-btns"><button class="ok" title="approve for recovery">✓</button><button class="no" title="dismiss">✕</button></span>`;
+  return `<span class="rev-btns"><button class="ok" data-d="confirm" title="a real pot - put it on the recovery route">✓</button><button class="no" data-d="reject" title="not a pot - take it off the queue">✕</button></span>`;
+}
+/* a PERSON's decision -> the agent re-plans (recovery route, queue, budget, passes); also a training label */
+async function decideHazard(d, t, decision) {
+  const by = ($("#apprName").value || "").trim();
+  if (!by) { $("#apprName").focus(); $("#apprName").placeholder = "your name — required to decide"; toast("enter your name in Approvals first"); setTimeout(toastHide, 1800); return; }
+  localStorage.setItem("depth.approver", by);
+  const r = await fetch(`${API}/api/survey/${encodeURIComponent(d.survey_id)}/decide`, { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ hazard_id: t.oid, decision, by }) });
+  const b = await r.json().catch(() => ({}));
+  if (!r.ok) { toast(b.detail || `not saved (${r.status})`); setTimeout(toastHide, 2200); return; }
+  if (decision === "confirm" || decision === "reject")
+    sendLabel({ bbox: t.bbox, cls_name: t.cls_name, decision, verdict_before: t.verdict, conf: t.conf, p_pot: t.p_pot,
+      source: "survey", frame_id: t.frame_id, frame_ref: (d.frame_refs || {})[t.frame_id] });
+  state.survey.tracked = b.tracked; state.survey.mission = b.mission;
+  const m = b.mission;
+  Log.push([{ tool: "human_gate", msg: `${t.oid} ${decision} by ${by}`, t: "" },
+            { tool: "replan", msg: `recovery route ${m.recovery_route.length} stop(s)${m.route_length_m ? " · " + m.route_length_m + " m" : ""} · queue ${m.review_queue.length} · ${(m.resurvey_plan.lines || []).length} re-survey pass(es)`, t: "" }]);
+  renderSurvey(state.survey, { keepView: true });
 }
 
 /* ------------------------------------------------------------------ human labels (every decision is a training label) */

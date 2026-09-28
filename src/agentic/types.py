@@ -215,6 +215,10 @@ class TrackedObject:
     also_in: list[str] = field(default_factory=list)   # other chunks showing the same object
     p_pot: Optional[float] = None                      # calibrated P(real pot) for REVIEW ordering
     sightings: int = 1                                 # passes/frames that saw it (repeat sightings merged)
+    # a PERSON's decision (the agent's verdict above is never overwritten): confirmed | rejected |
+    # recovered (a crew brought it up) | not_found (a crew went, nothing there); None = undecided
+    human: Optional[str] = None
+    human_by: Optional[str] = None
 
     def to_dict(self) -> dict:
         return _json(asdict(self))
@@ -237,6 +241,8 @@ class MissionPlan:
     guarantees: dict = field(default_factory=dict)         # the promises the tiers carry
     resurvey_plan: dict = field(default_factory=dict)      # second-look passes (opposite side, mid-swath)
     repeat_merges: int = 0                                 # detections merged as repeat sightings
+    human_log: list = field(default_factory=list)          # every person's decision, in order
+    impact: dict = field(default_factory=dict)             # ledger: confirmed / rejected / recovered …
 
     def to_dict(self) -> dict:
         return _json(asdict(self))
@@ -249,6 +255,8 @@ class SurveyResult:
     frames: list[FrameResult]
     tracked: list[TrackedObject]
     mission: MissionPlan
+    track: Optional[dict] = None          # the GPS track used (kept for re-planning; not serialised)
+    plan_args: dict = field(default_factory=dict)   # budget / boat minutes the plan was made with
 
     def to_dict(self) -> dict:
         return {
