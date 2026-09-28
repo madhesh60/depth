@@ -157,8 +157,9 @@ def run_survey(use_samples: bool = True, images_base64: Optional[list[str]] = No
     """Run a whole survey: every frame through the agent, then chunk stitching, repeat-sighting merge,
     the review queue ordered by calibrated P(pot), the analyst budget, inspection/recovery routes,
     opposite-side re-survey passes and the Stage-1 counterfactual. gps='synthetic' lays a labelled demo
-    track (the public frames carry no GPS); gps='none' gives a table-only plan. Returns a summary and a
-    survey_id for the other tools."""
+    track (the public frames carry no GPS); gps='none' gives a table-only plan; gps='recording' runs the
+    server's RAW sonar recording with real per-ping GPS and a measured range scale. Returns a summary and
+    a survey_id for the other tools."""
     import time
     import cv2
     import numpy as np
@@ -177,10 +178,15 @@ def run_survey(use_samples: bool = True, images_base64: Optional[list[str]] = No
         frames = A._sample_frames()
     else:
         raise ValueError("use_samples=true or give images_base64")
-    if gps not in ("synthetic", "none"):
-        raise ValueError("gps must be 'synthetic' or 'none'")
+    if gps not in ("synthetic", "none", "recording"):
+        raise ValueError("gps must be 'synthetic', 'none' or 'recording' (the raw recording with real GPS)")
+    track = None
+    if gps == "recording":
+        if not A._recording_summary().get("available"):
+            raise ValueError("no raw recording on this server")
+        frames, track, _, _ = A._recording()
     sid = f"survey-{time.strftime('%Y%m%d-%H%M%S')}-{len(frames)}f-mcp"
-    d = A._run_survey(frames, gps, budget_minutes, None, sid, None, boat_minutes)
+    d = A._run_survey(frames, gps, budget_minutes, None, sid, None, boat_minutes, track)
     m = d["mission"]
     rp = m.get("resurvey_plan") or {}
     cf = d.get("stage1_counterfactual") or {}

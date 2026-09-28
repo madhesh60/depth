@@ -51,7 +51,9 @@ class AgenticPipeline:
     def run_frame(self, frame: np.ndarray, frame_id: str = "frame",
                   fix: Optional[PingFix] = None, nadir: Optional[str] = None,
                   progress_cb: Optional[Callable[[str, dict], None]] = None) -> FrameResult:
-        result = self.agent.run_frame(frame, frame_id=frame_id, nadir=nadir, progress_cb=progress_cb)
+        # a real recording's sonar depth is a MEASURED altitude in metres -> heights in metres
+        alt_m = fix.depth_m if (fix is not None and not fix.synthetic and fix.depth_m) else None
+        result = self.agent.run_frame(frame, frame_id=frame_id, nadir=nadir, progress_cb=progress_cb, altitude_m=alt_m)
         if fix is not None:
             for c in result.candidates:
                 geotag(c, fix, result.nadir, result.width, result.height, frame_id, self.m_per_px)

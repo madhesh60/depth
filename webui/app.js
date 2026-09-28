@@ -43,6 +43,7 @@ async function loadHealth() {
   try {
     const h = await fetch(`${API}/api/health`).then(r => r.json());
     const cv = $("#pillCv"), md = $("#pillModel");
+    if (h.recording && h.recording.available && $("#gpsRecording")) $("#gpsRecording").hidden = false;
     cv.textContent = `OpenCV ${h.opencv}`;
     cv.className = "pill " + (String(h.opencv).startsWith("5") ? "pill-ok" : "pill");
     md.textContent = h.model_loaded ? "model ready" : h.model_error ? "model error" : "model warming up…";
@@ -740,8 +741,12 @@ function renderMap(d, keepView) {
   const m = d.mission, geoObjs = d.tracked.filter(t => t.lat != null && t.lon != null), note = $("#mapNote");
   if (!m.gps_available || !geoObjs.length) { $("#mapWrap").style.display = "none"; $("#cfBtn").hidden = $("#cfSum").hidden = true; CF.clear(); return; }
   $("#mapWrap").style.display = "";
+  const rc = d.recording && d.recording.available ? d.recording : null;
   note.textContent = m.gps_synthetic
     ? "⚠ SYNTHETIC DEMO GPS — not real coordinates. The HF crab-pot frames carry no GPS; this track is generated only to demonstrate the map + route."
+    : rc ? `Real per-ping GPS — raw Humminbird recording ${rc.name} (PINGMapper sample, ${rc.duration_s} s, ${rc.track_m} m of track). `
+      + (rc.range_scale && rc.range_scale.m_per_sample ? `Range scale measured: ${(rc.range_scale.m_per_sample * 100).toFixed(2)} cm/sample ±${Math.round(rc.range_scale.rel_unc * 100)}% (sonar depth ÷ Stage-1 altitude). ` : "")
+      + "No crab pots are known in this river — its cards measure false alarms."
     : "Real per-ping GPS.";
   if (!state.map) {
     state.map = L.map("map", { zoomControl: true, attributionControl: true, maxZoom: 20 });

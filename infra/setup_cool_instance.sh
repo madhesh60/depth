@@ -42,6 +42,10 @@ elif [ -n "${DEPTH_MODEL_URL:-}" ]; then curl -fsSL "$DEPTH_MODEL_URL" -o "$MODE
 if [ -n "${DEPTH_MODEL_SHA256:-}" ]; then
   echo "$DEPTH_MODEL_SHA256  $MODEL" | sha256sum -c - || { echo "ERROR: model sha256 mismatch" >&2; exit 2; }
 fi
+# the raw recording with real per-ping GPS (PINGMapper sample, ~11 MB, every file SHA-256 pinned) -
+# optional: the "Raw recording" survey source appears only if this succeeds
+( cd "$APP" && PYTHONPATH="$APP" "$COOL_PY" -m src.cv_pipeline.humminbird fetch ) \
+  || echo "note: raw-recording fetch skipped - the real-GPS survey source will be hidden"
 
 echo "== [4/5] web deps -> $APP/pydeps (COOL venv untouched)"
 # exact tree of the locally tested web stack (none of it depends on numpy/opencv)

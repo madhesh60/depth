@@ -108,6 +108,38 @@ Promote each into the log below with full results as it runs.
 
 ## Experiment log
 
+### STUDY-14 — A raw sonar recording with real GPS, read directly (physics-validated)
+
+- Tool: `python -m src.cv_pipeline.humminbird report` → `docs/raw_recording.md` + `docs/img/raw_recording.jpg`.
+  Data: PINGMapper sample `Test-Small-DS` (Zenodo 10.5281/zenodo.6604666 archives only Git-LFS
+  pointers; the objects come from the author's repository, each file SHA-256 pinned). It is recording
+  R01224: a Humminbird 9xx, 67-byte headers, 455 kHz, 150.6 s, 3,453 pings per side-scan channel.
+  It was recorded on the **Colorado River at Horseshoe Bend, AZ**, not the Mississippi recording the
+  Zenodo text describes (that is the ~216 MB `Test-Large-DS`, not downloaded).
+- Parser: 0 malformed pings, records and times monotonic, `.IDX` offsets consistent. A defensive
+  header walker handles every model family; a corrupt ping is skipped with an issue and the reader
+  resyncs (tested on synthetic files).
+- **Physics checks (no labels):**
+  - GPS speed = **0.103 × the speed field** (r = 0.946), so the field is in 0.1 m/s. The web
+    documentation says cm/s; the data says otherwise.
+  - |course over ground − heading|: median **2.4°**, p90 6.0°, so heading is in 0.1°.
+  - The depth field is in **decimetres** (1.0–6.6 m). Reading it as cm makes the range scale 10× off
+    the beam physics.
+  - Positions lie on the river channel in satellite imagery.
+- **Measured range scale** = sonar depth ÷ Stage-1 altitude, per 500-ping chunk: **2.19 cm/sample**.
+  - The robust spread is 6.8%; the beam-physics estimate is 1.88 cm (14.5% away).
+  - The uncertainty carried is **± 14.5%**.
+  - 5 of 11 chunks lie more than 3 robust σ away: bottom-track false picks, reported.
+- **Full agent** (14 frames, 5.8 s = 26× faster than the recording):
+  - 8 review cards, 0 auto-confirmed;
+  - P(pot) 0.15–0.44;
+  - heights 0.10–0.63 m (metres, from the measured depth);
+  - pins placed from their own ping's GPS, error radius 3.0–6.7 m.
+- **Reading.** No crab pots are known in this reach and there is no ground truth, so every card is a
+  false alarm or an unknown object: **191 cards per hour of sonar** on out-of-domain water. This is a
+  false-alarm measurement, not a recall one. The real-GPS path is ready for a labelled crab-pot
+  recording (asked for in `docs/outreach.md`).
+
 ### STUDY-13 — Larger input + flipped second view for EXP-001 (NEGATIVE — not shipped)
 
 - Tool: `python -m src.detection.study_scale_tta` → `docs/scale_tta.md`. EXP-001 weights exported at

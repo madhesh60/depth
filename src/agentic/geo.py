@@ -34,6 +34,8 @@ from .types import Candidate
 
 _EARTH_R = 6_371_000.0     # metres
 DEFAULT_M_PER_PX = 0.05    # demo range scale: a 640px frame ≈ 32 m across-track (per-survey in reality)
+GPS_ERR_M = 3.0            # consumer GNSS horizontal error assumed for real recordings (stated, not measured)
+HEADING_ERR_DEG = 6.0      # p90 |course over ground − heading| measured on the PINGMapper sample (docs/raw_recording.md)
 
 
 @dataclass
@@ -42,8 +44,15 @@ class PingFix:
     lat: float
     lon: float
     heading_deg: float = 0.0     # course over ground, degrees from north
-    altitude_m: float = 10.0     # sonar height above seabed (feeds the shadow-height estimate)
     synthetic: bool = False
+    # a REAL recording (src/cv_pipeline/humminbird.py) also carries, per column of the analysed frame,
+    # the ping's own position and heading, and the sonar's measured depth (m) for the frame
+    ping_lat: Optional[list] = None
+    ping_lon: Optional[list] = None
+    ping_heading: Optional[list] = None
+    depth_m: Optional[float] = None
+    range_m_per_px: Optional[float] = None      # measured range scale of the analysed frame (m / px)
+    range_scale_rel_unc: Optional[float] = None # its relative uncertainty (robust spread / median)
 
 
 def offset_latlon(lat: float, lon: float, dist_m: float, bearing_deg: float) -> tuple[float, float]:
@@ -86,7 +95,22 @@ def geotag(cand: Candidate, fix: PingFix, nadir: str, w: int, h: int,
     """Fill ``cand.lat/lon/geo_error_m`` from the boat fix + across-track range. Mutates and returns.
 
     Unknown orientation ⇒ the range can't be measured, so the object is placed at the boat fix with
-    an error radius covering the whole swath (an honest "somewhere in this frame")."""
+    an error radius covering the whole swath (an honest "somewhere in this frame").
+
+    A REAL recording (per-ping fixes + a measured range scale, ``humminbird.py``) is geotagged from the
+    object's own ping — its GPS position and heading — and the Stage-1 ground range × the measured
+    scale; the error radius is built from stated parts: GPS (``GPS_ERR_M``, assumed consumer-grade),
+    the scale's measured relative uncertainty and the measured heading error (``HEADING_ERR_DEG``)."""
+    if (fix.ping_lat and cand.ping_px is not None and cand.ground_range_px is not None and fix.range_m_per_px):
+        k = int(min(max(round(cand.ping_px), 0), len(fix.ping_lat) - 1))
+        ground_m = cand.ground_range_px * fix.range_m_per_px
+        side = parse_side(frame_id) or "starboard"
+        hdg = fix.ping_heading[k] if fix.ping_heading else fix.heading_deg
+        lat, lon = offset_latlon(fix.ping_lat[k], fix.ping_lon[k], ground_m, hdg + (90.0 if side == "starboard" else -90.0))
+        cand.lat, cand.lon = round(lat, 7), round(lon, 7)
+        unc = fix.range_scale_rel_unc if fix.range_scale_rel_unc is not None else 0.25
+        cand.geo_error_m = round(GPS_ERR_M + ground_m * (unc + math.sin(math.radians(HEADING_ERR_DEG))), 1)
+        return cand
     range_px = cand.ground_range_px if cand.ground_range_px is not None \
         else range_px_from_nadir(cand.bbox, nadir, w, h)
     if range_px is None:
@@ -143,6 +167,9 @@ def stage1_counterfactual(frames, tracked, track: Optional[dict], m_per_px: floa
     import statistics
     if not track:
         return {"available": False, "reason": "no GPS track"}
+    if any(f.ping_lat for f in track.values()):
+        return {"available": False, "reason": "real recording: the metric range scale is itself measured with Stage 1 "
+                                              "(sonar depth / Stage-1 altitude), so there is no Stage-1-free placement to compare"}
     idx = {(fr.frame_id, tuple(c.bbox)): (fr, c) for fr in frames for c in fr.candidates}
     pins, shifts = {}, []
     for t in tracked:

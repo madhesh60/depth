@@ -120,7 +120,7 @@ def survey_twin(frames: list[tuple[str, np.ndarray]], result: SurveyResult, trac
         return {"available": False, "reason": "no frame has a fix"}
     lat0, lon0 = fixes[0].lat, fixes[0].lon
     tex_side = 256 if len(frames) <= 20 else 160
-    ribbons, alts = [], {}
+    ribbons, alts, scales = [], {}, {}
     fr_by_id = {fr.frame_id: fr for fr in result.frames}
     for fid, img in frames:
         fix, side = track.get(fid), parse_side(fid)
@@ -138,14 +138,25 @@ def survey_twin(frames: list[tuple[str, np.ndarray]], result: SurveyResult, trac
         cx, cy = _enu(fix.lat, fix.lon, lat0, lon0)
         ux, uy = _unit(fix.heading_deg)
         vx, vy = _unit(fix.heading_deg + (90.0 if side == "starboard" else -90.0))
+        mpp = fix.range_m_per_px or m_per_px              # a real recording: the MEASURED range scale
+        scales[fid] = mpp
 
-        def at(p, g):
-            a, c = (p - W / 2) * m_per_px, g * m_per_px
-            return [round(cx + ux * a + vx * c, 3), round(cy + uy * a + vy * c, 3)]
+        if fix.ping_lat:                                  # real per-ping positions + headings
+            n = len(fix.ping_lat)
+
+            def at(p, g, fix=fix, n=n, mpp=mpp, side=side):
+                k = int(min(max(round(p * (n - 1) / max(W, 1)), 0), n - 1))
+                bx, by_ = _enu(fix.ping_lat[k], fix.ping_lon[k], lat0, lon0)
+                qx, qy = _unit(fix.ping_heading[k] + (90.0 if side == "starboard" else -90.0))
+                return [round(bx + qx * g * mpp, 3), round(by_ + qy * g * mpp, 3)]
+        else:
+            def at(p, g, cx=cx, cy=cy, ux=ux, uy=uy, vx=vx, vy=vy):
+                a, c = (p - W / 2) * m_per_px, g * m_per_px
+                return [round(cx + ux * a + vx * c, 3), round(cy + uy * a + vy * c, 3)]
         ribbons.append({"frame_id": fid, "side": side, "heading": fix.heading_deg,
                         "corners": {"p0g0": at(0, 0), "p1g0": at(W, 0), "p0g1": at(0, G), "p1g1": at(W, G)},
                         "texture": _jpeg(cv2.cvtColor(gimg, cv2.COLOR_GRAY2BGR), tex_side, 75),
-                        "altitude_m": round(cf.altitude_px * m_per_px, 3),
+                        "altitude_m": round(cf.altitude_px * mpp, 3),
                         "counts": fr_by_id[fid].counts if fid in fr_by_id else {}})
     objs = []
     for t in result.tracked:
@@ -153,7 +164,7 @@ def survey_twin(frames: list[tuple[str, np.ndarray]], result: SurveyResult, trac
             continue
         x, y = _enu(t.lat, t.lon, lat0, lon0)
         alt_px = alts.get(t.frame_id)
-        h = (round(t.height_rel * alt_px * m_per_px, 3)
+        h = (round(t.height_rel * alt_px * scales.get(t.frame_id, m_per_px), 3)
              if (alt_px and t.height_rel and t.shadow_quality in ("clear", "weak")) else None)
         objs.append({"oid": t.oid, "xy": [round(x, 3), round(y, 3)], "height_m": h, "verdict": t.verdict.value,
                      "p_pot": t.p_pot, "conf": t.conf, "err_m": t.geo_error_m, "sightings": t.sightings,
@@ -166,19 +177,33 @@ def survey_twin(frames: list[tuple[str, np.ndarray]], result: SurveyResult, trac
                    "b": [round(v, 3) for v in _enu(*L["end"], lat0, lon0)], "targets": L["targets"],
                    "voi": L["voi"], "boat_min": L["boat_min"]})
     path = []
-    for fid, fx in sorted(((f, track[f]) for f, _ in frames if f in track),
-                          key=lambda kv: _along(kv[1], lat0, lon0, fixes[0].heading_deg)):
-        cx, cy = _enu(fx.lat, fx.lon, lat0, lon0)
-        path.append([round(cx, 3), round(cy, 3)])
-    alt_m = float(np.median(list(alts.values()))) * m_per_px if alts else 1.0
+    real = any(track[f].ping_lat for f, _ in frames if f in track)
+    if real:                                              # the boat's actual GPS track (one channel)
+        side0 = parse_side(frames[0][0])
+        for fid, _ in frames:
+            fx = track.get(fid)
+            if fx is None or not fx.ping_lat or parse_side(fid) != side0:
+                continue
+            for k in range(0, len(fx.ping_lat), 16):
+                x, y = _enu(fx.ping_lat[k], fx.ping_lon[k], lat0, lon0)
+                path.append([round(x, 3), round(y, 3)])
+    else:
+        for fid, fx in sorted(((f, track[f]) for f, _ in frames if f in track),
+                              key=lambda kv: _along(kv[1], lat0, lon0, fixes[0].heading_deg)):
+            cx, cy = _enu(fx.lat, fx.lon, lat0, lon0)
+            path.append([round(cx, 3), round(cy, 3)])
+    alt_m = float(np.median([alts[f] * scales.get(f, m_per_px) for f in alts])) if alts else 1.0
+    mpp_note = float(np.median(list(scales.values()))) if scales else m_per_px
     return {
-        "available": True, "units": "m", "m_per_px": m_per_px, "synthetic": any(f.synthetic for f in fixes),
+        "available": True, "units": "m", "m_per_px": round(mpp_note, 5), "synthetic": any(f.synthetic for f in fixes),
         "origin": [lat0, lon0], "ribbons": ribbons, "objects": objs, "track": path, "altitude_m": round(alt_m, 3),
         "routes": {"recovery": [by[i] for i in m.recovery_route if i in by],
                    "inspection": [by[i] for i in m.inspection_route if i in by]},
         "resurvey": rs,
-        "note": ("SYNTHETIC demo track - positions are not real. " if any(f.synthetic for f in fixes) else "")
-                + f"Scale: {m_per_px} m/px (demo assumption, same as the geotag); heights = shadow h/H x tracked altitude.",
+        "note": (f"Real per-ping GPS; range scale MEASURED ({mpp_note:.4f} m/px = sonar depth / Stage-1 altitude); "
+                 f"heights = shadow h/H x the sonar's measured depth." if real else
+                 ("SYNTHETIC demo track - positions are not real. " if any(f.synthetic for f in fixes) else "")
+                 + f"Scale: {m_per_px} m/px (demo assumption, same as the geotag); heights = shadow h/H x tracked altitude."),
     }
 
 

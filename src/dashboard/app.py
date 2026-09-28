@@ -277,6 +277,42 @@ def _sample_frames() -> list[tuple[str, np.ndarray]]:
     return out
 
 
+# ---- a RAW sonar recording with real per-ping GPS (src/cv_pipeline/humminbird.py) --------------------
+RECORDING_DAT = Path(os.environ.get("DEPTH_RECORDING", str(REPO / "DATASET" / "external" / "pingmapper_sample" / "Test-Small-DS.DAT")))
+_REC_CACHE: dict = {}
+_REC_LOCK = threading.Lock()
+
+
+def _recording():
+    """(frames, track, meta, validation) of the configured recording; cached after the first load."""
+    with _REC_LOCK:
+        if "frames" not in _REC_CACHE:
+            from src.cv_pipeline.humminbird import read_recording, frames_and_track, validate
+            rec = read_recording(RECORDING_DAT)
+            frames, track, meta = frames_and_track(rec)
+            _REC_CACHE.update(frames=frames, track=track, meta=meta, validation=validate(rec), name=rec.name)
+        return _REC_CACHE["frames"], _REC_CACHE["track"], _REC_CACHE["meta"], _REC_CACHE["validation"]
+
+
+def _recording_summary() -> dict:
+    if not RECORDING_DAT.exists():
+        return {"available": False, "how": "python -m src.cv_pipeline.humminbird fetch"}
+    try:
+        frames, track, meta, val = _recording()
+    except Exception as e:                                   # a bad file never breaks the app
+        return {"available": False, "reason": f"{type(e).__name__}: {e}"[:200]}
+    ch = val["channels"].get("port") or next(iter(val["channels"].values()))
+    return {"available": True, "name": _REC_CACHE.get("name"), "frames": len(frames), "dat": val["dat"],
+            "duration_s": ch["duration_s"], "track_m": ch["track_m"], "bbox": ch["bbox"],
+            "range_scale": meta["range_scale"],
+            "checks": {"speed_gps_per_unit": ch["gps_speed_per_speed_unit"], "speed_corr": ch["speed_corr"],
+                       "course_vs_heading_deg_median": ch["course_vs_heading_deg_median"],
+                       "course_vs_heading_deg_p90": ch["course_vs_heading_deg_p90"],
+                       "records_monotonic": ch["records_monotonic"], "issues": ch["issues"]},
+            "source": "PINGMapper sample data (Bodine et al., MIT; Zenodo 10.5281/zenodo.6604666) - real Humminbird "
+                      "recording, real per-ping GPS; downloaded hash-checked, not redistributed"}
+
+
 def _collect_frames(use_samples: bool, files: Optional[list[UploadFile]]) -> list[tuple[str, np.ndarray]]:
     if use_samples:
         frames = _sample_frames()
@@ -299,8 +335,9 @@ def _remember(result: SurveyResult) -> None:
 
 def _run_survey(frames, gps: str, budget_minutes: Optional[float], nadir: Optional[str],
                 survey_id: str, progress: Optional[Callable[[dict], None]] = None,
-                boat_minutes: Optional[float] = None) -> dict:
-    track = synthetic_track([fid for fid, _ in frames]) if gps == "synthetic" else None
+                boat_minutes: Optional[float] = None, track: Optional[dict] = None) -> dict:
+    if track is None:
+        track = synthetic_track([fid for fid, _ in frames]) if gps == "synthetic" else None
     pipe = get_pipeline()
     total = len(frames)
     done = {"n": 0}
@@ -330,6 +367,8 @@ def _run_survey(frames, gps: str, budget_minutes: Optional[float], nadir: Option
     except Exception as e:
         log.exception("survey twin failed")
         d["twin"] = {"available": False, "reason": f"twin error: {type(e).__name__}"}
+    if gps == "recording":
+        d["recording"] = _recording_summary()
     try:                                                    # STUDY-12, live: where pins go without Stage 1
         d["stage1_counterfactual"] = stage1_counterfactual(result.frames, result.tracked, track, pipe.m_per_px)
     except Exception as e:
@@ -359,6 +398,7 @@ def health():
         "model_error": _MODEL_STATE["error"], "warmup_ms": _MODEL_STATE["warmup_ms"],
         "samples": len(samples_mod.list_samples()), "calibration": summary, "jobs": _JOBS.counts(),
         "limits": {"max_upload_mb": MAX_UPLOAD_MB, "max_frames": MAX_FRAMES, "max_sync_frames": MAX_SYNC_FRAMES},
+        "recording": {"available": RECORDING_DAT.exists(), "name": RECORDING_DAT.stem},
     }
 
 
@@ -561,10 +601,16 @@ def submit_survey(use_samples: bool = Query(False), gps: str = Query("synthetic"
     busy = _JOBS.counts()
     if busy["queued"] + busy["running"] >= int(os.environ.get("DEPTH_MAX_QUEUED_JOBS", "4")):
         raise HTTPException(503, "the survey queue is full - try again in a minute")
-    frames = _collect_frames(use_samples, files)
-    survey_id = f"survey-{time.strftime('%Y%m%d-%H%M%S')}-{len(frames)}f"
+    track = None
+    if gps == "recording":
+        if not _recording_summary().get("available"):
+            raise HTTPException(404, "no raw recording on this server (python -m src.cv_pipeline.humminbird fetch)")
+        frames, track, _, _ = _recording()
+    else:
+        frames = _collect_frames(use_samples, files)
+    survey_id = f"survey-{time.strftime('%Y%m%d-%H%M%S')}-{len(frames)}f{'-rec' if track else ''}"
     jid = _JOBS.submit(lambda progress: _run_survey(frames, gps, budget_minutes, nadir, survey_id, progress,
-                                                    boat_minutes), total=len(frames))
+                                                    boat_minutes, track), total=len(frames))
     return {"job_id": jid, "survey_id": survey_id, "frames": len(frames)}
 
 
@@ -581,12 +627,24 @@ def survey(use_samples: bool = Query(False), gps: str = Query("synthetic"),
            budget_minutes: Optional[float] = Query(None, ge=0, le=600),
            nadir: Optional[str] = Query(None),
            files: Optional[list[UploadFile]] = File(None)):
-    frames = _collect_frames(use_samples, files)
+    track = None
+    if gps == "recording":
+        if not _recording_summary().get("available"):
+            raise HTTPException(404, "no raw recording on this server (python -m src.cv_pipeline.humminbird fetch)")
+        frames, track, _, _ = _recording()
+    else:
+        frames = _collect_frames(use_samples, files)
     if len(frames) > MAX_SYNC_FRAMES:
         raise HTTPException(413, f"{len(frames)} frames: use POST /api/jobs/survey for more than "
                                  f"{MAX_SYNC_FRAMES} (runs in the background, poll /api/jobs/<id>)")
-    survey_id = f"survey-{time.strftime('%Y%m%d-%H%M%S')}-{len(frames)}f"
-    return JSONResponse(_run_survey(frames, gps, budget_minutes, nadir, survey_id))
+    survey_id = f"survey-{time.strftime('%Y%m%d-%H%M%S')}-{len(frames)}f{'-rec' if track else ''}"
+    return JSONResponse(_run_survey(frames, gps, budget_minutes, nadir, survey_id, track=track))
+
+
+@app.get("/api/recording")
+def recording_info():
+    """The raw recording available as a survey source (real per-ping GPS) and its validation."""
+    return _recording_summary()
 
 
 _MEDIA = {"geojson": "application/geo+json", "gpx": "application/gpx+xml",

@@ -60,8 +60,8 @@ class _Arm:
             tools = self.pipe.agent.tools
             real = tools.shadow_check
 
-            def none_shadow(gray, bbox, nadir, altitude_px=None):
-                proof, step = real(gray, bbox, nadir, altitude_px)
+            def none_shadow(gray, bbox, nadir, altitude_px=None, **kw):
+                proof, step = real(gray, bbox, nadir, altitude_px, **kw)
                 blank = ShadowProof(quality=ShadowQuality.NONE, contrast=0.0, run_px=0, strength=0.0, height_m=None,
                                     height_rel=0.0, echo_ratio=proof.echo_ratio, echo_xy=proof.echo_xy,
                                     strip=proof.strip, orientation_known=proof.orientation_known)

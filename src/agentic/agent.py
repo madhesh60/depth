@@ -87,8 +87,10 @@ class ReLookAgent:
 
     def run_frame(self, frame: np.ndarray, frame_id: str = "frame",
                   nadir: str | None = None,
-                  progress_cb: Optional[Callable[[str, dict], None]] = None) -> FrameResult:
-        """``nadir`` is an explicit override; otherwise orientation comes from the source rule in
+                  progress_cb: Optional[Callable[[str, dict], None]] = None,
+                  altitude_m: Optional[float] = None) -> FrameResult:
+        """``altitude_m``: a MEASURED sonar altitude in metres (a real recording's depth field) — only
+        then are shadow heights given in metres. ``nadir`` is an explicit override; otherwise orientation comes from the source rule in
         ``src.cv_pipeline.orientation`` (or the prover's configured default) - never guessed.
 
         Stage 1 (``src.cv_pipeline.canonical``) runs first: palette -> luminance, orientation,
@@ -110,7 +112,7 @@ class ReLookAgent:
 
         t0 = time.perf_counter()
         if self.cfg.tiers is not None:
-            candidates, n_inf = self._decide_calibrated(det_in, gray, dets, cf)
+            candidates, n_inf = self._decide_calibrated(det_in, gray, dets, cf, altitude_m)
         else:
             candidates = [self._decide_legacy(det_in, gray, d, cf) for d in dets]
             n_inf = 1 + sum(sum(s.tool in ("zoom_relook", "enhance_relook") for s in c.trace)
@@ -131,7 +133,8 @@ class ReLookAgent:
         )
 
     # ======================================================================= calibrated mode
-    def _decide_calibrated(self, frame, gray, dets: list[Detection], cf: CanonicalFrame):
+    def _decide_calibrated(self, frame, gray, dets: list[Detection], cf: CanonicalFrame,
+                           altitude_m: Optional[float] = None):
         tiers = self.cfg.tiers
         nadir = cf.orientation.nadir
         traces: list[list[AgentStep]] = [[] for _ in dets]
@@ -173,7 +176,8 @@ class ReLookAgent:
             wc, s = self.tools.water_column_check(cf, det.bbox)
             if s is not None:
                 trace.append(s)
-            proof, s = self.tools.shadow_check(gray, det.bbox, nadir, altitude_px=_altitude_for(cf, det.bbox))
+            proof, s = self.tools.shadow_check(gray, det.bbox, nadir, altitude_px=_altitude_for(cf, det.bbox),
+                                               altitude_m=altitude_m)
             trace.append(s)
             if proof.has_shadow and proof.orientation_known:
                 _, s = self.tools.estimate_height(proof)

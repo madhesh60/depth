@@ -55,9 +55,10 @@ class Toolbox:
 
     # -- Prove: physical shadow ------------------------------------------------------------
     def shadow_check(self, gray: np.ndarray, bbox, nadir: str | None,
-                     altitude_px: Optional[float] = None) -> tuple[ShadowProof, AgentStep]:
+                     altitude_px: Optional[float] = None,
+                     altitude_m: Optional[float] = None) -> tuple[ShadowProof, AgentStep]:
         t0 = time.perf_counter()
-        proof = self.shadow.prove(gray, bbox, nadir=nadir, altitude_px=altitude_px)
+        proof = self.shadow.prove(gray, bbox, nadir=nadir, altitude_px=altitude_px, altitude_m=altitude_m)
         ms = (time.perf_counter() - t0) * 1000
         if not proof.orientation_known:
             why = "frame orientation unknown -> shadow not measured (never guessed)"

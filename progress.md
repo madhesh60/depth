@@ -75,6 +75,44 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ## 4. Session log
 
+### 2026-09-28 (sweep 33) — Raw recordings with real GPS (STUDY-14) + docs truth pass
+- **Download, safely.** The Zenodo zip (29.8 MB) was verified against Zenodo's MD5 and contained only
+  Git-LFS pointers. The real objects of `Test-Small-DS` (~11 MB) came from the author's repository, each
+  checked against its pointer's SHA-256 (pinned in `humminbird.SAMPLE_FILES`). Nothing in the zip was
+  executed or extracted. The data is git-ignored and never redistributed.
+- **`src/cv_pipeline/humminbird.py`** — a defensive reader for `.DAT` / `.SON` / `.IDX`:
+  - a tag-structured header walker that works for 67 / 72 / 152-byte headers;
+  - bounds and size caps; resync after a corrupt ping, with the issue recorded;
+  - per-ping GPS (Humminbird Mercator, as in PINGMapper, MIT), heading, speed and depth;
+  - sonograms in the training layout;
+  - the `fetch`, `info`, `validate` and `report` commands.
+- **Units settled by physics, not documentation:**
+  - speed is in 0.1 m/s (GPS ratio 0.103, r = 0.95);
+  - heading is in 0.1° (2.4° median error);
+  - depth is in **decimetres** (my first `/100` was wrong; beam physics and the bottom track caught it).
+- **Measured range scale:** sonar depth ÷ Stage-1 altitude = 2.19 cm/sample ± 14.5%, a robust median
+  with a conservative uncertainty; 5 of 11 chunks were false bottom picks, reported.
+- **Real geotags:** the object's own ping fix and heading, plus ground range × the measured scale. The
+  error radius is GPS 3 m (assumed) + range × (scale uncertainty + sin 6°, the measured p90 heading
+  error). Heights are in metres from the measured depth. `PingFix.altitude_m` (an unused 10 m default)
+  is replaced by the measured `depth_m`.
+- **Survey source "Raw recording · real per-ping GPS":** in the UI, `/api/jobs/survey?gps=recording`,
+  and MCP `run_survey(gps="recording")`; `/api/recording` exposes the checks.
+  - The 3D twin lays real swaths along the real GPS track.
+  - The Stage-1 counterfactual honestly reports "not available" here, because the scale itself comes
+    from Stage 1.
+  - Browser-verified: the pins and the route sit on the river channel in satellite imagery.
+- **Result:** 8 review cards in 5.8 s on a river with no known pots, i.e. **191 cards per sonar-hour**,
+  a false-alarm measurement.
+- Setup fetches the recording (optional). Tests +8 (`test_humminbird.py`: byte-exact synthetic files,
+  corrupt / truncated / absurd input, the formula, per-ping geotag, the real sample, the API).
+- **Docs truth pass:**
+  - README, CLAUDE.md (layout, commands, data, the "Connect" layer) and `architecture.md`;
+  - the technical report (144 tests, STUDY-13 / 14, GPS and height limits), TODO, the dataset card
+    (external data + licence note) and responsible use;
+  - `agentic_vision`, `mcp.md`, `infra/README`, the video script and the architecture diagram input box.
+- Suite: **144 passed** (7.6 min on the laptop; an earlier 2.5 h run was the laptop sleeping).
+
 ### 2026-09-28 (sweep 32) — Real-GPS path found; sample-data licence discrepancy recorded
 - **Real GPS:** PINGMapper's official sample recording (Zenodo 10.5281/zenodo.6604666 — Humminbird
   Solix, Pearl River MS, 1 h, 29.8 MB, distributed with USFWS permission) carries per-ping GPS, heading,
