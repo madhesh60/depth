@@ -37,14 +37,13 @@ cleanup plan that a person approves:
 
 Code and report: https://github.com/madhesh60/depth
 
-Two small questions:
+Three small questions:
 
 1. **Would this be useful to a team planning derelict-pot removal?** Two or three sentences of honest
    feedback (critical is fine) would mean a lot. I'd quote it only with your permission.
 2. **Is there a recording with GPS I could use**, e.g. one of the raw Humminbird recordings behind the
    dataset, or a PINGMapper export with per-ping positions? Today the map uses a clearly labelled
    synthetic track because the published frames carry no coordinates.
-
 3. **A licence question:** the dataset card's metadata says CC BY-SA 4.0, but its text says GPL. Which
    applies? I redistribute 8 sample frames with attribution and want to get it right.
 
