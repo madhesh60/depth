@@ -69,6 +69,7 @@ from src.agentic import brief as brief_mod
 from src.agentic.approvals import ApprovalStore, ApprovalError
 from .mcp_server import ENDPOINT as MCP_ENDPOINT
 from .integrations import Webhooks, WebhookError, EVENTS as WEBHOOK_EVENTS
+from .ratelimit import RateLimitMiddleware
 
 log = logging.getLogger("depth.api")
 REPO = Path(__file__).resolve().parents[2]
@@ -174,6 +175,7 @@ def _survey_event(d: dict) -> dict:
 
 
 app = FastAPI(title="DEPTH — See→Prove→Decide→Act", version="2.0.0", lifespan=lifespan)
+app.add_middleware(RateLimitMiddleware)                # per-client limits on the expensive endpoints
 _cors = [o.strip() for o in os.environ.get("DEPTH_CORS_ORIGINS", "").split(",") if o.strip()]
 if _cors:
     app.add_middleware(CORSMiddleware, allow_origins=_cors, allow_methods=["GET", "POST"], allow_headers=["*"])
@@ -556,6 +558,9 @@ def submit_survey(use_samples: bool = Query(False), gps: str = Query("synthetic"
                   nadir: Optional[str] = Query(None),
                   boat_minutes: Optional[float] = Query(None, ge=0, le=1440),
                   files: Optional[list[UploadFile]] = File(None)):
+    busy = _JOBS.counts()
+    if busy["queued"] + busy["running"] >= int(os.environ.get("DEPTH_MAX_QUEUED_JOBS", "4")):
+        raise HTTPException(503, "the survey queue is full - try again in a minute")
     frames = _collect_frames(use_samples, files)
     survey_id = f"survey-{time.strftime('%Y%m%d-%H%M%S')}-{len(frames)}f"
     jid = _JOBS.submit(lambda progress: _run_survey(frames, gps, budget_minutes, nadir, survey_id, progress,

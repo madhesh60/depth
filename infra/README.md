@@ -36,6 +36,18 @@ The pinned web stack in `setup_cool_instance.sh` was verified locally: a clean v
 `numpy` + `opencv-python-headless` (standing in for the COOL venv) plus the `--target` deps imports
 and serves the app (`/api/health` → model warm in 0.3 s; `/api/analyze` works).
 
+## Public-demo protection (set up by `setup_cool_instance.sh`)
+
+| protection | how |
+|---|---|
+| per-client rate limits on analyze / survey / decide / MCP | `src/dashboard/ratelimit.py`; the client is the first `X-Forwarded-For` hop (`DEPTH_TRUST_PROXY=1` in the unit — CloudFront) |
+| survey queue cap | 503 when `DEPTH_MAX_QUEUED_JOBS` (4) jobs are queued / running |
+| MCP bearer token | `/etc/depth/mcp.env` (`DEPTH_MCP_TOKEN`), root-only, generated once |
+| webhook admin token | `/etc/depth/admin.env` (`DEPTH_ADMIN_TOKEN`), root-only, generated once |
+| approver PIN (production) | add `DEPTH_APPROVER_PIN=<pin>` to `/etc/depth/admin.env`; left unset for the judge demo |
+
+Read a token on the instance with `sudo cat /etc/depth/mcp.env` (SSM Session Manager — no SSH port).
+
 ## Optional: Claude on Amazon Bedrock writes the mission brief
 
 Off by default — the deterministic template brief needs nothing. To let Claude write it (it writes,

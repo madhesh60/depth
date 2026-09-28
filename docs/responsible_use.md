@@ -60,3 +60,11 @@ the [dataset card](dataset_card.md). Respect each source's attribution and share
 - **Provenance on every output** — model / calibration hashes, OpenCV build (COOL or stock), code
   commit and host, so any published hazard can be traced to what produced it.
 - **Human approval** before any dispatch; LOW-RISK items are kept for audit, never deleted.
+- **Decisions are signed and logged:** a named person confirms / rejects / marks recovered; the agent's
+  own verdict is kept alongside; every decision is in the decision log (2026-09-28).
+- **Public-demo protection (2026-09-28):** per-client rate limits on the expensive endpoints (429 +
+  Retry-After; `src/dashboard/ratelimit.py`), a cap on queued survey jobs (503), a bearer token on
+  `/mcp`, an admin token for webhook management (both generated root-only by the setup script), and
+  webhook targets checked against private / link-local addresses. A production deployment also sets
+  `DEPTH_APPROVER_PIN` so only people holding the PIN can decide; the public judge demo leaves it unset
+  so judges can try the human loop.

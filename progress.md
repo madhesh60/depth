@@ -75,6 +75,16 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ## 4. Session log
 
+### 2026-09-28 (sweep 29) — Public-demo protection
+- `src/dashboard/ratelimit.py`: per-client sliding-window limits (infer 30 / survey 6 / decide 60 /
+  MCP 60 / other writes 60 per minute; 429 + Retry-After; reads never limited); the client is the
+  socket peer, or the first `X-Forwarded-For` hop only when `DEPTH_TRUST_PROXY=1` (CloudFront).
+- Survey queue cap: 503 when 4 jobs are queued / running (`DEPTH_MAX_QUEUED_JOBS`).
+- Setup generates a root-only admin token (`/etc/depth/admin.env`) next to the MCP token; the unit
+  reads it and trusts CloudFront's forwarded address. Approver PIN documented for production.
+- Tests +5 (`test_ratelimit.py`; `tests/conftest.py` turns limits off for the rest of the suite);
+  suite 133 passed.
+
 ### 2026-09-28 (sweep 28) — STUDY-13 (accuracy without retraining) + speed-aware EXP-002 kit
 - **STUDY-13** (`src/detection/study_scale_tta.py`, `docs/scale_tta.md`): 640 / 800 / 960 / 1024-px
   inputs × along-track flip TTA for EXP-001. The pre-registered qualifier (800 / mean: +0.10 AP,
