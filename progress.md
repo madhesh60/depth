@@ -75,6 +75,17 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ## 4. Session log
 
+### 2026-09-28 (sweep 32) — Real-GPS path found; sample-data licence discrepancy recorded
+- **Real GPS:** PINGMapper's official sample recording (Zenodo 10.5281/zenodo.6604666 — Humminbird
+  Solix, Pearl River MS, 1 h, 29.8 MB, distributed with USFWS permission) carries per-ping GPS, heading,
+  speed and **depth**. The documented SON format (152-byte Solix headers, big-endian fields, EPSG:3395
+  coordinates, 8-bit returns) is enough for a DEPTH reader. Plan: a raw-recording reader, then real
+  per-ping geotags and a **measured range scale** (sonar depth in m ÷ Stage-1 altitude in px). This is
+  pending the owner's OK to download the file.
+- **Licence:** the crab-pot dataset card's metadata says CC BY-SA 4.0 but its text says GPL, and access
+  is now gated. This is recorded in `webui/samples/ATTRIBUTION.md` (AGPL-3.0 is compatible with either),
+  and the outreach email asks the authors to confirm.
+
 ### 2026-09-28 (sweep 31) — Submission documents: video script, proposal-vs-delivered, outreach
 - `docs/video_script.md`: a ≤ 5:00 storyboard around one sentence ("a promise, a proof and a plan"),
   every number on screen from a regenerated report; the COOL segment has placeholders until the EC2 runs.

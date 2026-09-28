@@ -45,6 +45,9 @@ Two small questions:
    dataset, or a PINGMapper export with per-ping positions? Today the map uses a clearly labelled
    synthetic track because the published frames carry no coordinates.
 
+3. **A licence question:** the dataset card's metadata says CC BY-SA 4.0, but its text says GPL. Which
+   applies? I redistribute 8 sample frames with attribution and want to get it right.
+
 Thank you for publishing the data.
 
 <your name> — Team Syndicate
