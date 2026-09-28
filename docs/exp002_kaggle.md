@@ -50,14 +50,21 @@ SRC = "/kaggle/input/depth-v2b/03_yolo_ready_dataset_v2b"      # ← adjust to t
 !python src/detection/train.py --data /kaggle/working/v2b_tiles/data.yaml --name EXP-002 --device 0
 ```
 
-Optional second run (a new notebook version, or the same one if time allows — Kaggle stops at 12 h):
+**Second run — the 640-px twin (recommended, ~1 h).** STUDY-13 (`docs/scale_tta.md`) found that a
+larger input helps the hardest recording but *not* the others — on unseen frames it added false alarms
+and cost ~3× the compute. So resolution must be chosen by the held-out recordings, not assumed:
+```python
+!python src/detection/train.py --data /kaggle/working/v2b_tiles/data.yaml --name EXP-002s --imgsz 640 --device 0
+```
+
+Optional third run (a new notebook version if time allows — Kaggle stops at 12 h):
 ```python
 !python src/detection/train.py --data /kaggle/working/v2b_tiles_paste/data.yaml --name EXP-002p --device 0
 ```
 
 ```python
 # the zips train.py wrote (weights .pt + verified .onnx + model_meta.json + curves)
-!cp runs/EXP-002_complete.zip /kaggle/working/ 2>/dev/null; cp runs/EXP-002p_complete.zip /kaggle/working/ 2>/dev/null; ls -la /kaggle/working/*.zip
+!cp runs/EXP-002*_complete.zip /kaggle/working/ 2>/dev/null; ls -la /kaggle/working/*.zip
 ```
 
 Run it as **Save Version → Save & Run All (Commit)** so it keeps going if your browser disconnects.
@@ -81,8 +88,19 @@ It unpacks → checks the ONNX sha256 and a `cv2.dnn` forward pass → registers
 evaluates deploy-faithfully on the v2b unique-frame test, the **official 398-frame split
 (GhostVision head-to-head, leakage-free for v2b)** and the **cross-sonar** `test_xsonar` → writes
 `docs/onboard_exp002.md` with the numbers next to EXP-001's. It warns loudly (and recommends NOT
-switching) if calibration fails or the recall promise is weak. Run the same for `EXP-002p` and keep
-the better one **by validation**, not by test.
+switching) if calibration fails or the recall promise is weak. It also **times the model against
+EXP-001 on the same machine** (ms per forward, compute per survey-hour) and, with `--max-ms`, refuses
+to recommend a model the target cannot afford:
+
+```bash
+python -m src.detection.onboard_model --zip EXP-002_complete.zip  --max-ms 700
+python -m src.detection.onboard_model --zip EXP-002s_complete.zip --max-ms 700
+```
+
+Keep the better one **by the validation recordings (recall ceiling, recall promise) within the speed
+budget** — never by test. If 1024 px wins on validation but fails the speed gate on the laptop, decide
+on the Graviton + COOL numbers (`python -m src.bench.product_bench`): COOL may be what makes the more
+accurate model affordable — that is the COOL story, measured.
 
 Switch the product:
 ```bash

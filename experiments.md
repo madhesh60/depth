@@ -108,6 +108,23 @@ Promote each into the log below with full results as it runs.
 
 ## Experiment log
 
+### STUDY-13 — Larger input + flipped second view for EXP-001 (NEGATIVE — not shipped)
+
+- Tool: `python -m src.detection.study_scale_tta` → `docs/scale_tta.md`. EXP-001 weights exported at
+  640 / 800 / 960 / 1024 (static), each with and without an along-track flip pass (fused `union` or
+  `mean`); `cv2.dnn`, floor 0.05, IoU ≥ 0.3, unique frames, paired frame-bootstrap 95% CI.
+  **Protocol fixed before looking:** qualify on the calibration split (v1 val, Rec19) — AP gain CI
+  lower bound > 0 and no ceiling loss — then run the single best qualifier once on v1 test.
+- Calibration split: the qualifier **800 / mean** raised the ceiling 0.724 → 0.806 (+0.081 [+0.035,
+  +0.129]) and AP@0.3 0.458 → 0.558 (+0.099 [+0.022, +0.177]).
+- **Verification split (once): it did not hold** — ceiling 0.862 → 0.870 (+0.007 [−0.046, +0.061]),
+  AP@0.3 0.587 → 0.520 (−0.063 [−0.123, +0.000]); candidates/frame 3.15 → 4.24 (mostly false
+  alarms); ~3× the compute. **Not shipped.**
+- **Reading:** larger inputs help the hardest recording (Rec19: far, low-contrast pots) but not the
+  others. For EXP-002 the kit now trains a 640-px twin (EXP-002s) next to the 1024-px run and
+  onboarding times each model against EXP-001 (`--max-ms` gate): resolution is chosen by the held-out
+  recordings and the speed budget, not assumed.
+
 ### STUDY-12 — Counterfactual: does OpenCV 5 output change what the agent *does*?
 
 - Tool: `python -m src.agentic.study_causal [--frames …/v1/test/images --limit 80]` →

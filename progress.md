@@ -75,6 +75,16 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ## 4. Session log
 
+### 2026-09-28 (sweep 28) — STUDY-13 (accuracy without retraining) + speed-aware EXP-002 kit
+- **STUDY-13** (`src/detection/study_scale_tta.py`, `docs/scale_tta.md`): 640 / 800 / 960 / 1024-px
+  inputs × along-track flip TTA for EXP-001. The pre-registered qualifier (800 / mean: +0.10 AP,
+  +0.08 ceiling on the calibration recording) **did not hold on the verification split** (AP −0.06,
+  ceiling +0.01, 3× compute) → not shipped; logged as a negative result.
+- **EXP-002 kit:** `onboard_model` now measures `cv2.dnn` ms/forward and compute per survey-hour
+  against EXP-001 on the same machine, with a `--max-ms` gate; the Kaggle guide trains a 640-px twin
+  (EXP-002s) next to the 1024-px run, chosen by held-out recordings + speed budget. Measured today:
+  1024 px costs 2.7× a 640-px forward on this laptop.
+
 ### 2026-09-28 (sweep 27) — Person-confirmed loop: the plan finally has a recovery route
 - **Gap closed:** EXP-001 never auto-confirms, and a ✓ only saved a training label, so every demo
   ended with a **0-stop recovery route**. The ✓ button also said "approved for recovery" while

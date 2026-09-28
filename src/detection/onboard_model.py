@@ -56,6 +56,31 @@ def verify_onnx(onnx: Path, imgsz: int, nc: int) -> str:
     return f"cv2.dnn {cv2.__version__}: forward OK at {imgsz}px, output {tuple(out.shape)}"
 
 
+FRAMES_PER_SURVEY_HOUR = 15 * 3600 / 640 * 2          # 15 Hz pings, 640 pings/frame, port + starboard
+
+
+def measure_ms(onnx: Path, imgsz: int, n: int = 15) -> dict:
+    """cv2.dnn forward latency on THIS machine (3 warm-up passes, then ``n`` timed), plus the compute a
+    survey-hour of sonar would need. Speed is part of the model choice: a larger input that finds more
+    pots is only worth it if the deployment can afford it (STUDY-13)."""
+    import time as _t
+    import cv2
+    import numpy as np
+    net = cv2.dnn.readNetFromONNX(str(onnx))
+    blob = cv2.dnn.blobFromImage(np.random.default_rng(0).integers(0, 255, (imgsz, imgsz, 3), np.uint8),
+                                 1 / 255.0, (imgsz, imgsz), swapRB=True)
+    for _ in range(3):
+        net.setInput(blob); net.forward()
+    ts = []
+    for _ in range(n):
+        t = _t.perf_counter(); net.setInput(blob); net.forward(); ts.append((_t.perf_counter() - t) * 1000)
+    ts.sort()
+    p50 = ts[len(ts) // 2]
+    return {"imgsz": imgsz, "forward_ms_p50": round(p50, 1), "forward_ms_p95": round(ts[int(0.95 * (len(ts) - 1))], 1),
+            "threads": cv2.getNumThreads(), "opencv": cv2.__version__,
+            "survey_hour_compute_s": round(p50 / 1000 * FRAMES_PER_SURVEY_HOUR, 1)}
+
+
 def _run(cmd: list[str], env: dict, log: Path) -> int:
     print("  $", " ".join(cmd))
     with open(log, "a", encoding="utf-8") as f:
@@ -87,6 +112,8 @@ def main():
     ap.add_argument("--skip-eval", action="store_true")
     ap.add_argument("--limit", type=int, default=0, help="cap frames per split (smoke test only)")
     ap.add_argument("--bootstrap", type=int, default=1000)
+    ap.add_argument("--max-ms", type=float, default=None,
+                    help="speed gate: warn (do not switch) if the forward p50 on this machine exceeds this")
     a = ap.parse_args()
 
     # 1. unpack --------------------------------------------------------------------------------
@@ -116,12 +143,18 @@ def main():
         raise SystemExit("ONNX sha256 does not match model_meta.json - corrupted download?")
     msg = verify_onnx(onnx, imgsz, len(names))
     print("  ", msg)
+    base_onnx = REPO / "runs" / "EXP-001" / "weights" / "best.onnx"
+    lat = measure_ms(onnx, imgsz)
+    lat0 = measure_ms(base_onnx, 640) if base_onnx.exists() else None     # same machine, same minute
+    print(f"   speed: {lat['forward_ms_p50']} ms/forward at {imgsz}px"
+          + (f" vs EXP-001 {lat0['forward_ms_p50']} ms at 640px ({lat['forward_ms_p50'] / lat0['forward_ms_p50']:.1f}x)" if lat0 else ""))
 
     # 3. register ------------------------------------------------------------------------------
     mdir = REPO / "models" / name
     mdir.mkdir(parents=True, exist_ok=True)
     shutil.copy2(onnx, mdir / "best.onnx")
-    meta.update({"onnx_sha256": sha, "onboarded": time.strftime("%Y-%m-%dT%H:%M:%S"), "cv2_dnn_check": msg})
+    meta.update({"onnx_sha256": sha, "onboarded": time.strftime("%Y-%m-%dT%H:%M:%S"), "cv2_dnn_check": msg,
+                 "latency": lat, "latency_exp001": lat0})
     (mdir / "model_meta.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
     g0 = names[0]
     from src.detection.calibration import save_calibration
@@ -178,6 +211,9 @@ def main():
     elif rp_new is not None and rp_old is not None and rp_new < rp_old:
         warn.append(f"Recall promise {rp_new} is below EXP-001's {rp_old} (different splits - compare the v2b "
                     f"evaluation reports before switching).")
+    if a.max_ms is not None and lat["forward_ms_p50"] > a.max_ms:
+        warn.append(f"**Too slow for the target:** {lat['forward_ms_p50']} ms/forward > --max-ms {a.max_ms} on this "
+                    f"machine. Re-measure on the deployment instance (`python -m src.bench.product_bench`) before switching.")
     L = [f"# Onboarding {name}", "", *[f"> {w}" for w in warn], *([""] if warn else []),
          f"_`python -m src.detection.onboard_model` · {time.strftime('%Y-%m-%d %H:%M')}_", "",
          f"- classes `{names}` · input {imgsz}px · ONNX sha256 `{sha[:16]}…` · {msg}",
@@ -193,6 +229,13 @@ def main():
          f"{(gtee.get('verified_on_test') or {}).get('recall_promise_held')} |",
          "", "_Different splits: EXP-001 is scored on its own unseen frames (v1); the fair model-vs-model "
          "comparison is the v2b test below, where EXP-001 is NOT leakage-free (v1 contains those recordings)._", "",
+         "## Speed (cv2.dnn forward on the onboarding machine, measured back to back)", "",
+         "| | EXP-001 @ 640 | " + name + f" @ {imgsz} |", "|---|--:|--:|",
+         f"| forward ms p50 / p95 | {lat0['forward_ms_p50'] if lat0 else '—'} / {lat0['forward_ms_p95'] if lat0 else '—'} | "
+         f"{lat['forward_ms_p50']} / {lat['forward_ms_p95']} |",
+         f"| compute per survey-hour of sonar (s) | {lat0['survey_hour_compute_s'] if lat0 else '—'} | {lat['survey_hour_compute_s']} |",
+         "", f"_OpenCV {lat['opencv']} · {lat['threads']} threads · {FRAMES_PER_SURVEY_HOUR:.0f} frames per survey-hour. "
+         "Re-measure on the deployment instance before switching (COOL benchmark)._", "",
          "## Evaluation reports", ""]
     L += [f"- `{s}` → [{p.relative_to(REPO).as_posix()}]({p.relative_to(REPO).as_posix()})" for s, p in evals.items()] or ["- (skipped)"]
     L += ["", "## Switch the product to this model", "",
