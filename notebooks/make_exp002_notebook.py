@@ -85,8 +85,6 @@ def progress():
                 print(f"  {name}: epoch {int(float(r['epoch']))}  val mAP50 {float(r['metrics/mAP50(B)']):.3f}  "
                       f"recall {float(r['metrics/recall(B)']):.3f}")
 pending = list(procs)
-if ngpu < 2:
-    pending = list(procs)
 while pending:
     time.sleep(600)
     print(f"--- {(time.time() - T0) / 3600:.1f} h"); progress()
@@ -116,6 +114,7 @@ for name, _ in RUNS:
     ub = (m.get("selection") or {}).get("ultralytics_best") or {}
     print(f"{name}: {m['train_minutes']} min | exported {sel.get('checkpoint')} ghost_gear AP50 {sel.get('ghost_ap50')} "
           f"(ultralytics' pick {ub.get('ghost_ap50')}) | {m.get('cv2_dnn_verified')}")
+!rm -rf /kaggle/working/v2b_tiles          # 629 MB of tiles: not needed any more
 !ls -la /kaggle/working/*.zip
 !tail -3 /kaggle/working/logs/*.log
 """),
