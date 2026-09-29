@@ -76,7 +76,7 @@ T0 = time.time()
     ("code", """# 5. wait for the runs (this cell blocks — needed for Save & Run All); progress every 10 min
 import csv, glob as _g
 def progress():
-    for name, _ in RUNS:
+    for name, *_ in RUNS:
         rc = f"/kaggle/working/depth/runs/{name}/results.csv"
         if os.path.exists(rc):
             rows = list(csv.DictReader(open(rc)))
@@ -103,7 +103,7 @@ print("all runs done in", round((time.time() - T0) / 3600, 2), "h")
 """),
     ("code", """# 6. collect the packages into the Output tab + print what was selected
 import json, shutil
-for name, _ in RUNS:
+for name, *_ in RUNS:
     z = f"/kaggle/working/depth/runs/{name}_complete.zip"
     meta_p = f"/kaggle/working/depth/runs/{name}/model_meta.json"
     if not os.path.exists(z):

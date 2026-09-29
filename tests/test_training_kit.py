@@ -76,3 +76,25 @@ def test_notebook_pins_the_tested_ultralytics():
     nb = json.loads((repo / "notebooks" / "exp002_kaggle.ipynb").read_text(encoding="utf-8"))
     src = "".join("".join(c["source"]) for c in nb["cells"])
     assert f"ultralytics=={pin}" in src and "--cache\", \"none\"" in src and "EXP-002s" in src
+
+
+def test_notebook_wait_and_collect_cells_run(tmp_path, monkeypatch):
+    """Execute the notebook's cells 5 and 6 (shell lines skipped) against fake finished runs — the
+    kind of unpacking bug that broke the first Kaggle run would fail here."""
+    import json, os, time
+    repo = Path(__file__).resolve().parents[1]
+    nb = json.loads((repo / "notebooks" / "exp002_kaggle.ipynb").read_text(encoding="utf-8"))
+    code = ["".join(c["source"]) for c in nb["cells"] if c["cell_type"] == "code"]
+    py = lambda s: "\n".join(l for l in s.splitlines() if not l.lstrip().startswith(("!", "%")))
+
+    class Done:
+        returncode = 0
+        def poll(self):
+            return 0
+    ns = {"os": os, "time": time, "RUNS": [("EXP-002", 1024, 8), ("EXP-002s", 640, 16)],
+          "procs": [("EXP-002", Done()), ("EXP-002s", Done())], "ngpu": 2, "T0": time.time(),
+          "subprocess": None, "cmd": None}
+    monkeypatch.setattr(time, "sleep", lambda s: None)
+    exec(py(code[4]), ns)                     # cell 5: wait loop + progress()
+    ns["progress"]()
+    exec(py(code[5]), ns)                     # cell 6: collect (no packages here -> prints, no crash)
