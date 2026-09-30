@@ -44,22 +44,42 @@ correctly refused by the gate.
    - **Add Input** → your **depth-v2b** dataset;
    - **Accelerator → GPU T4 ×2**;
    - **Internet → On**.
-3. **Save Version → Save & Run All (Commit)**. It keeps running if you close the browser. With 2 GPUs,
-   EXP-002 (1024 px) and EXP-002s (640 px) train at the same time; with 1 GPU they run one after the
-   other.
+3. Either **Save Version → Save & Run All (Commit)**, which keeps running if you close the browser, or
+   run cells 1–5 in order in the open session and keep the tab open. With 2 GPUs, EXP-002 (1024 px)
+   and EXP-002s (640 px) train at the same time; with 1 GPU they run one after the other.
 
-What the six cells do:
+What the five code cells do:
 
 1. Clone the repo and install **ultralytics 8.4.157** (pinned: the version the kit was tested with).
    Asserts a GPU.
 2. Find the dataset automatically and check the split sizes (train 1,773 · val 234 · test 285 ·
    official 398 · cross-sonar 555).
 3. Build the tiled set (about 30 s; 5,746 training images).
-4. Launch both trainings. Logs go to `/kaggle/working/logs/<name>.log`.
-5. Wait, printing epoch / val mAP50 / recall every 10 minutes. After training, each run validates
-   every epoch's checkpoint and exports the best one for ghost gear.
-6. Copy `EXP-002_complete.zip` and `EXP-002s_complete.zip` to the **Output** tab, and print which
-   checkpoint each run exported.
+4. Launch both trainings in their **own process group** (`start_new_session`), so Stop/Interrupt on a
+   cell cannot kill them. It **refuses to start a second copy** while a training is alive. Logs go to
+   `/kaggle/working/logs/<name>.log` (unbuffered).
+5. **Status / wait / collect** (`notebooks/monitor_cell.py`). It is safe to run at any time and any
+   number of times, and it never starts or stops a training.
+   - It reads the live process list and the run files, so it works after a cell error or a kernel
+     restart.
+   - For each run it prints the state:
+     - TRAINING
+     - CHOOSING THE BEST CHECKPOINT (k of N)
+     - EXPORTING
+     - FINISHED
+     - NOT STARTED
+     - STOPPED BEFORE FINISHING (with the log tail)
+   - With the state it shows the epoch, val mAP50 / recall, minutes per epoch and time left, GPU
+     use, and the latest log line.
+   - It warns about duplicate copies (with the `kill` command) and about a run that has written
+     nothing for 30 min.
+   - It re-checks every 5 minutes while anything runs.
+   - At the end it copies `EXP-002_complete.zip` and `EXP-002s_complete.zip` to the **Output** tab
+     and prints which checkpoint each run exported, with its ghost-gear AP50.
+
+> Trainings started by an **older** copy of cell 4 (before `start_new_session`) share the kernel's
+> process group. For those, do **not** press Stop/Interrupt or Restart while they run: a Jupyter
+> interrupt reaches the whole group.
 
 **Expected time:** about 2–3.5 h for the 1024-px run and about 1 h for the 640-px run (parallel), plus
 ~10–15 min of checkpoint selection. Kaggle's limit is 12 h. Disk use is about 3 GB (no image cache —
@@ -79,6 +99,9 @@ a disk cache at 1024 px would need ~27 GB and would crash the run).
 | `dataset not found` | the dataset is not attached: Add Input → depth-v2b |
 | `wrong ultralytics version` / pip error | Internet is off, or the phone is not verified |
 | one run fails, the other finishes | download the one zip that exists; re-run later with only the failed run in `RUNS` |
+| cell 5 says `STOPPED BEFORE FINISHING` | the printed log lines say why (OOM, disk, interrupt); fix, then run cells 4–5 again |
+| cell 5 says `N copies of … are running` | cell 4 ran twice on old code: run the printed `!kill <pid>` in a new cell |
+| a cell errors (e.g. `ValueError`) while training | the trainings are separate processes and keep going: just run cell 5 |
 | stopped at 12 h | lower `--epochs` to 20 in cell 4 (patience 8 usually stops earlier anyway) |
 
 ## 2. Back on your machine — one command per model

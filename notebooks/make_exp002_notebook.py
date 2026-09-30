@@ -17,9 +17,10 @@ Trains the next DEPTH detector on dataset **v2b** and packages each model for on
 Each run saves every epoch and exports the checkpoint with the best **ghost-gear AP@0.5 on the
 held-out validation recordings** (not ultralytics' default box-tightness fitness).
 
-**Settings:** Accelerator **GPU T4 ×2** · Internet **On** · then **Save Version → Save & Run All
-(Commit)**. With one GPU the two runs go one after the other. Outputs: `EXP-002_complete.zip`,
-`EXP-002s_complete.zip` in the Output tab."""),
+**Settings:** Accelerator **GPU T4 ×2** · Internet **On** · then either **Save Version → Save & Run All
+(Commit)** (runs unattended), or run cells 1–5 in order in this session and keep the tab open. Cell 5
+shows what is running, waits, and collects; it is safe to re-run at any time. With one GPU the two runs
+go one after the other. Outputs: `EXP-002_complete.zip`, `EXP-002s_complete.zip` in the Output tab."""),
     ("code", f"""# 1. environment — the repo + the EXACT ultralytics version the kit was tested with
 !nvidia-smi --query-gpu=index,name,memory.total --format=csv
 !rm -rf depth && git clone -q https://github.com/madhesh60/depth.git && cd depth && git log --oneline -1
@@ -48,7 +49,8 @@ assert len(os.listdir(os.path.join(SRC, "train", "images"))) > 1500, "train spli
 !df -h /kaggle/working | tail -1
 """),
     ("code", """# 4. launch both runs (parallel on 2 GPUs, else one after the other) — logs in /kaggle/working/logs
-import subprocess, time, torch
+#    Run it ONCE: it refuses to start a second copy while a training is alive. Cell 5 shows the status.
+import shlex, subprocess, torch
 os.makedirs("/kaggle/working/logs", exist_ok=True)
 DATA = "/kaggle/working/v2b_tiles/data.yaml"
 RUNS = [  # name, imgsz, batch
@@ -56,22 +58,22 @@ RUNS = [  # name, imgsz, batch
     ("EXP-002s", 640, 16),
 ]
 def cmd(name, imgsz, batch, dev):
-    return ["python", "src/detection/train.py", "--data", DATA, "--name", name, "--imgsz", str(imgsz),
+    return ["python", "-u", "src/detection/train.py", "--data", DATA, "--name", name, "--imgsz", str(imgsz),
             "--batch", str(batch), "--device", str(dev), "--workers", "2", "--cache", "none",
             "--epochs", "30", "--patience", "8", "--notes", f"Kaggle T4, {imgsz}px, tiles, ghost-AP50 selection"]
-ngpu = torch.cuda.device_count()
-procs = []
-if ngpu >= 2:
+live = subprocess.run(["bash", "-lc", "ps -eo args="], capture_output=True, text=True).stdout
+assert "src/detection/train.py" not in live, "a training is already running - do not start it twice; run cell 5"
+# start_new_session: the trainings get their own process group, so Stop/Interrupt on a cell cannot kill them
+if torch.cuda.device_count() >= 2:
     for dev, (name, imgsz, batch) in enumerate(RUNS):
         log = open(f"/kaggle/working/logs/{name}.log", "w")
-        procs.append((name, subprocess.Popen(cmd(name, imgsz, batch, dev), stdout=log, stderr=subprocess.STDOUT)))
+        subprocess.Popen(cmd(name, imgsz, batch, dev), stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
         print("started", name, "on GPU", dev)
 else:
-    print("one GPU: the runs will go one after the other (cell 5 starts the second)")
-    name, imgsz, batch = RUNS[0]
-    log = open(f"/kaggle/working/logs/{name}.log", "w")
-    procs.append((name, subprocess.Popen(cmd(name, imgsz, batch, 0), stdout=log, stderr=subprocess.STDOUT)))
-T0 = time.time()
+    chain = " ; ".join(f"{shlex.join(cmd(n, s, b, 0))} > /kaggle/working/logs/{n}.log 2>&1" for n, s, b in RUNS)
+    subprocess.Popen(["bash", "-c", chain], start_new_session=True)
+    print("one GPU: the runs go one after the other:", ", ".join(n for n, *_ in RUNS))
+print("now run cell 5: it shows what is running and waits until the models are packaged")
 """),
     ("code", Path(__file__).with_name("monitor_cell.py").read_text(encoding="utf-8")),
     ("markdown", """## Next — on your own machine

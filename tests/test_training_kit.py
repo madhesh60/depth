@@ -99,4 +99,27 @@ def test_notebook_monitor_cell_reports_and_collects(tmp_path, monkeypatch):
     ns = {}
     exec(cell.replace('WORK = "/kaggle/working"', f'WORK = "{w.as_posix()}"'), ns)
     assert (w / "EXP-002_complete.zip").exists() and not (w / "EXP-002s_complete.zip").exists()
-    assert ns["secs"]("1-02:03:04") == 93784 and ns["secs"]("05:06") == 306
+
+    # the live process list: a training, its data-loader worker (same args, parent = the training), a
+    # duplicate launch, the other run, a zombie and a one-GPU launcher shell
+    t = "src/detection/train.py --data d.yaml --name"
+    ps = "\n".join([f"  100     1 Sl  3600 python {t} EXP-002 --imgsz 1024",
+                    f"  101   100 Sl  3590 python {t} EXP-002 --imgsz 1024",
+                    f"  200     1 Sl   600 python -u {t} EXP-002 --imgsz 1024",
+                    f"  300   400 Rl  3000 /usr/bin/python3 {t} EXP-002s --imgsz 640",
+                    f"  301   300 Z      5 python {t} EXP-002s --imgsz 640",
+                    f"  400     1 S   3600 bash -c python {t} EXP-002 ; python {t} EXP-002s",
+                    "  500     1 S   9999 python other_script.py --name EXP-002"])
+    monkeypatch.setattr(subprocess, "run", lambda cmd, **kw: subprocess.CompletedProcess(
+        cmd, 0, stdout=ps if "ps -eo" in cmd[-1] else "", stderr=""))
+    runs, any_alive = ns["processes"]()
+    assert any_alive and runs == {"EXP-002": [(100, 3600), (200, 600)], "EXP-002s": [(300, 3000)]}
+
+    # a live run in its checkpoint-selection phase is reported as such, not as "training"
+    (w / "depth/runs/EXP-002s/weights").mkdir()
+    for p in ("epoch1.pt", "epoch2.pt", "best.pt", "last.pt"):
+        (w / "depth/runs/EXP-002s/weights" / p).write_bytes(b"")
+    (w / "depth/runs/EXP-002s/select/epoch1").mkdir(parents=True)
+    assert ns["phase"]("EXP-002s") == "CHOOSING THE BEST CHECKPOINT (validating 1 of 4)"
+    assert ns["phase"]("EXP-002") == "TRAINING"
+    assert ns["status"]() is True

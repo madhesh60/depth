@@ -75,6 +75,32 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ## 4. Session log
 
+### 2026-09-30 (sweep 35) — EXP-002 running on Kaggle; notebook made robust to what went wrong
+- **What happened on the first run.** The trainings (background processes from cell 4) started fine.
+  Epoch 5 at 1024 px: val mAP50 0.071, recall 0.290. Epoch 12 at 640 px: 0.091, 0.213. The waiting
+  cells then crashed on stale code (`for name, _ in RUNS` with 3-tuples), which left the user unable
+  to tell whether anything was still training.
+- **Cell 5 is now one status / wait / collect cell** (`notebooks/monitor_cell.py`). It never starts or
+  stops a training and is safe to re-run.
+  - It reads the live process list, not kernel variables, so it survives cell errors and kernel
+    restarts.
+  - It ignores data-loader workers and launcher shells, and flags duplicate launches with the `kill`
+    command.
+  - It shows the phase: TRAINING, CHOOSING THE BEST CHECKPOINT (k of N), EXPORTING, FINISHED,
+    STOPPED (with the log tail), or NOT STARTED.
+  - It shows min/epoch and time left, GPU use, the latest log line, and a warning after 30 min with
+    no output.
+- **Cell 4 hardened for future runs.**
+  - `start_new_session`: a Jupyter Stop/Interrupt goes to the kernel's process group, and would have
+    killed the trainings.
+  - It refuses to start a second copy while one runs.
+  - Unbuffered logs (`python -u`).
+  - The one-GPU path now actually queues the second run; the old path relied on a cell that no
+    longer started it.
+- The monitor test now simulates the process list and the selection phase. The guide
+  (`docs/exp002_kaggle.md`) documents the cells, the interrupt caveat, and three new
+  troubleshooting rows.
+
 ### 2026-09-28 (sweep 34) — EXP-002 ready to run tomorrow (Kaggle)
 - **Best-model selection for the product:** `train.py` saves every epoch and, after training, validates
   each checkpoint on the held-out recordings and exports the one with the best **ghost-gear AP@0.5**

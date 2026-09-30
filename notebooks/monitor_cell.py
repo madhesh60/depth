@@ -1,48 +1,53 @@
 # ==== DEPTH EXP-002 - STATUS / WAIT / COLLECT ====================================================
-# Safe to run at any time, any number of times. It NEVER starts or restarts a training.
-# 1) shows whether each training is RUNNING / FINISHED / STOPPED (reads the real process list + files,
-#    so it works even after a cell error or a kernel restart)
-# 2) if any training is still running: waits, printing progress every few minutes (+ time left)
-# 3) when both are done: copies the model packages to /kaggle/working and says what was exported
-import os, csv, json, shutil, subprocess, time
+# Run it in a NEW cell, any time, as often as you like. It only LOOKS: it never starts, restarts or
+# stops a training.
+#   1. shows what each training is doing right now - read from the live process list and the run
+#      files, so it works after a cell error or a kernel restart
+#   2. while anything is still running: waits and prints a fresh status every CHECK_EVERY_MIN minutes
+#   3. when nothing runs any more: copies the model packages to /kaggle/working (the Output panel)
+# While it waits: keep this tab open, and do NOT press Stop/Interrupt or Restart. A Jupyter interrupt
+# goes to the kernel's whole process group, which includes trainings launched without their own session.
+import csv, json, os, re, shutil, subprocess, sys, time
 
 WORK = "/kaggle/working"
 RUNS_DIR, LOGS = f"{WORK}/depth/runs", f"{WORK}/logs"
 NAMES = ["EXP-002", "EXP-002s"]          # 1024 px and 640 px
-EPOCHS = 30
+EPOCHS = 30                               # --epochs of cell 4 (patience 8 may end a run earlier)
 CHECK_EVERY_MIN = 5
+QUIET_WARN_MIN = 30                       # alive but nothing written for this long -> "may be stuck"
 
 
 def sh(cmd):
-    return subprocess.run(["bash", "-lc", cmd], capture_output=True, text=True).stdout.strip()
+    try:
+        return subprocess.run(["bash", "-lc", cmd], capture_output=True, text=True, timeout=60).stdout.strip()
+    except Exception:
+        return ""
 
 
-def secs(etime):                          # ps etime: [[dd-]hh:]mm:ss
-    d = 0
-    if "-" in etime:
-        d, etime = etime.split("-")
-    p = [int(x) for x in etime.split(":")]
-    while len(p) < 3:
-        p.insert(0, 0)
-    return int(d) * 86400 + p[0] * 3600 + p[1] * 60 + p[2]
+def processes():
+    """({run name: [(pid, seconds alive)]} for live trainings, whether any train.py process is alive).
+    Data-loader workers (children of a training) and launcher shells are not counted as trainings."""
+    procs = []
+    for line in sh("ps -eo pid=,ppid=,stat=,etimes=,args=").splitlines():
+        f = line.split(None, 4)
+        if len(f) == 5 and "src/detection/train.py" in f[4] and not f[2].startswith("Z"):
+            procs.append(f)
+    py = {f[0] for f in procs if os.path.basename(f[4].split()[0]).startswith("python")}
+    runs = {}
+    for pid, ppid, _, et, args in procs:
+        tok = args.split()
+        if pid not in py or ppid in py or "--name" not in tok[:-1]:
+            continue
+        runs.setdefault(tok[tok.index("--name") + 1], []).append((int(pid), int(et) if et.isdigit() else 0))
+    return runs, bool(procs)
 
 
-def running():
-    """{run name: seconds running} for training processes that are alive right now."""
-    out, alive = sh("ps -eo etime,args | grep 'src/detection/train.py' | grep -v grep"), {}
-    for line in out.splitlines():
-        et, args = (line.strip().split(None, 1) + [""])[:2]
-        for n in NAMES:
-            if f"--name {n} " in args + " ":
-                alive[n] = max(alive.get(n, 0), secs(et))
-    return alive
-
-
-def epochs(n):
+def rows(n):
     p = f"{RUNS_DIR}/{n}/results.csv"
     if not os.path.exists(p):
         return []
-    return [{k.strip(): v for k, v in r.items()} for r in csv.DictReader(open(p))]
+    with open(p) as f:
+        return [{k.strip(): (v or "").strip() for k, v in r.items() if k} for r in csv.DictReader(f)]
 
 
 def log_tail(n, k=4):
@@ -50,62 +55,117 @@ def log_tail(n, k=4):
     if not os.path.exists(p):
         return ["(no log file)"]
     with open(p, "rb") as f:
-        f.seek(0, 2); f.seek(max(0, f.tell() - 8000))
+        f.seek(0, 2)
+        f.seek(max(0, f.tell() - 16000))
         txt = f.read().decode("utf-8", "replace")
-    return [l.strip() for l in txt.replace("\r", "\n").split("\n") if l.strip()][-k:]
+    txt = re.sub(r"\x1b\[[0-9;?]*[A-Za-z]", "", txt).replace("\r", "\n")
+    return [l.strip() for l in txt.split("\n") if l.strip()][-k:] or ["(log is empty)"]
+
+
+def quiet_seconds(n):
+    """Seconds since the run last wrote anything (log, metrics, checkpoints, selection)."""
+    paths = [f"{LOGS}/{n}.log", f"{RUNS_DIR}/{n}/results.csv"]
+    for d in (f"{RUNS_DIR}/{n}/weights", f"{RUNS_DIR}/{n}/select"):
+        if os.path.isdir(d):
+            paths += [os.path.join(d, x) for x in os.listdir(d)]
+    t = [os.path.getmtime(p) for p in paths if os.path.exists(p)]
+    return time.time() - max(t) if t else None
+
+
+def phase(n):
+    """What a live run is doing, read from its files."""
+    run = f"{RUNS_DIR}/{n}"
+    if os.path.isdir(f"{run}/select"):
+        w = f"{run}/weights"
+        total = len([x for x in os.listdir(w) if x.endswith(".pt") and x != "best_depth.pt"]) if os.path.isdir(w) else 0
+        return f"CHOOSING THE BEST CHECKPOINT (validating {len(os.listdir(f'{run}/select'))} of {total})"
+    if os.path.exists(f"{run}/selection.csv") or os.path.exists(f"{run}/weights/best_depth.pt"):
+        return "EXPORTING ONNX + PACKAGING (a few minutes)"
+    return "TRAINING"
+
+
+def gpus():
+    out = sh("nvidia-smi --query-gpu=index,utilization.gpu,memory.used,memory.total --format=csv,noheader,nounits")
+    parts = []
+    for line in out.splitlines():
+        try:
+            i, u, m, t = [x.strip() for x in line.split(",")]
+            parts.append(f"GPU{i} {u}% busy, {float(m) / 1024:.1f}/{float(t) / 1024:.0f} GB")
+        except ValueError:
+            pass
+    return " | ".join(parts) or "GPU info n/a"
 
 
 def status():
-    alive = running()
-    print(time.strftime("\n=== %H:%M:%S ==="), "| GPUs:", sh("nvidia-smi --query-gpu=index,utilization.gpu,memory.used "
-                                                          "--format=csv,noheader | tr '\\n' ';'") or "n/a")
+    runs, any_alive = processes()
+    print(time.strftime("\n=== %H:%M:%S (Kaggle clock) ==="), "|", gpus())
     for n in NAMES:
-        rows = epochs(n)
-        done = os.path.exists(f"{RUNS_DIR}/{n}_complete.zip")
-        state = "FINISHED (package ready)" if done else ("RUNNING" if n in alive else "STOPPED")
-        line = f"{n:>9}: {state}"
-        if rows:
-            last = rows[-1]
-            best = max(float(r["metrics/mAP50(B)"]) for r in rows)
-            line += (f" | epoch {len(rows)}/{EPOCHS} | val mAP50 {float(last['metrics/mAP50(B)']):.3f}"
-                     f" (best {best:.3f}) | recall {float(last['metrics/recall(B)']):.3f}")
-            if n in alive and not done:
-                per = alive[n] / max(1, len(rows))
-                left = max(0, EPOCHS - len(rows)) * per / 60
-                line += f" | running {alive[n] / 3600:.1f} h, ~{left:.0f} min of training left + ~15 min selection"
-        elif n in alive:
-            line += f" | starting (running {alive[n] / 60:.0f} min, no finished epoch yet)"
-        print(line)
-        if state == "STOPPED":
+        r, alive = rows(n), runs.get(n, [])
+        if alive:
+            state = phase(n)
+        elif os.path.exists(f"{RUNS_DIR}/{n}_complete.zip"):
+            state = "FINISHED - package ready"
+        elif not r and not os.path.exists(f"{LOGS}/{n}.log"):
+            state = "NOT STARTED YET (queued)" if any_alive else "NOT STARTED"
+        else:
+            state = "STOPPED BEFORE FINISHING"
+        print(f"{n:>9}: {state}")
+        if r:
+            last = r[-1]
+            best = max(float(x.get("metrics/mAP50(B)") or 0) for x in r)
+            info = (f"           epoch {len(r)}/{EPOCHS} | val mAP50 {float(last.get('metrics/mAP50(B)') or 0):.3f}"
+                    f" (best so far {best:.3f}) | val recall {float(last.get('metrics/recall(B)') or 0):.3f}")
+            if state == "TRAINING":
+                per = (float(last.get("time") or 0) or max(et for _, et in alive)) / len(r)
+                left = max(0, EPOCHS - len(r)) * per / 60
+                info += f" | {per / 60:.1f} min/epoch -> at most ~{left:.0f} min + ~15 min to choose/export"
+            print(info)
+        elif alive:
+            print(f"           starting - no finished epoch yet ({max(et for _, et in alive) / 60:.0f} min since launch)")
+        if len(alive) > 1:
+            newest = [str(p) for p, _ in sorted(alive, key=lambda x: x[1])[:-1]]
+            print(f"           !! {len(alive)} copies of {n} are running (cell 4 was run twice); they share one folder."
+                  f" Stop the newest with:  !kill {' '.join(newest)}")
+        if alive:
+            q = quiet_seconds(n)
+            if q is not None and q > QUIET_WARN_MIN * 60:
+                print(f"           !! alive but nothing written for {q / 60:.0f} min - may be stuck (see GPU % above)")
+            print("           log:", log_tail(n, 1)[0][:150])
+        elif state == "STOPPED BEFORE FINISHING":
             print("           last log lines:")
-            for l in log_tail(n, 6):
-                print("             ", l[:160])
-    return alive
+            for l in log_tail(n, 8):
+                print("             ", l[:170])
+    sys.stdout.flush()
+    return any_alive
 
 
 alive = status()
 while alive:
+    print(f"   ... still running - next check in {CHECK_EVERY_MIN} min. Keep this tab open; do NOT press Stop.")
+    sys.stdout.flush()
     time.sleep(CHECK_EVERY_MIN * 60)
     alive = status()
 
-print("\n=== no training process is running any more - collecting ===")
+print("\n=== nothing is running any more - collecting the results ===")
 ok = 0
 for n in NAMES:
     z = f"{RUNS_DIR}/{n}_complete.zip"
     if not os.path.exists(z):
-        print(f"!! {n}: no package. It stopped before finishing - last log lines:")
+        print(f"!! {n}: NO package - it stopped before finishing. Last log lines:")
         for l in log_tail(n, 15):
-            print("   ", l[:200])
+            print("    ", l[:200])
         continue
     shutil.copy(z, f"{WORK}/{n}_complete.zip")
-    m = json.load(open(f"{RUNS_DIR}/{n}/model_meta.json"))
-    sel = (m.get("selection") or {}).get("picked") or {}
-    ub = (m.get("selection") or {}).get("ultralytics_best") or {}
-    print(f"OK {n}: trained {m.get('train_minutes')} min | exported {sel.get('checkpoint')} "
-          f"-> ghost_gear AP50 {sel.get('ghost_ap50')} (ultralytics' own pick: {ub.get('ghost_ap50')}) | "
-          f"{m.get('cv2_dnn_verified')}")
+    mp = f"{RUNS_DIR}/{n}/model_meta.json"
+    m = json.load(open(mp)) if os.path.exists(mp) else {}
+    sel = m.get("selection") or {}
+    pick, ub = sel.get("picked") or {}, sel.get("ultralytics_best") or {}
+    print(f"OK {n}: {(m.get('best') or {}).get('epochs_run')} epochs in {m.get('train_minutes')} min | exported "
+          f"{pick.get('checkpoint')} -> ghost_gear AP50 {pick.get('ghost_ap50')} on val (ultralytics' best.pt: "
+          f"{ub.get('ghost_ap50')}) | {m.get('cv2_dnn_verified')}")
     ok += 1
 if ok == len(NAMES):
-    shutil.rmtree(f"{WORK}/v2b_tiles", ignore_errors=True)
+    shutil.rmtree(f"{WORK}/v2b_tiles", ignore_errors=True)       # the tiled copy is not needed any more
 print(sh(f"ls -la {WORK}/*_complete.zip 2>/dev/null") or "no packages in /kaggle/working")
-print("\nDownload the *_complete.zip files: right-hand panel -> Output (/kaggle/working) -> ... -> Download.")
+if ok:
+    print("\nDONE. Download each *_complete.zip: right-hand panel -> Output (/kaggle/working) -> ... -> Download.")
