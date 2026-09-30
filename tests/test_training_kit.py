@@ -88,19 +88,13 @@ def test_notebook_monitor_cell_reports_and_collects(tmp_path, monkeypatch):
     cell = next("".join(c["source"]) for c in nb["cells"] if "STATUS / WAIT / COLLECT" in "".join(c["source"]))
     w = tmp_path
     (w / "logs").mkdir(); (w / "depth/runs/EXP-002").mkdir(parents=True); (w / "depth/runs/EXP-002s").mkdir(parents=True)
-    hdr = "epoch,metrics/recall(B),metrics/mAP50(B)
-"
-    (w / "depth/runs/EXP-002/results.csv").write_text(hdr + "1,0.3,0.2
-2,0.4,0.3
-")
-    (w / "depth/runs/EXP-002s/results.csv").write_text(hdr + "1,0.2,0.1
-")
+    hdr = "epoch,metrics/recall(B),metrics/mAP50(B)\n"
+    (w / "depth/runs/EXP-002/results.csv").write_text(hdr + "1,0.3,0.2\n2,0.4,0.3\n")
+    (w / "depth/runs/EXP-002s/results.csv").write_text(hdr + "1,0.2,0.1\n")
     (w / "depth/runs/EXP-002/model_meta.json").write_text(json.dumps(
         {"train_minutes": 1.0, "selection": {"picked": {"checkpoint": "epoch1.pt", "ghost_ap50": 0.5}}}))
     zipfile.ZipFile(w / "depth/runs/EXP-002_complete.zip", "w").close()
-    (w / "logs/EXP-002s.log").write_text("1/30Traceback (most recent call last):
-RuntimeError: boom
-")
+    (w / "logs/EXP-002s.log").write_text("1/30\rTraceback (most recent call last):\nRuntimeError: boom\n")
     monkeypatch.setattr(subprocess, "run", lambda cmd, **kw: subprocess.CompletedProcess(cmd, 0, stdout="", stderr=""))
     ns = {}
     exec(cell.replace('WORK = "/kaggle/working"', f'WORK = "{w.as_posix()}"'), ns)
