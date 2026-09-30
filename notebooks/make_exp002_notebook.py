@@ -73,51 +73,7 @@ else:
     procs.append((name, subprocess.Popen(cmd(name, imgsz, batch, 0), stdout=log, stderr=subprocess.STDOUT)))
 T0 = time.time()
 """),
-    ("code", """# 5. wait for the runs (this cell blocks — needed for Save & Run All); progress every 10 min
-import csv, glob as _g
-def progress():
-    for name, *_ in RUNS:
-        rc = f"/kaggle/working/depth/runs/{name}/results.csv"
-        if os.path.exists(rc):
-            rows = list(csv.DictReader(open(rc)))
-            if rows:
-                r = {k.strip(): v for k, v in rows[-1].items()}
-                print(f"  {name}: epoch {int(float(r['epoch']))}  val mAP50 {float(r['metrics/mAP50(B)']):.3f}  "
-                      f"recall {float(r['metrics/recall(B)']):.3f}")
-pending = list(procs)
-while pending:
-    time.sleep(600)
-    print(f"--- {(time.time() - T0) / 3600:.1f} h"); progress()
-    still = []
-    for name, p in pending:
-        if p.poll() is None:
-            still.append((name, p))
-        else:
-            print(name, "finished with exit code", p.returncode)
-            if ngpu < 2 and name == RUNS[0][0]:                    # one GPU: start the 640 run now
-                n2, s2, b2 = RUNS[1]
-                log = open(f"/kaggle/working/logs/{n2}.log", "w")
-                still.append((n2, subprocess.Popen(cmd(n2, s2, b2, 0), stdout=log, stderr=subprocess.STDOUT)))
-    pending = still
-print("all runs done in", round((time.time() - T0) / 3600, 2), "h")
-"""),
-    ("code", """# 6. collect the packages into the Output tab + print what was selected
-import json, shutil
-for name, *_ in RUNS:
-    z = f"/kaggle/working/depth/runs/{name}_complete.zip"
-    meta_p = f"/kaggle/working/depth/runs/{name}/model_meta.json"
-    if not os.path.exists(z):
-        print(f"!! {name}: no package - see /kaggle/working/logs/{name}.log"); continue
-    shutil.copy(z, "/kaggle/working/")
-    m = json.load(open(meta_p))
-    sel = (m.get("selection") or {}).get("picked") or {}
-    ub = (m.get("selection") or {}).get("ultralytics_best") or {}
-    print(f"{name}: {m['train_minutes']} min | exported {sel.get('checkpoint')} ghost_gear AP50 {sel.get('ghost_ap50')} "
-          f"(ultralytics' pick {ub.get('ghost_ap50')}) | {m.get('cv2_dnn_verified')}")
-!rm -rf /kaggle/working/v2b_tiles          # 629 MB of tiles: not needed any more
-!ls -la /kaggle/working/*.zip
-!tail -3 /kaggle/working/logs/*.log
-"""),
+    ("code", Path(__file__).with_name("monitor_cell.py").read_text(encoding="utf-8")),
     ("markdown", """## Next — on your own machine
 
 Download `EXP-002_complete.zip` and `EXP-002s_complete.zip` from the **Output** tab into the repo root, then:
