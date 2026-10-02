@@ -108,8 +108,8 @@
         <label class="field">Your name or initials <input type="text" id="audName" maxlength="40" placeholder="e.g. RK" /></label>
         <button class="btn btn-primary btn-block" id="audStart">Start / resume audit</button>
         <div class="aud-keys">
-          <span><kbd>1</kbd> real object</span><span><kbd>2</kbd> clutter / natural</span>
-          <span><kbd>3</kbd> noise / artefact</span><span><kbd>4</kbd> unsure</span><span><kbd>←</kbd> back</span>
+          <span><kbd>1</kbd> Real object</span><span><kbd>2</kbd> Clutter</span>
+          <span><kbd>3</kbd> Noise</span><span><kbd>4</kbd> Unsure</span><span><kbd>←</kbd> Back</span>
         </div>
       </section>
 
@@ -121,16 +121,16 @@
       <section class="panel collapsible is-collapsed">
         <div class="panel-head"><span class="panel-title">Model</span><span class="panel-meta" id="regBrief"></span></div>
         <div class="reg" id="modelReg">
-          <div class="reg-row"><span class="reg-k">detector</span><span class="reg-v">YOLO11 · cv2.dnn</span></div>
-          <div class="reg-row"><span class="reg-k">weights</span><span class="reg-v" id="regWeights">…</span></div>
-          <div class="reg-row"><span class="reg-k">classes</span><span class="reg-v" id="regClasses">…</span></div>
-          <div class="reg-row"><span class="reg-k" id="regGateK">gate</span><span class="reg-v" id="regGate">…</span></div>
-          <div class="reg-row"><span class="reg-k">tiers</span><span class="reg-v" id="regTiers">…</span></div>
-          <div class="reg-row"><span class="reg-k">opencv</span><span class="reg-v" id="regCv">…</span></div>
-          <div class="reg-row"><span class="reg-k">runtime</span><span class="reg-v" id="regModel">…</span></div>
-          <div class="reg-row"><span class="reg-k">host</span><span class="reg-v" id="regHost">…</span></div>
-          <div class="reg-row"><span class="reg-k">p50 · this server</span><span class="reg-v" id="regLat">run a frame</span></div>
-          <div class="reg-row" title="every approve / reject / missed-pot mark is saved as a training label (python -m src.agentic.feedback export)"><span class="reg-k">human labels</span><span class="reg-v" id="regLabels">0</span></div>
+          <div class="reg-row"><span class="reg-k">Detector</span><span class="reg-v">YOLO11 · cv2.dnn</span></div>
+          <div class="reg-row"><span class="reg-k">Weights</span><span class="reg-v" id="regWeights">…</span></div>
+          <div class="reg-row"><span class="reg-k">Classes</span><span class="reg-v" id="regClasses">…</span></div>
+          <div class="reg-row"><span class="reg-k" id="regGateK">Gate</span><span class="reg-v" id="regGate">…</span></div>
+          <div class="reg-row"><span class="reg-k">Tiers</span><span class="reg-v" id="regTiers">…</span></div>
+          <div class="reg-row"><span class="reg-k">OpenCV</span><span class="reg-v" id="regCv">…</span></div>
+          <div class="reg-row"><span class="reg-k">Runtime</span><span class="reg-v" id="regModel">…</span></div>
+          <div class="reg-row"><span class="reg-k">Host</span><span class="reg-v" id="regHost">…</span></div>
+          <div class="reg-row"><span class="reg-k">Median latency</span><span class="reg-v" id="regLat">Run a frame</span></div>
+          <div class="reg-row" title="every approve / reject / missed-pot mark is saved as a training label (python -m src.agentic.feedback export)"><span class="reg-k">Human labels</span><span class="reg-v" id="regLabels">0</span></div>
         </div>
       </section>
     </aside>
@@ -167,9 +167,9 @@
             <img id="stageImg" alt="analysed sonar frame" draggable="false" />
             <svg id="boxLayer" class="box-layer" xmlns="http://www.w3.org/2000/svg"></svg>
           </div>
-          <div class="viewer-empty" id="viewerEmpty" hidden>no detections on this frame</div>
+          <div class="viewer-empty" id="viewerEmpty" hidden>No detections on this frame</div>
           <figure class="agent-eye" id="agentEye" hidden>
-            <figcaption class="ae-cap"><span class="ae-dot"></span><span id="aeCap">agent's eye</span></figcaption>
+            <figcaption class="ae-cap"><span class="ae-dot"></span><span id="aeCap">Agent's eye</span></figcaption>
             <img id="aeImg" alt="agent's-eye re-look view" />
           </figure>
           <div class="viewer-placeholder" id="analyzePlaceholder">
@@ -239,14 +239,14 @@
           </div>
         </div>
         <div class="study-screen" id="audTask" hidden>
-          <div class="st-bar"><span class="st-arm">Audit</span><span class="mono" id="audProg"></span><span class="tb-spacer"></span><button class="tb-btn" id="audBack">← back</button></div>
+          <div class="st-bar"><span class="st-arm">Audit</span><span class="mono" id="audProg"></span><span class="tb-spacer"></span><button class="tb-btn" id="audBack">Back</button></div>
           <div class="aud-view">
-            <figure><img id="audCrop" alt="audit crop" /><figcaption>the flagged return (bracketed)</figcaption></figure>
-            <figure><img id="audCtx" alt="wider context" /><figcaption>wider context</figcaption></figure>
+            <figure><img id="audCrop" alt="audit crop" /><figcaption>The flagged return</figcaption></figure>
+            <figure><img id="audCtx" alt="wider context" /><figcaption>Wider context</figcaption></figure>
           </div>
           <div class="st-answer aud-answer">
-            <button class="btn" data-tag="real">1 · real object</button><button class="btn" data-tag="clutter">2 · clutter / natural</button>
-            <button class="btn" data-tag="noise">3 · noise / artefact</button><button class="btn" data-tag="unsure">4 · unsure</button>
+            <button class="btn" data-tag="real">Real object</button><button class="btn" data-tag="clutter">Clutter</button>
+            <button class="btn" data-tag="noise">Noise</button><button class="btn" data-tag="unsure">Unsure</button>
           </div>
         </div>
         <div class="study-screen" id="audDone" hidden><div class="st-card"><h2>Audit complete — thank you</h2><p>Your tags are saved. The summary on the right updates as more people audit.</p></div></div>
@@ -268,7 +268,7 @@
         <div class="study-screen" id="studyManual" hidden>
           <div class="st-bar"><span class="st-arm">Manual review</span><span class="mono" id="stManProg"></span>
             <span class="mono st-timer" id="stManTimer">0.0 s</span><span class="mono" id="stManClicks">0 marks</span>
-            <span class="tb-spacer"></span><button class="tb-btn" id="stUndo">undo</button><button class="btn btn-primary" id="stNext">Next frame →</button></div>
+            <span class="tb-spacer"></span><button class="tb-btn" id="stUndo">Undo</button><button class="btn btn-primary" id="stNext">Next frame</button></div>
           <div class="st-frame" id="stFrameWrap"><img id="stFrame" alt="sonar frame to review" draggable="false" /><svg id="stMarks"></svg></div>
         </div>
         <div class="study-screen" id="studyCards" hidden>
@@ -277,11 +277,11 @@
           <div class="st-cardview">
             <img id="stCard" alt="DEPTH evidence card" />
             <div class="st-cardmeta mono" id="stCardMeta"></div>
-            <div class="st-answer"><button class="btn st-yes" id="stYes">✓ real pot <kbd>Y</kbd></button><button class="btn st-no" id="stNo">✕ not a pot <kbd>N</kbd></button></div>
+            <div class="st-answer"><button class="btn st-yes" id="stYes">Real pot <kbd>Y</kbd></button><button class="btn st-no" id="stNo">Not a pot <kbd>N</kbd></button></div>
           </div>
         </div>
         <div class="study-screen" id="studyBreak" hidden>
-          <div class="st-card"><h2 id="stBreakTitle">Part 1 done</h2><p id="stBreakTxt"></p><button class="btn btn-primary" id="stContinue">Continue →</button></div>
+          <div class="st-card"><h2 id="stBreakTitle">Part 1 done</h2><p id="stBreakTxt"></p><button class="btn btn-primary" id="stContinue">Continue</button></div>
         </div>
         <div class="study-screen" id="studyDone" hidden>
           <div class="st-card" id="stDoneCard"></div>
@@ -333,8 +333,8 @@
       <section class="panel" data-when="study">
         <div class="panel-head"><span class="panel-title" data-tab="Effort">Analyst effort</span><span class="panel-meta" id="effProv"></span></div>
         <div class="eff-ctl">
-          <label>manual s / frame <output class="mono" id="effSpfV"></output><input type="range" id="effSpf" min="3" max="120" step="1" /></label>
-          <label>s / card <output class="mono" id="effSpcV"></output><input type="range" id="effSpc" min="1" max="30" step="0.5" /></label>
+          <label>Manual, seconds per frame <output class="mono" id="effSpfV"></output><input type="range" id="effSpf" min="3" max="120" step="1" /></label>
+          <label>Seconds per card <output class="mono" id="effSpcV"></output><input type="range" id="effSpc" min="1" max="30" step="0.5" /></label>
         </div>
         <div id="effChart"></div>
         <div class="eff-stats" id="effStats"></div>
@@ -360,7 +360,7 @@
         <div class="panel-head"><span class="panel-title" data-tab="Hazards">Hazards</span><span class="panel-meta mono" id="hazCount"></span></div>
         <div class="table-scroll">
           <table class="haz-table"><thead><tr>
-            <th>ID</th><th>Class</th><th>Verdict</th><th>Conf</th><th>Score</th><th>P(pot)</th><th>H</th><th>Shadow</th><th>Lat, Lon</th><th>±</th><th>Review</th>
+            <th>ID</th><th>Class</th><th>Verdict</th><th>Confidence</th><th>Score</th><th>P(pot)</th><th>Height</th><th>Shadow</th><th>Position</th><th>±</th><th>Review</th>
           </tr></thead><tbody id="hazBody"></tbody></table>
         </div>
       </section>
@@ -372,7 +372,7 @@
       <section class="panel" data-when="survey">
         <div class="panel-head"><span class="panel-title" data-tab="Exports">Exports</span><span class="panel-meta"></span></div>
         <label class="pub-toggle" title="wrecks can be war graves or protected heritage sites: a public share generalises their positions to ~1.1 km and drops re-survey passes that would reveal them">
-          <input type="checkbox" id="pubShare" /> public share — generalise protected-site locations</label>
+          <input type="checkbox" id="pubShare" /> Public share: generalise protected-site locations</label>
         <div class="dl-grid" id="dlGrid"></div>
         <div class="panel-head" style="margin-top:14px"><span class="panel-title">Frames</span></div>
         <div class="thumb-strip" id="thumbStrip"></div>

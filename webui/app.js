@@ -9,7 +9,9 @@ const SVGNS = "http://www.w3.org/2000/svg";
 
 const VERDICTS = ["confirmed", "review", "low_risk"];
 const VCOLOR = { confirmed: "#6fe3b4", review: "#f2c879", low_risk: "#8aa1b4", rejected: "#8aa1b4" };
-const VLABEL = { confirmed: "confirmed", review: "review", low_risk: "low-risk", rejected: "low-risk" };
+const VLABEL = { confirmed: "Confirmed", review: "Review", low_risk: "Low risk", rejected: "Low risk" };
+/* display text: sentence case, no snake_case ("fishing_gear" -> "Fishing gear") */
+const human = s => { s = String(s ?? "").replace(/_/g, " ").trim(); return s ? s[0].toUpperCase() + s.slice(1) : s; };
 const CLASS_SW = ["#64d2ff", "#f2c879", "#a99cf5", "#6fe3b4", "#ff9fbf"];
 
 const state = {
@@ -127,19 +129,19 @@ async function loadHealth() {
     if (h.recording && h.recording.available && $("#gpsRecording")) $("#gpsRecording").hidden = false;
     cv.textContent = `OpenCV ${h.opencv}`;
     cv.className = "pill " + (String(h.opencv).startsWith("5") ? "pill-ok" : "pill");
-    md.textContent = h.model_loaded ? "model ready" : h.model_error ? "model error" : "model warming up…";
+    md.textContent = h.model_loaded ? "Ready" : h.model_error ? "Error" : "Warming up";
     md.className = "pill " + (h.model_loaded ? "pill-ok" : h.model_error ? "pill-bad" : "pill");
     md.title = h.model_error || (h.warmup_ms != null ? `warm-up ${h.warmup_ms} ms` : "");
     if (h.is_cool_path) { cv.textContent += " · COOL"; cv.title = h.cv2_file; }
     const rc = $("#regCv"), rm = $("#regModel");
     if (rc) rc.textContent = h.opencv + (h.is_cool_path ? " (COOL /opt/cool)" : "");
-    if (rm) rm.textContent = h.model_loaded ? "loaded + warm" : "loading…";
+    if (rm) rm.textContent = h.model_loaded ? "Loaded and warm" : "Loading";
     state.calibration = h.calibration || null;
     const cal = h.calibration || {};
     if ($("#regWeights")) $("#regWeights").textContent = `${cal.model || h.model} · ${cal.imgsz || "?"} px ONNX`;
     if ($("#regBrief")) $("#regBrief").textContent = `${cal.model || h.model || ""}`;
-    if ($("#regClasses")) $("#regClasses").textContent = `${(cal.names || []).length} · ${(cal.names || []).join(", ")}`;
-    if ($("#regGateK")) $("#regGateK").textContent = `gate · ${cal.guaranteed_class || "?"}`;
+    if ($("#regClasses")) $("#regClasses").textContent = `${(cal.names || []).length} · ${(cal.names || []).map(human).join(", ")}`;
+    if ($("#regGateK")) $("#regGateK").textContent = `Gate · ${human(cal.guaranteed_class || "?")}`;
     renderGuarantees(h.calibration);
     setSys(h.model_loaded ? "ok" : h.model_error ? "bad" : "busy",
            h.model_loaded ? (h.is_cool_path ? "Ready · COOL" : "Ready") : h.model_error ? "Model error" : "Warming up");
@@ -530,7 +532,7 @@ function renderAnalyze(d) {
   const s1 = d.stage1 || {};
   $("#stageCap").textContent = `${d.frame_id} · ${d.width}×${d.height}px · nadir=${d.nadir}${d.orientation && d.orientation.source ? ` (${d.orientation.source})` : ""}`
     + ` · seabed ${s1.measured ? `tracked @ ${s1.altitude_px} px` : "not measured"} · ${d.candidates.length} candidate(s)`;
-  $("#verdictCounts").innerHTML = VERDICTS.map(v => `<span class="vc vc-${v}"><span class="n">${d.counts[v] || 0}</span>${v}</span>`).join("");
+  $("#verdictCounts").innerHTML = VERDICTS.map(v => `<span class="vc vc-${v}"><span class="n">${d.counts[v] || 0}</span>${VLABEL[v] || human(v)}</span>`).join("");
   const sm = d.stage_ms || {};
   $("#latency").textContent = `⏱ ${d.wall_ms}ms · stage1 ${fmt(sm.stage1)} · see ${fmt(sm.see)} · prove+decide ${fmt(sm.prove_decide)}`;
   const dl = $("#dockLatency"); if (dl) dl.textContent = `wall ${d.wall_ms}ms`;
@@ -567,7 +569,7 @@ function buildClassLegend(ordered) {
   names.forEach((nm, i) => {
     const chip = document.createElement("button");
     chip.className = "cls-chip" + (state.hiddenClasses.has(nm) ? " is-off" : "");
-    chip.innerHTML = `<span class="sw" style="background:${CLASS_SW[i % CLASS_SW.length]}"></span>${escapeHtml(nm)}<span class="cnt">${counts[nm]}</span>`;
+    chip.innerHTML = `<span class="sw" style="background:${CLASS_SW[i % CLASS_SW.length]}"></span>${escapeHtml(human(nm))}<span class="cnt">${counts[nm]}</span>`;
     chip.title = "show / cut this class";
     chip.onclick = () => {
       if (state.hiddenClasses.has(nm)) state.hiddenClasses.delete(nm); else state.hiddenClasses.add(nm);
@@ -617,17 +619,17 @@ function relooked(c) {
 function decideDetail(c) { const d = (c.trace || []).find(s => s.tool === "decide"); return (d && d.detail) || {}; }
 function tierPromise(c) {
   const g = (state.calibration && state.calibration.guarantees) || {}, d = decideDetail(c);
-  if (d.mode !== "calibrated") return "legacy rule (no calibrated promise)";
-  if (c.verdict === "confirmed") return `CONFIRMED tier promise: ≥ ${Math.round((g.precision_promise || 0) * 100)}% are real (95% conf.)`;
-  if (c.verdict === "review") return `REVIEW + CONFIRMED together reach ≥ ${Math.round((g.recall_promise || 0) * 100)}% of pots (95% conf.)`;
-  if (((state.calibration || {}).non_hazard_classes || []).includes(c.cls_name)) return "natural seabed class — not a hazard, kept for audit";
-  return `LOW-RISK tier holds ≤ ${Math.round((1 - (g.recall_promise || 0)) * 100)}% of pots — kept for audit, never deleted`;
+  if (d.mode !== "calibrated") return "Legacy rule (no calibrated promise)";
+  if (c.verdict === "confirmed") return `Confirmed tier: at least ${Math.round((g.precision_promise || 0) * 100)}% are real (95% confidence)`;
+  if (c.verdict === "review") return `Review and confirmed together reach at least ${Math.round((g.recall_promise || 0) * 100)}% of pots (95% confidence)`;
+  if (((state.calibration || {}).non_hazard_classes || []).includes(c.cls_name)) return "Natural seabed class: not a hazard, kept for audit";
+  return `Low-risk tier holds at most ${Math.round((1 - (g.recall_promise || 0)) * 100)}% of pots; kept for audit, never deleted`;
 }
 function verdictReason(c) {
   const d = decideDetail(c), p = (c.evidence || {}).p_pot;
-  if (c.verdict === "confirmed") return d.mode === "calibrated" ? "above tau_confirm — carries the precision promise" : "legacy rule";
-  if (c.verdict === "review") return `human review${p != null ? ` · P(pot) ~${Math.round(p * 100)}%` : ""} — ordered in the queue`;
-  return "LOW-RISK — below tau_review, retained for audit, not surfaced";
+  if (c.verdict === "confirmed") return d.mode === "calibrated" ? "Above the confirm threshold: carries the precision promise" : "Legacy rule";
+  if (c.verdict === "review") return `Human review${p != null ? ` · P(pot) ~${Math.round(p * 100)}%` : ""}, ordered in the queue`;
+  return "Low risk: below the review threshold, kept for audit, not surfaced";
 }
 
 function selectCandidate(id, fromTwin) {
@@ -726,23 +728,23 @@ function evidenceCard(c, id) {
     <div class="ev-crop${c.relook_view ? " has-enh" : ""}">
       ${c.crop_png ? `<img class="ev-img raw" alt="evidence crop" src="${c.crop_png}" decoding="async"/>` : `<div style="aspect-ratio:1"></div>`}
       ${c.relook_view ? `<img class="ev-img enh" alt="CLAHE re-look (what the agent saw)" src="${c.relook_view.enhanced_png}" loading="lazy" decoding="async"/>` : ""}
-      <span class="ev-badge b-${v}">${v}</span>
+      <span class="ev-badge b-${v}">${VLABEL[v] || human(v)}</span>
       ${c.relook_view ? `<button class="cmp-chip" title="toggle raw / CLAHE re-look">Enhanced</button>` : ""}
       <button class="gaze-btn" title="replay what the agent saw (G)">Replay gaze</button>
     </div>
     <div class="ev-body">
       <p class="ev-tier">${escapeHtml(tierPromise(c))}</p>
       <div class="conf-flow">
-        <div class="conf-chip"><span class="lbl">detector</span><span class="val">${(c.conf).toFixed(2)}</span></div>
+        <div class="conf-chip"><span class="lbl">Detector</span><span class="val">${(c.conf).toFixed(2)}</span></div>
         <div class="conf-arrow ${arrowCls}"><div class="track"></div>
-          <span class="tag">${!rlDone ? "no re-look (VoI 0)" : `re-look ${rl.found ? `${rlConf.toFixed(2)} (${gain >= 0 ? "+" : ""}${gain.toFixed(2)})` : "no re-fire"}`}</span></div>
-        <div class="conf-chip"><span class="lbl">score</span><span class="val ${arrowCls}">${(ev.evidence_score ?? c.conf).toFixed(2)}</span></div>
+          <span class="tag">${!rlDone ? "No re-look (VoI 0)" : `re-look ${rl.found ? `${rlConf.toFixed(2)} (${gain >= 0 ? "+" : ""}${gain.toFixed(2)})` : "no re-fire"}`}</span></div>
+        <div class="conf-chip"><span class="lbl">Score</span><span class="val ${arrowCls}">${(ev.evidence_score ?? c.conf).toFixed(2)}</span></div>
       </div>
       <div class="ev-facts">
-        <div class="fact"><span class="k">shadow</span><span class="v ${shCls}">${sh.quality || "none"}${sh.contrast ? ` · c${sh.contrast}` : ""}</span></div>
-        <div class="fact"><span class="k">rel. height</span><span class="v">${height}</span></div>
-        <div class="fact"><span class="k">echo × bg</span><span class="v">${(sh.echo_ratio ?? ev.echo_ratio ?? 0).toFixed(1)}×</span></div>
-        <div class="fact"><span class="k">position</span><span class="v ${c.in_water_column ? "chip-weak" : ""}">${c.in_water_column == null ? "—" : c.in_water_column ? "water column" : "on seabed"}${c.ground_range_px != null ? ` · ${Math.round(c.ground_range_px)} px gnd` : ""}</span></div>
+        <div class="fact"><span class="k">Shadow</span><span class="v ${shCls}">${human(sh.quality || "none")}${sh.contrast ? ` · c${sh.contrast}` : ""}</span></div>
+        <div class="fact"><span class="k">Relative height</span><span class="v">${height}</span></div>
+        <div class="fact"><span class="k">Echo vs background</span><span class="v">${(sh.echo_ratio ?? ev.echo_ratio ?? 0).toFixed(1)}×</span></div>
+        <div class="fact"><span class="k">Position</span><span class="v ${c.in_water_column ? "chip-weak" : ""}">${c.in_water_column == null ? "—" : c.in_water_column ? "Water column" : "On seabed"}${c.ground_range_px != null ? ` · ${Math.round(c.ground_range_px)} px gnd` : ""}</span></div>
         <div class="fact"><span class="k">P(pot)</span><span class="v">${ev.p_pot != null ? Math.round(ev.p_pot * 100) + "%" : "—"}</span></div>
       </div>
       <div class="ev-label"><span class="lbl-k">Your label</span>
@@ -832,8 +834,8 @@ async function pollJob(jobId) {
 function renderSurvey(d, opts = {}) {
   $("#surveyPlaceholder").hidden = true;
   const m = d.mission, cc = m.counts || {};
-  const gpsTag = !m.gps_available ? `<span class="mb-tag">○ No GPS — table only</span>`
-    : m.gps_synthetic ? `<span class="mb-tag mb-synthetic">⚠ Synthetic demo GPS — not real positions</span>` : `<span class="mb-tag mb-real">● Real GPS</span>`;
+  const gpsTag = !m.gps_available ? `<span class="mb-tag">No GPS — table only</span>`
+    : m.gps_synthetic ? `<span class="mb-tag mb-synthetic">Synthetic demo GPS — not real positions</span>` : `<span class="mb-tag mb-real">Real GPS</span>`;
   const rp = m.resurvey_plan || {}, passes = (rp.lines || []).length, insp = (m.inspection_route || []).length;
   const total = (cc.confirmed || 0) + (cc.review || 0) + (cc.low_risk || 0);
   const tile = (label, value, sub) => `<div class="kpi-t"><div class="kpi-l">${label}</div><div class="kpi-v">${value}</div><div class="kpi-s">${sub}</div></div>`;
@@ -846,7 +848,7 @@ function renderSurvey(d, opts = {}) {
         ? `${m.impact.person_confirmed} confirmed by people · ${m.impact.person_recovered} recovered`
         : (m.recovery_route.length ? `${m.route_length_m} m · confirmed finds` : "none yet — a person confirms"))}
     </div>
-    <div class="mb-tags">${gpsTag}${m.repeat_merges ? `<span class="mb-tag">◎ ${m.repeat_merges} repeat sighting${m.repeat_merges > 1 ? "s" : ""} merged</span>` : ""}<span class="mb-tag mb-gate">● Human approval required — nothing is dispatched automatically</span></div>`;
+    <div class="mb-tags">${gpsTag}${m.repeat_merges ? `<span class="mb-tag">${m.repeat_merges} repeat sighting${m.repeat_merges > 1 ? "s" : ""} merged</span>` : ""}<span class="mb-tag mb-gate">● Human approval required — nothing is dispatched automatically</span></div>`;
   renderMap(d, opts.keepView); renderDownloads(d.survey_id, m); renderThumbs(d); renderHazards(d); renderEffort(d); loadBrief(d.survey_id);
   if (!opts.keepView) Log.push([
     { stage: true, tool: "ACT", msg: `${cc.confirmed || 0} confirmed · ${cc.review || 0} review · ${cc.low_risk || 0} low-risk (kept for audit)`, t: "" },
@@ -894,7 +896,7 @@ function renderMap(d, keepView) {
     const onRoute = t.human === "confirmed" || (t.verdict === "confirmed" && !t.human);
     const mk = L.circleMarker([t.lat, t.lon], { radius: onRoute ? 8 : (t.human === "rejected" || t.human === "not_found") ? 4 : 6,
         color: onRoute ? "#d8ffe4" : "#02121d", weight: onRoute ? 2 : 1.5, fillColor: color, fillOpacity: (t.human === "rejected" || t.human === "not_found") ? .5 : .95 })
-      .bindPopup(`<b>${t.oid}</b> · ${t.verdict}<br/>${t.cls_name} · conf ${t.conf}<br/>evidence ${t.evidence_score} · ${t.shadow_quality} shadow${t.height_m != null || t.height_rel ? ` · h ${heightText(t.height_m, t.height_rel, 1)}` : ""}<br/>${t.lat.toFixed(5)}, ${t.lon.toFixed(5)} ±${t.geo_error_m ?? "?"} m${t.human ? `<br/><b>person: ${t.human}</b> (${escapeHtml(t.human_by || "")})` : ""}`);
+      .bindPopup(`<b>${t.oid}</b> · ${VLABEL[t.verdict] || human(t.verdict)}<br/>${human(t.cls_name)} · conf ${t.conf}<br/>evidence ${t.evidence_score} · ${t.shadow_quality} shadow${t.height_m != null || t.height_rel ? ` · h ${heightText(t.height_m, t.height_rel, 1)}` : ""}<br/>${t.lat.toFixed(5)}, ${t.lon.toFixed(5)} ±${t.geo_error_m ?? "?"} m${t.human ? `<br/><b>person: ${t.human}</b> (${escapeHtml(t.human_by || "")})` : ""}`);
     if (t.geo_error_m) {
       const ring = L.circle([t.lat, t.lon], { radius: t.geo_error_m, color, weight: 1, opacity: .55, fillOpacity: .06, dashArray: "3 4", interactive: false });
       ring.addTo(state.map); state.mapLayers.push(ring);
@@ -912,7 +914,7 @@ function renderMap(d, keepView) {
   const inspPts = (m.inspection_route || []).map(id => byId[id]).filter(t => t && t.lat != null).map(t => [t.lat, t.lon]);
   if (inspPts.length > 1) {
     const il = L.polyline(inspPts, { color: "#f2c879", weight: 2, dashArray: "2 6", opacity: .85 })
-      .bindTooltip("inspection route — REVIEW cards to check first (pending human approval)").addTo(state.map);
+      .bindTooltip("Inspection route: review cards to check first (pending human approval)").addTo(state.map);
     state.mapLayers.push(il);
   }
   ((m.resurvey_plan || {}).lines || []).forEach(Lr => {
@@ -1175,15 +1177,15 @@ function renderHazards(d) {
   const rank = Object.fromEntries((d.mission.review_queue || []).map((id, i) => [id, i]));
   rows.sort((a, b) => (VERDICTS.indexOf(a.verdict) - VERDICTS.indexOf(b.verdict)) || ((rank[a.oid] ?? 1e9) - (rank[b.oid] ?? 1e9)));
   const imp = d.mission.impact || {};
-  $("#hazCount").textContent = `${rows.length} hazards · REVIEW ordered by P(pot)` + (imp.decisions
-    ? ` · people ✓${imp.person_confirmed} ✕${imp.person_rejected} ⚓${imp.person_recovered}` + (imp.reviewed_precision != null
+  $("#hazCount").textContent = `${rows.length} hazards · review ordered by P(pot)` + (imp.decisions
+    ? ` · people: ${imp.person_confirmed} confirmed, ${imp.person_rejected} rejected, ${imp.person_recovered} recovered` + (imp.reviewed_precision != null
       ? ` · reviewed precision ${Math.round(imp.reviewed_precision * 100)}% (95% CI ${Math.round(imp.reviewed_precision_ci95[0] * 100)}–${Math.round(imp.reviewed_precision_ci95[1] * 100)}%)` : "")
-    : " · LOW-RISK kept for audit");
+    : " · low risk kept for audit");
   const body = $("#hazBody"); body.innerHTML = "";
   rows.forEach(t => {
     const tr = document.createElement("tr"); tr.dataset.oid = t.oid;
     const coords = t.lat != null ? `${t.lat.toFixed(5)}, ${t.lon.toFixed(5)}` : `<span class="muted">no GPS</span>`;
-    tr.innerHTML = `<td>${t.oid}${t.sightings > 1 ? ` <span class="muted" title="seen on ${t.sightings} frames/passes">×${t.sightings}</span>` : ""}</td><td>${t.cls_name}</td>
+    tr.innerHTML = `<td>${t.oid}${t.sightings > 1 ? ` <span class="muted" title="seen on ${t.sightings} frames/passes">×${t.sightings}</span>` : ""}</td><td>${human(t.cls_name)}</td>
       <td><span class="v-tag" style="color:${VCOLOR[t.verdict]};background:${VCOLOR[t.verdict]}22">${VLABEL[t.verdict] || t.verdict}</span></td>
       <td>${t.conf}</td><td>${t.evidence_score}</td><td>${t.p_pot != null ? Math.round(t.p_pot * 100) + "%" : "—"}</td><td>${heightText(t.height_m, t.height_rel, t.height_rel ? 1 : 0)}</td>
       <td class="${t.shadow_quality === "clear" ? "chip-clear" : t.shadow_quality === "weak" ? "chip-weak" : "chip-none"}">${t.shadow_quality}</td>
@@ -1648,7 +1650,7 @@ function renderEffort(d) {
   const byId = Object.fromEntries(d.tracked.map(t => [t.oid, t]));
   const q = (m.review_queue || []).map(id => byId[id]).filter(Boolean);
   const conf = (m.counts || {}).confirmed || 0;
-  if (!q.length) { box.innerHTML = `<p class="empty-hint">No REVIEW cards in this survey — ${conf} auto-confirmed under the precision promise.</p>`; meta.textContent = ""; return; }
+  if (!q.length) { box.innerHTML = `<p class="empty-hint">No review cards in this survey: ${conf} auto-confirmed under the precision promise.</p>`; meta.textContent = ""; return; }
   const spc = b.sec_per_card || 8, W = 300, H = 120, P = 26;
   const mins = [0], pots = [0];
   q.forEach((t, i) => { mins.push((i + 1) * spc / 60); pots.push(pots[i] + (t.p_pot ?? 0)); });

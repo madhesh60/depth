@@ -257,7 +257,7 @@ class ShadowProver:
         x1, y1, x2, y2 = [int(v) for v in box]
         cv2.rectangle(vis, (x1, y1), (x2, y2), (0, 200, 255), 1)
         if not proof.orientation_known:
-            cv2.putText(vis, "shadow: orientation unknown", (x1, max(10, y1 - 4)),
+            cv2.putText(vis, "Shadow: orientation unknown", (x1, max(10, y1 - 4)),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.4, (120, 120, 120), 1, cv2.LINE_AA)
             return vis
         cv2.circle(vis, proof.echo_xy, 3, (0, 0, 255), -1)
@@ -265,8 +265,8 @@ class ShadowProver:
                   ShadowQuality.NONE: (120, 120, 120)}[proof.quality]
         sx1, sy1, sx2, sy2 = [int(v) for v in proof.strip]
         cv2.rectangle(vis, (sx1, sy1), (sx2, sy2), colour, 1)
-        h_txt = (f" h~{proof.height_m:.1f}m" if proof.height_m is not None
-                 else (f" h~{100 * proof.height_rel:.0f}%alt" if proof.run_px else ""))
-        cv2.putText(vis, f"shadow:{proof.quality.value} c{proof.contrast:.2f}{h_txt}",
+        h_txt = (f", height ~{proof.height_m:.1f} m" if proof.height_m is not None
+                 else (f", height ~{100 * proof.height_rel:.0f}% alt" if proof.run_px else ""))
+        cv2.putText(vis, f"Shadow: {proof.quality.value}{h_txt}",
                     (x1, max(10, y1 - 4)), cv2.FONT_HERSHEY_SIMPLEX, 0.4, colour, 1, cv2.LINE_AA)
         return vis

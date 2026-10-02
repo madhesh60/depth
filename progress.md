@@ -75,6 +75,24 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ## 4. Session log
 
+### 2026-10-02 (sweep 44) — Apple-like type: SF Pro on Apple devices, sentence case everywhere
+- **Font stack:** `-apple-system` / SF Pro first, so Mac and iOS show Apple's own font. SF Pro cannot
+  be redistributed for other platforms, so Inter follows, with stylistic alternates removed
+  (`cv11` was a non-SF single-storey "a").
+- **Casing** — one rule, sentence case. All-caps came from CSS and from strings; both are gone:
+  - CSS: badges, verdict tags and the approvals action no longer force capitals;
+  - strings: "REVIEW + CONFIRMED…", "LOW-RISK…" and the hazard subtitle now read in sentence case;
+  - raw `snake_case` such as `fishing_gear` and `low_risk` goes through a `human()` formatter:
+    verdict counts, class chips, evidence badges and facts, the hazard table, map popups, the
+    registry, the status pill;
+  - static labels are sentence case too (registry, audit, study, table headers);
+  - symbol prefixes were dropped (⚠ ○ ● ◎ ✓ ✕ →).
+- **Wordmark:** "DEPTH Studio" in 17 px, tight tracking, no spaced-out capitals.
+- The server-drawn evidence caption is now "Shadow: weak, height ~1% alt", in ASCII because OpenCV's
+  Hershey fonts cannot draw "·".
+- Verified in the browser (Analyze, Survey with the hazard table); no console errors. Full test
+  suite: 152 passed.
+
 ### 2026-10-02 (sweep 43) — Studio v5: production loading, wordmark only, Apple-like deep-ocean dark
 - **Loading:** the spinner toast was replaced by one `Busy` controller used by analyze, survey, study
   start and study scoring.

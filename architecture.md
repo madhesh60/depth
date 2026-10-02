@@ -199,7 +199,10 @@ UI: a zero-build studio with five modes (Analyze · Survey · Study · Audit · 
   near-black navy and a faint static nautical chart. The wordmark has no icon. The depth contours are
   made with OpenCV (`webui/img/make_bathymetry.py`). Marine palette: aqua is the single call to
   action; seafoam / sand / slate / coral mark the verdicts. It is synced with `app.js` and `twin3d.js`.
-- **Type:** one family, **Inter** (vendored, OFL), on a fixed scale (11 / 12 / 13 / 14 / 16 / 20 /
+- **Type:** Apple devices get the real **SF Pro**. It is the system font and may not be
+  redistributed, so everyone else gets **Inter** (vendored, OFL), the closest open match, with no
+  stylistic alternates. **Sentence case everywhere**: no all-caps, and no raw `snake_case`, because
+  one `human()` formatter displays class and verdict names. The type uses on a fixed scale (11 / 12 / 13 / 14 / 16 / 20 /
   28 px) with Inter's size-dependent tracking, weights 400 / 500 / 600, tabular figures for numbers.
   **JetBrains Mono** is used only for code and the agent log.
 - **Progressive disclosure** — what an analyst needs is visible; the rest is one click away:
