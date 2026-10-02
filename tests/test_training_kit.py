@@ -75,10 +75,10 @@ def test_notebook_pins_the_tested_ultralytics():
     repo = Path(__file__).resolve().parents[1]
     pin = next(l.split("==")[1].strip() for l in (repo / "requirements-train.txt").read_text().splitlines()
                if l.startswith("ultralytics=="))
-    nb = json.loads((repo / "notebooks" / "exp003_kaggle.ipynb").read_text(encoding="utf-8"))
+    nb = json.loads((repo / "notebooks" / "exp004_kaggle.ipynb").read_text(encoding="utf-8"))
     src = "".join("".join(c["source"]) for c in nb["cells"])
-    assert f"ultralytics=={pin}" in src and "--cache\", \"none\"" in src and "EXP-003f" in src
-    assert "\"--optimizer\", \"SGD\"" in src and "--no-tiles" in src
+    assert f"ultralytics=={pin}" in src and "--cache\", \"none\"" in src and "EXP-004g" in src
+    assert "\"--optimizer\", \"SGD\"" in src and "--drop-rotated" in src and "--keep-classes 0" in src
 
 
 def test_notebook_monitor_cell_reports_and_collects(tmp_path, monkeypatch):
@@ -87,44 +87,44 @@ def test_notebook_monitor_cell_reports_and_collects(tmp_path, monkeypatch):
     bug that broke the first Kaggle run (stale variables, wrong unpacking) would fail here."""
     import json, subprocess, zipfile
     repo = Path(__file__).resolve().parents[1]
-    nb = json.loads((repo / "notebooks" / "exp003_kaggle.ipynb").read_text(encoding="utf-8"))
+    nb = json.loads((repo / "notebooks" / "exp004_kaggle.ipynb").read_text(encoding="utf-8"))
     cell = next("".join(c["source"]) for c in nb["cells"] if "STATUS / WAIT / COLLECT" in "".join(c["source"]))
     w = tmp_path
-    (w / "logs").mkdir(); (w / "depth/runs/EXP-003").mkdir(parents=True); (w / "depth/runs/EXP-003f").mkdir(parents=True)
+    (w / "logs").mkdir(); (w / "depth/runs/EXP-004").mkdir(parents=True); (w / "depth/runs/EXP-004g").mkdir(parents=True)
     hdr = "epoch,metrics/recall(B),metrics/mAP50(B)\n"
-    (w / "depth/runs/EXP-003/results.csv").write_text(hdr + "1,0.3,0.2\n2,0.4,0.3\n")
-    (w / "depth/runs/EXP-003f/results.csv").write_text(hdr + "1,0.2,0.1\n")
-    (w / "depth/runs/EXP-003/model_meta.json").write_text(json.dumps(
+    (w / "depth/runs/EXP-004/results.csv").write_text(hdr + "1,0.3,0.2\n2,0.4,0.3\n")
+    (w / "depth/runs/EXP-004g/results.csv").write_text(hdr + "1,0.2,0.1\n")
+    (w / "depth/runs/EXP-004/model_meta.json").write_text(json.dumps(
         {"train_minutes": 1.0, "selection": {"picked": {"checkpoint": "epoch1.pt", "ghost_ap50": 0.5}}}))
-    zipfile.ZipFile(w / "depth/runs/EXP-003_complete.zip", "w").close()
-    (w / "logs/EXP-003f.log").write_text("1/30\rTraceback (most recent call last):\nRuntimeError: boom\n")
+    zipfile.ZipFile(w / "depth/runs/EXP-004_complete.zip", "w").close()
+    (w / "logs/EXP-004g.log").write_text("1/30\rTraceback (most recent call last):\nRuntimeError: boom\n")
     monkeypatch.setattr(subprocess, "run", lambda cmd, **kw: subprocess.CompletedProcess(cmd, 0, stdout="", stderr=""))
     ns = {}
     exec(cell.replace('WORK = "/kaggle/working"', f'WORK = "{w.as_posix()}"'), ns)
-    assert (w / "EXP-003_complete.zip").exists() and not (w / "EXP-003f_complete.zip").exists()
+    assert (w / "EXP-004_complete.zip").exists() and not (w / "EXP-004g_complete.zip").exists()
 
     # the live process list: a training, its data-loader worker (same args, parent = the training), a
     # duplicate launch, the other run, a zombie and a one-GPU launcher shell
     t = "src/detection/train.py --data d.yaml --name"
-    ps = "\n".join([f"  100     1 Sl  3600 python {t} EXP-003 --imgsz 1024",
-                    f"  101   100 Sl  3590 python {t} EXP-003 --imgsz 1024",
-                    f"  200     1 Sl   600 python -u {t} EXP-003 --imgsz 1024",
-                    f"  300   400 Rl  3000 /usr/bin/python3 {t} EXP-003f --imgsz 640",
-                    f"  301   300 Z      5 python {t} EXP-003f --imgsz 640",
-                    f"  400     1 S   3600 bash -c python {t} EXP-003 ; python {t} EXP-003f",
-                    "  500     1 S   9999 python other_script.py --name EXP-003"])
+    ps = "\n".join([f"  100     1 Sl  3600 python {t} EXP-004 --imgsz 1024",
+                    f"  101   100 Sl  3590 python {t} EXP-004 --imgsz 1024",
+                    f"  200     1 Sl   600 python -u {t} EXP-004 --imgsz 1024",
+                    f"  300   400 Rl  3000 /usr/bin/python3 {t} EXP-004g --imgsz 640",
+                    f"  301   300 Z      5 python {t} EXP-004g --imgsz 640",
+                    f"  400     1 S   3600 bash -c python {t} EXP-004 ; python {t} EXP-004g",
+                    "  500     1 S   9999 python other_script.py --name EXP-004"])
     monkeypatch.setattr(subprocess, "run", lambda cmd, **kw: subprocess.CompletedProcess(
         cmd, 0, stdout=ps if "ps -eo" in cmd[-1] else "", stderr=""))
     runs, any_alive = ns["processes"]()
-    assert any_alive and runs == {"EXP-003": [(100, 3600), (200, 600)], "EXP-003f": [(300, 3000)]}
+    assert any_alive and runs == {"EXP-004": [(100, 3600), (200, 600)], "EXP-004g": [(300, 3000)]}
 
     # a live run in its checkpoint-selection phase is reported as such, not as "training"
-    (w / "depth/runs/EXP-003f/weights").mkdir()
+    (w / "depth/runs/EXP-004g/weights").mkdir()
     for p in ("epoch1.pt", "epoch2.pt", "best.pt", "last.pt"):
-        (w / "depth/runs/EXP-003f/weights" / p).write_bytes(b"")
-    (w / "depth/runs/EXP-003f/select/epoch1").mkdir(parents=True)
-    assert ns["phase"]("EXP-003f") == "CHOOSING THE BEST CHECKPOINT (validating 1 of 4)"
-    assert ns["phase"]("EXP-003") == "TRAINING"
+        (w / "depth/runs/EXP-004g/weights" / p).write_bytes(b"")
+    (w / "depth/runs/EXP-004g/select/epoch1").mkdir(parents=True)
+    assert ns["phase"]("EXP-004g") == "CHOOSING THE BEST CHECKPOINT (validating 1 of 4)"
+    assert ns["phase"]("EXP-004") == "TRAINING"
     assert ns["status"]() is True
 
 
@@ -182,3 +182,23 @@ def test_diagnose_sources_and_verdicts():
     assert s["ap50"] == 0.0 and s["ap30"] == 1.0 and dg._cell(s).startswith("0.000 / 1.00")
     assert dg.Model("B", Path("x"), 640, ["fishing_gear", "pipe_cylinder", "structural_fragment",
                                           "natural_formation"]).cmap == {0: 0, 1: 1, 2: 1}
+
+
+def test_rotated_copies_are_detected_but_sonograms_are_not():
+    """Rotation padding = whole black corners; a sonogram's dark nadir stripe or dim far range is not."""
+    import numpy as np
+    rng = np.random.default_rng(0)
+    sono = rng.integers(40, 200, (300, 300, 3), dtype=np.uint8)
+    nadir = sono.copy(); nadir[:, 140:160] = 0                       # black water column down the middle
+    rot = sono.copy()
+    for y in range(300):                                              # a 45-degree rotated copy: black corners
+        k = abs(150 - y)
+        rot[y, :k] = 0; rot[y, 300 - k:] = 0
+    assert not bt.is_rotated_copy(sono) and not bt.is_rotated_copy(nadir) and bt.is_rotated_copy(rot)
+
+
+def test_keep_classes_renumbers_and_drops():
+    lab = [(0, .1, .1, .05, .05), (1, .5, .5, .3, .3), (0, .7, .7, .04, .04)]
+    assert bt.keep_labels(lab, None) == lab
+    assert bt.keep_labels(lab, [0]) == [lab[0], lab[2]]
+    assert bt.keep_labels(lab, [1]) == [(0, .5, .5, .3, .3)]

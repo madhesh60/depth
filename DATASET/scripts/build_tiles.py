@@ -15,6 +15,15 @@ tiled inference"; crab pots are small — 91% of EXP-001's misses were < 10% of 
   - the visible part of any box a tile still cuts below ``min_vis`` is **inpainted**
     (``cv2.inpaint``, Telea) from the surrounding seabed, so the tile carries no unlabelled object.
 * ``--no-tiles``: full frames only, with the same ``data.yaml`` layout. This is the comparison arm.
+* **EXP-004 data cleanup** (``docs/exp003_diagnosis.md``), all applied to TRAIN only:
+  - ``--drop-sources seabed`` drops the off-domain "seabed" frames: colour screenshots of consumer
+    fish-finder displays, with on-screen interface. They supplied most of the wreck labels, and
+    look nothing like the side-scan sonar we deploy on.
+  - ``--drop-rotated`` drops Roboflow rotated copies: two or more corners almost entirely pure
+    black. Rotation breaks side-scan range geometry, and the black corners look like objects.
+  - ``--keep-classes 0`` makes a single-class (ghost-gear) set. Other boxes are removed and their
+    frames stay as negatives. Val and test are copied with the same classes, so the metrics stay
+    comparable.
 * val/ and test*/ are **not tiled** — ``data.yaml`` points at the source dataset's full frames, so
   model selection and evaluation stay deploy-faithful (full-frame inference).
 * Tiles are written as JPEG at native resolution; ultralytics resizes them to ``imgsz`` (so a tile
@@ -102,6 +111,23 @@ def tile_frame(im, labels, tile_frac=0.6, min_vis=0.6, max_tile_box=0.25, pad=3)
             crop = cv2.inpaint(crop, mask, 5, cv2.INPAINT_TELEA)
         out.append((k, crop, tile_boxes(labels, W, H, x0, y0, tw, th, min_vis), len(rects)))
     return out
+
+
+def is_rotated_copy(im, frac: float = 0.06, black: int = 8, fill: float = 0.85) -> bool:
+    """Rotation padding fills whole corners with pure black; real sonograms never do that."""
+    g = im if im.ndim == 2 else cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
+    h, w = g.shape[:2]
+    k = max(6, int(frac * min(h, w)))
+    corners = (g[:k, :k], g[:k, -k:], g[-k:, :k], g[-k:, -k:])
+    return sum((c < black).mean() > fill for c in corners) >= 2
+
+
+def keep_labels(labels, keep):
+    """Keep only the listed classes, renumbered 0..k-1 in the listed order."""
+    if keep is None:
+        return labels
+    remap = {c: i for i, c in enumerate(keep)}
+    return [(remap[c], x, y, w, h) for c, x, y, w, h in labels if c in remap]
 
 
 def tiles_for(W, H, tile_frac, overlap):
@@ -223,16 +249,32 @@ def main():
     ap.add_argument("--bg-keep", type=float, default=0.35, help="share of box-free tiles to keep")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--paste", type=int, default=0, help="N synthetic sonar-aware copy-paste frames (0 = off)")
+    ap.add_argument("--drop-sources", default="", help="comma list of filename prefixes to leave out of TRAIN, e.g. seabed")
+    ap.add_argument("--drop-rotated", action="store_true", help="leave out rotated copies (black corners) from TRAIN")
+    ap.add_argument("--keep-classes", default="", help="e.g. 0 = single-class ghost-gear set (val/test copied to match)")
     a = ap.parse_args()
+    drop = tuple(x.strip().lower() for x in a.drop_sources.split(",") if x.strip())
+    keep = [int(x) for x in a.keep_classes.split(",") if x.strip()] or None
     random.seed(a.seed)
     src, out = Path(a.src), Path(a.out)
     (out / "train" / "images").mkdir(parents=True, exist_ok=True)
     (out / "train" / "labels").mkdir(parents=True, exist_ok=True)
 
     stats = {"frames": 0, "frames_not_tiled_large_box": 0, "tiles_written": 0, "tiles_bg_dropped": 0,
-             "boxes_full": 0, "boxes_tiles": 0, "boxes_cut_inpainted": 0}
+             "boxes_full": 0, "boxes_tiles": 0, "boxes_cut_inpainted": 0,
+             "dropped_source": 0, "dropped_rotated": 0, "boxes_dropped_class": 0}
     for ip in sorted((src / "train" / "images").iterdir()):
-        labels = read_labels(src / "train" / "labels" / f"{ip.stem}.txt")
+        if drop and ip.name.lower().startswith(drop):
+            stats["dropped_source"] += 1
+            continue
+        if a.drop_rotated:
+            probe = cv2.imread(str(ip))
+            if probe is not None and is_rotated_copy(probe):
+                stats["dropped_rotated"] += 1
+                continue
+        raw = read_labels(src / "train" / "labels" / f"{ip.stem}.txt")
+        labels = keep_labels(raw, keep)
+        stats["boxes_dropped_class"] += len(raw) - len(labels)
         stats["frames"] += 1
         stats["boxes_full"] += len(labels)
         shutil.copy2(ip, out / "train" / "images" / ip.name)                      # the full frame
@@ -266,6 +308,19 @@ def main():
         if line.strip().startswith("- "):
             names.append(line.strip()[2:].strip())
     rel = lambda d: str((src / d / "images").resolve()).replace("\\", "/")
+    if keep is not None:
+        # val/test must carry the same classes, or the metrics stop being comparable: copy them with
+        # the other classes removed (their frames stay, as negatives)
+        names = [names[c] for c in keep]
+        for d in ("val", "test"):
+            (out / d / "images").mkdir(parents=True, exist_ok=True)
+            (out / d / "labels").mkdir(parents=True, exist_ok=True)
+            for ip in sorted((src / d / "images").iterdir()):
+                shutil.copy2(ip, out / d / "images" / ip.name)
+                kl = keep_labels(read_labels(src / d / "labels" / f"{ip.stem}.txt"), keep)
+                (out / d / "labels" / f"{ip.stem}.txt").write_text(
+                    "\n".join(f"{c} {x:.6f} {y:.6f} {w:.6f} {h:.6f}" for c, x, y, w, h in kl))
+        rel = lambda d: str((out / d / "images").resolve()).replace("\\", "/")
     kind = "full frames only" if a.no_tiles else "full frames + 2x2 tiles"
     yaml = [f"# training set (build_tiles.py) - train = {kind}; val/test = source full frames",
             f"path: {str(out.resolve()).replace(chr(92), '/')}", "train: train/images",
