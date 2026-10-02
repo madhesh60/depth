@@ -75,6 +75,25 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ## 4. Session log
 
+### 2026-10-02 (sweep 43) — Studio v5: production loading, wordmark only, Apple-like deep-ocean dark
+- **Loading:** the spinner toast was replaced by one `Busy` controller used by analyze, survey, study
+  start and study scoring.
+  - A hairline progress bar runs on the navigation's lower edge. It is determinate from the
+    survey's reported frames, and an indeterminate sweep otherwise.
+  - A quiet status pill states the step ("Analyzing frame", "Frame 4 of 8").
+  - The bar exposes `aria` progressbar state.
+- **Brand:** the sonar icon next to "DEPTH" was removed; the wordmark stands alone.
+- **Theme** — Apple-style dark materials in deep-ocean tones:
+  - near-black navy depth gradient;
+  - neutral glass (`rgba(16,24,36,.62)`, blur 30px, saturate 170%) with 0.5 px sheen;
+  - Apple dark-mode label colours;
+  - ocean-cyan accent `#64d2ff`;
+  - the chart at 38% opacity.
+
+  Synced into `app.js` and `twin3d.js`.
+- Verified in the browser: Survey (run, tabs), the progress bar state (opacity 1, scaleX toward the
+  reported fraction) and the pill. No console errors.
+
 ### 2026-10-02 (sweep 42) — Studio v4: production type, progressive disclosure, faster
 - **Feedback:** "still clumsy", "fonts very bad", "hide what users don't need until they click".
 - **Type:**

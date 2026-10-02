@@ -11,7 +11,7 @@ import * as THREE from "three";
 import { OrbitControls } from "./vendor/three/addons/OrbitControls.js";
 
 const VCOL = { confirmed: 0x6fe3b4, review: 0xf2c879, low_risk: 0x8aa1b4, rejected: 0x8aa1b4 };
-const CYAN = 0x5fd3e4, VIOLET = 0xb3a8ff;
+const CYAN = 0x64d2ff, VIOLET = 0xb3a8ff;
 
 class TwinViewer {
   constructor(el, opts = {}) {
@@ -22,8 +22,8 @@ class TwinViewer {
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     el.appendChild(this.renderer.domElement);
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x03111f);
-    this.scene.fog = new THREE.FogExp2(0x03111f, 0.006);
+    this.scene.background = new THREE.Color(0x050b14);
+    this.scene.fog = new THREE.FogExp2(0x050b14, 0.006);
     this.camera = new THREE.PerspectiveCamera(45, 1, 0.05, 5000);
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true; this.controls.dampingFactor = 0.08; this.controls.screenSpacePanning = true;
@@ -260,7 +260,7 @@ class TwinViewer {
     });
     // the boat + two sonar fans (port / starboard) for the replay
     this.boat = new THREE.Group();
-    const hull = new THREE.Mesh(new THREE.ConeGeometry(0.9, 3.2, 10), new THREE.MeshStandardMaterial({ color: 0xe7eef4, emissive: 0x5fd3e4, emissiveIntensity: 0.25 }));
+    const hull = new THREE.Mesh(new THREE.ConeGeometry(0.9, 3.2, 10), new THREE.MeshStandardMaterial({ color: 0xe7eef4, emissive: 0x64d2ff, emissiveIntensity: 0.25 }));
     hull.rotation.x = Math.PI / 2; this.boat.add(hull);
     const swath = 640 * (tw.m_per_px || 0.05);
     const fan = side => {

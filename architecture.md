@@ -195,7 +195,8 @@ Hardening:
 UI: a zero-build studio with five modes (Analyze · Survey · Study · Audit · Connect)
 (`webui/styles.css`, `webui/app.js`).
 
-- **Look:** three floating ocean-glass layers over a static nautical chart. The depth contours are
+- **Look:** Apple-style dark materials in deep-ocean tones: three floating glass layers over
+  near-black navy and a faint static nautical chart. The wordmark has no icon. The depth contours are
   made with OpenCV (`webui/img/make_bathymetry.py`). Marine palette: aqua is the single call to
   action; seafoam / sand / slate / coral mark the verdicts. It is synced with `app.js` and `twin3d.js`.
 - **Type:** one family, **Inter** (vendored, OFL), on a fixed scale (11 / 12 / 13 / 14 / 16 / 20 /
@@ -210,6 +211,10 @@ UI: a zero-build studio with five modes (Analyze · Survey · Study · Audit · 
   - the guarantee and model sections fold to a one-line summary, and advanced survey options fold
     away;
   - panel explanations sit behind an (i), and the agent log opens from a slim status dock.
+- **Loading:** one controller (`Busy`) for every long action.
+  - A hairline progress bar sits on the navigation's lower edge. It is determinate when the server
+    reports progress (survey frames) and an indeterminate sweep otherwise.
+  - A quiet status pill states the step in words ("Frame 4 of 8").
 - **Performance and robustness:**
   - one font file (48 KB) is preloaded;
   - images use lazy loading and async decoding;

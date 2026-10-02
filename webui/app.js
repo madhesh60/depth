@@ -10,7 +10,7 @@ const SVGNS = "http://www.w3.org/2000/svg";
 const VERDICTS = ["confirmed", "review", "low_risk"];
 const VCOLOR = { confirmed: "#6fe3b4", review: "#f2c879", low_risk: "#8aa1b4", rejected: "#8aa1b4" };
 const VLABEL = { confirmed: "confirmed", review: "review", low_risk: "low-risk", rejected: "low-risk" };
-const CLASS_SW = ["#5fd3e4", "#f2c879", "#a99cf5", "#6fe3b4", "#ff9fbf"];
+const CLASS_SW = ["#64d2ff", "#f2c879", "#a99cf5", "#6fe3b4", "#ff9fbf"];
 
 const state = {
   samples: [], selected: null, survey: null, map: null, mapLayers: [],
@@ -226,7 +226,7 @@ async function loadSamples() {
 
 function sonarGlyph() {
   const d = document.createElement("div");
-  d.style.cssText = "aspect-ratio:1;display:grid;place-items:center;background:radial-gradient(circle at 50% 35%,#0b3352,#03111f);color:#5fd3e4";
+  d.style.cssText = "aspect-ratio:1;display:grid;place-items:center;background:radial-gradient(circle at 50% 35%,#0b3352,#03111f);color:#64d2ff";
   d.innerHTML = `<svg viewBox="0 0 24 24" width="28" height="28" opacity=".7"><path d="M12 3a9 9 0 1 0 9 9h-9V3Z" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg>`;
   return d;
 }
@@ -468,12 +468,38 @@ const Log = (() => {
 function toast(txt) { const t = $("#runToast"); $("#runToastTxt").textContent = txt; t.hidden = false; }
 function toastHide() { $("#runToast").hidden = true; }
 
+/* loading: a hairline progress bar under the navigation (determinate when the server reports
+   progress, a sweep otherwise) + a quiet status pill that says the step in words */
+const Busy = {
+  n: 0,
+  start(txt) {
+    this.n++;
+    const bar = $("#progress");
+    if (bar) { bar.classList.add("indeterminate"); bar.style.setProperty("--p", 0); bar.setAttribute("aria-hidden", "false"); }
+    document.body.classList.add("is-busy");
+    toast(txt);
+  },
+  set(frac, txt) {
+    const bar = $("#progress"); if (!bar) return;
+    bar.classList.toggle("indeterminate", frac == null);
+    if (frac != null) { const v = Math.max(.04, Math.min(1, frac)); bar.style.setProperty("--p", v); bar.setAttribute("aria-valuenow", String(Math.round(v * 100))); }
+    if (txt) $("#runToastTxt").textContent = txt;
+  },
+  done() {
+    this.n = Math.max(0, this.n - 1); if (this.n) return;
+    const bar = $("#progress");
+    if (bar) { bar.classList.remove("indeterminate"); bar.style.setProperty("--p", 1); bar.setAttribute("aria-hidden", "true"); }
+    setTimeout(() => { if (!this.n) { document.body.classList.remove("is-busy"); if (bar) bar.style.setProperty("--p", 0); } }, 420);
+    toastHide();
+  },
+};
+
 /* ------------------------------------------------------------------ ANALYZE */
 async function runAnalyze() {
   if (!state.selected) return;
   $("#analyzeBtn").disabled = true;
   $("#analyzePlaceholder").hidden = true;
-  toast("See → Prove → Decide …");
+  Busy.start("Analyzing frame");
   stepperRun(["stage1", "see", "prove", "decide"]);
   Log.reset(); Log.now({ stage: true, tool: "SEE", msg: "perceive — full-frame YOLO11 via cv2.dnn …", t: "run" });
 
@@ -493,7 +519,7 @@ async function runAnalyze() {
     $("#analyzePlaceholder").hidden = false;
     $("#analyzePlaceholder").querySelector("p").innerHTML =
       `<b style="color:var(--danger)">Analyze failed (${e.message}).</b><br/>Is the backend running and the model present?`;
-  } finally { toastHide(); $("#analyzeBtn").disabled = false; }
+  } finally { Busy.done(); $("#analyzeBtn").disabled = false; }
 }
 
 function renderAnalyze(d) {
@@ -759,7 +785,7 @@ function traceBlock(trace) {
 async function runSurvey() {
   const btn = $("#surveyBtn"); btn.disabled = true;
   $("#surveyPlaceholder").hidden = true; $("#missionBanner").hidden = true;
-  toast("Running full loop over the survey …");
+  Busy.start("Running survey");
   stepperRun(["stage1", "see", "prove", "decide", "act"]);
   Log.reset(); Log.now({ stage: true, tool: "SURVEY", msg: "running See→Prove→Decide→Act over all sample frames …", t: "run" });
   const gps = $("#gpsMode").value;
@@ -783,7 +809,7 @@ async function runSurvey() {
     $("#surveyPlaceholder").hidden = false;
     $("#surveyPlaceholder").querySelector("p").innerHTML =
       `<b style="color:var(--danger)">Survey failed (${e.message}).</b><br/>The backend needs the model + local samples.`;
-  } finally { toastHide(); btn.disabled = false; }
+  } finally { Busy.done(); btn.disabled = false; }
 }
 
 async function pollJob(jobId) {
@@ -793,7 +819,7 @@ async function pollJob(jobId) {
     const p = j.progress || {};
     if (p.done !== lastDone && p.total) {
       lastDone = p.done;
-      $("#runToastTxt").textContent = `survey · frame ${Math.min(p.done + (j.status === "running" ? 1 : 0), p.total)}/${p.total}${p.frame ? " · " + p.frame : ""}`;
+      Busy.set(p.total ? p.done / p.total : null, `Frame ${Math.min(p.done + (j.status === "running" ? 1 : 0), p.total)} of ${p.total}`);
       if (p.done > 0) Log.now({ tool: "frame_done", msg: `${p.done}/${p.total}${p.frame ? " · " + p.frame : ""}`, t: "" });
     }
     if (j.status === "done") return j.result;
@@ -877,9 +903,9 @@ function renderMap(d, keepView) {
   });
   const routePts = m.recovery_route.map(id => byId[id]).filter(t => t && t.lat != null).map(t => [t.lat, t.lon]);
   if (routePts.length > 1) {
-    const line = L.polyline(routePts, { color: "#5fd3e4", weight: 2.2, dashArray: "6 6", opacity: .9 }).addTo(state.map); state.mapLayers.push(line);
+    const line = L.polyline(routePts, { color: "#64d2ff", weight: 2.2, dashArray: "6 6", opacity: .9 }).addTo(state.map); state.mapLayers.push(line);
     routePts.forEach((p, i) => {
-      const badge = L.marker(p, { icon: L.divIcon({ className: "", html: `<div style="background:#5fd3e4;color:#03202e;font:600 10px/18px var(--sans,sans-serif);width:18px;height:18px;border-radius:50%;text-align:center;border:1.5px solid rgba(7,26,43,.6);box-shadow:0 2px 6px rgba(0,0,0,.4)">${i + 1}</div>`, iconSize: [18, 18], iconAnchor: [9, 9] }) }).addTo(state.map);
+      const badge = L.marker(p, { icon: L.divIcon({ className: "", html: `<div style="background:#64d2ff;color:#03202e;font:600 10px/18px var(--sans,sans-serif);width:18px;height:18px;border-radius:50%;text-align:center;border:1.5px solid rgba(7,26,43,.6);box-shadow:0 2px 6px rgba(0,0,0,.4)">${i + 1}</div>`, iconSize: [18, 18], iconAnchor: [9, 9] }) }).addTo(state.map);
       state.mapLayers.push(badge);
     });
   }
@@ -1289,7 +1315,7 @@ function wireStudy() {
 }
 
 async function studyStart() {
-  const btn = $("#studyStartBtn"); btn.disabled = true; toast("preparing your session — the agent is building its review cards …");
+  const btn = $("#studyStartBtn"); btn.disabled = true; Busy.start("Preparing your session");
   try {
     const name = ($("#studyName").value || "anon").trim();
     Study.plan = await fetch(`${API}/api/study/plan?participant=${encodeURIComponent(name)}`).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); });
@@ -1297,7 +1323,7 @@ async function studyStart() {
     $("#studyMeta").textContent = `session ${Study.plan.index + 1} · ${Study.plan.order.join(" → ")}`;
     startArm(0);
   } catch (e) { toast(`could not start (${e.message})`); setTimeout(toastHide, 1800); }
-  finally { toastHide(); btn.disabled = false; }
+  finally { Busy.done(); btn.disabled = false; }
 }
 function startArm(k) {
   Study.armIdx = k; Study.i = 0;
@@ -1357,7 +1383,7 @@ function cardAnswer(decision) {
 }
 
 async function finishStudy() {
-  clearInterval(Study.timer); toast("scoring against the labels …");
+  clearInterval(Study.timer); Busy.start("Scoring against the labels");
   try {
     const r = await fetch(`${API}/api/study/result`, { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ session_id: Study.plan.session_id, manual: Study.manual, cards: Study.cards }) }).then(r => r.json());
@@ -1374,7 +1400,7 @@ async function finishStudy() {
     studyShow("studyDone");
     renderStudySummary(r.summary); loadStudySummary();            // re-syncs sliders + curves to the measured timings
   } catch (e) { toast("could not save the session"); setTimeout(toastHide, 1800); }
-  finally { toastHide(); }
+  finally { Busy.done(); }
 }
 
 async function loadStudySummary() {
@@ -1494,7 +1520,7 @@ function twinPanel(wrap, kind) {
       ${survey ? `<button class="tw-btn" data-a="replay" title="replay: the boat sweeps its sonar fans; finds appear as it passes them">Replay</button>` : ""}
       <button class="tw-btn" data-a="home" title="reset view">⌂ home</button><button class="tw-btn" data-a="snap" title="save a PNG of this view">⤓ PNG</button>
     </div><div class="twin-canvas"></div>
-    <div class="twin-foot"><span class="twin-legend"><span><i style="background:#6fe3b4"></i>confirmed</span><span><i style="background:#f2c879"></i>review</span><span><i style="background:#8aa1b4"></i>low-risk</span>${survey ? `<span><i style="background:#5fd3e4"></i>track · recovery</span><span><i style="background:#b3a8ff"></i>re-survey</span>` : `<span><i style="background:#5fd3e4"></i>sonar at tracked altitude</span><span><i style="background:#000;border:1px solid #445"></i>measured shadow</span>`}</span><span class="tw-note"></span></div>
+    <div class="twin-foot"><span class="twin-legend"><span><i style="background:#6fe3b4"></i>confirmed</span><span><i style="background:#f2c879"></i>review</span><span><i style="background:#8aa1b4"></i>low-risk</span>${survey ? `<span><i style="background:#64d2ff"></i>track · recovery</span><span><i style="background:#b3a8ff"></i>re-survey</span>` : `<span><i style="background:#64d2ff"></i>sonar at tracked altitude</span><span><i style="background:#000;border:1px solid #445"></i>measured shadow</span>`}</span><span class="tw-note"></span></div>
     <div class="twin-empty" hidden></div>`;
   const ui = { canvas: wrap.querySelector(".twin-canvas"), note: wrap.querySelector(".tw-note"), empty: wrap.querySelector(".twin-empty"), wrap };
   return ui;
