@@ -219,6 +219,7 @@ def main():
          f"- classes `{names}` · input {imgsz}px · ONNX sha256 `{sha[:16]}…` · {msg}",
          f"- trained: best epoch {meta.get('best', {}).get('epoch')} of {meta.get('best', {}).get('epochs_run')} "
          f"(val mAP50 {meta.get('best', {}).get('val_mAP50')}), {meta.get('train_minutes')} min; data `{Path(meta.get('data', '')).parent.name}`",
+         f"- optimizer built: {json.dumps(meta.get('optimizer_built')) if meta.get('optimizer_built') else 'not recorded (runs before EXP-003: optimizer=auto)'}",
          (f"- **exported checkpoint:** `{meta['selection']['picked']['checkpoint']}` — "
           f"{meta['selection']['criterion']}: ghost_gear AP50 {meta['selection']['picked']['ghost_ap50']} "
           f"(ultralytics' fitness pick: {(meta['selection'].get('ultralytics_best') or {}).get('ghost_ap50')})"

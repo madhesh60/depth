@@ -61,11 +61,13 @@ def test_auc_gain_guard_on_degenerate_frames():
 
 
 def test_kaggle_safe_defaults(monkeypatch):
-    """No image cache (a 1024-px disk cache would overflow Kaggle's disk); ghost-gear-first selection."""
+    """No image cache (would overflow Kaggle's disk); ghost-gear-first selection; and an EXPLICIT
+    optimizer - 'auto' silently trained EXP-002 with AdamW at lr 0.00167 and ignored lr0."""
     import src.detection.train as tr
     monkeypatch.setattr(sys, "argv", ["train.py"])
     a = tr.parse_args()
-    assert a.cache == "none" and a.select == "ghost_ap50" and a.imgsz == 1024 and a.patience == 8
+    assert a.cache == "none" and a.select == "ghost_ap50" and a.imgsz == 640
+    assert a.optimizer == "SGD" and a.lr0 == 0.01 and a.epochs >= 100 and a.patience == 0
 
 
 def test_notebook_pins_the_tested_ultralytics():
@@ -73,9 +75,10 @@ def test_notebook_pins_the_tested_ultralytics():
     repo = Path(__file__).resolve().parents[1]
     pin = next(l.split("==")[1].strip() for l in (repo / "requirements-train.txt").read_text().splitlines()
                if l.startswith("ultralytics=="))
-    nb = json.loads((repo / "notebooks" / "exp002_kaggle.ipynb").read_text(encoding="utf-8"))
+    nb = json.loads((repo / "notebooks" / "exp003_kaggle.ipynb").read_text(encoding="utf-8"))
     src = "".join("".join(c["source"]) for c in nb["cells"])
-    assert f"ultralytics=={pin}" in src and "--cache\", \"none\"" in src and "EXP-002s" in src
+    assert f"ultralytics=={pin}" in src and "--cache\", \"none\"" in src and "EXP-003f" in src
+    assert "\"--optimizer\", \"SGD\"" in src and "--no-tiles" in src
 
 
 def test_notebook_monitor_cell_reports_and_collects(tmp_path, monkeypatch):
@@ -84,42 +87,93 @@ def test_notebook_monitor_cell_reports_and_collects(tmp_path, monkeypatch):
     bug that broke the first Kaggle run (stale variables, wrong unpacking) would fail here."""
     import json, subprocess, zipfile
     repo = Path(__file__).resolve().parents[1]
-    nb = json.loads((repo / "notebooks" / "exp002_kaggle.ipynb").read_text(encoding="utf-8"))
+    nb = json.loads((repo / "notebooks" / "exp003_kaggle.ipynb").read_text(encoding="utf-8"))
     cell = next("".join(c["source"]) for c in nb["cells"] if "STATUS / WAIT / COLLECT" in "".join(c["source"]))
     w = tmp_path
-    (w / "logs").mkdir(); (w / "depth/runs/EXP-002").mkdir(parents=True); (w / "depth/runs/EXP-002s").mkdir(parents=True)
+    (w / "logs").mkdir(); (w / "depth/runs/EXP-003").mkdir(parents=True); (w / "depth/runs/EXP-003f").mkdir(parents=True)
     hdr = "epoch,metrics/recall(B),metrics/mAP50(B)\n"
-    (w / "depth/runs/EXP-002/results.csv").write_text(hdr + "1,0.3,0.2\n2,0.4,0.3\n")
-    (w / "depth/runs/EXP-002s/results.csv").write_text(hdr + "1,0.2,0.1\n")
-    (w / "depth/runs/EXP-002/model_meta.json").write_text(json.dumps(
+    (w / "depth/runs/EXP-003/results.csv").write_text(hdr + "1,0.3,0.2\n2,0.4,0.3\n")
+    (w / "depth/runs/EXP-003f/results.csv").write_text(hdr + "1,0.2,0.1\n")
+    (w / "depth/runs/EXP-003/model_meta.json").write_text(json.dumps(
         {"train_minutes": 1.0, "selection": {"picked": {"checkpoint": "epoch1.pt", "ghost_ap50": 0.5}}}))
-    zipfile.ZipFile(w / "depth/runs/EXP-002_complete.zip", "w").close()
-    (w / "logs/EXP-002s.log").write_text("1/30\rTraceback (most recent call last):\nRuntimeError: boom\n")
+    zipfile.ZipFile(w / "depth/runs/EXP-003_complete.zip", "w").close()
+    (w / "logs/EXP-003f.log").write_text("1/30\rTraceback (most recent call last):\nRuntimeError: boom\n")
     monkeypatch.setattr(subprocess, "run", lambda cmd, **kw: subprocess.CompletedProcess(cmd, 0, stdout="", stderr=""))
     ns = {}
     exec(cell.replace('WORK = "/kaggle/working"', f'WORK = "{w.as_posix()}"'), ns)
-    assert (w / "EXP-002_complete.zip").exists() and not (w / "EXP-002s_complete.zip").exists()
+    assert (w / "EXP-003_complete.zip").exists() and not (w / "EXP-003f_complete.zip").exists()
 
     # the live process list: a training, its data-loader worker (same args, parent = the training), a
     # duplicate launch, the other run, a zombie and a one-GPU launcher shell
     t = "src/detection/train.py --data d.yaml --name"
-    ps = "\n".join([f"  100     1 Sl  3600 python {t} EXP-002 --imgsz 1024",
-                    f"  101   100 Sl  3590 python {t} EXP-002 --imgsz 1024",
-                    f"  200     1 Sl   600 python -u {t} EXP-002 --imgsz 1024",
-                    f"  300   400 Rl  3000 /usr/bin/python3 {t} EXP-002s --imgsz 640",
-                    f"  301   300 Z      5 python {t} EXP-002s --imgsz 640",
-                    f"  400     1 S   3600 bash -c python {t} EXP-002 ; python {t} EXP-002s",
-                    "  500     1 S   9999 python other_script.py --name EXP-002"])
+    ps = "\n".join([f"  100     1 Sl  3600 python {t} EXP-003 --imgsz 1024",
+                    f"  101   100 Sl  3590 python {t} EXP-003 --imgsz 1024",
+                    f"  200     1 Sl   600 python -u {t} EXP-003 --imgsz 1024",
+                    f"  300   400 Rl  3000 /usr/bin/python3 {t} EXP-003f --imgsz 640",
+                    f"  301   300 Z      5 python {t} EXP-003f --imgsz 640",
+                    f"  400     1 S   3600 bash -c python {t} EXP-003 ; python {t} EXP-003f",
+                    "  500     1 S   9999 python other_script.py --name EXP-003"])
     monkeypatch.setattr(subprocess, "run", lambda cmd, **kw: subprocess.CompletedProcess(
         cmd, 0, stdout=ps if "ps -eo" in cmd[-1] else "", stderr=""))
     runs, any_alive = ns["processes"]()
-    assert any_alive and runs == {"EXP-002": [(100, 3600), (200, 600)], "EXP-002s": [(300, 3000)]}
+    assert any_alive and runs == {"EXP-003": [(100, 3600), (200, 600)], "EXP-003f": [(300, 3000)]}
 
     # a live run in its checkpoint-selection phase is reported as such, not as "training"
-    (w / "depth/runs/EXP-002s/weights").mkdir()
+    (w / "depth/runs/EXP-003f/weights").mkdir()
     for p in ("epoch1.pt", "epoch2.pt", "best.pt", "last.pt"):
-        (w / "depth/runs/EXP-002s/weights" / p).write_bytes(b"")
-    (w / "depth/runs/EXP-002s/select/epoch1").mkdir(parents=True)
-    assert ns["phase"]("EXP-002s") == "CHOOSING THE BEST CHECKPOINT (validating 1 of 4)"
-    assert ns["phase"]("EXP-002") == "TRAINING"
+        (w / "depth/runs/EXP-003f/weights" / p).write_bytes(b"")
+    (w / "depth/runs/EXP-003f/select/epoch1").mkdir(parents=True)
+    assert ns["phase"]("EXP-003f") == "CHOOSING THE BEST CHECKPOINT (validating 1 of 4)"
+    assert ns["phase"]("EXP-003") == "TRAINING"
     assert ns["status"]() is True
+
+
+def test_tiles_never_leave_an_unlabelled_partial_object():
+    """EXP-002 post-mortem: a box cut by a tile lost its label but kept its pixels. Now frames with a
+    large box are not tiled, and a cut small box is inpainted away (no label, no object)."""
+    import numpy as np
+    im = np.full((640, 640, 3), 60, np.uint8)
+    assert bt.tile_frame(im, [(1, 0.5, 0.5, 0.40, 0.30)]) == []               # a large wreck: full frame only
+    im[250:262, 370:400] = 255                                                  # a bright pot at x 370..400
+    lab = [(0, 385 / 640, 256 / 640, 30 / 640, 12 / 640)]                        # tile 0 (x 0..384) sees 14/30
+    tiles = {k: (crop, tl, n) for k, crop, tl, n in bt.tile_frame(im, lab)}
+    crop, tl, n = tiles[0]
+    assert tl == [] and n == 1 and crop[250:262, 370:384].max() < 200          # cut -> inpainted, unlabelled
+    crop, tl, n = tiles[1]                                                      # tile 1 (x 256..640) sees all of it
+    assert len(tl) == 1 and n == 0 and crop[250:262, 114:144].min() == 255
+
+
+def test_ghost_tracker_keeps_the_best_ghost_epoch(tmp_path):
+    """The callback reads ultralytics' per-class val AP (a numpy class index - the smoke test caught
+    an 'or' on it) and copies last.pt to best_ghost.pt only when ghost AP improves."""
+    import numpy as np
+    from types import SimpleNamespace as NS
+    import src.detection.train as tr
+    last = tmp_path / "last.pt"
+    tk = tr.GhostTracker(0)
+    for ep, (ghost, wreck) in enumerate([(0.2, 0.9), (0.5, 0.1), (0.4, 0.95)]):
+        last.write_text(f"epoch{ep}")
+        box = NS(ap50=np.array([ghost, wreck]), map50=(ghost + wreck) / 2)
+        trainer = NS(epoch=ep, last=last, wdir=tmp_path,
+                     validator=NS(metrics=NS(ap_class_index=np.array([0, 1]), box=box)))
+        tk.on_model_save(trainer)
+    assert (tmp_path / "best_ghost.pt").read_text() == "epoch1" and tk.best == 0.5
+    assert [r["ghost_ap50"] for r in tk.rows] == [0.2, 0.5, 0.4]
+    opt = NS(param_groups=[{"lr": 0.0001, "initial_lr": 0.01}])
+    tk.on_train_start(NS(optimizer=opt, args=NS(nbs=64), accumulate=4))
+    assert tk.optimizer["lr"] == 0.01 and tk.optimizer["type"] == "SimpleNamespace"
+
+
+def test_diagnose_sources_and_verdicts():
+    from src.detection import diagnose as dg
+    assert dg.group("Rec07_Sensor_x.jpg") == "crabpot_Rec7" and dg.group("BC_POST_T2_01.jpg") == "crabpot_bc_post"
+    assert dg.group("seabed_train_natform_3.jpg") == "seabed_natform" and dg.group("TI0040_png.jpg") == "crabpot_other"
+    rec = lambda tp, fp, n: {"group": "g", "pc": {"0": {"pts": [(0.9, 1)] * tp + [(0.8, 0)] * fp, "n_gt": n},
+                                                  "1": {"pts": [], "n_gt": 0}}}
+    m = dg.Model("M", Path("x.onnx"), 640, ["ghost_gear", "wreck_debris"])
+    under = {("M", "train"): [rec(4, 0, 10)], ("M", "val"): [rec(3, 0, 10)]}
+    gap = {("M", "train"): [rec(9, 0, 10)], ("M", "val"): [rec(3, 0, 10)]}
+    good = {("M", "train"): [rec(9, 0, 10)], ("M", "val"): [rec(8, 0, 10)]}
+    assert "UNDERFIT" in dg.verdict(m, under) and "GAP" in dg.verdict(m, gap) and "ready" in dg.verdict(m, good)
+    assert dg.Model("B", Path("x"), 640, ["fishing_gear", "pipe_cylinder", "structural_fragment",
+                                          "natural_formation"]).cmap == {0: 0, 1: 1, 2: 1}

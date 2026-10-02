@@ -1,5 +1,5 @@
 """
-build_tiles.py — EXP-002 training data: every TRAIN frame as a full frame **plus** a 2×2 grid of
+build_tiles.py — EXP-002/003 training data: every TRAIN frame as a full frame **plus** a 2×2 grid of
 overlapping tiles (review I-3: "train on 2×2 overlapping tiles and full frames, so training matches
 tiled inference"; crab pots are small — 91% of EXP-001's misses were < 10% of frame width).
 
@@ -7,6 +7,14 @@ tiled inference"; crab pots are small — 91% of EXP-001's misses were < 10% of 
   neighbours). Boxes are clipped to the tile; a clipped box is kept only if ≥ ``min_vis`` of its area
   is visible (a pot cut in half is a different-looking object — don't teach it). Background tiles
   (no box) are kept at ``bg_keep`` so the detector still sees empty seabed.
+* **No unlabelled partial objects.** EXP-002's builder dropped a cut-off box from a tile's labels but
+  left its pixels, which taught "object = background". That happened in 49% of the times a wreck
+  appeared in a tile and 8% for ghost gear (``docs/exp002_diagnosis.md``). Now:
+  - a frame is tiled only if every box is small (longest side ≤ ``max_tile_box`` of the frame). Large
+    wrecks gain nothing from tiles and are always cut by them; those frames stay full-frame only;
+  - the visible part of any box a tile still cuts below ``min_vis`` is **inpainted**
+    (``cv2.inpaint``, Telea) from the surrounding seabed, so the tile carries no unlabelled object.
+* ``--no-tiles``: full frames only, with the same ``data.yaml`` layout. This is the comparison arm.
 * val/ and test*/ are **not tiled** — ``data.yaml`` points at the source dataset's full frames, so
   model selection and evaluation stay deploy-faithful (full-frame inference).
 * Tiles are written as JPEG at native resolution; ultralytics resizes them to ``imgsz`` (so a tile
@@ -62,6 +70,37 @@ def tile_boxes(labels, W, H, x0, y0, tw, th, min_vis):
         if (ix2 - ix1) * (iy2 - iy1) / area < min_vis:
             continue
         out.append((c, ((ix1 + ix2) / 2 - x0) / tw, ((iy1 + iy2) / 2 - y0) / th, (ix2 - ix1) / tw, (iy2 - iy1) / th))
+    return out
+
+
+def cut_rects(labels, W, H, x0, y0, tw, th, min_vis):
+    """Pixel rectangles (tile coordinates) of boxes the tile cuts but ``tile_boxes`` drops."""
+    out = []
+    for c, cx, cy, bw, bh in labels:
+        x1, y1, x2, y2 = (cx - bw / 2) * W, (cy - bh / 2) * H, (cx + bw / 2) * W, (cy + bh / 2) * H
+        ix1, iy1, ix2, iy2 = max(x1, x0), max(y1, y0), min(x2, x0 + tw), min(y2, y0 + th)
+        if ix2 <= ix1 or iy2 <= iy1:
+            continue
+        if (ix2 - ix1) * (iy2 - iy1) / max(1e-6, (x2 - x1) * (y2 - y1)) < min_vis:
+            out.append((int(ix1 - x0), int(iy1 - y0), int(np.ceil(ix2 - x0)), int(np.ceil(iy2 - y0))))
+    return out
+
+
+def tile_frame(im, labels, tile_frac=0.6, min_vis=0.6, max_tile_box=0.25, pad=3):
+    """The tiles of one frame: [(k, crop, tile labels, n_inpainted)]. No tiles when a box is large."""
+    H, W = im.shape[:2]
+    if any(max(bw, bh) > max_tile_box for _, _, _, bw, bh in labels):
+        return []
+    out = []
+    for k, (x0, y0, tw, th) in enumerate(tiles_for(W, H, tile_frac, 0)):
+        crop = im[y0:y0 + th, x0:x0 + tw].copy()
+        rects = cut_rects(labels, W, H, x0, y0, tw, th, min_vis)
+        if rects:
+            mask = np.zeros(crop.shape[:2], np.uint8)
+            for rx1, ry1, rx2, ry2 in rects:
+                mask[max(0, ry1 - pad):min(th, ry2 + pad), max(0, rx1 - pad):min(tw, rx2 + pad)] = 255
+            crop = cv2.inpaint(crop, mask, 5, cv2.INPAINT_TELEA)
+        out.append((k, crop, tile_boxes(labels, W, H, x0, y0, tw, th, min_vis), len(rects)))
     return out
 
 
@@ -178,6 +217,9 @@ def main():
     ap.add_argument("--out", required=True)
     ap.add_argument("--tile-frac", type=float, default=0.6, help="tile side as a fraction of the frame side")
     ap.add_argument("--min-vis", type=float, default=0.6, help="min visible fraction to keep a clipped box")
+    ap.add_argument("--max-tile-box", type=float, default=0.25,
+                    help="tile a frame only if every box's longest side is <= this fraction of the frame")
+    ap.add_argument("--no-tiles", action="store_true", help="full frames only (the comparison arm)")
     ap.add_argument("--bg-keep", type=float, default=0.35, help="share of box-free tiles to keep")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--paste", type=int, default=0, help="N synthetic sonar-aware copy-paste frames (0 = off)")
@@ -187,31 +229,29 @@ def main():
     (out / "train" / "images").mkdir(parents=True, exist_ok=True)
     (out / "train" / "labels").mkdir(parents=True, exist_ok=True)
 
-    stats = {"frames": 0, "tiles_written": 0, "tiles_bg_dropped": 0, "boxes_full": 0, "boxes_tiles": 0,
-             "boxes_clipped_dropped": 0}
+    stats = {"frames": 0, "frames_not_tiled_large_box": 0, "tiles_written": 0, "tiles_bg_dropped": 0,
+             "boxes_full": 0, "boxes_tiles": 0, "boxes_cut_inpainted": 0}
     for ip in sorted((src / "train" / "images").iterdir()):
-        im = cv2.imread(str(ip))
-        if im is None:
-            continue
-        H, W = im.shape[:2]
         labels = read_labels(src / "train" / "labels" / f"{ip.stem}.txt")
         stats["frames"] += 1
         stats["boxes_full"] += len(labels)
         shutil.copy2(ip, out / "train" / "images" / ip.name)                      # the full frame
         (out / "train" / "labels" / f"{ip.stem}.txt").write_text(
             "\n".join(f"{c} {x:.6f} {y:.6f} {w:.6f} {h:.6f}" for c, x, y, w, h in labels))
-        for k, (x0, y0, tw, th) in enumerate(tiles_for(W, H, a.tile_frac, 0)):
-            tl = tile_boxes(labels, W, H, x0, y0, tw, th, a.min_vis)
-            touching = sum(1 for c, cx, cy, bw, bh in labels
-                           if (cx + bw / 2) * W > x0 and (cx - bw / 2) * W < x0 + tw
-                           and (cy + bh / 2) * H > y0 and (cy - bh / 2) * H < y0 + th)
-            stats["boxes_clipped_dropped"] += touching - len(tl)
+        if a.no_tiles:
+            continue
+        im = cv2.imread(str(ip))
+        if im is None:
+            continue
+        tiles = tile_frame(im, labels, a.tile_frac, a.min_vis, a.max_tile_box)
+        stats["frames_not_tiled_large_box"] += not tiles
+        for k, crop, tl, n_cut in tiles:
+            stats["boxes_cut_inpainted"] += n_cut
             if not tl and random.random() > a.bg_keep:
                 stats["tiles_bg_dropped"] += 1
                 continue
             name = f"{ip.stem}__t{k}"
-            cv2.imwrite(str(out / "train" / "images" / f"{name}.jpg"), im[y0:y0 + th, x0:x0 + tw],
-                        [cv2.IMWRITE_JPEG_QUALITY, 95])
+            cv2.imwrite(str(out / "train" / "images" / f"{name}.jpg"), crop, [cv2.IMWRITE_JPEG_QUALITY, 95])
             (out / "train" / "labels" / f"{name}.txt").write_text(
                 "\n".join(f"{c} {x:.6f} {y:.6f} {w:.6f} {h:.6f}" for c, x, y, w, h in tl))
             stats["tiles_written"] += 1
@@ -226,7 +266,8 @@ def main():
         if line.strip().startswith("- "):
             names.append(line.strip()[2:].strip())
     rel = lambda d: str((src / d / "images").resolve()).replace("\\", "/")
-    yaml = [f"# EXP-002 tiled training set (build_tiles.py) — train = full frames + 2x2 tiles; val/test = source full frames",
+    kind = "full frames only" if a.no_tiles else "full frames + 2x2 tiles"
+    yaml = [f"# training set (build_tiles.py) - train = {kind}; val/test = source full frames",
             f"path: {str(out.resolve()).replace(chr(92), '/')}", "train: train/images",
             f"val: {rel('val')}", f"test: {rel('test')}", f"nc: {len(names)}", "names:"] + [f"- {n}" for n in names]
     (out / "data.yaml").write_text("\n".join(yaml) + "\n", encoding="utf-8")

@@ -1,27 +1,36 @@
 """
 train.py — Stage-2 detector training (YOLO11) with sonar-aware settings, then ONNX export + packaging.
 
-EXP-002 recipe (review I-3 — the recall ceiling is the binding constraint: EXP-001 never proposes
-~20-28% of pots even at conf 0.05, and no triage can recover those):
+EXP-003 recipe — the EXP-002 post-mortem (``docs/exp002_diagnosis.md``) fixed in code:
 
+* **explicit optimizer (SGD, lr0 0.01).** EXP-002 passed ``lr0 0.01`` but left ``optimizer=auto``,
+  which in ultralytics 8.4 silently picks **AdamW at lr 0.002·5/(4+nc) = 0.00167** whenever the run
+  has ≤ 10 000 optimizer steps (v2b: 2 700) and ignores ``lr0``. The models were badly underfit
+  (ghost-gear AP 0.42 on their OWN training frames; train cls loss 1.72 vs EXP-001's 0.51). The
+  optimizer actually built is now recorded in ``model_meta.json`` and must match the request.
+* **enough steps:** ~9-10 k SGD steps at nominal batch 64, about EXP-001's 16.6 k scale: 150 epochs
+  on the tiled set, or 300 on full frames only. Patience is a quarter of the epochs.
 * **data:** dataset v2b (2 classes, sonar only, one copy per Roboflow frame, val = held-out
-  recordings Rec10/12/16 → ``best.pt`` is selected on the SAME sonar as test), optionally the tiled
-  build (``DATASET/scripts/build_tiles.py``: full frames + 2×2 overlapping tiles; val/test stay full
-  frame) and the sonar-aware copy-paste (``--paste`` in build_tiles: pots + their shadow tails pasted
-  onto empty seabed at the same range with Poisson blending).
-* **imgsz 1024** (small objects), 30 epochs, patience 8 (EXP-001 overfit after ~epoch 16-20),
-  cosine LR, mosaic off for the last 5 epochs.
+  recordings Rec10/12/16). Training uses either the tiled build (``DATASET/scripts/build_tiles.py``)
+  or the full frames only (``--no-tiles``). The tiled build no longer leaves objects that a tile
+  cuts unlabelled. Val and test stay full frame.
+* **imgsz 640.** At 1024 px EXP-002 matched 640 px (ghost AP 0.25 vs 0.25 on val) and cost about
+  2.6× the inference time.
 * **sonar-aware augmentation:** no hue/saturation (no real colour), no rotation / vertical flip
   (break range geometry), along-track flip only, mild brightness (gain), scale + translate for size.
   NOTE: ultralytics ``copy_paste`` is a no-op for box-only labels (it returns early without masks),
   so it is not used — the offline, range-preserving copy-paste in ``build_tiles.py`` replaces it.
 * **checkpoint selection for the product, not the leaderboard:** ultralytics keeps the epoch with
   the best ``0.9·mAP50-95 + 0.1·mAP50`` over *both* classes — box tightness, dominated by the easy wreck
-  class. DEPTH needs *ghost gear found* at a loose match (IoU ≥ 0.3). So every epoch is saved and,
-  after training, each checkpoint is validated on the held-out recordings and the one with the best
-  **ghost-gear AP@0.5** is kept as ``best_depth.pt`` (tie-break: all-class mAP50). The per-epoch table
-  and ultralytics' own pick are both recorded. (The val recordings also host the calibration later;
-  the promise is still verified once on test, so this selection cannot inflate it.)
+  class. DEPTH needs *ghost gear found* at a loose match (IoU ≥ 0.3).
+  - During training, a callback reads ultralytics' own per-class val AP after every epoch.
+  - It keeps the epoch with the best **ghost-gear AP@0.5** as ``best_ghost.pt``, with no per-epoch
+    files.
+  - After training, the shortlist (``best_ghost.pt``, ``best.pt``, ``last.pt``) is re-validated with
+    fixed settings. The winner becomes ``best_depth.pt`` (tie-break: all-class mAP50).
+  - The per-epoch table and ultralytics' own pick are both recorded.
+  - The val recordings also host the calibration later; the promise is still verified once on test,
+    so this selection cannot inflate it.
 * **after training:** ``best_depth.pt`` → ONNX (opset 12, static ``imgsz``) → verified through
   ``cv2.dnn`` (the deploy path) → ``model_meta.json`` (names, imgsz, data, args, selection, val
   metrics, sha256) → ``<name>_complete.zip`` (per-epoch checkpoints excluded) ready to download.
@@ -29,8 +38,8 @@ EXP-002 recipe (review I-3 — the recall ceiling is the binding constraint: EXP
 * **Kaggle-safe defaults:** no image cache (``--cache none``: a disk cache of ~9 k tiles at 1024 px
   is ~27 GB and would overflow Kaggle's ~20 GB working disk hours into the run).
 
-Usage (Kaggle T4 — see docs/exp002_kaggle.md):
-    python src/detection/train.py --data /kaggle/working/v2b_tiles/data.yaml --name EXP-002
+Usage (Kaggle T4 — see docs/exp003_kaggle.md):
+    python src/detection/train.py --data /kaggle/working/v2b_tiles/data.yaml --name EXP-003
     python src/detection/train.py --data DATASET/03_yolo_ready_dataset_v2b/data.yaml --fraction 0.05 \
         --epochs 1 --imgsz 320 --name smoke          # a 2-minute smoke test on CPU
 """
@@ -59,12 +68,14 @@ def parse_args():
     p = argparse.ArgumentParser(description="Train the DEPTH detector (sonar-aware) + export/verify ONNX.")
     p.add_argument("--model", default="yolo11s.pt", help="base weights")
     p.add_argument("--data", default=str(DEFAULT_DATA), help="path to data.yaml (made absolute)")
-    p.add_argument("--imgsz", type=int, default=1024)
-    p.add_argument("--epochs", type=int, default=30)
-    p.add_argument("--batch", type=int, default=8)
-    p.add_argument("--patience", type=int, default=8)
-    p.add_argument("--close-mosaic", type=int, default=5)
-    p.add_argument("--lr0", type=float, default=0.01)
+    p.add_argument("--imgsz", type=int, default=640)
+    p.add_argument("--epochs", type=int, default=150)
+    p.add_argument("--batch", type=int, default=16)
+    p.add_argument("--patience", type=int, default=0, help="early-stop patience (0 = a quarter of the epochs)")
+    p.add_argument("--close-mosaic", type=int, default=10)
+    p.add_argument("--optimizer", default="SGD", choices=["SGD", "AdamW", "auto"],
+                   help="explicit by default: 'auto' silently swaps in AdamW at lr 0.00167 for short runs")
+    p.add_argument("--lr0", type=float, default=0.01, help="honoured only with an explicit --optimizer")
     p.add_argument("--no-cos-lr", action="store_true")
     p.add_argument("--fraction", type=float, default=1.0, help="train on a fraction (smoke tests)")
     p.add_argument("--workers", type=int, default=4)
@@ -121,15 +132,51 @@ def _best_epoch(run: Path) -> dict:
             "val_recall": round(float(best["metrics/recall(B)"]), 4)}
 
 
+def ghost_class(names: list[str]) -> int:
+    return names.index("ghost_gear") if "ghost_gear" in names else 0
+
+
+class GhostTracker:
+    """ultralytics ``on_model_save`` callback: after each epoch's validation (``last.pt`` has just
+    been written), read the per-class AP@0.5 and keep the best ghost-gear epoch as
+    ``weights/best_ghost.pt``. Replaces ``save_period=1``: no per-epoch files, so no 4-GB disk use.
+    It also records the optimizer ultralytics really built."""
+
+    def __init__(self, cls_id: int):
+        self.cls_id, self.best, self.rows, self.optimizer = cls_id, -1.0, [], None
+
+    def on_train_start(self, trainer):
+        opt = getattr(trainer, "optimizer", None)
+        if opt is not None:
+            self.optimizer = {"type": type(opt).__name__,
+                              "lr": float(opt.param_groups[0].get("initial_lr", opt.param_groups[0]["lr"])),   # per group; defaults is unused
+                              "nominal_batch": int(trainer.args.nbs),
+                              "accumulate": int(getattr(trainer, "accumulate", 1))}
+
+    def on_model_save(self, trainer):
+        m = getattr(trainer.validator, "metrics", None)
+        raw = getattr(m, "ap_class_index", None) if m is not None else None      # a numpy array
+        idx = [int(i) for i in raw] if raw is not None else []
+        ap50 = list(m.box.ap50) if idx else []
+        ghost = float(ap50[idx.index(self.cls_id)]) if self.cls_id in idx else 0.0
+        self.rows.append({"epoch": trainer.epoch + 1, "ghost_ap50": round(ghost, 4),
+                          "map50": round(float(m.box.map50), 4) if idx else 0.0})
+        if ghost > self.best and Path(trainer.last).exists():
+            self.best = ghost
+            shutil.copy2(trainer.last, Path(trainer.wdir) / "best_ghost.pt")
+
+
 def select_checkpoint(run: Path, data: Path, names: list[str], imgsz: int, device, batch: int = 16) -> dict:
-    """Validate every saved checkpoint on the held-out val split; return the table and the pick
-    (best ghost-gear AP@0.5, tie-break all-class mAP50). Writes ``selection.csv`` next to the run."""
+    """Re-validate the shortlist (``best_ghost.pt`` from training, ultralytics' ``best.pt``,
+    ``last.pt``; plus any ``epoch*.pt`` from older runs) on the held-out val split with fixed settings.
+    Return the table and the pick: best ghost-gear AP@0.5, tie-break all-class mAP50. Writes
+    ``selection.csv`` next to the run."""
     import re as _re
     from ultralytics import YOLO
     wdir = run / "weights"
-    g = names.index("ghost_gear") if "ghost_gear" in names else 0
+    g = ghost_class(names)
     cks = sorted(wdir.glob("epoch*.pt"), key=lambda p: int(_re.sub(r"\D", "", p.stem) or 0))
-    cks += [p for p in (wdir / "best.pt", wdir / "last.pt") if p.exists()]
+    cks += [p for p in (wdir / "best_ghost.pt", wdir / "best.pt", wdir / "last.pt") if p.exists()]
     rows = []
     for ck in cks:
         m = YOLO(str(ck)).val(data=str(data), imgsz=imgsz, batch=batch, conf=0.001, iou=0.6, split="val",
@@ -157,26 +204,36 @@ def main():
                          f"Build it: python DATASET/scripts/build_dataset_v2b.py "
                          f"(+ DATASET/scripts/build_tiles.py for the tiled set)")
     names = _names(data)
-    print(f"data {data} | classes {names} | imgsz {a.imgsz} | epochs {a.epochs} | batch {a.batch}")
+    patience = a.patience or max(10, a.epochs // 4)
+    print(f"data {data} | classes {names} | imgsz {a.imgsz} | epochs {a.epochs} (patience {patience}) | "
+          f"batch {a.batch} | optimizer {a.optimizer} lr0 {a.lr0}")
 
     from ultralytics import YOLO                       # train-time dependency only
     import ultralytics
     t0 = time.time()
     model = YOLO(a.model)
+    tracker = GhostTracker(ghost_class(names))
+    if a.select == "ghost_ap50":
+        model.add_callback("on_train_start", tracker.on_train_start)
+        model.add_callback("on_model_save", tracker.on_model_save)
     model.train(
         data=str(data), task="detect", imgsz=a.imgsz, epochs=a.epochs, batch=a.batch,
-        device=a.device, patience=a.patience, seed=a.seed, deterministic=True,
-        project=str(REPO / "runs"), name=a.name, exist_ok=True,
+        device=a.device, patience=patience, seed=a.seed, deterministic=True,
+        project=str(REPO / "runs"), name=a.name, exist_ok=True, optimizer=a.optimizer,
         cos_lr=not a.no_cos_lr, lr0=a.lr0, close_mosaic=a.close_mosaic, fraction=a.fraction,
-        workers=a.workers, cache=(False if a.cache == "none" else a.cache), plots=True,
-        save_period=(1 if a.select == "ghost_ap50" else -1),
+        workers=a.workers, cache=(False if a.cache == "none" else a.cache), plots=True, save_period=-1,
         **SONAR_AUG,
     )
     run = REPO / "runs" / a.name
     best = run / "weights" / "best.pt"
+    if tracker.optimizer:
+        print("optimizer built by ultralytics:", json.dumps(tracker.optimizer))
+        if a.optimizer != "auto" and tracker.optimizer["type"] != a.optimizer:
+            print(f"!! WARNING: asked for {a.optimizer}, ultralytics built {tracker.optimizer['type']}")
     meta = {
         "name": a.name, "names": names, "imgsz": a.imgsz, "data": str(data), "base": a.model,
-        "args": vars(a), "augmentation": SONAR_AUG, "best": _best_epoch(run),
+        "args": vars(a), "patience_used": patience, "optimizer_built": tracker.optimizer,
+        "ghost_ap50_per_epoch": tracker.rows, "augmentation": SONAR_AUG, "best": _best_epoch(run),
         "train_minutes": round((time.time() - t0) / 60, 1),
         "ultralytics": ultralytics.__version__, "python": platform.python_version(),
         "created": time.strftime("%Y-%m-%dT%H:%M:%S"), "notes": a.notes,
@@ -195,8 +252,8 @@ def main():
             best = chosen
             print(f"picked {sel['picked']['checkpoint']}: ghost_gear AP50 {sel['picked']['ghost_ap50']} "
                   f"(ultralytics best.pt: {(sel['ultralytics_best'] or {}).get('ghost_ap50')})")
-        for ep in (run / "weights").glob("epoch*.pt"):             # 30+ × ~40 MB: not shipped
-            ep.unlink()
+        for ep in [*(run / "weights").glob("epoch*.pt"), run / "weights" / "best_ghost.pt"]:   # not shipped
+            ep.unlink(missing_ok=True)
 
     if not a.no_export and best.exists():
         from src.detection.export_onnx import export, verify

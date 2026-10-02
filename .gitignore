@@ -34,7 +34,7 @@ wandb/
 Thumbs.db
 .vscode/
 .idea/
-EXP-001_complete.zip
+*_complete.zip
 
 # Working scratch / transient — kept local, not part of the deliverable
 NEEDTOFIX.md
