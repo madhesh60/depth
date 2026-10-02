@@ -192,20 +192,23 @@ Hardening:
 * **Startup:** the model is warmed at startup.
 * **Map:** Leaflet vendored (SRI-checked); keyless basemaps with an offline grid fallback.
 
-UI: a zero-build studio with five modes (Analyze · Survey · Study · Audit · Connect), built from
-translucent glass panels over a deep-ocean field (`webui/styles.css`). One accent colour (sea-glass
-teal) and calm verdict colours are kept in step with `app.js` and `twin3d.js`. There are four type
-roles and no web-font downloads; each role uses the platform's system faces:
+UI: a zero-build studio with five modes (Analyze · Survey · Study · Audit · Connect)
+(`webui/styles.css`).
 
-| role | used for | macOS | Windows 11 |
-|---|---|---|---|
-| display | headings, KPIs | SF Pro Display | Segoe UI Variable Display |
-| interface | text and buttons | SF Pro Text | Segoe UI Variable Text / Small |
-| data | numbers, code, logs | SF Mono | Cascadia Mono |
-| reading | the mission brief and study instructions | New York | Sitka |
-
-Each screen has one frosted-white primary action; other controls are glass. The pipeline dock
-collapses to a slim status bar, and motion respects `prefers-reduced-motion`.
+- **Look:** three floating graphite-glass layers (sources, canvas, inspector) over an abstract layer of
+  chrome shapes. The shapes show sharp in the gaps and as soft light beneath the glass. Inside a
+  layer, sections are divided by hairlines rather than nested boxes.
+- **Less text:** each panel's explanation folds behind a small (i), and the model registry is
+  collapsed by default.
+- **Colour:** calm verdict colours and one quiet accent, kept in step with `app.js` and `twin3d.js`.
+- **Fonts** are vendored (`webui/vendor/fonts`, OFL, SHA-256 listed), so nothing loads from a third
+  party:
+  - **Poppins** for the brand, navigation, headings and large numbers;
+  - **Inter** for interface and reading text;
+  - **JetBrains Mono** only for numbers, code and logs.
+- **Actions:** each screen has one white primary action; other controls are hairline pills.
+- **Dock and motion:** the pipeline dock collapses to a slim status bar, and motion respects
+  `prefers-reduced-motion`.
 
 ## 10. Cloud + COOL (`infra/`)
 

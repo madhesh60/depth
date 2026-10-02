@@ -8,9 +8,13 @@
   <!-- Leaflet 1.9.4 vendored (BSD-2) so the map never depends on a CDN; SRI = the upstream hash -->
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css"
         integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" />
+  <link rel="preload" href="vendor/fonts/poppins-latin-400.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="preload" href="vendor/fonts/inter-latin-var.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
+<!-- abstract layer: chrome shapes that the glass blurs into soft light -->
+<div class="abyss" aria-hidden="true"><i class="ring r1"></i><i class="ring r2"></i><i class="sphere s1"></i><i class="sphere s2"></i><i class="sphere s3"></i><i class="sphere s4"></i></div>
 <div class="app">
 
   <!-- ============================ TOPBAR ============================ -->
@@ -58,7 +62,7 @@
 
       <section class="panel" data-when="analyze">
         <div class="panel-head"><span class="panel-title">Run</span></div>
-        <button class="btn btn-primary btn-block" id="analyzeBtn" disabled>Run See → Prove → Decide</button>
+        <button class="btn btn-primary btn-block" id="analyzeBtn" disabled>Analyze frame</button>
         <p class="panel-note" id="analyzeHint">Choose a sample above to begin.</p>
       </section>
 
@@ -77,7 +81,7 @@
         <label class="field" title="boat time for second-look passes (opposite side, mid-swath); empty = plan every pass"><span>Re-survey boat time (minutes)</span>
           <input type="number" id="boatMin" min="1" max="1440" step="1" value="10" />
         </label>
-        <button class="btn btn-primary btn-block" id="surveyBtn">Run full survey</button>
+        <button class="btn btn-primary btn-block" id="surveyBtn">Run survey</button>
         <p class="panel-note">Every sample → evidence-backed hazards → budgeted review queue → human-approved route + reports.</p>
       </section>
 
@@ -107,8 +111,8 @@
         <div class="guar" id="guarPanel"><p class="panel-note">loading calibration …</p></div>
       </section>
 
-      <section class="panel">
-        <div class="panel-head"><span class="panel-title">Model registry</span></div>
+      <section class="panel collapsible is-collapsed">
+        <div class="panel-head"><span class="panel-title">Model</span><span class="panel-meta" id="regBrief"></span></div>
         <div class="reg" id="modelReg">
           <div class="reg-row"><span class="reg-k">detector</span><span class="reg-v">YOLO11 · cv2.dnn</span></div>
           <div class="reg-row"><span class="reg-k">weights</span><span class="reg-v" id="regWeights">…</span></div>
@@ -156,7 +160,8 @@
           </figure>
           <div class="viewer-placeholder" id="analyzePlaceholder">
             <div class="ph-ring"></div>
-            <p>Pick a frame and run the loop. Each detection gets <b>evidence</b> (re-look view, acoustic shadow, relative height) and a <b>calibrated tier</b> with a stated promise — watch the agent fly to every find.</p>
+            <h3>Choose a sonar frame</h3>
+            <p>Every find comes with evidence and a calibrated tier.</p>
           </div>
         </div>
         <div class="twin-wrap" id="twinFrameWrap" hidden></div>
@@ -197,7 +202,8 @@
         </div>
         <div class="viewer-placeholder" id="surveyPlaceholder">
           <div class="ph-ring"></div>
-          <p>Run a survey to see the <b>Act</b> stage: hazards on a map, a nearest-neighbour recovery route, and GeoJSON / GPX / KML / CSV exports — human-approved before dispatch.</p>
+          <h3>Run a survey</h3>
+          <p>Hazards on a map, a recovery route and reports, approved by a person.</p>
         </div>
       </div>
 
@@ -206,10 +212,10 @@
         <div class="study-screen" id="audIntro">
           <div class="st-card">
             <h2>Is it really a false alarm?</h2>
-            <p>Each item is a spot the detector flagged on the calibration recordings. Most were <b>not</b> labelled as pots — but labellers miss things. For each crop decide what the bracketed return is:</p>
-            <ol><li><b>Real object</b> — a pot, trap or other man-made thing (bright return, often a thin dark shadow beyond it, away from the top edge).</li>
-              <li><b>Clutter / natural</b> — rock, weed, seabed texture.</li><li><b>Noise / artefact</b> — speckle, stripes, water column.</li><li><b>Unsure</b>.</li></ol>
-            <p class="muted">The result is the <b>audited precision</b> of the model: how many of its "false" alarms are real objects the labels missed. Enter your name on the left to start (you can stop and resume).</p>
+            <p>Judge each spot the detector flagged. You never see its score.</p>
+            <ol><li><b>Real object</b>: pot, trap, anything man-made.</li>
+              <li><b>Clutter</b>: rock, weed, seabed.</li><li><b>Noise</b>: speckle, stripes, water column.</li></ol>
+            <p class="muted">Enter your name on the left to start. You can stop and resume.</p>
           </div>
         </div>
         <div class="study-screen" id="audTask" hidden>
@@ -230,13 +236,13 @@
       <div class="study-center" data-when="study" id="studyCenter">
         <div class="study-screen" id="studyIntro">
           <div class="st-card">
-            <h2>Does DEPTH save analyst time? Measure it.</h2>
-            <p>Two tasks, timed separately:</p>
+            <h2>Does DEPTH save time?</h2>
+            <p>Two timed tasks, about five minutes.</p>
             <ol>
-              <li><b>Manual review</b> — a raw sonar frame. Click on every crab pot you see, then <kbd>Next</kbd> (<kbd>Enter</kbd>). <kbd>Backspace</kbd> undoes a click.</li>
-              <li><b>DEPTH cards</b> — the agent's review queue. For each card answer <kbd>Y</kbd> real pot or <kbd>N</kbd> not a pot.</li>
+              <li><b>By hand</b>: click every crab pot on a raw frame, then <kbd>Enter</kbd>.</li>
+              <li><b>With DEPTH</b>: answer each card, <kbd>Y</kbd> real pot or <kbd>N</kbd> not a pot.</li>
             </ol>
-            <p class="muted">Pots are small bright returns, often with a thin dark shadow line beyond them (away from the top edge). Enter your name on the left and press <b>Start session</b>.</p>
+            <p class="muted">Enter your name on the left to start.</p>
           </div>
         </div>
         <div class="study-screen" id="studyManual" hidden>
@@ -265,8 +271,8 @@
       <div class="connect scrollable" data-when="connect" id="connectPage">
         <div class="cx-head">
           <h2>Connect DEPTH to your systems</h2>
-          <p>Standard interfaces — no DEPTH-specific code on your side. AI agents, GIS and operations consoles can all
-             <b>read</b> DEPTH's results and <b>ask</b> for actions; only a named person in this studio approves.</p>
+          <p>Standard interfaces for agents, GIS and operations consoles. They read results and ask for actions;
+             a named person approves.</p>
           <div class="cx-base mono" id="cxBase"></div>
         </div>
         <div class="cx-grid">
@@ -302,7 +308,7 @@
       </section>
       <section class="panel" data-when="study">
         <div class="panel-head"><span class="panel-title">Study results</span><span class="panel-meta" id="stSumMeta"></span></div>
-        <div id="stSummary"><p class="empty-hint">No sessions yet — the first result replaces the assumed timings everywhere.</p></div>
+        <div id="stSummary"><p class="empty-hint">No sessions yet.</p></div>
       </section>
       <section class="panel" data-when="study">
         <div class="panel-head"><span class="panel-title">Analyst effort</span><span class="panel-meta" id="effProv"></span></div>
@@ -315,9 +321,9 @@
       </section>
       <!-- analyze: evidence -->
       <section class="panel evidence-panel" data-when="analyze">
-        <div class="panel-head"><span class="panel-title">Evidence</span><span class="panel-meta">evidence before trust</span></div>
+        <div class="panel-head"><span class="panel-title">Evidence</span><span class="panel-meta"></span></div>
         <div class="evidence-grid" id="evidenceGrid">
-          <p class="empty-hint">Run the loop — every detection gets an evidence card here: its tier and the promise that tier carries, detector→re-look score, P(pot), acoustic shadow, relative height, and the full tool-call trace (including the calls the agent chose not to make).</p>
+          <p class="empty-hint">Analyze a frame to see the evidence for each find.</p>
         </div>
       </section>
 
@@ -325,19 +331,19 @@
       <section class="panel" data-when="survey">
         <div class="panel-head"><span class="panel-title">Approvals</span><span class="panel-meta mono" id="apprMeta"></span></div>
         <div class="appr-who"><label for="apprName">Approver</label><input id="apprName" class="appr-name" maxlength="60" placeholder="your name" autocomplete="name" /></div>
-        <div id="apprList" class="appr-list"><p class="empty-hint">No requests. Agents (this studio, MCP clients, partner consoles) can only <b>ask</b> — a person decides here.</p></div>
+        <div id="apprList" class="appr-list"><p class="empty-hint">No requests yet. Agents can only ask; a person decides here.</p></div>
       </section>
       <!-- survey: mission brief + downloads + hazards -->
       <section class="panel" data-when="survey">
         <div class="panel-head"><span class="panel-title">Mission brief</span><span class="panel-meta mono" id="briefMeta"></span></div>
-        <div id="briefBody" class="brief"><p class="empty-hint">Run a survey — the agent writes a one-page hand-over for the boat crew. Every number in it is traced back to the survey.</p></div>
+        <div id="briefBody" class="brief"><p class="empty-hint">The crew hand-over appears here after a survey.</p></div>
         <div class="brief-foot" id="briefFoot" hidden>
           <span class="brief-ground mono" id="briefGround"></span>
           <button class="mini-btn" id="briefCopy" title="copy the brief as markdown">Copy</button>
         </div>
       </section>
       <section class="panel" data-when="survey">
-        <div class="panel-head"><span class="panel-title">Reports</span><span class="panel-meta">open on any GPS / GIS</span></div>
+        <div class="panel-head"><span class="panel-title">Reports</span><span class="panel-meta"></span></div>
         <label class="pub-toggle" title="wrecks can be war graves or protected heritage sites: a public share generalises their positions to ~1.1 km and drops re-survey passes that would reveal them">
           <input type="checkbox" id="pubShare" /> public share — generalise protected-site locations</label>
         <div class="dl-grid" id="dlGrid"></div>
@@ -346,7 +352,7 @@
       </section>
       <section class="panel" data-when="survey">
         <div class="panel-head"><span class="panel-title">Analyst effort</span><span class="panel-meta mono" id="effortMeta"></span></div>
-        <div id="effortPanel"><p class="empty-hint">Run a survey — the agent orders the REVIEW queue by calibrated P(pot) and shows what your time budget buys.</p></div>
+        <div id="effortPanel"><p class="empty-hint">Run a survey to see what your review time buys.</p></div>
       </section>
       <section class="panel" data-when="survey">
         <div class="panel-head"><span class="panel-title">Hazards</span><span class="panel-meta mono" id="hazCount"></span></div>

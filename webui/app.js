@@ -8,9 +8,9 @@ const API = ""; // same-origin (served by FastAPI)
 const SVGNS = "http://www.w3.org/2000/svg";
 
 const VERDICTS = ["confirmed", "review", "low_risk"];
-const VCOLOR = { confirmed: "#5fcf9c", review: "#e3b261", low_risk: "#7d8b9a", rejected: "#7d8b9a" };
+const VCOLOR = { confirmed: "#8ee0b4", review: "#ecc27d", low_risk: "#8d97a1", rejected: "#8d97a1" };
 const VLABEL = { confirmed: "confirmed", review: "review", low_risk: "low-risk", rejected: "low-risk" };
-const CLASS_SW = ["#5bbfd0", "#e3b261", "#9b92f0", "#5fcf9c", "#e98aa8"];
+const CLASS_SW = ["#9fd8e0", "#ecc27d", "#b9b2f5", "#8ee0b4", "#f0a8c0"];
 
 const state = {
   samples: [], selected: null, survey: null, map: null, mapLayers: [],
@@ -36,8 +36,31 @@ window.addEventListener("DOMContentLoaded", async () => {
   Appr.start();
   $("#demoStop").onclick = () => Demo.stop();
   wireAudit();
+  tidyPanels();
   await Promise.all([loadHealth(), loadSamples(), loadMetrics(), loadLabelStats()]);
 });
+
+/* calm panels: a panel's explanation folds behind a small (i); collapsible sections open on click */
+function tidyPanels() {
+  document.querySelectorAll(".panel").forEach(panel => {
+    const head = panel.querySelector(":scope > .panel-head"), title = head && head.querySelector(".panel-title");
+    const notes = [...panel.querySelectorAll(":scope > .panel-note:not([id])")];
+    if (title && notes.length) {
+      notes.forEach(n => n.classList.add("tucked"));
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "info-btn"; b.textContent = "i";
+      b.setAttribute("aria-label", "about " + title.textContent); b.setAttribute("aria-expanded", "false");
+      b.onclick = e => { e.stopPropagation(); const open = panel.classList.toggle("notes-open"); b.setAttribute("aria-expanded", String(open)); };
+      title.after(b);
+    }
+    if (panel.classList.contains("collapsible") && head) {
+      head.setAttribute("role", "button"); head.tabIndex = 0;
+      const toggle = () => panel.classList.toggle("is-collapsed");
+      head.onclick = toggle;
+      head.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); } };
+    }
+  });
+}
 
 async function loadHealth() {
   try {
@@ -56,6 +79,7 @@ async function loadHealth() {
     state.calibration = h.calibration || null;
     const cal = h.calibration || {};
     if ($("#regWeights")) $("#regWeights").textContent = `${cal.model || h.model} · ${cal.imgsz || "?"} px ONNX`;
+    if ($("#regBrief")) $("#regBrief").textContent = `${cal.model || h.model || ""}`;
     if ($("#regClasses")) $("#regClasses").textContent = `${(cal.names || []).length} · ${(cal.names || []).join(", ")}`;
     if ($("#regGateK")) $("#regGateK").textContent = `gate · ${cal.guaranteed_class || "?"}`;
     renderGuarantees(h.calibration);
@@ -94,11 +118,11 @@ function renderGuarantees(c) {
   if (gate) gate.textContent = `${(c.detector_floor ?? c.tau_review).toFixed(2)} (floor) · review ≥ ${c.tau_review.toFixed(2)}`;
   if (tiers) tiers.textContent = `${c.method ? "conformal (CP · LTT)" : "calibrated"}${c.policy ? " · " + c.policy : ""}`;
   panel.innerHTML = `
-    <div class="g-row"><span class="g-badge g-recall">≥ ${pct(g.recall_promise)}</span>
-      <span class="g-txt">of pots reach a human (CONFIRMED + REVIEW)${g.requested_recall_achievable === false ? ` — the requested 90% is <b>not</b> achievable with this detector (proposal ceiling ${pct(g.recall_ceiling)})` : ""}. ${held(v.recall_promise_held)}</span></div>
+    <div class="g-row" title="${g.requested_recall_achievable === false ? `The requested 90% is not achievable with this detector (proposal ceiling ${pct(g.recall_ceiling)}).` : ""}"><span class="g-badge g-recall">≥ ${pct(g.recall_promise)}</span>
+      <span class="g-txt">of real pots reach a person<br>${held(v.recall_promise_held)}</span></div>
     <div class="g-row"><span class="g-badge g-prec">${g.precision_promise ? "≥ " + pct(g.precision_promise) : "none"}</span>
-      <span class="g-txt">${g.precision_promise ? `of CONFIRMED finds are real (τ_confirm ${c.tau_confirm != null ? c.tau_confirm.toFixed(2) : "—"}). ${held(v.precision_promise_held)}` : "no auto-confirm can be promised with this model — every find goes to a human."}</span></div>
-    <p class="panel-note">Fit on held-out validation frames, verified once on test (${escapeHtml((c.fit && c.fit.frames) ? c.fit.frames + " calib. frames" : "")}). <a href="https://github.com/madhesh60/depth/blob/main/${escapeHtml(g.report || "docs/")}" target="_blank" rel="noopener">report</a></p>`;
+      <span class="g-txt">${g.precision_promise ? `of confirmed finds are real<br>${held(v.precision_promise_held)}` : "no auto-confirm: every find is checked by a person"}</span></div>
+    <p class="panel-note">Fit on validation, verified once on test · <a href="https://github.com/madhesh60/depth/blob/main/${escapeHtml(g.report || "docs/")}" target="_blank" rel="noopener">report</a></p>`;
 }
 
 async function loadSamples() {
@@ -141,7 +165,7 @@ async function loadSamples() {
 
 function sonarGlyph() {
   const d = document.createElement("div");
-  d.style.cssText = "aspect-ratio:1;display:grid;place-items:center;background:radial-gradient(circle at 50% 35%,#10263c,#060e19);color:#5bbfd0";
+  d.style.cssText = "aspect-ratio:1;display:grid;place-items:center;background:radial-gradient(circle at 50% 35%,#1d2024,#0b0c0e);color:#9fd8e0";
   d.innerHTML = `<svg viewBox="0 0 24 24" width="28" height="28" opacity=".7"><path d="M12 3a9 9 0 1 0 9 9h-9V3Z" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg>`;
   return d;
 }
@@ -607,8 +631,8 @@ function evidenceCard(c, id) {
       ${c.crop_png ? `<img class="ev-img raw" alt="evidence crop" src="${c.crop_png}"/>` : `<div style="aspect-ratio:1"></div>`}
       ${c.relook_view ? `<img class="ev-img enh" alt="CLAHE re-look (what the agent saw)" src="${c.relook_view.enhanced_png}"/>` : ""}
       <span class="ev-badge b-${v}">${v}</span>
-      ${c.relook_view ? `<button class="cmp-chip" title="toggle raw ⇄ CLAHE re-look">raw ⇄ enhanced</button>` : ""}
-      <button class="gaze-btn" title="replay what the agent saw (G)">◉ Replay gaze</button>
+      ${c.relook_view ? `<button class="cmp-chip" title="toggle raw / CLAHE re-look">Enhanced</button>` : ""}
+      <button class="gaze-btn" title="replay what the agent saw (G)">Replay gaze</button>
     </div>
     <div class="ev-body">
       <p class="ev-tier">${escapeHtml(tierPromise(c))}</p>
@@ -625,10 +649,10 @@ function evidenceCard(c, id) {
         <div class="fact"><span class="k">position</span><span class="v ${c.in_water_column ? "chip-weak" : ""}">${c.in_water_column == null ? "—" : c.in_water_column ? "water column" : "on seabed"}${c.ground_range_px != null ? ` · ${Math.round(c.ground_range_px)} px gnd` : ""}</span></div>
         <div class="fact"><span class="k">P(pot)</span><span class="v">${ev.p_pot != null ? Math.round(ev.p_pot * 100) + "%" : "—"}</span></div>
       </div>
-      <ul class="ev-notes">${(ev.notes || []).map(n => `<li>${escapeHtml(n)}</li>`).join("")}</ul>
-      <div class="ev-label"><span class="lbl-k">your label</span>
-        <button class="ok" title="a real pot — saved as a training label">✓ real pot</button>
-        <button class="no" title="not a pot — saved as a hard negative">✕ not a pot</button></div>
+      <div class="ev-label"><span class="lbl-k">Your label</span>
+        <button class="ok" title="a real pot — saved as a training label">Real pot</button>
+        <button class="no" title="not a pot — saved as a hard negative">Not a pot</button></div>
+      ${(ev.notes || []).length ? `<details class="ev-why"><summary>Why this tier</summary><ul class="ev-notes">${ev.notes.map(n => `<li>${escapeHtml(n)}</li>`).join("")}</ul></details>` : ""}
       ${traceBlock(c.trace || [])}
     </div>`;
   card.querySelectorAll(".ev-label button").forEach(b => b.addEventListener("click", async e => {
@@ -657,7 +681,7 @@ function traceBlock(trace) {
     <li class="trace-step ${s.tool === "decide" ? "t-decide" : ""}">
       <span class="trace-tool">${s.tool}</span><span class="trace-ms">${fmt(s.latency_ms)} ms</span>
       <div class="trace-why">${escapeHtml(s.rationale)}</div></li>`).join("");
-  return `<details class="trace"><summary>agent trace — ${trace.length} tool calls</summary><ol>${steps}</ol></details>`;
+  return `<details class="trace"><summary>Agent trace · ${trace.length} steps</summary><ol>${steps}</ol></details>`;
 }
 
 /* ------------------------------------------------------------------ SURVEY */
@@ -743,7 +767,7 @@ function renderMap(d, keepView) {
   $("#mapWrap").style.display = "";
   const rc = d.recording && d.recording.available ? d.recording : null;
   note.textContent = m.gps_synthetic
-    ? "⚠ SYNTHETIC DEMO GPS — not real coordinates. The HF crab-pot frames carry no GPS; this track is generated only to demonstrate the map + route."
+    ? "Synthetic demo track: these crab-pot frames carry no GPS, so positions are illustrative."
     : rc ? `Real per-ping GPS — raw Humminbird recording ${rc.name} (PINGMapper sample, ${rc.duration_s} s, ${rc.track_m} m of track). `
       + (rc.range_scale && rc.range_scale.m_per_sample ? `Range scale measured: ${(rc.range_scale.m_per_sample * 100).toFixed(2)} cm/sample ±${Math.round(rc.range_scale.rel_unc * 100)}% (sonar depth ÷ Stage-1 altitude). ` : "")
       + "No crab pots are known in this river — its cards measure false alarms."
@@ -768,7 +792,7 @@ function renderMap(d, keepView) {
   state.mapLayers.forEach(l => state.map.removeLayer(l)); state.mapLayers = [];
   const byId = Object.fromEntries(d.tracked.map(t => [t.oid, t])), latlngs = [];
   geoObjs.forEach(t => {
-    const hc = { confirmed: "#5fcf9c", recovered: "#5fcf9c", rejected: "#7d8b9a", not_found: "#7d8b9a" }[t.human];
+    const hc = { confirmed: "#8ee0b4", recovered: "#8ee0b4", rejected: "#8d97a1", not_found: "#8d97a1" }[t.human];
     const color = hc || VCOLOR[t.verdict] || "#8ba6c2";
     const onRoute = t.human === "confirmed" || (t.verdict === "confirmed" && !t.human);
     const mk = L.circleMarker([t.lat, t.lon], { radius: onRoute ? 8 : (t.human === "rejected" || t.human === "not_found") ? 4 : 6,
@@ -782,7 +806,7 @@ function renderMap(d, keepView) {
   });
   const routePts = m.recovery_route.map(id => byId[id]).filter(t => t && t.lat != null).map(t => [t.lat, t.lon]);
   if (routePts.length > 1) {
-    const line = L.polyline(routePts, { color: "#5bbfd0", weight: 2.5, dashArray: "6 6", opacity: .9 }).addTo(state.map); state.mapLayers.push(line);
+    const line = L.polyline(routePts, { color: "#ffffff", weight: 2, dashArray: "6 6", opacity: .85 }).addTo(state.map); state.mapLayers.push(line);
     routePts.forEach((p, i) => {
       const badge = L.marker(p, { icon: L.divIcon({ className: "", html: `<div style="background:#eef6fa;color:#071a2b;font:600 10px/18px var(--sans,sans-serif);width:18px;height:18px;border-radius:50%;text-align:center;border:1.5px solid rgba(7,26,43,.6);box-shadow:0 2px 6px rgba(0,0,0,.4)">${i + 1}</div>`, iconSize: [18, 18], iconAnchor: [9, 9] }) }).addTo(state.map);
       state.mapLayers.push(badge);
@@ -790,7 +814,7 @@ function renderMap(d, keepView) {
   }
   const inspPts = (m.inspection_route || []).map(id => byId[id]).filter(t => t && t.lat != null).map(t => [t.lat, t.lon]);
   if (inspPts.length > 1) {
-    const il = L.polyline(inspPts, { color: "#e3b261", weight: 2, dashArray: "2 6", opacity: .85 })
+    const il = L.polyline(inspPts, { color: "#ecc27d", weight: 2, dashArray: "2 6", opacity: .85 })
       .bindTooltip("inspection route — REVIEW cards to check first (pending human approval)").addTo(state.map);
     state.mapLayers.push(il);
   }
@@ -1399,7 +1423,7 @@ function twinPanel(wrap, kind) {
       ${survey ? `<button class="tw-btn" data-a="replay" title="replay: the boat sweeps its sonar fans; finds appear as it passes them">Replay</button>` : ""}
       <button class="tw-btn" data-a="home" title="reset view">⌂ home</button><button class="tw-btn" data-a="snap" title="save a PNG of this view">⤓ PNG</button>
     </div><div class="twin-canvas"></div>
-    <div class="twin-foot"><span class="twin-legend"><span><i style="background:#5fcf9c"></i>confirmed</span><span><i style="background:#e3b261"></i>review</span><span><i style="background:#7d8b9a"></i>low-risk</span>${survey ? `<span><i style="background:#5bbfd0"></i>track · recovery</span><span><i style="background:#b3a8ff"></i>re-survey</span>` : `<span><i style="background:#5bbfd0"></i>sonar at tracked altitude</span><span><i style="background:#000;border:1px solid #445"></i>measured shadow</span>`}</span><span class="tw-note"></span></div>
+    <div class="twin-foot"><span class="twin-legend"><span><i style="background:#8ee0b4"></i>confirmed</span><span><i style="background:#ecc27d"></i>review</span><span><i style="background:#8d97a1"></i>low-risk</span>${survey ? `<span><i style="background:#9fd8e0"></i>track · recovery</span><span><i style="background:#b3a8ff"></i>re-survey</span>` : `<span><i style="background:#9fd8e0"></i>sonar at tracked altitude</span><span><i style="background:#000;border:1px solid #445"></i>measured shadow</span>`}</span><span class="tw-note"></span></div>
     <div class="twin-empty" hidden></div>`;
   const ui = { canvas: wrap.querySelector(".twin-canvas"), note: wrap.querySelector(".tw-note"), empty: wrap.querySelector(".twin-empty"), wrap };
   return ui;

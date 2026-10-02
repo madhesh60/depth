@@ -75,6 +75,30 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ## 4. Session log
 
+### 2026-10-02 (sweep 39) — Studio v2: graphite glass, abstract layer, vendored fonts, far less text
+- Following the user's glassmorphism reference:
+  - three floating graphite-glass layers over chrome spheres and rings, blurred into soft light
+    beneath the glass;
+  - sections are divided by hairlines instead of boxes inside boxes;
+  - the backdrop under the glass is dimmed, so white text keeps contrast over the bright shapes.
+- **Fonts vendored with permission:** Poppins 300–600, Inter (variable) and JetBrains Mono (variable).
+  They are the Fontsource builds of the Google Fonts files, 120 KB in total, OFL licences and SHA-256
+  in `webui/vendor/fonts/README.md`.
+- **Text cut down:**
+  - panel explanations fold behind an (i);
+  - empty states are one line each;
+  - placeholders are a light Poppins headline plus one short line;
+  - the guarantees read "≥ 65% of real pots reach a person", with the qualifications in a tooltip;
+  - the evidence-card notes fold into "Why this tier";
+  - latency, hints, stage subtitles and card subtitles are hidden;
+  - the model registry is collapsed;
+  - the study, audit and Connect intros are shortened;
+  - there is one short synthetic-GPS note.
+- **Navigation:** uppercase, letter-spaced Poppins tabs with an active dot. One white primary pill
+  per screen; other controls are hairline pills.
+- Verified in the browser: Analyze (run and evidence), Survey (full run), Connect, the (i) toggle,
+  and all six fonts loaded. No console errors; `app.js` passes `node --check`.
+
 ### 2026-10-02 (sweep 38) — EXP-003 pre-flight: suite green, exact flags dry-run, pass bar calibrated
 - **Full test suite: 150 passed** (5 min) on the pushed EXP-003 kit and the redesigned studio.
 - **Dry run of the exact EXP-003f notebook flags** (640 px, batch 16, SGD 0.01, `--close-mosaic 10`)
