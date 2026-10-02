@@ -12,7 +12,7 @@ validation alone; the test split was **not** scored. There are two causes:
    ghost-gear appearances.
 
 Both are fixed in the kit (`src/detection/train.py`, `DATASET/scripts/build_tiles.py`), and the
-EXP-003 notebook is ready (`docs/exp003_kaggle.md`). Every number below is reproducible:
+EXP-003 notebook is ready (`docs/kaggle_training.md`). Every number below is reproducible:
 
 ```bash
 python -m src.detection.diagnose --zip EXP-002_complete.zip --zip EXP-002s_complete.zip --train-sample 200
@@ -138,7 +138,7 @@ seabed. That fits the wreck collapse, and it penalised partial pots too.
   STUDY-13's question is still open. EXP-003 runs at 640, which is 2.6× cheaper at inference, and
   asks the cleaner question first: do tiles help at all?
 
-## 7. EXP-003 — the corrected run (`docs/exp003_kaggle.md`)
+## 7. EXP-003 — the corrected run (`docs/kaggle_training.md`)
 
 | | GPU 0: **EXP-003** | GPU 1: **EXP-003f** |
 |---|---|---|

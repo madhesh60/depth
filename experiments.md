@@ -94,7 +94,8 @@ focus first, aug-ablation demoted.
 |---|---|---|
 | ✅ EXP-001 | Baseline (**done** — 40 ep) | YOLO11s detect, v1, 640, sonar aug → mAP@0.5 0.822 (aggregate), sonar fishing_gear R 0.47 |
 | ❌ EXP-002 | Higher resolution + tiles on clean v2b (run 2026-09-30) | **Underfit**: auto-optimizer AdamW 0.00167 + tile label poisoning. Val ghost AP 0.25 → rejected (see log) |
-| **EXP-003** (next) | The EXP-002 causes fixed: explicit SGD 0.01, ~10 k steps, fixed tiles; tiles vs full frames at 640 | `notebooks/exp003_kaggle.ipynb` |
+| ✅ EXP-003 | The EXP-002 causes fixed: explicit SGD 0.01, fixed tiles; tiles vs full frames at 640 | **Recall promise 65% → 79%** (held on test at 81%), fewer review cards; wreck fails; official-split F1 0.41 |
+| **EXP-004** (next) | Clean data: no fish-finder screenshots, no rotated copies; + a ghost-only arm | `notebooks/exp004_kaggle.ipynb` |
 | ✅ (in v2b) | **Sonar-only** training raises the target-domain numbers + removes the optical→natural_formation shortcut (optical debris is 0% and off-product) | filter to crabpot/uatd/mpulse/seabed/shipwreck |
 | (EXP-003 arms) | **Tiled train+infer** (SAHI-style slicing) beats one large frame for tiny targets — doubles as Stage-1's reframed tiling role | slice → detect per tile → merge |
 | EXP-005 | Oversampling fishing_gear + small-object aug (copy_paste>0, scale-up mosaic) lifts recall | minority oversample + aug |
@@ -241,10 +242,25 @@ DEPTH's order equals confidence order for EXP-001 (STUDY-07); its measurable ext
 (when to stop) and a forecast that held (slightly conservative). Status: **study pending** (needs
 3+ people). A higher recall ceiling (EXP-002) moves the promise and the card count.
 
-### EXP-003 / EXP-003f — v2b at 640 px with the EXP-002 causes fixed — READY TO RUN
+### EXP-004 / EXP-004g — EXP-003's recipe on cleaned data (+ a ghost-gear-only arm) — READY TO RUN
 
-- Status: **kit fixed, CPU smoke-tested, notebook ready** (`notebooks/exp003_kaggle.ipynb`,
-  `docs/exp003_kaggle.md`); the GPU run is pending (Kaggle T4 ×2).
+- Status: **kit ready and tested** (`notebooks/exp004_kaggle.ipynb`, [`docs/kaggle_training.md`](docs/kaggle_training.md));
+  GPU run pending.
+- Why: after EXP-003, what is left is data ([`docs/exp003_diagnosis.md`](docs/exp003_diagnosis.md)):
+  - the wreck class learned from 389 off-domain colour fish-finder screenshots;
+  - the side-scan shipwreck labels are loose;
+  - 139 training frames are rotated copies.
+- Recipe: EXP-003's (SGD 0.01, fixed tiles, 640 px, 150 epochs). The "seabed" frames (412) and the
+  rotated copies (88 more) are left out of train. **EXP-004** keeps 2 classes; **EXP-004g** is ghost
+  gear only. Val and test are untouched.
+- Pass bar: fit AP@0.3 ≥ 0.65; validation ghost AP clearly above EXP-003's 0.39; for the 2-class arm,
+  a wreck recall ceiling > 0.5.
+- Result: _pending._
+
+### EXP-003 / EXP-003f — v2b at 640 px with the EXP-002 causes fixed — DONE (EXP-003 onboarded, not yet the default)
+
+- Status: **kit fixed, CPU smoke-tested, notebook ready** (`notebooks/exp004_kaggle.ipynb`,
+  `docs/kaggle_training.md`); the GPU run is pending (Kaggle T4 ×2).
 - What changed (from the EXP-002 post-mortem, `docs/exp002_diagnosis.md`):
   - **explicit SGD at lr 0.01**, with the optimizer actually built recorded in `model_meta.json`;
   - about 8–11 k optimizer steps;
@@ -264,7 +280,30 @@ DEPTH's order equals confidence order for EXP-001 (STUDY-07); its measurable ext
   Then `onboard_model` scores test once.
 - Targets (unchanged): ceiling ≥ 0.85 · crab-pot AP@0.5 ≥ 0.60 · F1 within 0.05 of GhostVision ·
   promise ≥ 90%.
-- Result: _pending — record every number here, including misses._
+- Result (Kaggle T4 ×2, 2026-10-02; full record in [`docs/exp003_diagnosis.md`](docs/exp003_diagnosis.md)):
+
+  | | EXP-003 (fixed tiles) | EXP-003f (full frames) |
+  |---|--:|--:|
+  | optimizer actually built | SGD 0.01 | SGD 0.01 |
+  | epochs (early stop) / minutes | 104 / 135 | 273 / 141 |
+  | final train class loss | 0.96 | 0.70 |
+  | fit: ghost AP@0.3, own training frames | 0.76 | 0.92 |
+  | **val** ghost AP@0.5 / AP@0.3 / recall ceiling | **0.39 / 0.51 / 0.77** | 0.36 / 0.49 / 0.69 |
+  | **val** wreck recall ceiling | 0.10 | 0.05 |
+  | `diagnose` verdict | fits and transfers | generalisation gap |
+
+- **EXP-003 onboarded** (test scored once):
+  - recall promise **≥ 79%** (EXP-001: ≥ 65%), held on test at **81.1%** (lower bound 76.7%, 264 pots);
+  - recall ceiling 0.85 val / 0.84 test;
+  - 3.5 / 2.7 review cards per frame (EXP-001: 4.2 / 3.2); ranking AUC 0.80 (EXP-001: 0.74);
+  - v2b test: ghost AP@0.5 0.48 (CI 0.43–0.55), wreck AP 0.16;
+  - **official 398 split: F1 0.41** (GhostVision 0.71–0.73);
+  - cross-sonar: AP 0.34, recall 0.11 at the val threshold;
+  - speed: 167 ms/frame (EXP-001: 168).
+- Why it is not the default yet: the wreck class fails, there is the official-split gap, and EXP-004
+  may fix both. EXP-001 stays the default, and `DEPTH_MODEL=EXP-003` switches.
+- Learning: tiles help (EXP-003f overfits). The remaining limits are in the data (off-domain wreck
+  screenshots, loose shipwreck labels, rotated copies), not the training.
 
 ### EXP-002 / EXP-002s — YOLO11s on v2b + tiles, 1024 px / 640 px (NEGATIVE — underfit, not deployed)
 

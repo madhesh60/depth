@@ -35,7 +35,7 @@ Flip = the frame mirrored along-track (pings reversed; physically valid for a si
 
 **Not adopted — the gain did not hold on unseen data.** On the calibration recording (Rec19, the hardest: ceiling 0.72) the larger input and the flipped view reach more pots (+0.08 ceiling, +0.10 AP). On the verification recordings the ceiling barely moves (+0.007 (-0.046 .. +0.061)) and AP falls (-0.063 (-0.123 .. +0.000)): the extra candidates are mostly false alarms. It would also cost ~3× the compute (two passes at 1.56× the pixels). Same lesson as STUDY-07 — a second look that helps one recording is not a product change until it holds on another.
 
-**For EXP-002:** test-time upscaling helps only the hard recording, so a 1024-px model is not a safe bet by default. Train both 640 and 1024 on v2b and let the held-out recordings (Rec10/12/16) and the latency gate decide (`docs/exp003_kaggle.md`).
+**For EXP-002:** test-time upscaling helps only the hard recording, so a 1024-px model is not a safe bet by default. Train both 640 and 1024 on v2b and let the held-out recordings (Rec10/12/16) and the latency gate decide (`docs/kaggle_training.md`).
 
 _Outcome (2026-09-30): both sizes were trained (EXP-002 / EXP-002s). Both were underfit and tied on validation (ghost AP 0.25 vs 0.25; `docs/exp002_diagnosis.md`), so EXP-003 trains at 640 px and the resolution question stays open._
 

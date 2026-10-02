@@ -90,7 +90,7 @@ python -m src.agentic.calibrate                            # guaranteed tiers (v
 python -m src.detection.evaluate [--model M --test-split S]  # deploy-faithful detector eval
 python -m src.detection.diagnose --zip EXP-003_complete.zip        # val per source + fit check (never test)
 python -m src.detection.onboard_model --zip EXP-003_complete.zip   # plug in a Kaggle-trained model
-python notebooks/make_kaggle_notebook.py                     # regenerate the Kaggle notebook (exp003_kaggle.ipynb)
+python notebooks/make_kaggle_notebook.py                     # regenerate the Kaggle notebook (exp004_kaggle.ipynb)
 python -m src.agentic.effort                               # analyst-effort curve
 python -m src.bench.product_bench --label <host>            # benchmark this machine
 python -m src.agentic.feedback stats|export                 # human labels → fine-tune set
@@ -106,7 +106,7 @@ python -m src.detection.study_scale_tta                     # STUDY-13 (input si
 
 Global Python 3.10 (no venv) with the runtime pinned in `requirements.txt` (OpenCV 5.0.0.93,
 numpy 2.2.6, FastAPI) plus `ultralytics` + CPU torch for local smoke tests. The local GPU (MX330,
-2 GB) cannot train YOLO11s — **training runs on Kaggle** (`docs/exp003_kaggle.md`).
+2 GB) cannot train YOLO11s — **training runs on Kaggle** (`docs/kaggle_training.md`).
 AWS CLI v2 is installed user-scoped (`C:\Users\RAJ\AppData\Local\Programs\Amazon\AWSCLIV2\aws.exe`,
 profile `hackathon`, us-east-1); login + the MCP wizard are deferred to the AWS day.
 

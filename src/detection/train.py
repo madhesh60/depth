@@ -38,7 +38,7 @@ EXP-003 recipe — the EXP-002 post-mortem (``docs/exp002_diagnosis.md``) fixed 
 * **Kaggle-safe defaults:** no image cache (``--cache none``: a disk cache of ~9 k tiles at 1024 px
   is ~27 GB and would overflow Kaggle's ~20 GB working disk hours into the run).
 
-Usage (Kaggle T4 — see docs/exp003_kaggle.md):
+Usage (Kaggle T4 — see docs/kaggle_training.md):
     python src/detection/train.py --data /kaggle/working/v2b_tiles/data.yaml --name EXP-003
     python src/detection/train.py --data DATASET/03_yolo_ready_dataset_v2b/data.yaml --fraction 0.05 \
         --epochs 1 --imgsz 320 --name smoke          # a 2-minute smoke test on CPU

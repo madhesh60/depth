@@ -262,7 +262,7 @@ on Spot → S3.
 ## 6. Limitations (stated in the product, not hidden)
 
 - **Scope.** One bay's crab pots and one sonar family. Cross-sonar results are pending EXP-003, the first leakage-free model for that test.
-- **Recall ceiling.** EXP-001's ceiling caps the promise at 65%. EXP-002 (v2b, tiles, 1024 and 640 px) was meant to lift it and **failed**: ghost AP 0.25 on the held-out recordings and only 0.42 on its own training frames. It was underfit: `optimizer=auto` silently trained with AdamW at lr 0.00167, and the tiles left cut objects unlabelled ([`exp002_diagnosis.md`](exp002_diagnosis.md)). EXP-003 fixes both, and the kit is ready ([`exp003_kaggle.md`](exp003_kaggle.md)).
+- **Recall ceiling.** EXP-001's ceiling caps the promise at 65%. EXP-002 (v2b, tiles, 1024 and 640 px) was meant to lift it and **failed**: ghost AP 0.25 on the held-out recordings and only 0.42 on its own training frames. It was underfit: `optimizer=auto` silently trained with AdamW at lr 0.00167, and the tiles left cut objects unlabelled ([`exp002_diagnosis.md`](exp002_diagnosis.md)). EXP-003 fixes both, and the kit is ready ([`kaggle_training.md`](kaggle_training.md)).
 - **Calibration.** Calibration uses a single recording, whose frames are correlated. That is why the promise is verified on a separate split.
 - **Labels.** Labels are incomplete, so precision is a lower estimate (the audit will quantify this).
 - **GPS.** The public crab-pot frames carry no GPS, so their demo track is synthetic and labelled as such everywhere, including the counterfactual's metres. The raw-recording path has **real** per-ping GPS and a measured range scale, but that recording is a river with no known pots: it measures false alarms, not recall.

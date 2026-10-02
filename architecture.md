@@ -239,7 +239,7 @@ EXP-002 (1024 px and a 640-px twin, full frames + tiles) ran on Kaggle and was *
 validation** (ghost AP 0.25). It was underfit, because `optimizer=auto` silently swapped in AdamW at lr
 0.00167, and the tiles left cut objects unlabelled ([`docs/exp002_diagnosis.md`](docs/exp002_diagnosis.md)).
 EXP-003 fixes both: explicit SGD and fixed tiles, with a tiles vs full-frames arm at 640 px
-([`docs/exp003_kaggle.md`](docs/exp003_kaggle.md)). `python -m src.detection.diagnose` now checks every new
+([`docs/kaggle_training.md`](docs/kaggle_training.md)). `python -m src.detection.diagnose` now checks every new
 model on validation per source and on its own training frames before onboarding. Onboarding
 times each model against EXP-001 (`--max-ms`); STUDY-13 showed resolution must be chosen on held-out
 recordings.

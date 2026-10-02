@@ -1,39 +1,38 @@
-# EXP-003 on Kaggle — train, check, then ONE command to plug it in
+# Training on Kaggle — the current run is EXP-004
 
-**Why this run matters most.** EXP-001's recall ceiling caps its recall promise at 65%
-(`docs/calibration_exp001.md`: it never proposes about 20–28% of crab pots, even at conf 0.05). No
-triage can recover a pot the detector never proposes; only a better detector can.
+This page is the procedure for every training run: train on Kaggle, check with `diagnose`, then plug
+in with ONE command. History: EXP-002 was underfit ([`exp002_diagnosis.md`](exp002_diagnosis.md)).
+EXP-003 fixed that and raised the recall promise from 65% to 79%
+([`exp003_diagnosis.md`](exp003_diagnosis.md)).
 
-EXP-002 tried and **failed**: ghost-gear AP 0.25 on the held-out recordings. The cause was found and
-fixed — see [`exp002_diagnosis.md`](exp002_diagnosis.md):
+**Why EXP-004.** EXP-003 fits its training frames and transfers to new recordings for ghost gear.
+What is left is **data**:
 
-1. **Underfit.** `optimizer=auto` silently trained with AdamW at lr 0.00167 for 2,700 steps and
-   ignored `lr0`. The models scored only AP 0.42 on their own training frames.
-2. **Tiles taught "object = background".** Cut objects lost their labels but kept their pixels.
+- the wreck class learned from 389 off-domain colour fish-finder screenshots (validation wreck recall
+  ceiling 0.10);
+- 139 training frames are rotated copies with black corners.
 
-| | EXP-002 (failed) | **EXP-003 / EXP-003f** |
-|---|---|---|
-| optimizer | `auto` → AdamW lr 0.00167 (`lr0` ignored) | **explicit SGD lr 0.01**; the optimizer actually built is recorded and checked |
-| optimizer steps | ~2,700 | **~11.4 k (EXP-003) / ~8.4 k (EXP-003f)**, near EXP-001's 16.6 k |
-| training set | full frames + 2×2 tiles (5,746); cut boxes left unlabelled | **EXP-003:** full frames + fixed tiles (4,839): large-object frames are not tiled, cut boxes are inpainted. **EXP-003f:** full frames only (1,773) |
-| input | 1024 and 640 (no difference while underfit) | **640** for both (2.6× cheaper at inference) |
-| epochs / patience | 30 / 8 | **150 / 37 (EXP-003)** and **300 / 75 (EXP-003f)**; mosaic off for the last 10 |
-| checkpoint selection | every epoch saved (~40 MB each) and validated afterwards | best **ghost-gear AP@0.5** tracked during training (no per-epoch files); shortlist re-validated |
-| before onboarding | — | **`diagnose`:** per-source val + fit check on the model's own training frames |
+| | EXP-003 (onboarded) | **EXP-004** | **EXP-004g** |
+|---|---|---|---|
+| recipe | SGD 0.01 (explicit), fixed tiles, 640 px, 150 ep | same | same |
+| training data | v2b train | **without** the "seabed" screenshots (412 frames) and rotated copies (88 more) | same |
+| classes | ghost_gear, wreck_debris | same | **ghost_gear only** (wreck boxes removed; their frames stay as negatives) |
+| question | — | does clean data help? | does the noisy wreck class hurt pot detection? |
 
-The comparison is fair because both arms have the same optimizer and a similar step count. So
-EXP-003 vs EXP-003f answers whether tiles help.
+The cleanup happens when the training set is built on Kaggle (`build_tiles.py --drop-sources seabed
+--drop-rotated [--keep-classes 0]`), so nothing needs re-uploading. Val and test are untouched; for the
+ghost-only arm, val and test are copied with the same single class.
 
-**Tested before the run (CPU smoke test).**
+**Tested before the run.**
 
-- **Training:** the run built `SGD lr 0.01`, the per-epoch ghost AP was tracked, and the shortlist
-  selection picked a checkpoint.
-- **Packaging:** the ONNX export passed the `cv2.dnn` check, and the zip was complete.
-- **Monitor cell:** tested against a simulated process list.
-- **Dry run of the exact EXP-003f flags** (640 px, batch 16, SGD 0.01, `--close-mosaic 10`) on the
-  `--no-tiles` set: training, recorded optimizer `SGD lr 0.01`, shortlist selection, ONNX + `cv2.dnn`,
-  zip and `diagnose` all passed (CPU, 1% of the data, 1 epoch; this checks the path, not accuracy).
-- **Full test suite:** 150 passed.
+- **Locally:** a dry build of the ghost-only set (1,273 frames + 2,672 tiles; 412 + 88 frames left
+  out; all 186 val / 285 test ghost boxes kept).
+- **Kit tests (13 passed):**
+  - rotated copies are detected, but not a sonogram's black nadir stripe;
+  - class filtering;
+  - the notebook flags;
+  - the status cell.
+- The training path itself is unchanged from EXP-003, which ran end to end on Kaggle.
 
 ---
 
@@ -47,7 +46,7 @@ EXP-003 vs EXP-003f answers whether tiles help.
 ## 1. The notebook (import it, no pasting)
 
 1. Kaggle → **Code → New Notebook** → **File → Import Notebook** → upload
-   **`notebooks/exp003_kaggle.ipynb`** from this repo.
+   **`notebooks/exp004_kaggle.ipynb`** from this repo.
 2. Right panel:
    - **Add Input** → **depth-v2b**;
    - **Accelerator → GPU T4 ×2**;
@@ -60,7 +59,8 @@ What the five code cells do:
 1. Clone the repo and install **ultralytics 8.4.157** (pinned). Assert a GPU.
 2. Find the dataset automatically and check the split sizes (train 1,773 · val 234 · test 285 ·
    official 398 · cross-sonar 555).
-3. Build both training sets (about 2 minutes): `v2b_tiles` (4,839 images) and `v2b_full` (1,773).
+3. Build both cleaned training sets (about 3 minutes): `v2b_clean` (2 classes) and `v2b_clean_g`
+   (ghost gear only), each about 1,273 frames + 2,672 tiles.
 4. Launch both trainings, each in its **own process group**, so Stop/Interrupt on a cell cannot kill
    them. It refuses to start a second copy. Logs go to `/kaggle/working/logs/<name>.log`.
 5. **Status / wait / collect.** It is safe to run at any time and never starts or stops a training.
@@ -73,14 +73,14 @@ What the five code cells do:
    It also warns about duplicates and stalls. At the end it copies both `*_complete.zip` files to
    **Output**.
 
-**Expected time:** about 3–3.5 h per arm, running in parallel; Kaggle's limit is 12 h. Disk use is
-about 2 GB.
+**Expected time:** about 2–2.5 h per arm, running in parallel (EXP-003 took 2.2 h on a similar set);
+Kaggle's limit is 12 h. Disk use is about 2 GB.
 
 **While it runs, check:**
 
 - the first epoch finishes within ~5 minutes;
 - the train class loss falls steadily, below ~1.2 by about epoch 30;
-- val mAP50 passes EXP-002's 0.12 within the first ~20 epochs.
+- val mAP50 passes ~0.15 within the first ~40 epochs (EXP-003 reached 0.15 by epoch 41).
 
 **If something goes wrong:**
 
@@ -101,7 +101,7 @@ Download both zips from **Output** into the repo root. Then run the check: per-s
 frames. It never touches test.
 
 ```bash
-python -m src.detection.diagnose --zip EXP-003_complete.zip --zip EXP-003f_complete.zip
+python -m src.detection.diagnose --zip EXP-004_complete.zip --zip EXP-004g_complete.zip
 ```
 
 **Pass bar:**
@@ -109,13 +109,13 @@ python -m src.detection.diagnose --zip EXP-003_complete.zip --zip EXP-003f_compl
 - ghost AP@0.3 ≥ 0.65 on its own training frames (not underfit). The bar was set before any
   EXP-003 result, from the reference: EXP-001, a working model, scores 0.71 there (0.57 at IoU 0.5,
   because the 14–36 px label boxes disagree by a few pixels); underfit EXP-002 scores 0.57;
-- validation ghost AP clearly above EXP-002's 0.29;
-- wreck recall ceiling above 0.5.
+- validation ghost AP clearly above EXP-003's 0.39 (deploy path, IoU 0.5);
+- for the 2-class arm, a wreck recall ceiling above 0.5. The ghost-only arm has no wreck class by design.
 
 Onboard only the models that pass:
 
 ```bash
-python -m src.detection.onboard_model --zip EXP-003_complete.zip --max-ms 700
+python -m src.detection.onboard_model --zip EXP-004_complete.zip --max-ms 700   # or EXP-004g
 ```
 
 Onboarding:
@@ -132,17 +132,18 @@ Onboarding:
 speed budget. Then switch:
 
 ```bash
-DEPTH_MODEL=EXP-003 python -m uvicorn src.dashboard.app:app --port 8000
+DEPTH_MODEL=EXP-004 python -m uvicorn src.dashboard.app:app --port 8000
 ```
 
 ## Success criteria
 
 - recall ceiling at the detector floor on the calibration recordings: **0.72 → ≥ 0.85**
+  (EXP-003: 0.85 on val; promise ≥ 79%, held on test at 81%)
 - crab-pot AP@0.5 on the v2b unique-frame test: **≥ 0.60**
 - official 398-frame split F1 within 0.05 of GhostVision (0.71–0.73)
 - recall promise ≥ 90% (95% confidence), held on test
 
-Log EXP-003 / EXP-003f in `experiments.md` with the diagnosis and the onboarding reports linked,
+Log EXP-004 / EXP-004g in `experiments.md` with the diagnosis and the onboarding reports linked,
 **including if they miss these targets**.
 
 ---

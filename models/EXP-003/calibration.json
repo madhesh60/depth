@@ -1,0 +1,97 @@
+{
+  "model": "EXP-003",
+  "names": [
+    "ghost_gear",
+    "wreck_debris"
+  ],
+  "detector": {
+    "imgsz": 640,
+    "iou_nms": 0.45,
+    "class_aware_nms": true,
+    "conf": {
+      "fishing_gear": 0.1,
+      "pipe_cylinder": 0.25,
+      "structural_fragment": 0.25,
+      "natural_formation": 0.25,
+      "ghost_gear": 0.05,
+      "wreck_debris": 0.25
+    },
+    "relook_conf": 0.05,
+    "input": "raw"
+  },
+  "tiers": {
+    "method": "conformal-LTT (Clopper-Pearson, fixed-sequence)",
+    "score": "conf",
+    "tau_review": 0.06,
+    "tau_confirm": null,
+    "guarantees": {
+      "recall_promise": 0.79,
+      "requested_recall_achievable": false,
+      "precision_promise": null,
+      "best_precision_promise_achievable": 0.565,
+      "recall_ceiling": 0.8495,
+      "verified_on_test": {
+        "recall": 0.8106,
+        "recall_promise_held": true,
+        "confirmed_precision": null,
+        "precision_promise_held": null
+      },
+      "report": "docs/calibration_exp003.md"
+    },
+    "guaranteed_class": "ghost_gear",
+    "non_hazard_classes": [],
+    "policy": "baseline_conf",
+    "relook_mode": null,
+    "escalate_clahe": false,
+    "combine": "lift",
+    "alpha_requested": 0.1,
+    "target_precision": 0.85,
+    "delta": 0.05,
+    "p_pot_bins": [
+      {
+        "lo": 0.06,
+        "hi": 0.0823,
+        "p_pot": 0.0515,
+        "n": 95
+      },
+      {
+        "lo": 0.0823,
+        "hi": 0.1147,
+        "p_pot": 0.1237,
+        "n": 95
+      },
+      {
+        "lo": 0.1147,
+        "hi": 0.1564,
+        "p_pot": 0.1327,
+        "n": 96
+      },
+      {
+        "lo": 0.1564,
+        "hi": 0.218,
+        "p_pot": 0.2041,
+        "n": 96
+      },
+      {
+        "lo": 0.218,
+        "hi": 0.3036,
+        "p_pot": 0.5258,
+        "n": 95
+      },
+      {
+        "lo": 0.3036,
+        "hi": 0.7586,
+        "p_pot": 0.6327,
+        "n": 96
+      }
+    ]
+  },
+  "fit": {
+    "split": "`DATASET/03_yolo_ready_dataset_v2b/val` *wcp_ss_*.jpg \u2014 163 unique frames, recordings ['Rec10', 'Rec12', 'Rec16']",
+    "frames": 163,
+    "created": "2026-10-02",
+    "pots": 186,
+    "verified_on": "`DATASET/03_yolo_ready_dataset_v2b/test` *wcp_ss_*.jpg \u2014 199 unique frames, recordings ['Rec14', 'Rec8', 'Rec9']",
+    "note": "fitted by `python -m src.agentic.calibrate` (calibration split only; test scored once)"
+  }
+}

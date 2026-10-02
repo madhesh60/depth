@@ -101,7 +101,7 @@ this model would put on an analyst there.
 **Pending, by design:** EXP-003, the recall lever. EXP-002 trained and **failed** (ghost AP 0.25 on the
 held-out recordings: underfit by a silent optimizer switch, plus tile label poisoning; post-mortem in
 [`docs/exp002_diagnosis.md`](docs/exp002_diagnosis.md)). The fixed kit is ready
-([`docs/exp003_kaggle.md`](docs/exp003_kaggle.md)). Also pending: the timed study,
+([`docs/kaggle_training.md`](docs/kaggle_training.md)). Also pending: the timed study,
 the audit, the EC2 benchmark, and publishing the weights as a GitHub Release.
 
 ## 4. How it works

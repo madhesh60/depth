@@ -8,7 +8,7 @@ Legend: `[x]` done · `[ ]` open · **(YOU)** needs a person / an account / a GP
 **Order that unblocks the most:**
 
 1. Grant check-in (due 2 Oct).
-2. EXP-003 on Kaggle.
+2. EXP-004 on Kaggle.
 3. AWS day.
 4. Study and audit with real people.
 5. README numbers, diagram and screenshots last.
@@ -65,9 +65,12 @@ Legend: `[x]` done · `[ ]` open · **(YOU)** needs a person / an account / a GP
     training frames).
   
   Full suite 150 passed; the exact EXP-003f flags were dry-run.
-- [ ] **(YOU) EXP-003 on Kaggle** (~3.5 h, T4 ×2). Import `notebooks/exp003_kaggle.ipynb`, add
-      **depth-v2b**, Save & Run All ([`docs/exp003_kaggle.md`](docs/exp003_kaggle.md)). Download both
-      zips and tell Claude "EXP-003 done".
+- [x] **EXP-003 on Kaggle**, diagnosed and onboarded. Recall promise 65% → **79%** (held on test at
+      81%), fewer review cards. Wreck fails, and official-split F1 is 0.41 vs GhostVision 0.71–0.73
+      ([`docs/exp003_diagnosis.md`](docs/exp003_diagnosis.md)).
+- [ ] **(YOU) EXP-004 on Kaggle** (~2.5 h, T4 ×2). Import `notebooks/exp004_kaggle.ipynb`, add
+      **depth-v2b**, Save & Run All ([`docs/kaggle_training.md`](docs/kaggle_training.md)). Download
+      `EXP-004_complete.zip` + `EXP-004g_complete.zip`, then tell Claude "EXP-004 done".
 - [ ] `python -m src.detection.diagnose --zip EXP-003_complete.zip --zip EXP-003f_complete.zip`.
 - [ ] `onboard_model` for the models that pass:
   - guarantees fit on val, verified once on test;
