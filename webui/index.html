@@ -20,7 +20,7 @@
         <svg viewBox="0 0 24 24" width="18" height="18"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm0 3.4A6.6 6.6 0 0 1 18.6 12H12V5.4Z" fill="currentColor"/></svg>
       </div>
       <div class="brand-txt">
-        <h1>DEPTH<span class="brand-sub">studio</span></h1>
+        <h1>DEPTH<span class="brand-sub">Studio</span></h1>
         <p>See · Prove · Decide · Act</p>
       </div>
     </div>
@@ -33,7 +33,7 @@
       <button class="mode-btn" data-mode="connect" role="tab" title="connect AI agents (MCP), GIS / operations consoles (OGC API), webhooks, embeds">Connect</button>
     </nav>
 
-    <button class="demo-btn" id="demoBtn" title="a guided 60-second walk through the whole loop — any key or click stops it">▶ 60-s demo</button>
+    <button class="demo-btn" id="demoBtn" title="a guided 60-second walk through the whole loop — any key or click stops it">Guided demo</button>
     <div class="status-pills" id="healthPills">
       <span class="pill" id="pillCv">OpenCV …</span>
       <span class="pill" id="pillModel">model …</span>
@@ -52,7 +52,7 @@
         <div class="sample-grid" id="sampleGrid"><div class="skeleton"></div><div class="skeleton"></div></div>
         <label class="dropzone" id="dropzone">
           <input type="file" id="fileInput" accept="image/*" hidden />
-          <span class="dz-ico">⇪</span><span>Drop a sonar frame or <u>browse</u></span>
+          <span class="dz-ico"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V4m0 0-4 4m4-4 4 4"/><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg></span><span>Drop a sonar frame or <u>browse</u></span>
         </label>
       </section>
 
@@ -138,7 +138,7 @@
         </div>
         <div class="class-legend" id="classLegend" title="show / cut a detected class"></div>
         <div class="tb-spacer"></div>
-        <button class="tb-btn" id="missedBtn" title="draw a box around a pot the detector missed — it becomes a training label (M)">＋ missed pot</button>
+        <button class="tb-btn" id="missedBtn" title="draw a box around a pot the detector missed — it becomes a training label (M)">Mark missed pot</button>
         <div class="latency mono" id="latency"></div>
       </div>
 
@@ -165,8 +165,8 @@
             <button class="vb-btn" id="zoomOut" title="zoom out ( − )">−</button>
             <span class="zoom-read mono" id="zoomRead">100%</span>
             <button class="vb-btn" id="zoomIn" title="zoom in ( + )">+</button>
-            <button class="vb-btn vb-fit" id="zoomFit" title="fit ( 0 )">fit</button>
-            <button class="vb-btn vb-tour" id="tourBtn" title="fly through every find the way the agent looked">▶ agent tour</button>
+            <button class="vb-btn vb-fit" id="zoomFit" title="fit ( 0 )">Fit</button>
+            <button class="vb-btn vb-tour" id="tourBtn" title="fly through every find the way the agent looked">Agent tour</button>
           </div>
           <div class="vb-gate">
             <span class="vb-gate-lbl">gate</span>
@@ -187,7 +187,7 @@
             <button class="sv-btn is-active" data-sv="map">Map</button>
             <button class="sv-btn" data-sv="3d" title="3D survey twin: swaths on the track, hazards, routes, re-survey passes, replay">3D twin</button>
           </div>
-          <button class="cf-btn" id="cfBtn" hidden title="counterfactual (STUDY-12): where every pin would land if the agent ignored Stage 1's bottom track — slant range and the frame-centre ping instead of ground range and the object's own ping. Tiers do not change; the boat's destination does.">⊘ without Stage 1</button>
+          <button class="cf-btn" id="cfBtn" hidden title="counterfactual (STUDY-12): where every pin would land if the agent ignored Stage 1's bottom track — slant range and the frame-centre ping instead of ground range and the object's own ping. Tiers do not change; the boat's destination does.">Without Stage 1</button>
           <span class="cf-sum mono" id="cfSum" hidden></span>
         </div>
         <div class="twin-wrap twin-survey" id="twinSurveyWrap" hidden></div>
@@ -333,7 +333,7 @@
         <div id="briefBody" class="brief"><p class="empty-hint">Run a survey — the agent writes a one-page hand-over for the boat crew. Every number in it is traced back to the survey.</p></div>
         <div class="brief-foot" id="briefFoot" hidden>
           <span class="brief-ground mono" id="briefGround"></span>
-          <button class="mini-btn" id="briefCopy" title="copy the brief as markdown">copy</button>
+          <button class="mini-btn" id="briefCopy" title="copy the brief as markdown">Copy</button>
         </div>
       </section>
       <section class="panel" data-when="survey">
@@ -371,7 +371,7 @@
       <div class="dstep" data-stage="decide"><span class="dnode">4</span><div class="dtxt"><b>Decide</b><span>guaranteed tiers</span></div></div>
       <div class="dlink"></div>
       <div class="dstep" data-stage="act"><span class="dnode">5</span><div class="dtxt"><b>Act</b><span>route + reports</span></div></div>
-      <button class="dock-toggle" id="dockToggle" aria-expanded="true" title="show / hide the agent's tool-call log">Agent log ▾</button>
+      <button class="dock-toggle" id="dockToggle" aria-expanded="true" title="show / hide the agent's tool-call log">Agent log</button>
     </div>
     <div class="dock-log">
       <div class="dock-log-head"><span class="panel-title">Agent log</span><span class="mono prov-line" id="provLine" title="provenance of the last result"></span><span class="mono" id="dockLatency"></span></div>
@@ -384,7 +384,7 @@
   <div class="demo-step mono" id="demoStep"></div>
   <div class="demo-txt" id="demoTxt"></div>
   <div class="demo-dots" id="demoDots"></div>
-  <button class="demo-stop" id="demoStop">stop ✕</button>
+  <button class="demo-stop" id="demoStop">Stop</button>
 </div>
 <div class="run-toast" id="runToast" hidden><span class="spin"></span><span id="runToastTxt">working…</span></div>
 

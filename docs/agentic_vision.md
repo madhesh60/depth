@@ -91,7 +91,7 @@ significantly on the calibration split**, and on the verification split confiden
 0.764 vs 0.65–0.71 for every re-look variant). So, for this model, the agent's value-of-information
 rule spends **no re-look inference on tiering: 1 inference per frame** (the old ladder spent 4–7).
 The re-look stays as a display-only "agent's eye" view on each card. The same machinery re-decides
-automatically for EXP-002.
+automatically for the next model (EXP-003; EXP-002 was rejected as underfit).
 
 ---
 
@@ -107,7 +107,7 @@ verification); Roboflow copies are removed.
 | **Precision** — CONFIRMED finds that are real | ≥ 85% | **none** — the best any threshold supports is ~62–66% | — (nothing auto-confirmed) |
 
 So with EXP-001 **every find goes to a human**, in P(pot) order. That is the honest consequence of the
-guarantee machinery, and it is the quantitative case for EXP-002: raising the proposal ceiling is the
+guarantee machinery, and it is the quantitative case for a better detector (EXP-003): raising the proposal ceiling is the
 only lever that can raise the recall promise, and a better-separated score is the only way to earn an
 auto-confirm tier.
 
@@ -207,7 +207,7 @@ and every survey exports its decision log (`mission.trace.jsonl`).
 | Orchestration & autonomy | 25% | stated objective; value-of-information tool use; analyst **and boat** budgets; stitching; repeat-sighting merge; routes; opposite-side re-survey planning (§3, §6) |
 | Task success | 20% | a recall promise that **held on unseen test** (86%); honest "no auto-confirm"; forecast held; effort measured, not assumed (§4, §6) |
 | Failure handling & human control | 15% | bounded LOW-RISK tier, budgeted REVIEW queue, human-approval gate, missed-pot labels, blinded audit (§5, §6) |
-| User experience | 10% | calm studio with five modes (Analyze · Survey · Study · Audit · Connect) and a guided 60-s demo: guarantee badges, evidence cards, seabed overlay, map + routes + re-survey passes, person-confirmed recovery route, 3D twin, live effort curve, downloads |
+| User experience | 10% | calm glass studio with five modes (Analyze · Survey · Study · Audit · Connect), purposeful type roles, and a guided 60-s demo: guarantee badges, evidence cards, seabed overlay, map + routes + re-survey passes, person-confirmed recovery route, 3D twin, live effort curve, downloads |
 
 **Reproduce:** `python -m src.agentic.calibrate` (fit + verify + report + `calibration.json`) ·
 `python -m src.agentic.pipeline --survey <dir>` · `python -m src.agentic.effort` · `pytest -q`.

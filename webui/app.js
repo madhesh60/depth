@@ -8,9 +8,9 @@ const API = ""; // same-origin (served by FastAPI)
 const SVGNS = "http://www.w3.org/2000/svg";
 
 const VERDICTS = ["confirmed", "review", "low_risk"];
-const VCOLOR = { confirmed: "#2ea043", review: "#d9a441", low_risk: "#5f6f7d", rejected: "#5f6f7d" };
+const VCOLOR = { confirmed: "#5fcf9c", review: "#e3b261", low_risk: "#7d8b9a", rejected: "#7d8b9a" };
 const VLABEL = { confirmed: "confirmed", review: "review", low_risk: "low-risk", rejected: "low-risk" };
-const CLASS_SW = ["#1fb6d5", "#d9a441", "#8b7ff0", "#4fb477", "#e5789b"];
+const CLASS_SW = ["#5bbfd0", "#e3b261", "#9b92f0", "#5fcf9c", "#e98aa8"];
 
 const state = {
   samples: [], selected: null, survey: null, map: null, mapLayers: [],
@@ -141,7 +141,7 @@ async function loadSamples() {
 
 function sonarGlyph() {
   const d = document.createElement("div");
-  d.style.cssText = "aspect-ratio:1;display:grid;place-items:center;background:radial-gradient(circle at 50% 35%,#123049,#0a1626);color:#1fb6d5";
+  d.style.cssText = "aspect-ratio:1;display:grid;place-items:center;background:radial-gradient(circle at 50% 35%,#10263c,#060e19);color:#5bbfd0";
   d.innerHTML = `<svg viewBox="0 0 24 24" width="28" height="28" opacity=".7"><path d="M12 3a9 9 0 1 0 9 9h-9V3Z" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg>`;
   return d;
 }
@@ -574,7 +574,7 @@ function playGazeTour() {
   const ids = $$(".ev-card:not(.ev-under)").map(c => +c.dataset.id);
   if (!ids.length) return;
   state._tour = true; state._tourOptOut = false;
-  const btn = $("#tourBtn"); if (btn) { btn.classList.add("is-on"); btn.innerHTML = "⏸ stop"; }
+  const btn = $("#tourBtn"); if (btn) { btn.classList.add("is-on"); btn.innerHTML = "Stop tour"; }
   let i = 0;
   const step = () => {
     if (!state._tour) return;
@@ -583,7 +583,7 @@ function playGazeTour() {
   };
   step();
 }
-function endTour() { state._tour = false; clearTimeout(_tourTimer); _tourTimer = null; const btn = $("#tourBtn"); if (btn) { btn.classList.remove("is-on"); btn.innerHTML = "▶ agent tour"; } }
+function endTour() { state._tour = false; clearTimeout(_tourTimer); _tourTimer = null; const btn = $("#tourBtn"); if (btn) { btn.classList.remove("is-on"); btn.innerHTML = "Agent tour"; } }
 function cancelTour() { if (state._tour) state._tourOptOut = true; endTour(); hideAgentEye(); }
 
 // Height is RELATIVE to sonar altitude unless the altitude was measured (never an assumed 10 m).
@@ -768,7 +768,7 @@ function renderMap(d, keepView) {
   state.mapLayers.forEach(l => state.map.removeLayer(l)); state.mapLayers = [];
   const byId = Object.fromEntries(d.tracked.map(t => [t.oid, t])), latlngs = [];
   geoObjs.forEach(t => {
-    const hc = { confirmed: "#2ea043", recovered: "#2ea043", rejected: "#5f6f7d", not_found: "#5f6f7d" }[t.human];
+    const hc = { confirmed: "#5fcf9c", recovered: "#5fcf9c", rejected: "#7d8b9a", not_found: "#7d8b9a" }[t.human];
     const color = hc || VCOLOR[t.verdict] || "#8ba6c2";
     const onRoute = t.human === "confirmed" || (t.verdict === "confirmed" && !t.human);
     const mk = L.circleMarker([t.lat, t.lon], { radius: onRoute ? 8 : (t.human === "rejected" || t.human === "not_found") ? 4 : 6,
@@ -782,15 +782,15 @@ function renderMap(d, keepView) {
   });
   const routePts = m.recovery_route.map(id => byId[id]).filter(t => t && t.lat != null).map(t => [t.lat, t.lon]);
   if (routePts.length > 1) {
-    const line = L.polyline(routePts, { color: "#1fb6d5", weight: 2.5, dashArray: "6 6", opacity: .9 }).addTo(state.map); state.mapLayers.push(line);
+    const line = L.polyline(routePts, { color: "#5bbfd0", weight: 2.5, dashArray: "6 6", opacity: .9 }).addTo(state.map); state.mapLayers.push(line);
     routePts.forEach((p, i) => {
-      const badge = L.marker(p, { icon: L.divIcon({ className: "", html: `<div style="background:#1fb6d5;color:#04121a;font:700 10px/18px var(--mono,monospace);width:18px;height:18px;border-radius:50%;text-align:center;border:2px solid #04121a">${i + 1}</div>`, iconSize: [18, 18], iconAnchor: [9, 9] }) }).addTo(state.map);
+      const badge = L.marker(p, { icon: L.divIcon({ className: "", html: `<div style="background:#eef6fa;color:#071a2b;font:600 10px/18px var(--sans,sans-serif);width:18px;height:18px;border-radius:50%;text-align:center;border:1.5px solid rgba(7,26,43,.6);box-shadow:0 2px 6px rgba(0,0,0,.4)">${i + 1}</div>`, iconSize: [18, 18], iconAnchor: [9, 9] }) }).addTo(state.map);
       state.mapLayers.push(badge);
     });
   }
   const inspPts = (m.inspection_route || []).map(id => byId[id]).filter(t => t && t.lat != null).map(t => [t.lat, t.lon]);
   if (inspPts.length > 1) {
-    const il = L.polyline(inspPts, { color: "#d9a441", weight: 2, dashArray: "2 6", opacity: .85 })
+    const il = L.polyline(inspPts, { color: "#e3b261", weight: 2, dashArray: "2 6", opacity: .85 })
       .bindTooltip("inspection route — REVIEW cards to check first (pending human approval)").addTo(state.map);
     state.mapLayers.push(il);
   }
@@ -905,7 +905,7 @@ async function loadBrief(surveyId) {
 const Dock = {
   set(min) {
     document.body.classList.toggle("dock-min", min);
-    $("#dockToggle").textContent = min ? "Agent log ▴" : "Agent log ▾";
+    $("#dockToggle").textContent = "Agent log";
     $("#dockToggle").setAttribute("aria-expanded", String(!min));
     localStorage.setItem("depth.dockMin", min ? "1" : "0");
     setTimeout(() => { if (state.map) state.map.invalidateSize(); window.dispatchEvent(new Event("resize")); }, 220);
@@ -922,7 +922,7 @@ const Connect = {
   info: null, lastSecret: null,
   code(txt, multi) {
     const id = "cx" + Math.random().toString(36).slice(2, 8);
-    return `<div class="cx-code">${multi ? `<pre id="${id}">${escapeHtml(txt)}</pre>` : `<code id="${id}">${escapeHtml(txt)}</code>`}<button class="cx-copy" data-copy="${id}">copy</button></div>`;
+    return `<div class="cx-code">${multi ? `<pre id="${id}">${escapeHtml(txt)}</pre>` : `<code id="${id}">${escapeHtml(txt)}</code>`}<button class="cx-copy" data-copy="${id}">Copy</button></div>`;
   },
   wireCopy(root) {
     root.querySelectorAll(".cx-copy[data-copy]").forEach(b => b.onclick = () => {
@@ -1396,10 +1396,10 @@ function twinPanel(wrap, kind) {
       ${survey ? "" : `<label class="tw-sl" title="backscatter relief — a visual aid, NOT bathymetry">relief <input type="range" data-s="relief" min="0" max="6" step="0.5" value="0"><output>0</output></label>`}
       <label class="tw-sl" title="vertical exaggeration of heights and sonar altitude">height × <input type="range" data-s="exag" min="1" max="12" step="1" value="${survey ? 6 : 3}"><output>${survey ? 6 : 3}</output></label>
       <span class="tb-spacer"></span>
-      ${survey ? `<button class="tw-btn" data-a="replay" title="replay: the boat sweeps its sonar fans; finds appear as it passes them">▶ replay</button>` : ""}
+      ${survey ? `<button class="tw-btn" data-a="replay" title="replay: the boat sweeps its sonar fans; finds appear as it passes them">Replay</button>` : ""}
       <button class="tw-btn" data-a="home" title="reset view">⌂ home</button><button class="tw-btn" data-a="snap" title="save a PNG of this view">⤓ PNG</button>
     </div><div class="twin-canvas"></div>
-    <div class="twin-foot"><span class="twin-legend"><span><i style="background:#2ea043"></i>confirmed</span><span><i style="background:#d9a441"></i>review</span><span><i style="background:#6b7a88"></i>low-risk</span>${survey ? `<span><i style="background:#1fb6d5"></i>track · recovery</span><span><i style="background:#b3a8ff"></i>re-survey</span>` : `<span><i style="background:#1fb6d5"></i>sonar at tracked altitude</span><span><i style="background:#000;border:1px solid #445"></i>measured shadow</span>`}</span><span class="tw-note"></span></div>
+    <div class="twin-foot"><span class="twin-legend"><span><i style="background:#5fcf9c"></i>confirmed</span><span><i style="background:#e3b261"></i>review</span><span><i style="background:#7d8b9a"></i>low-risk</span>${survey ? `<span><i style="background:#5bbfd0"></i>track · recovery</span><span><i style="background:#b3a8ff"></i>re-survey</span>` : `<span><i style="background:#5bbfd0"></i>sonar at tracked altitude</span><span><i style="background:#000;border:1px solid #445"></i>measured shadow</span>`}</span><span class="tw-note"></span></div>
     <div class="twin-empty" hidden></div>`;
   const ui = { canvas: wrap.querySelector(".twin-canvas"), note: wrap.querySelector(".tw-note"), empty: wrap.querySelector(".twin-empty"), wrap };
   return ui;
@@ -1415,7 +1415,7 @@ function wireTwinPanel(ui, viewer) {
   w.querySelector('[data-a="home"]').onclick = () => viewer.goHome();
   w.querySelector('[data-a="snap"]').onclick = () => { const a = document.createElement("a"); a.href = viewer.snapshot(); a.download = "depth-twin.png"; a.click(); };
   const rp = w.querySelector('[data-a="replay"]');
-  if (rp) rp.onclick = () => { const on = viewer.replay(); rp.classList.toggle("on", !!on); rp.textContent = on ? "⏸ pause" : "▶ replay"; };
+  if (rp) rp.onclick = () => { const on = viewer.replay(); rp.classList.toggle("on", !!on); rp.textContent = on ? "Pause" : "Replay"; };
 }
 function wireTwin() {
   $$(".dim-btn").forEach(b => b.onclick = () => {
@@ -1448,7 +1448,7 @@ function showSurveyTwin() {
   twinReady(() => {
     if (!Twin.survey) {
       Twin.surveyUi = twinPanel($("#twinSurveyWrap"), "survey");
-      Twin.survey = window.DepthTwin.create(Twin.surveyUi.canvas, { onReplayEnd: () => { const b = Twin.surveyUi.wrap.querySelector('[data-a="replay"]'); b.classList.remove("on"); b.textContent = "▶ replay"; } });
+      Twin.survey = window.DepthTwin.create(Twin.surveyUi.canvas, { onReplayEnd: () => { const b = Twin.surveyUi.wrap.querySelector('[data-a="replay"]'); b.classList.remove("on"); b.textContent = "Replay"; } });
       Twin.survey.setExag(6); wireTwinPanel(Twin.surveyUi, Twin.survey);
     }
     const d = state.survey, ui = Twin.surveyUi, tw = d && d.twin;
@@ -1465,7 +1465,7 @@ const Demo = {
   steps: 7,
   async run() {
     this.on = true; const tok = ++this.token;
-    $("#demoBtn").classList.add("is-on"); $("#demoBtn").textContent = "■ stop demo"; $("#demoBar").hidden = false;
+    $("#demoBtn").classList.add("is-on"); $("#demoBtn").textContent = "Stop demo"; $("#demoBar").hidden = false;
     const stopper = e => { if (e.target.closest && (e.target.closest("#demoBar") || e.target.closest("#demoBtn"))) return; this.stop(); };
     setTimeout(() => { window.addEventListener("keydown", this._k = () => this.stop(), { once: true }); window.addEventListener("pointerdown", this._p = stopper); }, 400);
     const alive = () => this.on && tok === this.token;
@@ -1510,7 +1510,7 @@ const Demo = {
   },
   stop() {
     this.on = false; this.token++;
-    $("#demoBtn").classList.remove("is-on"); $("#demoBtn").textContent = "▶ 60-s demo"; $("#demoBar").hidden = true;
+    $("#demoBtn").classList.remove("is-on"); $("#demoBtn").textContent = "Guided demo"; $("#demoBar").hidden = true;
     if (this._k) window.removeEventListener("keydown", this._k); if (this._p) window.removeEventListener("pointerdown", this._p);
     if (Twin.survey) Twin.survey.play = false;
   },

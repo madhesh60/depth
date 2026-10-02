@@ -192,8 +192,20 @@ Hardening:
 * **Startup:** the model is warmed at startup.
 * **Map:** Leaflet vendored (SRI-checked); keyless basemaps with an offline grid fallback.
 
-UI: a zero-build panelled studio with five modes (Analyze · Survey · Study · Audit · Connect). The
-pipeline dock collapses to a slim status bar.
+UI: a zero-build studio with five modes (Analyze · Survey · Study · Audit · Connect), built from
+translucent glass panels over a deep-ocean field (`webui/styles.css`). One accent colour (sea-glass
+teal) and calm verdict colours are kept in step with `app.js` and `twin3d.js`. There are four type
+roles and no web-font downloads; each role uses the platform's system faces:
+
+| role | used for | macOS | Windows 11 |
+|---|---|---|---|
+| display | headings, KPIs | SF Pro Display | Segoe UI Variable Display |
+| interface | text and buttons | SF Pro Text | Segoe UI Variable Text / Small |
+| data | numbers, code, logs | SF Mono | Cascadia Mono |
+| reading | the mission brief and study instructions | New York | Sitka |
+
+Each screen has one frosted-white primary action; other controls are glass. The pipeline dock
+collapses to a slim status bar, and motion respects `prefers-reduced-motion`.
 
 ## 10. Cloud + COOL (`infra/`)
 
@@ -215,10 +227,14 @@ workers (Spot) → S3.
 | dataset | role |
 |---|---|
 | v1 (4 classes, 29k images) | trained EXP-001 (the deployed model); its unseen crab-pot sonograms (v1 val Rec19, v1 test) host EXP-001's calibration/verification |
-| **v2b** (2 classes, sonar only, deduped) | EXP-002: val = held-out recordings Rec10/12/16; test = 214 unique crab-pot frames; `test_official398` (GhostVision head-to-head); `test_xsonar` (orange Contact crops) |
+| **v2b** (2 classes, sonar only, deduped) | EXP-002/003: val = held-out recordings Rec10/12/16; test = 214 unique crab-pot frames; `test_official398` (GhostVision head-to-head); `test_xsonar` (orange Contact crops) |
 
-EXP-002 (1024 px and a 640-px twin, full + tiles, optional sonar-aware copy-paste) is built and
-round-trip tested. The GPU run is on Kaggle ([`docs/exp002_kaggle.md`](docs/exp002_kaggle.md)). Onboarding
+EXP-002 (1024 px and a 640-px twin, full frames + tiles) ran on Kaggle and was **rejected on
+validation** (ghost AP 0.25). It was underfit, because `optimizer=auto` silently swapped in AdamW at lr
+0.00167, and the tiles left cut objects unlabelled ([`docs/exp002_diagnosis.md`](docs/exp002_diagnosis.md)).
+EXP-003 fixes both: explicit SGD and fixed tiles, with a tiles vs full-frames arm at 640 px
+([`docs/exp003_kaggle.md`](docs/exp003_kaggle.md)). `python -m src.detection.diagnose` now checks every new
+model on validation per source and on its own training frames before onboarding. Onboarding
 times each model against EXP-001 (`--max-ms`); STUDY-13 showed resolution must be chosen on held-out
 recordings.
 
@@ -253,7 +269,7 @@ DATASET/scripts/  audit_dataset · build_dataset_v1/v2/v2b · build_tiles · vis
 
 ## 13. Known limits (stated in the product)
 
-* Recall ceiling of EXP-001 (0.72–0.86 by recording) caps the promise at 65% → EXP-002.
+* Recall ceiling of EXP-001 (0.72–0.86 by recording) caps the promise at 65% → EXP-003 (EXP-002 was underfit).
 * No precision promise yet → every find goes to a human.
 * Synthetic GPS for the shipped crab-pot frames (the HF frames carry none). The raw recording has
   real GPS and a measured scale, but it is a river with no known pots (a false-alarm measurement, not a
