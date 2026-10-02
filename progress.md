@@ -75,6 +75,24 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ## 4. Session log
 
+### 2026-10-02 (sweep 40) — Studio v3: marine palette, nautical-chart background
+- Feedback on v2: the chrome shapes and the black-and-white palette were "not good" and not marine.
+  Both were replaced.
+- **Background:** a deep-sea gradient (lighter near the surface, abyss below) with surface light,
+  faint marine snow, and **bathymetric depth contours generated with OpenCV**
+  (`webui/img/make_bathymetry.py`). It builds a smooth synthetic seabed, then runs
+  `cv2.findContours` per depth level and `cv2.approxPolyDP`; index contours are drawn stronger, as
+  on charts. The result is a 10 KB SVG. The glass blur was lightened so the chart shows faintly
+  through the panels.
+- **Palette:** deep-ocean blues; aqua for the one primary action, the active navigation dot, the
+  route and the active pipeline stage; seafoam (confirmed), sand (review), slate (low risk), coral
+  (alerts). Synced into `app.js` and `twin3d.js`.
+- The brand mark is now a sonar ping. The run toast moved under the navigation so it no longer
+  covers the viewer controls.
+- Kept from v2: the Poppins / Inter / JetBrains Mono fonts and the decluttered text.
+- Verified in the browser: Analyze (run and evidence) and Survey (full run, map, brief, approvals).
+  No console errors; `app.js` passes `node --check`.
+
 ### 2026-10-02 (sweep 39) — Studio v2: graphite glass, abstract layer, vendored fonts, far less text
 - Following the user's glassmorphism reference:
   - three floating graphite-glass layers over chrome spheres and rings, blurred into soft light

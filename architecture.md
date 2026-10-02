@@ -195,18 +195,21 @@ Hardening:
 UI: a zero-build studio with five modes (Analyze · Survey · Study · Audit · Connect)
 (`webui/styles.css`).
 
-- **Look:** three floating graphite-glass layers (sources, canvas, inspector) over an abstract layer of
-  chrome shapes. The shapes show sharp in the gaps and as soft light beneath the glass. Inside a
-  layer, sections are divided by hairlines rather than nested boxes.
+- **Look:** three floating ocean-glass layers (sources, canvas, inspector) over a deep-sea chart:
+  - depth contours generated with OpenCV (`webui/img/make_bathymetry.py` → `bathymetry.svg`, 10 KB);
+  - light from the surface and faint marine snow.
+
+  Inside a layer, sections are divided by hairlines rather than nested boxes.
 - **Less text:** each panel's explanation folds behind a small (i), and the model registry is
   collapsed by default.
-- **Colour:** calm verdict colours and one quiet accent, kept in step with `app.js` and `twin3d.js`.
+- **Colour:** a marine palette kept in step with `app.js` and `twin3d.js`: deep-ocean blues, aqua for
+  the one call to action, seafoam (confirmed), sand (review), slate (low risk), coral (alerts).
 - **Fonts** are vendored (`webui/vendor/fonts`, OFL, SHA-256 listed), so nothing loads from a third
   party:
   - **Poppins** for the brand, navigation, headings and large numbers;
   - **Inter** for interface and reading text;
   - **JetBrains Mono** only for numbers, code and logs.
-- **Actions:** each screen has one white primary action; other controls are hairline pills.
+- **Actions:** each screen has one aqua primary action; other controls are hairline pills.
 - **Dock and motion:** the pipeline dock collapses to a slim status bar, and motion respects
   `prefers-reduced-motion`.
 
