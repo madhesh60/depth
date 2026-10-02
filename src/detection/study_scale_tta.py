@@ -193,7 +193,10 @@ def report(out: dict) -> str:
                f"recording is not a product change until it holds on another."), "",
               "**For EXP-002:** test-time upscaling helps only the hard recording, so a 1024-px model is not a safe bet "
               "by default. Train both 640 and 1024 on v2b and let the held-out recordings (Rec10/12/16) and the "
-              "latency gate decide (`docs/exp002_kaggle.md`).", ""]
+              "latency gate decide (`docs/exp003_kaggle.md`).", "",
+              "_Outcome (2026-09-30): both sizes were trained (EXP-002 / EXP-002s). Both were underfit and tied "
+              "on validation (ghost AP 0.25 vs 0.25; `docs/exp002_diagnosis.md`), so EXP-003 trains at 640 px and "
+              "the resolution question stays open._", ""]
     L += ["---", "_Latency is not reported: this run shared the laptop with other work (640-px forwards ranged "
           "270–1650 ms), so only the relative cost (passes × pixels) is used above._", ""]
     return "\n".join(L)

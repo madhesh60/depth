@@ -1,26 +1,36 @@
-"""Writes notebooks/exp002_kaggle.ipynb — the EXP-002 training notebook for Kaggle (import it with
-File → Import Notebook, or paste the cells). Regenerate: python notebooks/make_exp002_notebook.py"""
+"""Writes notebooks/exp003_kaggle.ipynb — the EXP-003 training notebook for Kaggle (File → Import
+Notebook). Regenerate: python notebooks/make_kaggle_notebook.py"""
 import json
 from pathlib import Path
 
 ULTRALYTICS = "8.4.157"          # the version the kit is smoke-tested with (requirements-train.txt)
 
 cells = [
-    ("markdown", """# DEPTH — EXP-002 training (Kaggle, GPU T4 ×2)
+    ("markdown", """# DEPTH — EXP-003 training (Kaggle, GPU T4 ×2)
 
-Trains the next DEPTH detector on dataset **v2b** and packages each model for one-command onboarding.
+EXP-002 failed (ghost-gear AP 0.25 on the held-out recordings). The post-mortem is in
+`docs/exp002_diagnosis.md`. It found two causes, and both are fixed in this kit:
 
-* **EXP-002** — YOLO11s at **1024 px** on full frames + 2×2 tiles (GPU 0)
-* **EXP-002s** — the same at **640 px** (GPU 1) — STUDY-13 showed resolution must be *chosen* on
-  held-out recordings, not assumed; onboarding compares the two within a speed budget.
+1. **Underfit.** `optimizer=auto` silently trained with AdamW at lr 0.00167 for 2,700 steps, and the
+   requested `lr0 0.01` was ignored. The models reached only AP 0.42 on their *own training frames*.
+   This kit uses an **explicit SGD optimizer at lr 0.01** with enough steps, and records the optimizer
+   ultralytics actually built.
+2. **Tiles taught "object = background".** Objects cut by a tile kept their pixels but lost their
+   label: 49% of wreck appearances and 8% of ghost-gear appearances. Frames with large objects are no
+   longer tiled, and cut objects are inpainted.
 
-Each run saves every epoch and exports the checkpoint with the best **ghost-gear AP@0.5 on the
-held-out validation recordings** (not ultralytics' default box-tightness fitness).
+Two arms, both at 640 px with the same optimizer and a similar number of steps:
 
-**Settings:** Accelerator **GPU T4 ×2** · Internet **On** · then either **Save Version → Save & Run All
-(Commit)** (runs unattended), or run cells 1–5 in order in this session and keep the tab open. Cell 5
-shows what is running, waits, and collects; it is safe to re-run at any time. With one GPU the two runs
-go one after the other. Outputs: `EXP-002_complete.zip`, `EXP-002s_complete.zip` in the Output tab."""),
+* **EXP-003**: full frames + the fixed 2×2 tiles, 150 epochs (GPU 0)
+* **EXP-003f**: full frames only, 300 epochs (GPU 1)
+
+This shows whether tiles help. Each run keeps the epoch with the best **ghost-gear AP@0.5 on the
+held-out validation recordings**.
+
+**Settings:** Accelerator **GPU T4 ×2** · Internet **On** · add the **depth-v2b** dataset (Add Input).
+Then either **Save Version → Save & Run All (Commit)** (runs unattended), or run cells 1–5 in order and
+keep the tab open. Cell 5 shows what is running, waits, and collects; it is safe to re-run at any
+time."""),
     ("code", f"""# 1. environment — the repo + the EXACT ultralytics version the kit was tested with
 !nvidia-smi --query-gpu=index,name,memory.total --format=csv
 !rm -rf depth && git clone -q https://github.com/madhesh60/depth.git && cd depth && git log --oneline -1
@@ -42,35 +52,35 @@ for s in ("train", "val", "test", "test_official398", "test_xsonar"):
 print("SRC =", SRC)
 assert len(os.listdir(os.path.join(SRC, "train", "images"))) > 1500, "train split looks incomplete"
 """),
-    ("code", """# 3. tiled training set in /kaggle/working (val/test stay the untouched full frames)
+    ("code", """# 3. the two training sets in /kaggle/working (val/test stay the untouched full frames)
 !python DATASET/scripts/build_tiles.py --src "{SRC}" --out /kaggle/working/v2b_tiles
-!cat /kaggle/working/v2b_tiles/data.yaml
-!echo "train images: $(ls /kaggle/working/v2b_tiles/train/images | wc -l)"
+!python DATASET/scripts/build_tiles.py --src "{SRC}" --out /kaggle/working/v2b_full --no-tiles
+!echo "tiles set: $(ls /kaggle/working/v2b_tiles/train/images | wc -l) images | full-frame set: $(ls /kaggle/working/v2b_full/train/images | wc -l) images"
 !df -h /kaggle/working | tail -1
 """),
     ("code", """# 4. launch both runs (parallel on 2 GPUs, else one after the other) — logs in /kaggle/working/logs
 #    Run it ONCE: it refuses to start a second copy while a training is alive. Cell 5 shows the status.
 import shlex, subprocess, torch
 os.makedirs("/kaggle/working/logs", exist_ok=True)
-DATA = "/kaggle/working/v2b_tiles/data.yaml"
-RUNS = [  # name, imgsz, batch
-    ("EXP-002", 1024, 8),
-    ("EXP-002s", 640, 16),
+RUNS = [  # name, training set, epochs  (both: 640 px, batch 16, SGD lr0 0.01 - ~9-11 k optimizer steps)
+    ("EXP-003", "v2b_tiles", 150),
+    ("EXP-003f", "v2b_full", 300),
 ]
-def cmd(name, imgsz, batch, dev):
-    return ["python", "-u", "src/detection/train.py", "--data", DATA, "--name", name, "--imgsz", str(imgsz),
-            "--batch", str(batch), "--device", str(dev), "--workers", "2", "--cache", "none",
-            "--epochs", "30", "--patience", "8", "--notes", f"Kaggle T4, {imgsz}px, tiles, ghost-AP50 selection"]
+def cmd(name, data, epochs, dev):
+    return ["python", "-u", "src/detection/train.py", "--data", f"/kaggle/working/{data}/data.yaml", "--name", name,
+            "--imgsz", "640", "--batch", "16", "--device", str(dev), "--workers", "2", "--cache", "none",
+            "--optimizer", "SGD", "--lr0", "0.01", "--epochs", str(epochs), "--close-mosaic", "10",
+            "--notes", f"Kaggle T4, 640px, {data}, SGD 0.01, ghost-AP50 selection"]
 live = subprocess.run(["bash", "-lc", "ps -eo args="], capture_output=True, text=True).stdout
 assert "src/detection/train.py" not in live, "a training is already running - do not start it twice; run cell 5"
 # start_new_session: the trainings get their own process group, so Stop/Interrupt on a cell cannot kill them
 if torch.cuda.device_count() >= 2:
-    for dev, (name, imgsz, batch) in enumerate(RUNS):
+    for dev, (name, data, epochs) in enumerate(RUNS):
         log = open(f"/kaggle/working/logs/{name}.log", "w")
-        subprocess.Popen(cmd(name, imgsz, batch, dev), stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
+        subprocess.Popen(cmd(name, data, epochs, dev), stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
         print("started", name, "on GPU", dev)
 else:
-    chain = " ; ".join(f"{shlex.join(cmd(n, s, b, 0))} > /kaggle/working/logs/{n}.log 2>&1" for n, s, b in RUNS)
+    chain = " ; ".join(f"{shlex.join(cmd(n, d, e, 0))} > /kaggle/working/logs/{n}.log 2>&1" for n, d, e in RUNS)
     subprocess.Popen(["bash", "-c", chain], start_new_session=True)
     print("one GPU: the runs go one after the other:", ", ".join(n for n, *_ in RUNS))
 print("now run cell 5: it shows what is running and waits until the models are packaged")
@@ -78,14 +88,16 @@ print("now run cell 5: it shows what is running and waits until the models are p
     ("code", Path(__file__).with_name("monitor_cell.py").read_text(encoding="utf-8")),
     ("markdown", """## Next — on your own machine
 
-Download `EXP-002_complete.zip` and `EXP-002s_complete.zip` from the **Output** tab into the repo root, then:
+Download `EXP-003_complete.zip` and `EXP-003f_complete.zip` from the **Output** panel into the repo
+root and tell Claude "EXP-003 done". The diagnosis (per-source val, fit on training frames) comes
+first, then onboarding:
 
 ```bash
-python -m src.detection.onboard_model --zip EXP-002_complete.zip  --max-ms 700
-python -m src.detection.onboard_model --zip EXP-002s_complete.zip --max-ms 700
+python -m src.detection.diagnose --zip EXP-003_complete.zip --zip EXP-003f_complete.zip
+python -m src.detection.onboard_model --zip EXP-003_complete.zip --max-ms 700
 ```
 
-Keep the model with the better **recall ceiling / recall promise on the validation recordings within
+Keep the model with the better **ghost-gear AP and recall ceiling on the validation recordings within
 the speed budget** (never pick by test), then `DEPTH_MODEL=<name>`."""),
 ]
 
@@ -100,6 +112,6 @@ nb = {"cells": [{"cell_type": t, "metadata": {}, "source": as_source(s), **({"ou
       "metadata": {"kernelspec": {"display_name": "Python 3", "language": "python", "name": "python3"},
                    "language_info": {"name": "python"}, "kaggle": {"accelerator": "nvidiaTeslaT4", "isInternetEnabled": True}},
       "nbformat": 4, "nbformat_minor": 5}
-out = Path(__file__).with_name("exp002_kaggle.ipynb")
+out = Path(__file__).with_name("exp003_kaggle.ipynb")
 out.write_text(json.dumps(nb, indent=1), encoding="utf-8")
 print("wrote", out)

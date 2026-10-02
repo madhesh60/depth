@@ -93,9 +93,10 @@ focus first, aug-ablation demoted.
 | ID | Hypothesis | Key change |
 |---|---|---|
 | ✅ EXP-001 | Baseline (**done** — 40 ep) | YOLO11s detect, v1, 640, sonar aug → mAP@0.5 0.822 (aggregate), sonar fishing_gear R 0.47 |
-| **EXP-002** (next) | **Higher resolution recovers small fishing_gear** (91% of misses <10% frame; ceiling ~0.78) | `--imgsz 1280 --batch 8` (else = EXP-001). Cheapest, highest-EV lever. |
-| EXP-003 | **Sonar-only** training raises the target-domain numbers + removes the optical→natural_formation shortcut (optical debris is 0% and off-product) | filter to crabpot/uatd/mpulse/seabed/shipwreck |
-| EXP-004 | **Tiled train+infer** (SAHI-style slicing) beats one large frame for tiny targets — doubles as Stage-1's reframed tiling role | slice → detect per tile → merge |
+| ❌ EXP-002 | Higher resolution + tiles on clean v2b (run 2026-09-30) | **Underfit**: auto-optimizer AdamW 0.00167 + tile label poisoning. Val ghost AP 0.25 → rejected (see log) |
+| **EXP-003** (next) | The EXP-002 causes fixed: explicit SGD 0.01, ~10 k steps, fixed tiles; tiles vs full frames at 640 | `notebooks/exp003_kaggle.ipynb` |
+| ✅ (in v2b) | **Sonar-only** training raises the target-domain numbers + removes the optical→natural_formation shortcut (optical debris is 0% and off-product) | filter to crabpot/uatd/mpulse/seabed/shipwreck |
+| (EXP-003 arms) | **Tiled train+infer** (SAHI-style slicing) beats one large frame for tiny targets — doubles as Stage-1's reframed tiling role | slice → detect per tile → merge |
 | EXP-005 | Oversampling fishing_gear + small-object aug (copy_paste>0, scale-up mosaic) lifts recall | minority oversample + aug |
 | EXP-006 | Aug ablation: are the ~62% baked-in v0 augs helping or just doubling online aug? | originals-only vs baked-aug (demoted) |
 
@@ -240,19 +241,63 @@ DEPTH's order equals confidence order for EXP-001 (STUDY-07); its measurable ext
 (when to stop) and a forecast that held (slightly conservative). Status: **study pending** (needs
 3+ people). A higher recall ceiling (EXP-002) moves the promise and the card count.
 
-### EXP-002 — YOLO11s @1024 on v2b + tiles (+ sonar-aware copy-paste variant EXP-002p) — READY TO RUN
+### EXP-003 / EXP-003f — v2b at 640 px with the EXP-002 causes fixed — READY TO RUN
 
-- Status: **kit built and round-trip tested; GPU run pending (Kaggle T4)** — `docs/exp002_kaggle.md`.
-- Why: EXP-001's recall ceiling (0.72 on its calibration recording) caps the recall promise at 65%;
-  triage cannot recover unproposed pots (STUDY-07).
-- Recipe: v2b (2 classes, sonar only, deduped; `best.pt` selected on held-out recordings Rec10/12/16),
-  full frames + 2×2 tiles, 1024 px, 30 epochs, patience 8, cosine LR, sonar-aware augmentation.
-  EXP-002p adds 600 sonar-aware copy-paste frames. Choose between them **on validation**.
-- Evaluation (automatic via `onboard_model`): guarantees fit on val, verified once on v2b test;
-  deploy-faithful AP on v2b test (unique frames), official 398 split (GhostVision F1 0.71–0.73), and
-  cross-sonar `test_xsonar`.
-- Targets: ceiling ≥ 0.85 · crab-pot AP@0.5 ≥ 0.60 · F1 within 0.05 of GhostVision · promise ≥ 90%.
+- Status: **kit fixed, CPU smoke-tested, notebook ready** (`notebooks/exp003_kaggle.ipynb`,
+  `docs/exp003_kaggle.md`); the GPU run is pending (Kaggle T4 ×2).
+- What changed (from the EXP-002 post-mortem, `docs/exp002_diagnosis.md`):
+  - **explicit SGD at lr 0.01**, with the optimizer actually built recorded in `model_meta.json`;
+  - about 8–11 k optimizer steps;
+  - tiles that never leave an unlabelled partial object: frames with large boxes are not tiled, and
+    cut boxes are inpainted;
+  - ghost-gear AP tracked every epoch, with no per-epoch checkpoint files.
+- Arms (same optimizer, similar steps):
+  - **EXP-003**: full frames + fixed tiles (4,839 images), 150 epochs;
+  - **EXP-003f**: full frames only (1,773 images), 300 epochs.
+- Pass bar before onboarding (`python -m src.detection.diagnose`):
+  - ghost AP ≥ 0.70 on its own training frames;
+  - validation ghost AP clearly above EXP-002's 0.29;
+  - wreck recall ceiling > 0.5.
+  
+  Then `onboard_model` scores test once.
+- Targets (unchanged): ceiling ≥ 0.85 · crab-pot AP@0.5 ≥ 0.60 · F1 within 0.05 of GhostVision ·
+  promise ≥ 90%.
 - Result: _pending — record every number here, including misses._
+
+### EXP-002 / EXP-002s — YOLO11s on v2b + tiles, 1024 px / 640 px (NEGATIVE — underfit, not deployed)
+
+- Status: **trained on Kaggle T4 ×2 (2026-09-30), rejected on validation; test NOT scored.**
+  Post-mortem: [`docs/exp002_diagnosis.md`](docs/exp002_diagnosis.md); tables:
+  [`docs/exp002_diagnosis_tables.md`](docs/exp002_diagnosis_tables.md).
+- Recipe as run:
+  - v2b train as full frames + 2×2 tiles (5,746 images);
+  - 30 epochs, patience 8, cosine LR, sonar-aware augmentation;
+  - EXP-002 at 1024 px (batch 8), EXP-002s at 640 px (batch 16);
+  - every epoch validated, best ghost-gear AP exported.
+  
+  EXP-002p (copy-paste) was not run.
+- Result: these numbers are from the v2b **validation** recordings Rec10/12/16 and the deploy path
+  (`cv2.dnn`).
+
+  | | EXP-002 (1024) | EXP-002s (640) |
+  |---|--:|--:|
+  | ghost AP@0.5, exported checkpoint (ultralytics val) | 0.250 (epoch 23) | 0.253 (epoch 21) |
+  | ghost AP@0.5 / recall ceiling @0.05 (cv2.dnn) | 0.26 / 0.83 | 0.29 / 0.81 |
+  | wreck AP@0.5 / recall ceiling | 0.01 / 0.05 | 0.01 / 0.10 |
+  | **ghost AP on its own training frames** (200, seed 0) | **0.42** | **0.41** |
+  | final train class loss (EXP-001: 0.51) | 1.72 | 1.57 |
+  | train minutes | 93 | 39 |
+
+- Why (measured):
+  1. **Underfit.** `optimizer=auto` silently built AdamW at lr 0.00167 for 2,700 steps (≤ 10 k)
+     and ignored `lr0 0.01`. EXP-001 got SGD 0.01 for 16.6 k steps. This is our kit's bug.
+  2. **Tile label poisoning.** 49% of wreck appearances in tiles, and 8% of ghost-gear appearances,
+     were cut, unlabelled, but left visible.
+- Not the cause: the export (ultralytics 0.25 and `cv2.dnn` 0.26 agree), or the val labels (EXP-001
+  scores 0.66, although it is leaky). Resolution is inconclusive: 1024 = 640 while both are underfit.
+- Learning: never trust `optimizer=auto` on a shrunken dataset; record the optimizer actually built.
+  Never drop a cut label while leaving its pixels. Always run a fit check on the model's own
+  training frames before reading a validation number.
 
 
 ### STUDY-08 — Stage-1 sonar canonicalisation: measured geometry, and does it help the detector?

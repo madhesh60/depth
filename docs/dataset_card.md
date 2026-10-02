@@ -42,11 +42,11 @@ The v1 class *names* over-claimed. What the data actually is, and the v2 rename:
 - **v1** (`03_yolo_ready_dataset_v1/`, EXP-001 trained here) — 4-class, leakage-free (split by
   recording/clip, 0 shared frames), full-frame + sliver boxes removed, 1,120 background negatives.
   train 26,533 / val 1,204 / test 1,276.
-- **v2** (`03_yolo_ready_dataset_v2/`, EXP-002 trains here) — 2-class, **sonar-only, honest**
+- **v2** (`03_yolo_ready_dataset_v2/`, superseded by v2b) — 2-class, **sonar-only, honest**
   (`build_dataset_v2.py`). Fixes three v1 label bugs (below). train 6,291 (1,550 bg) / val 626 /
   test 469; leakage 0/0/0; **official crab-pot 398-frame test split locked** for the GhostVision
   head-to-head. Held-out UATD forward-looking eval kept separate.
-- **v2b** (`03_yolo_ready_dataset_v2b/`, **EXP-002 trains here**) — v2 with its three *evaluation
+- **v2b** (`03_yolo_ready_dataset_v2b/`, **EXP-002 and EXP-003 train here**) — v2 with its three *evaluation
   traps* removed (`build_dataset_v2b.py`, below). train **1,773** (1,615 unique Roboflow frames +
   158 wreck/seabed; 462 bg) / val **234** (recordings Rec10/12/16 held out whole: 163 frames, 186
   pots + 71 wreck/seabed) / test **285** (**214 unique** crab-pot frames + 71 wreck) — plus
@@ -92,3 +92,27 @@ The v1 class *names* over-claimed. What the data actually is, and the v2 rename:
   crab-pot test recordings. Its only unseen crab-pot sonograms are v1 val (**66 unique frames**,
   Rec19; 439 images incl. copies) and v1 test (**92 unique frames**). All EXP-001 agent/guarantee
   numbers are fit on the former and checked on the latter.
+
+## Measured quality of v2b (2026-10-02, after EXP-002)
+
+These are measured, not assumed. Reproduce with `python -m src.detection.diagnose` (the model-based
+checks) and the census in [`exp002_diagnosis.md`](exp002_diagnosis.md).
+
+| check | v2b | what it means |
+|---|---|---|
+| leakage (shared Roboflow frames train/val/test) | **0 / 0 / 0** (manifest) | clean |
+| train size | 1,773 frames · ghost 1,420 boxes · wreck 525 · 462 background | small for a detector; there is no headroom to waste steps (EXP-002) |
+| **target-domain share** | grayscale crab-pot recordings (Rec\*): **852 frames, 1,019 ghost boxes**. The other 401 ghost boxes come from orange-palette surveys (baycove, BC_POST: 279 frames, tiny boxes) and single frames (TI/MC) | val and test are **all grayscale Rec\*** recordings; 707 of 1,773 training frames are colour |
+| object size | median ghost box 0.32% of the frame (~36 px at 640) on Rec\*; **0.05–0.09%** (~14–19 px) on BC_POST / baycove | strict IoU 0.5 is harsh on 14–36 px boxes |
+| **box consistency** | EXP-001 on 200 v2b training frames (all but the 9 Rec19 frames were in its v1 training set): ghost AP **0.55 @ IoU 0.5 → 0.69 @ 0.3 → 0.74 @ 0.1** | a few pixels of box disagreement fail IoU 0.5. Report IoU 0.3 too (DEPTH matches at ≥ 0.3) |
+| **missing labels (estimate)** | EXP-001 detections at conf ≥ 0.5 with **no label nearby** (IoU < 0.05): 12 in those 200 training frames, **19 in the 234 val frames**. A visual read of the 31 crops: about a third to a half are pot-shaped with a shadow tail | val probably has **~10 unlabelled pots beside 186 labelled ones (~5%)**. Precision is understated, and a model is penalised for finding real pots. Visual estimate only: the blinded audit (STUDY-10) is the proper measurement |
+| rotation artifacts | 351 training frames are still black-bordered rotated copies (manifest). Some confident detections sit on those borders | border edges look like objects; the copies teach a geometry that real sonar never has |
+| validation power | 3 recordings, **186 ghost boxes, 20 wreck boxes**. Per-recording ghost AP for one model spans 0.23–0.57 | the wreck val metric is noise-level (1 box = 5% recall); judge the ghost class by recording |
+
+**Next data fixes, in order:**
+
+1. Run the blinded audit on val, then add the confirmed missing pots as **v2c** labels. Never edit test.
+2. Report AP at IoU 0.3 beside 0.5.
+3. Drop or crop the black-bordered rotated copies.
+4. EXP-004 hypothesis: luminance-normalised training (one palette), because the target recordings are
+   grayscale.

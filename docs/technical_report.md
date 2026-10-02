@@ -222,7 +222,7 @@ known crab pots.
 
 | proposal target | delivered | reading |
 |---|---|---|
-| mAP@0.5 ≥ 0.70 | all classes 0.827, but inflated by easy classes; **crab pots on sonar 0.473** | not met on the class that matters. EXP-002 is the lever; the promise below makes the shortfall safe to use. |
+| mAP@0.5 ≥ 0.70 | all classes 0.827, but inflated by easy classes; **crab pots on sonar 0.473** | not met on the class that matters. A better detector is the lever (EXP-002 failed as underfit; EXP-003 is next); the promise below makes the shortfall safe to use. |
 | < 300 ms per frame | 238 ms p50 / 397 ms p95 (laptop, full product path) | met at p50, not at p95. Graviton + COOL numbers pending. |
 | ≥ 5 FPS | 3.9 FPS | not met. It is also the wrong yardstick for side-scan: one frame per ~43 s per channel arrives from the boat. What matters is survey-hours processed: **43 s of compute per hour of sonar (80× faster than real time)**. |
 | (not in the proposal) | ≥ 65% of pots reach a person, verified on unseen data (86%) | added: a promise instead of an average |
@@ -261,8 +261,8 @@ on Spot → S3.
 
 ## 6. Limitations (stated in the product, not hidden)
 
-- **Scope.** One bay's crab pots and one sonar family. Cross-sonar results are pending EXP-002, the first leakage-free model for that test.
-- **Recall ceiling.** EXP-001's ceiling caps the promise at 65%; EXP-002 (v2b, 1024 px, tiles) is the lever. The Kaggle kit is ready ([`exp002_kaggle.md`](exp002_kaggle.md)).
+- **Scope.** One bay's crab pots and one sonar family. Cross-sonar results are pending EXP-003, the first leakage-free model for that test.
+- **Recall ceiling.** EXP-001's ceiling caps the promise at 65%. EXP-002 (v2b, tiles, 1024 and 640 px) was meant to lift it and **failed**: ghost AP 0.25 on the held-out recordings and only 0.42 on its own training frames. It was underfit: `optimizer=auto` silently trained with AdamW at lr 0.00167, and the tiles left cut objects unlabelled ([`exp002_diagnosis.md`](exp002_diagnosis.md)). EXP-003 fixes both, and the kit is ready ([`exp003_kaggle.md`](exp003_kaggle.md)).
 - **Calibration.** Calibration uses a single recording, whose frames are correlated. That is why the promise is verified on a separate split.
 - **Labels.** Labels are incomplete, so precision is a lower estimate (the audit will quantify this).
 - **GPS.** The public crab-pot frames carry no GPS, so their demo track is synthetic and labelled as such everywhere, including the counterfactual's metres. The raw-recording path has **real** per-ping GPS and a measured range scale, but that recording is a river with no known pots: it measures false alarms, not recall.

@@ -2,8 +2,8 @@
 
 > **⚠️ Historical / superseded (2026-09-22).** EXP-001 was ultimately run on **Kaggle T4 for
 > 40 epochs** (not Colab/100 — the args below are the original template). For the **next run
-> (EXP-002) use [`exp002_kaggle.md`](exp002_kaggle.md)** — it has the correct settings
-> (`imgsz 1024 / batch 8 / 40 ep`) and the unattended "Save & Run All" flow. This file is kept
+> (EXP-003) use [`exp003_kaggle.md`](exp003_kaggle.md)** — it has the correct settings
+> (explicit SGD, 640 px, tiles vs full frames; EXP-002 failed as underfit, `exp002_diagnosis.md`). This file is kept
 > for provenance of how the baseline was set up.
 
 The local machine (MX330 / 2 GB, CPU-only torch) can't train this dataset. Run on a cloud
@@ -107,7 +107,8 @@ Download `best.pt`, `best.onnx`, `results.png`, and the per-class table from
 EXP-001 is logged in `experiments.md` (done). The ladder was **reprioritised** after the deep
 error analysis (fishing_gear is a small-object sonar problem):
 
-- **EXP-002** — higher resolution (`imgsz 1024`) for small fishing_gear. **← next**, see
-  [`exp002_kaggle.md`](exp002_kaggle.md).
+- **EXP-002** — higher resolution (`imgsz 1024`) for small fishing_gear. Ran 2026-09-30 and failed
+  (underfit, [`exp002_diagnosis.md`](exp002_diagnosis.md)); EXP-003 is next, see
+  [`exp003_kaggle.md`](exp003_kaggle.md).
 - **EXP-003** — sonar-only training (optical debris is a total miss and off-product).
 - Aug-ablation (originals-only) demoted to EXP-006.

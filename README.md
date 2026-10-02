@@ -98,8 +98,10 @@ range scale measured 2.19 cm/sample ± 14.5%; the full agent in 5.8 s (26× fast
 8 review cards = **191 cards per hour of sonar** on water with no known pots — the false-alarm load
 this model would put on an analyst there.
 
-**Pending, by design:** EXP-002 (the recall lever — kit ready: 640 + 1024 px, chosen on held-out
-recordings within a speed budget, [`docs/exp002_kaggle.md`](docs/exp002_kaggle.md)), the timed study,
+**Pending, by design:** EXP-003, the recall lever. EXP-002 trained and **failed** (ghost AP 0.25 on the
+held-out recordings: underfit by a silent optimizer switch, plus tile label poisoning; post-mortem in
+[`docs/exp002_diagnosis.md`](docs/exp002_diagnosis.md)). The fixed kit is ready
+([`docs/exp003_kaggle.md`](docs/exp003_kaggle.md)). Also pending: the timed study,
 the audit, the EC2 benchmark, and publishing the weights as a GitHub Release.
 
 ## 4. How it works
@@ -120,7 +122,8 @@ python -m src.detection.evaluate                       # deploy-faithful detecto
 python -m src.cv_pipeline.study_canonical              # STUDY-08 (Stage 1)
 python -m src.agentic.effort                           # analyst-effort curve
 python -m src.bench.product_bench --label my_host      # benchmark this machine (product workload)
-python -m src.detection.onboard_model --zip EXP-002_complete.zip   # plug in a new model (+ speed gate)
+python -m src.detection.diagnose --zip EXP-003_complete.zip        # why a new model is (not) good: val + fit check
+python -m src.detection.onboard_model --zip EXP-003_complete.zip   # plug in a new model (+ speed gate)
 python -m src.agentic.study_causal --frames <v1>/test/images --limit 80   # STUDY-12 counterfactual
 python -m src.detection.study_scale_tta               # STUDY-13 input size + flip TTA
 python -m src.cv_pipeline.humminbird report           # STUDY-14 raw recording, real GPS

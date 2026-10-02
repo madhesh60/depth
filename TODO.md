@@ -11,11 +11,10 @@ Legend: `[x]` done · `[ ]` open · **(YOU)** needs a person / an account / a GP
 - [ ] **(YOU) Publish the weights** — GitHub → Releases → Draft a new release, tag `exp001-v1`, attach
       `runs/EXP-001/weights/best.onnx` (37,932,951 bytes, SHA-256 `55f827db…`). `fetch_model` and CI
       pick it up automatically.
-- [ ] **(YOU) EXP-002 on Kaggle** — the recall ceiling (0.72) is the binding limit. Follow
-      `docs/exp002_kaggle.md` (upload v2b once, paste the cells, Save & Run All). Then locally:
-      `python -m src.detection.onboard_model --zip EXP-002_complete.zip --max-ms 700`. **Ready:** upload
-      `runs/kaggle_upload/depth-v2b.zip`, import `notebooks/exp002_kaggle.ipynb`, GPU T4 ×2. Also the 640-px twin
-      EXP-002s (STUDY-13: resolution must be chosen on held-out recordings). Optional EXP-002p (+copy-paste).
+- [ ] **(YOU) EXP-003 on Kaggle** — the recall ceiling (0.72) is still the binding limit. EXP-002 ran
+      and failed (underfit; `docs/exp002_diagnosis.md`). Import `notebooks/exp003_kaggle.ipynb`, add the
+      existing **depth-v2b** dataset, GPU T4 ×2, run (`docs/exp003_kaggle.md`). Then download both zips
+      and tell Claude "EXP-003 done": `diagnose` first, then `onboard_model` for the models that pass.
 - [ ] **(YOU) AWS day** — `aws login`; subscribe to the COOL Graviton listing (note the AMI id);
       upload `best.onnx` to S3; `infra/deploy_aws.sh` (dry run → `APPLY=1`); check
       `/api/health` shows `is_cool_path: true`. Then the 3-way benchmark (`infra/bench_cool.sh` on
@@ -29,17 +28,18 @@ Legend: `[x]` done · `[ ]` open · **(YOU)** needs a person / an account / a GP
 
 ## After those land (engineering)
 
-- [ ] EXP-002 → if the onboarding report clears the gate: switch `DEPTH_MODEL`, regenerate
-      `python -m src.agentic.effort`, re-run the audit build for EXP-002, update README numbers.
-- [ ] Log EXP-002, STUDY-09 (study numbers), STUDY-10 (audit) in `experiments.md` — including misses.
+- [ ] EXP-003 → if the diagnosis passes and the onboarding report clears the gate: switch
+      `DEPTH_MODEL`, regenerate `python -m src.agentic.effort`, re-run the audit build, update README numbers.
+- [ ] Log EXP-003, STUDY-09 (study numbers), STUDY-10 (audit) in `experiments.md` — including misses.
+      (EXP-002 is logged: negative, underfit.)
 - [ ] Put the measured study timings into the survey budget mode (`sec_per_card`).
-- [ ] Cross-sonar table from `test_xsonar` (EXP-002 is the first leakage-free model for it).
+- [ ] Cross-sonar table from `test_xsonar` (EXP-003 will be the first leakage-free model for it).
 - [ ] Fine-tune seed from human labels (`python -m src.agentic.feedback export`) — a small
       before/after if labels accumulate.
 
 ## Submission package (by 21 Oct freeze; 22–25 Oct polish)
 
-- [ ] Technical report — **draft written** ([`docs/technical_report.md`](docs/technical_report.md)); fill the ⏳ items (COOL runs, EXP-002, study, audit, live URL): problem → the two promises → architecture → OpenCV 5 + COOL → evaluation
+- [ ] Technical report — **draft written** ([`docs/technical_report.md`](docs/technical_report.md)); fill the ⏳ items (COOL runs, EXP-003, study, audit, live URL): problem → the two promises → architecture → OpenCV 5 + COOL → evaluation
       (guarantees, per-source, effort, audit, benchmark) → what didn't work → responsible use.
 - [ ] ≤ 5-min video — storyboard ready (`docs/video_script.md`): problem, live demo on AWS, guarantees,
       counterfactual, person-confirmed route, Connect, real-GPS recording, COOL chart, limits.

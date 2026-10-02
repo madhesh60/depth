@@ -43,7 +43,9 @@ Every runtime threshold comes from **`models/<MODEL>/calibration.json`** (`$DEPT
 class name or threshold.
 
 Classes: EXP-001 (deployed) is 4-class `fishing_gear, pipe_cylinder, structural_fragment,
-natural_formation`; EXP-002 (v2b) is 2-class `ghost_gear, wreck_debris`. The runtime is
+natural_formation`; EXP-002/003 (v2b) are 2-class `ghost_gear, wreck_debris`. EXP-002 was rejected on val
+(underfit: `optimizer=auto` → AdamW 0.00167; tile label poisoning — `docs/exp002_diagnosis.md`). Always
+pass an explicit optimizer. The runtime is
 model-agnostic.
 
 ## Cloud (scripted, not yet run — AWS work is scheduled for a dedicated day)
@@ -62,13 +64,15 @@ Details: [infra/README.md](infra/README.md).
 - `03_yolo_ready_dataset_v1/` — 4-class, train 26,533 · val 1,204 · test 1,276; **EXP-001 trained
   on it**. Its unseen crab-pot sonograms (v1 val Rec19 = calibration, v1 test = verification,
   unique frames) host EXP-001's guarantees.
-- **`03_yolo_ready_dataset_v2b/`** — **EXP-002 trains on this** (`build_dataset_v2b.py`): 2-class,
+- **`03_yolo_ready_dataset_v2b/`** — **EXP-002/003 train on this** (`build_dataset_v2b.py`): 2-class,
   sonar-only, one copy per Roboflow frame, val = held-out recordings Rec10/12/16, test = 214 unique
   crab-pot frames, `test_official398/` (GhostVision head-to-head), `test_xsonar/` (cross-sonar),
   `groups.json`. Its `data.yaml` is UTF-8 with **no `path:` key** (ultralytics resolves a relative
   `path` against the working directory).
-- `03_yolo_ready_dataset_v2b_tiles/` — `build_tiles.py` output: full frames + 2×2 tiles (+ optional
-  `--paste N` sonar-aware copy-paste); val/test point at v2b's full frames.
+- `03_yolo_ready_dataset_v2b_tiles/` — `build_tiles.py` output: full frames + 2×2 tiles. Frames with a
+  large box are not tiled, and boxes a tile cuts are inpainted, so no partial object is left unlabelled
+  (`--no-tiles` = full frames only; optional `--paste N` sonar-aware copy-paste). val/test point at
+  v2b's full frames.
 - `external/pingmapper_sample/` — PINGMapper's sample data (MIT code; Zenodo 10.5281/zenodo.6604666 holds
   Git-LFS pointers, the objects come from the author's repo, every file SHA-256 pinned in
   `humminbird.SAMPLE_FILES`): `Test-Small-DS` = recording R01224, Humminbird 9xx, Colorado River at
@@ -84,8 +88,9 @@ python -m uvicorn src.dashboard.app:app --port 8000        # the studio (Analyze
 pytest -q                                                  # test suite
 python -m src.agentic.calibrate                            # guaranteed tiers (val) → verified once (test)
 python -m src.detection.evaluate [--model M --test-split S]  # deploy-faithful detector eval
-python -m src.detection.onboard_model --zip EXP-002_complete.zip   # plug in a Kaggle-trained model
-python notebooks/make_exp002_notebook.py                    # regenerate the Kaggle notebook (exp002_kaggle.ipynb)
+python -m src.detection.diagnose --zip EXP-003_complete.zip        # val per source + fit check (never test)
+python -m src.detection.onboard_model --zip EXP-003_complete.zip   # plug in a Kaggle-trained model
+python notebooks/make_kaggle_notebook.py                     # regenerate the Kaggle notebook (exp003_kaggle.ipynb)
 python -m src.agentic.effort                               # analyst-effort curve
 python -m src.bench.product_bench --label <host>            # benchmark this machine
 python -m src.agentic.feedback stats|export                 # human labels → fine-tune set
@@ -101,7 +106,7 @@ python -m src.detection.study_scale_tta                     # STUDY-13 (input si
 
 Global Python 3.10 (no venv) with the runtime pinned in `requirements.txt` (OpenCV 5.0.0.93,
 numpy 2.2.6, FastAPI) plus `ultralytics` + CPU torch for local smoke tests. The local GPU (MX330,
-2 GB) cannot train YOLO11s — **training runs on Kaggle** (`docs/exp002_kaggle.md`).
+2 GB) cannot train YOLO11s — **training runs on Kaggle** (`docs/exp003_kaggle.md`).
 AWS CLI v2 is installed user-scoped (`C:\Users\RAJ\AppData\Local\Programs\Amazon\AWSCLIV2\aws.exe`,
 profile `hackathon`, us-east-1); login + the MCP wizard are deferred to the AWS day.
 
@@ -111,7 +116,7 @@ profile `hackathon`, us-east-1); login + the MCP wizard are deferred to the AWS 
 src/cv_pipeline/  canonical.py (Stage 1) · humminbird.py (raw recordings) · orientation.py ·
                   study_canonical.py · pipeline.py (STUDY-01 record)
 src/detection/    infer · calibration · evaluate · export_onnx · train · onboard_model · fetch_model ·
-                  fp_audit · frames · failure_gallery · seam / study_seam (11b) · study_scale_tta (13)
+                  diagnose · fp_audit · frames · failure_gallery · seam / study_seam (11b) · study_scale_tta (13)
 src/agentic/      agent · perception · shadow · tools · policy · guarantees · calibrate · geo · stitch ·
                   resurvey · mission (plan_mission / apply_human) · pipeline · approvals · brief · twin ·
                   provenance · feedback · study · effort · study_causal (12) · types

@@ -1,4 +1,4 @@
-# ==== DEPTH EXP-002 - STATUS / WAIT / COLLECT ====================================================
+# ==== DEPTH TRAINING - STATUS / WAIT / COLLECT ====================================================
 # Run it in a NEW cell, any time, as often as you like. It only LOOKS: it never starts, restarts or
 # stops a training.
 #   1. shows what each training is doing right now - read from the live process list and the run
@@ -11,8 +11,8 @@ import csv, json, os, re, shutil, subprocess, sys, time
 
 WORK = "/kaggle/working"
 RUNS_DIR, LOGS = f"{WORK}/depth/runs", f"{WORK}/logs"
-NAMES = ["EXP-002", "EXP-002s"]          # 1024 px and 640 px
-EPOCHS = 30                               # --epochs of cell 4 (patience 8 may end a run earlier)
+NAMES = ["EXP-003", "EXP-003f"]          # tiles + full frames, full frames only
+EPOCHS = {"EXP-003": 150, "EXP-003f": 300}   # cell 4 (early stopping may end a run sooner)
 CHECK_EVERY_MIN = 5
 QUIET_WARN_MIN = 30                       # alive but nothing written for this long -> "may be stuck"
 
@@ -40,6 +40,16 @@ def processes():
             continue
         runs.setdefault(tok[tok.index("--name") + 1], []).append((int(pid), int(et) if et.isdigit() else 0))
     return runs, bool(procs)
+
+
+def epochs_of(n):
+    """--epochs of the run, from the args.yaml ultralytics writes when it starts."""
+    p = f"{RUNS_DIR}/{n}/args.yaml"
+    if os.path.exists(p):
+        for line in open(p):
+            if line.startswith("epochs:"):
+                return int(line.split(":")[1])
+    return EPOCHS.get(n, 0) if isinstance(EPOCHS, dict) else EPOCHS
 
 
 def rows(n):
@@ -113,12 +123,13 @@ def status():
         if r:
             last = r[-1]
             best = max(float(x.get("metrics/mAP50(B)") or 0) for x in r)
-            info = (f"           epoch {len(r)}/{EPOCHS} | val mAP50 {float(last.get('metrics/mAP50(B)') or 0):.3f}"
-                    f" (best so far {best:.3f}) | val recall {float(last.get('metrics/recall(B)') or 0):.3f}")
+            info = (f"           epoch {len(r)}/{epochs_of(n)} | val mAP50 {float(last.get('metrics/mAP50(B)') or 0):.3f}"
+                    f" (best so far {best:.3f}) | val recall {float(last.get('metrics/recall(B)') or 0):.3f}"
+                    f" | train cls loss {float(last.get('train/cls_loss') or 0):.2f}")
             if state == "TRAINING":
                 per = (float(last.get("time") or 0) or max(et for _, et in alive)) / len(r)
-                left = max(0, EPOCHS - len(r)) * per / 60
-                info += f" | {per / 60:.1f} min/epoch -> at most ~{left:.0f} min + ~15 min to choose/export"
+                left = max(0, epochs_of(n) - len(r)) * per / 60
+                info += f" | {per / 60:.1f} min/epoch -> at most ~{left:.0f} min + ~5 min to choose/export"
             print(info)
         elif alive:
             print(f"           starting - no finished epoch yet ({max(et for _, et in alive) / 60:.0f} min since launch)")
