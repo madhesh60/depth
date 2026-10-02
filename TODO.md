@@ -1,77 +1,139 @@
-# TODO — DEPTH (updated 2026-09-28)
+# TODO — DEPTH (updated 2026-10-02)
 
 Deadline **2026-10-26 23:59 PT** (27 Oct 12:29 IST). Judging 27 Oct – 9 Nov (keep the demo up).
 The review's roadmap lives in the local `NEEDTOIMPROVE.md`; this is the working backlog.
 
 Legend: `[x]` done · `[ ]` open · **(YOU)** needs a person / an account / a GPU
 
-## Needs you — highest leverage first
+**Order that unblocks the most:**
+
+1. Grant check-in (due 2 Oct).
+2. EXP-003 on Kaggle.
+3. AWS day.
+4. Study and audit with real people.
+5. README numbers, diagram and screenshots last.
 
 - [ ] **(YOU) Grant check-in** — due by **2 Oct** (unlocks the second half of the grant).
-- [ ] **(YOU) Publish the weights** — GitHub → Releases → Draft a new release, tag `exp001-v1`, attach
-      `runs/EXP-001/weights/best.onnx` (37,932,951 bytes, SHA-256 `55f827db…`). `fetch_model` and CI
-      pick it up automatically.
-- [ ] **(YOU) EXP-003 on Kaggle** — the recall ceiling (0.72) is still the binding limit. EXP-002 ran
-      and failed (underfit; `docs/exp002_diagnosis.md`). Import `notebooks/exp003_kaggle.ipynb`, add the
-      existing **depth-v2b** dataset, GPU T4 ×2, run (`docs/exp003_kaggle.md`). Then download both zips
-      and tell Claude "EXP-003 done": `diagnose` first, then `onboard_model` for the models that pass.
-- [ ] **(YOU) AWS day** — `aws login`; subscribe to the COOL Graviton listing (note the AMI id);
-      upload `best.onnx` to S3; `infra/deploy_aws.sh` (dry run → `APPLY=1`); check
-      `/api/health` shows `is_cool_path: true`. Then the 3-way benchmark (`infra/bench_cool.sh` on
-      c7i + stock c8g + COOL c8g; terminate the extra instances) → `python -m src.bench.compare`.
-- [ ] **(YOU) Timed study** — 3+ people × ~10 min in the **Study** tab (`docs/user_study.md`).
-- [ ] **(YOU) False-alarm audit** — 2+ people × ~15 min in the **Audit** tab.
-- [ ] **(YOU) Outreach** — send the two drafts in `docs/outreach.md` (dataset authors: a quote, a
-      recording with GPS **in a crab-pot area**, the licence question; a cleanup organisation / NIOT).
-- [ ] **(YOU, optional)** OK to download PINGMapper's `Test-Large-DS` (Solix, 1 h, ~216 MB for the two
-      side-scan channels) — would exercise the 152-byte Solix header path on real data.
 
-## After those land (engineering)
+## 1) Best UI
 
-- [ ] EXP-003 → if the diagnosis passes and the onboarding report clears the gate: switch
-      `DEPTH_MODEL`, regenerate `python -m src.agentic.effort`, re-run the audit build, update README numbers.
-- [ ] Log EXP-003, STUDY-09 (study numbers), STUDY-10 (audit) in `experiments.md` — including misses.
-      (EXP-002 is logged: negative, underfit.)
-- [ ] Put the measured study timings into the survey budget mode (`sec_per_card`).
-- [ ] Cross-sonar table from `test_xsonar` (EXP-003 will be the first leakage-free model for it).
-- [ ] Fine-tune seed from human labels (`python -m src.agentic.feedback export`) — a small
+- [x] Calm glass redesign: four type roles, one frosted-white primary action per screen, calm palette,
+      glyph labels replaced by words (sweep 37).
+- [ ] Screenshots of every mode (Analyze · Survey · Study · Audit · Connect) for the README and the
+      submission. Take them after EXP-003, so they show the final model.
+- [ ] Layout check at a laptop size (1366×768) and on a phone; fix anything cramped.
+- [ ] Screen recording of the 60-s guided demo for the video.
+
+## 2) COOL and agentic benchmarks
+
+- [ ] Laptop baseline now: `python -m src.bench.product_bench --label laptop`.
+- [ ] **(YOU, AWS) COOL 3-way benchmark.** Run `infra/bench_cool.sh` on x86 c7i, stock Graviton c8g and
+      COOL Graviton c8g, then `python -m src.bench.compare`. This is the evidence for Best Use of
+      COOL; add the chart and the provenance JSONs.
+- [x] Agentic evidence so far: the counterfactual trace (STUDY-12), the analyst-effort curve, and the
+      guaranteed tiers verified on test.
+- [ ] **(YOU) Timed study.** 3+ people × ~10 min in the **Study** tab (`docs/user_study.md`); this
+      measures the minutes DEPTH saves.
+- [ ] **(YOU) Blinded false-alarm audit.** 2+ people × ~15 min in the **Audit** tab; this measures
+      audited precision and the label noise.
+- [ ] With the winning EXP-003:
+  - re-run `python -m src.agentic.effort` and the audit build;
+  - put the measured study timings into the survey budget (`sec_per_card`);
+  - log STUDY-09 and STUDY-10 in `experiments.md`, including misses.
+
+## 3) AWS (a dedicated day)
+
+- [ ] **(YOU)** Budget alarm first, then `aws login` (profile `hackathon`, us-east-1).
+- [ ] **(YOU)** Subscribe to the COOL Graviton listing (note the AMI id). Accepting the terms is yours to do.
+- [ ] Upload `best.onnx` to S3. Run `infra/deploy_aws.sh` as a dry run, then `APPLY=1` only after an
+      explicit yes.
+- [ ] Check that `/api/health` shows `is_cool_path: true`, and that the CloudFront HTTPS link works.
+- [ ] Optional: enable the Bedrock mission-brief writer (`infra/README.md`).
+- [ ] Run the 3-way benchmark (section 2), then terminate the extra instances.
+- [ ] 24 h soak test of the live link; CloudWatch alarm to email; daily check during judging.
+
+## 4) Best training numbers
+
+- [x] EXP-002 / EXP-002s ran and were **rejected on validation**. They were underfit: the
+      auto-optimizer silently used AdamW at 0.00167, and tiles left cut objects unlabelled. Test was
+      not scored ([`docs/exp002_diagnosis.md`](docs/exp002_diagnosis.md)).
+- [x] Kit fixed:
+  - explicit SGD, with the optimizer actually built recorded;
+  - tiles without unlabelled partial objects;
+  - ghost-AP checkpoint selection;
+  - the `diagnose` gate with a pass bar calibrated before any result (AP@0.3 ≥ 0.65 on its own
+    training frames).
+  
+  Full suite 150 passed; the exact EXP-003f flags were dry-run.
+- [ ] **(YOU) EXP-003 on Kaggle** (~3.5 h, T4 ×2). Import `notebooks/exp003_kaggle.ipynb`, add
+      **depth-v2b**, Save & Run All ([`docs/exp003_kaggle.md`](docs/exp003_kaggle.md)). Download both
+      zips and tell Claude "EXP-003 done".
+- [ ] `python -m src.detection.diagnose --zip EXP-003_complete.zip --zip EXP-003f_complete.zip`.
+- [ ] `onboard_model` for the models that pass:
+  - guarantees fit on val, verified once on test;
+  - GhostVision head-to-head on the official 398-frame split;
+  - the cross-sonar `test_xsonar` table;
+  - the speed gate.
+- [ ] If it passes: switch `DEPTH_MODEL`, publish its weights as a GitHub Release (`fetch_model`), and
+      log EXP-003 in `experiments.md`.
+- [ ] If it fails: diagnose, then EXP-004. Candidates:
+  - luminance-normalised training (one palette);
+  - audit-confirmed missing labels (v2c, val only, never test);
+  - dropping the rotated black-bordered copies.
+- [ ] **(YOU) Publish the EXP-001 weights.** GitHub → Releases → tag `exp001-v1`, attach
+      `runs/EXP-001/weights/best.onnx` (37,932,951 bytes, SHA-256 `55f827db…`).
+- [ ] Fine-tune seed from human labels (`python -m src.agentic.feedback export`): a small
       before/after if labels accumulate.
+
+## 5) Architecture diagram
+
+- [x] `docs/img/architecture.svg` (as of 2026-09-28).
+- [ ] Update it for:
+  - raw-recording input with real GPS (STUDY-14);
+  - the person-confirmed loop;
+  - Connect (MCP, OGC API, webhooks, embed);
+  - the `diagnose` gate in the training path;
+  - the COOL deployment.
+- [ ] A one-page "data flow + where the guarantees live" figure for the technical report.
+
+## 6) Numbers in README.md
+
+- [ ] Results table, with the split named next to every number:
+  - EXP-001 per-class sonar crab-pot numbers (never only the aggregate);
+  - the recall promise (≥ 65%, held at 86.2% on test);
+  - EXP-003 once onboarded.
+- [ ] Speed: laptop now; Graviton stock vs COOL and x86 after the AWS day (ms/frame, FPS against the
+      < 300 ms / ≥ 5 FPS targets).
+- [ ] Analyst minutes saved (study), audited precision (audit), GhostVision head-to-head, cross-sonar.
+- [ ] A negative-results section, linked: STUDY-01, 11b, 13, and EXP-002.
 
 ## Submission package (by 21 Oct freeze; 22–25 Oct polish)
 
-- [ ] Technical report — **draft written** ([`docs/technical_report.md`](docs/technical_report.md)); fill the ⏳ items (COOL runs, EXP-003, study, audit, live URL): problem → the two promises → architecture → OpenCV 5 + COOL → evaluation
-      (guarantees, per-source, effort, audit, benchmark) → what didn't work → responsible use.
-- [ ] ≤ 5-min video — storyboard ready (`docs/video_script.md`): problem, live demo on AWS, guarantees,
-      counterfactual, person-confirmed route, Connect, real-GPS recording, COOL chart, limits.
-- [x] Architecture diagram (`docs/img/architecture.svg`). - [ ] COOL benchmark chart + provenance JSONs (after the EC2 runs).
-- [x] Failure gallery: 12 misses, 12 false alarms (`docs/failure_gallery.md`). - [ ] audit tags once the audit runs.
-- [ ] 24 h soak test of the live link; CloudWatch alarm to email; daily check during judging.
+- [ ] Technical report — **draft written** ([`docs/technical_report.md`](docs/technical_report.md)).
+      Fill the ⏳ items: COOL runs, EXP-003, study, audit, live URL.
+- [ ] ≤ 5-min video — storyboard ready (`docs/video_script.md`).
+- [x] Failure gallery: 12 misses, 12 false alarms (`docs/failure_gallery.md`).
+- [ ] Add the audit tags to the failure gallery once the audit runs.
+- [ ] **(YOU) Outreach** — send the two drafts in `docs/outreach.md`.
+- [ ] **(YOU, optional)** OK to download PINGMapper's `Test-Large-DS` (~216 MB).
 
 ## Optional (only if ahead)
 
-- [x] Mission brief (`brief.py`): template always; Bedrock writer built + tested with a fake client — enable on the AWS day (`infra/README.md`).
+- [x] Mission brief (`brief.py`): template always; Bedrock writer built and tested with a fake client.
+      Enable it on the AWS day.
+- [x] Real per-ping GPS on a raw PINGMapper recording (`humminbird.py`, STUDY-14).
 - [ ] SQS + Graviton Spot worker scaling demo.
-- [x] Real per-ping GPS on a raw PINGMapper recording — `humminbird.py`, STUDY-14 (`docs/raw_recording.md`).
 
 ## Done (highlights — details in `progress.md`)
 
-- [x] Dataset v1 → v2 → **v2b** (deduped, recording-level val, unique-frame + official + cross-sonar tests).
+- [x] Dataset v1 → v2 → **v2b**: deduped, recording-level val, unique-frame, official and cross-sonar
+      tests. Measured quality is in the dataset card.
 - [x] EXP-001 baseline; deploy-faithful `cv2.dnn` evaluation (per source, bootstrap CIs).
 - [x] **Guaranteed tiers** (CP / LTT) fit on validation, verified on test; VoI agent; budgets.
 - [x] **Stage 1 canonicalisation** in the product path (bottom tracking validated, STUDY-08).
-- [x] Honesty fixes: orientation by rule, thin-line shadow, relative height, no fake cross-pass.
-- [x] Backend hardening: jobs, limits, per-frame model lock, shipped samples, vendored map.
-- [x] **COOL benchmark v3** (product workload) + Graviton/COOL deploy kit (dry-run).
-- [x] **EXP-002 kit**: tiles, sonar-aware copy-paste, train → verify → zip → one-command onboarding.
-- [x] Human labels (✓ / ✕ / ＋missed), **Study** mode + effort curve, **Audit** mode.
-- [x] **Opposite-side re-survey** planner + repeat-sighting merge.
-- [x] Docs truth pass (README, architecture, CLAUDE, TODO) — again 2026-09-28 after the sweeps below.
-- [x] **Counterfactual trace** (STUDY-12) + live "⊘ without Stage 1" map toggle.
-- [x] **Person-confirmed loop**: decisions re-plan the recovery route; impact ledger.
-- [x] **MCP server** (stdio + `/mcp`), approvals inbox; **OGC API – Features**, signed webhooks,
-      `<depth-hazards>` embed, Connect tab.
-- [x] Calm studio redesign; architecture diagram; technical report draft; video script; outreach drafts.
-- [x] Public-demo protection (rate limits, queue cap, admin + MCP tokens); CI; `fetch_model`.
-- [x] STUDY-13 (larger input + flip TTA: negative) → speed-aware EXP-002 kit (640 + 1024, `--max-ms`).
-- [x] **Raw recordings**: defensive Humminbird reader, physics checks, measured range scale, real
-      per-ping geotags, heights in metres (STUDY-14).
+- [x] Counterfactual trace (STUDY-12); person-confirmed loop; opposite-side re-survey planner.
+- [x] MCP server, approvals inbox, OGC API – Features, signed webhooks, `<depth-hazards>` embed.
+- [x] Public-demo protection (rate limits, queue cap, tokens); CI; `fetch_model`.
+- [x] Raw recordings: Humminbird reader, physics checks, measured range scale (STUDY-14).
+- [x] COOL benchmark v3 (product workload) + Graviton/COOL deploy kit (dry run).
+- [x] EXP-002 post-mortem, fixed kit, `diagnose` gate (sweeps 36–38); calm glass studio (sweep 37).
