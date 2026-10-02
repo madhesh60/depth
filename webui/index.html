@@ -8,13 +8,12 @@
   <!-- Leaflet 1.9.4 vendored (BSD-2) so the map never depends on a CDN; SRI = the upstream hash -->
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css"
         integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" />
-  <link rel="preload" href="vendor/fonts/poppins-latin-400.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="preload" href="vendor/fonts/inter-latin-var.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
 <!-- the sea: a nautical chart under the glass (img/bathymetry.svg, made with OpenCV) -->
-<div class="sea" aria-hidden="true"><i class="snow"></i></div>
+<div class="sea" aria-hidden="true"></div>
 <div class="app">
 
   <!-- ============================ TOPBAR ============================ -->
@@ -37,11 +36,18 @@
       <button class="mode-btn" data-mode="connect" role="tab" title="connect AI agents (MCP), GIS / operations consoles (OGC API), webhooks, embeds">Connect</button>
     </nav>
 
-    <button class="demo-btn" id="demoBtn" title="a guided 60-second walk through the whole loop — any key or click stops it">Guided demo</button>
-    <div class="status-pills" id="healthPills">
-      <span class="pill" id="pillCv">OpenCV …</span>
-      <span class="pill" id="pillModel">model …</span>
-      <span class="pill pill-live" id="pillLive"><span class="dot"></span>live</span>
+    <div class="top-actions">
+      <button class="demo-btn" id="demoBtn" title="a guided 60-second walk through the whole loop — any key or click stops it">Guided demo</button>
+      <div class="pop-wrap">
+        <button class="sys-btn" id="sysBtn" data-pop="sysPop" aria-expanded="false" aria-haspopup="dialog" title="system status">
+          <span class="sys-dot"></span><span id="sysTxt">Starting</span></button>
+        <div class="popover pop-right" id="sysPop" role="dialog" aria-label="system status" hidden>
+          <div class="pop-title">System</div>
+          <div class="pop-row"><span>OpenCV</span><span class="pill" id="pillCv">…</span></div>
+          <div class="pop-row"><span>Detector</span><span class="pill" id="pillModel">…</span></div>
+          <span class="pill pill-live" id="pillLive" hidden><span class="dot"></span>live</span>
+        </div>
+      </div>
     </div>
   </header>
 
@@ -50,7 +56,7 @@
 
     <!-- ---------------- LEFT RAIL ---------------- -->
     <aside class="rail rail-left scrollable">
-      <section class="panel" data-when="analyze survey">
+      <section class="panel" data-when="analyze">
         <div class="panel-head"><span class="panel-title">Sources</span><span class="panel-meta" id="sampleCount"></span></div>
         <p class="panel-note">One click — no sonar files needed, or drop your own frame.</p>
         <div class="sample-grid" id="sampleGrid"><div class="skeleton"></div><div class="skeleton"></div></div>
@@ -75,12 +81,15 @@
             <option value="none">None (honest no-GPS)</option>
           </select>
         </label>
-        <label class="field"><span>Analyst budget (minutes)</span>
-          <input type="number" id="budgetMin" min="1" max="600" step="1" value="5" />
-        </label>
-        <label class="field" title="boat time for second-look passes (opposite side, mid-swath); empty = plan every pass"><span>Re-survey boat time (minutes)</span>
-          <input type="number" id="boatMin" min="1" max="1440" step="1" value="10" />
-        </label>
+        <details class="opts">
+          <summary>Options</summary>
+          <label class="field"><span>Analyst budget (minutes)</span>
+            <input type="number" id="budgetMin" min="1" max="600" step="1" value="5" />
+          </label>
+          <label class="field" title="boat time for second-look passes (opposite side, mid-swath); empty = plan every pass"><span>Re-survey boat time (minutes)</span>
+            <input type="number" id="boatMin" min="1" max="1440" step="1" value="10" />
+          </label>
+        </details>
         <button class="btn btn-primary btn-block" id="surveyBtn">Run survey</button>
         <p class="panel-note">Every sample → evidence-backed hazards → budgeted review queue → human-approved route + reports.</p>
       </section>
@@ -106,8 +115,8 @@
         </div>
       </section>
 
-      <section class="panel">
-        <div class="panel-head"><span class="panel-title">Guarantees</span><span class="panel-meta" id="guarMeta"></span></div>
+      <section class="panel collapsible is-collapsed">
+        <div class="panel-head"><span class="panel-title">Guarantee</span><span class="panel-meta" id="guarMeta"></span></div>
         <div class="guar" id="guarPanel"><p class="panel-note">loading calibration …</p></div>
       </section>
 
@@ -140,9 +149,16 @@
           <button class="dim-btn is-active" data-dim="2d">2D</button>
           <button class="dim-btn" data-dim="3d" title="physics-grounded 3D twin: ground-range seabed, tracked sonar altitude, shadow-derived heights">3D twin</button>
         </div>
-        <div class="class-legend" id="classLegend" title="show / cut a detected class"></div>
         <div class="tb-spacer"></div>
-        <button class="tb-btn" id="missedBtn" title="draw a box around a pot the detector missed — it becomes a training label (M)">Mark missed pot</button>
+        <div class="pop-wrap">
+          <button class="tb-btn more-btn" data-pop="morePop" aria-expanded="false" aria-haspopup="dialog" title="classes and labelling">More</button>
+          <div class="popover pop-right" id="morePop" role="dialog" aria-label="classes and labelling" hidden>
+            <div class="pop-title">Show classes</div>
+            <div class="class-legend" id="classLegend"></div>
+            <div class="pop-title">Label</div>
+            <button class="tb-btn" id="missedBtn" title="draw a box around a pot the detector missed — it becomes a training label (M)">Mark a missed pot</button>
+          </div>
+        </div>
         <div class="latency mono" id="latency"></div>
       </div>
 
@@ -173,13 +189,19 @@
             <button class="vb-btn vb-fit" id="zoomFit" title="fit ( 0 )">Fit</button>
             <button class="vb-btn vb-tour" id="tourBtn" title="fly through every find the way the agent looked">Agent tour</button>
           </div>
-          <div class="vb-gate">
-            <span class="vb-gate-lbl">gate</span>
-            <input type="range" id="confGate" min="0.05" max="0.9" step="0.05" value="0.05" aria-label="detector confidence gate" />
-            <output class="mono" id="confGateVal">0.05</output>
-            <span class="vb-gate-showing mono" id="gateShowing"></span>
+          <div class="pop-wrap">
+            <button class="vb-btn" data-pop="gatePop" aria-expanded="false" aria-haspopup="dialog" title="confidence gate">Gate <span class="gate-val" id="gateBtnVal">0.05</span></button>
+            <div class="popover pop-up" id="gatePop" role="dialog" aria-label="confidence gate" hidden>
+              <div class="pop-title">Confidence gate</div>
+              <div class="vb-gate">
+                <input type="range" id="confGate" min="0.05" max="0.9" step="0.05" value="0.05" aria-label="detector confidence gate" />
+                <output id="confGateVal">0.05</output>
+              </div>
+              <div class="vb-gate-showing" id="gateShowing"></div>
+              <p class="pop-note">Hides finds below this detector confidence. The recall guarantee applies at the calibrated floor.</p>
+            </div>
           </div>
-          <div class="vb-hint">scroll zoom · drag pan · click box · ←/→ · G gaze</div>
+          <div class="vb-hint">Scroll to zoom · drag to pan · ←/→ to step</div>
         </div>
         <div class="canvas-cap mono" id="stageCap"></div>
       </div>
@@ -307,11 +329,11 @@
         <div id="audSummary"><p class="empty-hint">No tags yet.</p></div>
       </section>
       <section class="panel" data-when="study">
-        <div class="panel-head"><span class="panel-title">Study results</span><span class="panel-meta" id="stSumMeta"></span></div>
+        <div class="panel-head"><span class="panel-title" data-tab="Results">Study results</span><span class="panel-meta" id="stSumMeta"></span></div>
         <div id="stSummary"><p class="empty-hint">No sessions yet.</p></div>
       </section>
       <section class="panel" data-when="study">
-        <div class="panel-head"><span class="panel-title">Analyst effort</span><span class="panel-meta" id="effProv"></span></div>
+        <div class="panel-head"><span class="panel-title" data-tab="Effort">Analyst effort</span><span class="panel-meta" id="effProv"></span></div>
         <div class="eff-ctl">
           <label>manual s / frame <output class="mono" id="effSpfV"></output><input type="range" id="effSpf" min="3" max="120" step="1" /></label>
           <label>s / card <output class="mono" id="effSpcV"></output><input type="range" id="effSpc" min="1" max="30" step="0.5" /></label>
@@ -327,15 +349,9 @@
         </div>
       </section>
 
-      <!-- approvals: agents (studio, MCP, partner consoles) ask - a named person decides here -->
+      <!-- survey: one tab at a time - hand-over, hazards, approvals (agents ask, a person decides), exports, effort -->
       <section class="panel" data-when="survey">
-        <div class="panel-head"><span class="panel-title">Approvals</span><span class="panel-meta mono" id="apprMeta"></span></div>
-        <div class="appr-who"><label for="apprName">Approver</label><input id="apprName" class="appr-name" maxlength="60" placeholder="your name" autocomplete="name" /></div>
-        <div id="apprList" class="appr-list"><p class="empty-hint">No requests yet. Agents can only ask; a person decides here.</p></div>
-      </section>
-      <!-- survey: mission brief + downloads + hazards -->
-      <section class="panel" data-when="survey">
-        <div class="panel-head"><span class="panel-title">Mission brief</span><span class="panel-meta mono" id="briefMeta"></span></div>
+        <div class="panel-head"><span class="panel-title" data-tab="Brief">Mission brief</span><span class="panel-meta mono" id="briefMeta"></span></div>
         <div id="briefBody" class="brief"><p class="empty-hint">The crew hand-over appears here after a survey.</p></div>
         <div class="brief-foot" id="briefFoot" hidden>
           <span class="brief-ground mono" id="briefGround"></span>
@@ -343,7 +359,20 @@
         </div>
       </section>
       <section class="panel" data-when="survey">
-        <div class="panel-head"><span class="panel-title">Reports</span><span class="panel-meta"></span></div>
+        <div class="panel-head"><span class="panel-title" data-tab="Hazards">Hazards</span><span class="panel-meta mono" id="hazCount"></span></div>
+        <div class="table-scroll">
+          <table class="haz-table"><thead><tr>
+            <th>ID</th><th>Class</th><th>Verdict</th><th>Conf</th><th>Score</th><th>P(pot)</th><th>H</th><th>Shadow</th><th>Lat, Lon</th><th>±</th><th>Review</th>
+          </tr></thead><tbody id="hazBody"></tbody></table>
+        </div>
+      </section>
+      <section class="panel" data-when="survey">
+        <div class="panel-head"><span class="panel-title" data-tab="Approvals">Approvals</span><span class="panel-meta mono" id="apprMeta"></span></div>
+        <div class="appr-who"><label for="apprName">Approver</label><input id="apprName" class="appr-name" maxlength="60" placeholder="your name" autocomplete="name" /></div>
+        <div id="apprList" class="appr-list"><p class="empty-hint">No requests yet. Agents can only ask; a person decides here.</p></div>
+      </section>
+      <section class="panel" data-when="survey">
+        <div class="panel-head"><span class="panel-title" data-tab="Exports">Exports</span><span class="panel-meta"></span></div>
         <label class="pub-toggle" title="wrecks can be war graves or protected heritage sites: a public share generalises their positions to ~1.1 km and drops re-survey passes that would reveal them">
           <input type="checkbox" id="pubShare" /> public share — generalise protected-site locations</label>
         <div class="dl-grid" id="dlGrid"></div>
@@ -351,16 +380,8 @@
         <div class="thumb-strip" id="thumbStrip"></div>
       </section>
       <section class="panel" data-when="survey">
-        <div class="panel-head"><span class="panel-title">Analyst effort</span><span class="panel-meta mono" id="effortMeta"></span></div>
+        <div class="panel-head"><span class="panel-title" data-tab="Effort">Analyst effort</span><span class="panel-meta mono" id="effortMeta"></span></div>
         <div id="effortPanel"><p class="empty-hint">Run a survey to see what your review time buys.</p></div>
-      </section>
-      <section class="panel" data-when="survey">
-        <div class="panel-head"><span class="panel-title">Hazards</span><span class="panel-meta mono" id="hazCount"></span></div>
-        <div class="table-scroll">
-          <table class="haz-table"><thead><tr>
-            <th>ID</th><th>Class</th><th>Verdict</th><th>Conf</th><th>Score</th><th>P(pot)</th><th>H</th><th>Shadow</th><th>Lat, Lon</th><th>±</th><th>Review</th>
-          </tr></thead><tbody id="hazBody"></tbody></table>
-        </div>
       </section>
     </aside>
   </div>

@@ -75,6 +75,37 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ## 4. Session log
 
+### 2026-10-02 (sweep 42) — Studio v4: production type, progressive disclosure, faster
+- **Feedback:** "still clumsy", "fonts very bad", "hide what users don't need until they click".
+- **Type:**
+  - Poppins removed (31 KB less to load);
+  - one family, Inter, on a fixed scale with Inter's dynamic tracking, weights 400 / 500 / 600 and
+    no thin weights;
+  - tabular Inter figures for numbers instead of monospace; uppercase only for tiny verdict badges;
+  - JetBrains Mono kept for code and the agent log.
+- **Progressive disclosure:**
+  - system status is one indicator, with details in a popover;
+  - "More" holds the class filters and "mark a missed pot";
+  - the confidence gate is a "Gate 0.05" button with a popover;
+  - evidence is a compact list (thumbnail · verdict · score · P(pot)), and the selected find opens;
+  - the right column has tabs (survey: Brief · Hazards · Approvals · Exports · Effort; study:
+    Results · Effort);
+  - the guarantee and model fold to one-line summaries;
+  - survey options fold away, and Sources are hidden in Survey, which runs every sample;
+  - the dock starts slim, and the light rays and marine snow were removed.
+- **Robustness:**
+  - popovers close on outside click and on Esc;
+  - a popover stacking bug was found and fixed (the toolbar's entrance animation created its own
+    layer under the viewer);
+  - a pre-existing bug was fixed: the tour caption never hid when the tour ended;
+  - static libraries now carry `Cache-Control: public, max-age=604800`.
+- **Verified in the browser:**
+  - Analyze: run, compact evidence, the "More" popover;
+  - Survey: full run, five tabs, Hazards;
+  - Study.
+
+  Only Inter loads, and there are no console errors. Full test suite: 152 passed.
+
 ### 2026-10-02 (sweep 41) — EXP-003 trained, diagnosed, onboarded; EXP-004 prepared
 - **EXP-003 / EXP-003f trained on Kaggle** with the fixed kit. The optimizer recorded is SGD 0.01 for
   both. The models now fit their training frames (train class loss 0.96 / 0.70; EXP-002 was 1.72).

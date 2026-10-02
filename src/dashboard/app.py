@@ -186,7 +186,10 @@ async def _revalidate_static(request, call_next):
     """Browsers must revalidate the zero-build UI on every load (ETag makes it cheap), so a judge
     never sees a stale app.js/styles.css after a deploy."""
     resp = await call_next(request)
-    if not request.url.path.startswith("/api/"):
+    path = request.url.path
+    if path.startswith(("/vendor/", "/img/")):          # pinned third-party files + static art: cache a week
+        resp.headers.setdefault("Cache-Control", "public, max-age=604800")
+    elif not path.startswith("/api/"):
         resp.headers.setdefault("Cache-Control", "no-cache")
     return resp
 

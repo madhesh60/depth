@@ -37,8 +37,61 @@ window.addEventListener("DOMContentLoaded", async () => {
   $("#demoStop").onclick = () => Demo.stop();
   wireAudit();
   tidyPanels();
+  Pop.init();
+  Tabs.render();
   await Promise.all([loadHealth(), loadSamples(), loadMetrics(), loadLabelStats()]);
 });
+
+/* small popovers: secondary tools stay out of sight until asked for (click outside or Esc closes) */
+const Pop = {
+  init() {
+    document.addEventListener("click", e => {
+      const btn = e.target.closest("[data-pop]");
+      if (btn) { this.toggle(btn); return; }
+      if (e.target.closest(".popover [data-close]") || !e.target.closest(".popover")) this.closeAll();
+    });
+    document.addEventListener("keydown", e => { if (e.key === "Escape") this.closeAll(); });
+    const mb = $("#missedBtn"); if (mb) mb.dataset.close = "1";       // drawing happens on the frame
+  },
+  toggle(btn) {
+    const pop = document.getElementById(btn.dataset.pop); if (!pop) return;
+    const open = pop.hidden;
+    this.closeAll();
+    if (open) { pop.hidden = false; btn.setAttribute("aria-expanded", "true"); btn.classList.add("is-open"); }
+  },
+  closeAll() {
+    $$(".popover").forEach(pop => {
+      if (pop.hidden) return;
+      pop.hidden = true;
+      const b = $(`[data-pop="${pop.id}"]`);
+      if (b) { b.setAttribute("aria-expanded", "false"); b.classList.remove("is-open"); }
+    });
+  },
+};
+
+/* the right column shows one section at a time when a mode has several (labels from data-tab) */
+const Tabs = {
+  active: {},
+  render() {
+    const ins = $(".inspector"); if (!ins) return;
+    const mode = $("#workspace").dataset.mode;
+    const panels = $$(".inspector > .panel").filter(p => !p.dataset.when || p.dataset.when.split(" ").includes(mode));
+    const tabbed = panels.filter(p => p.querySelector("[data-tab]"));
+    let bar = ins.querySelector(":scope > .tabs");
+    if (tabbed.length < 2) {
+      if (bar) bar.remove();
+      ins.classList.remove("tabbed");
+      $$(".inspector > .panel").forEach(p => p.classList.remove("tab-off"));
+      return;
+    }
+    if (!bar) { bar = document.createElement("div"); bar.className = "tabs"; bar.setAttribute("role", "tablist"); ins.prepend(bar); }
+    const cur = Math.min(this.active[mode] ?? 0, tabbed.length - 1);
+    bar.innerHTML = tabbed.map((p, i) => `<button type="button" role="tab" class="tab${i === cur ? " is-active" : ""}" aria-selected="${i === cur}" data-i="${i}">${escapeHtml(p.querySelector("[data-tab]").dataset.tab)}</button>`).join("");
+    tabbed.forEach((p, i) => p.classList.toggle("tab-off", i !== cur));
+    ins.classList.add("tabbed");
+    bar.onclick = e => { const b = e.target.closest(".tab"); if (!b) return; this.active[mode] = +b.dataset.i; this.render(); ins.scrollTop = 0; };
+  },
+};
 
 /* calm panels: a panel's explanation folds behind a small (i); collapsible sections open on click */
 function tidyPanels() {
@@ -62,6 +115,11 @@ function tidyPanels() {
   });
 }
 
+function setSys(state, text) {
+  const b = $("#sysBtn"); if (!b) return;
+  b.dataset.state = state; $("#sysTxt").textContent = text;
+}
+
 async function loadHealth() {
   try {
     const h = await fetch(`${API}/api/health`).then(r => r.json());
@@ -83,10 +141,13 @@ async function loadHealth() {
     if ($("#regClasses")) $("#regClasses").textContent = `${(cal.names || []).length} · ${(cal.names || []).join(", ")}`;
     if ($("#regGateK")) $("#regGateK").textContent = `gate · ${cal.guaranteed_class || "?"}`;
     renderGuarantees(h.calibration);
+    setSys(h.model_loaded ? "ok" : h.model_error ? "bad" : "busy",
+           h.model_loaded ? (h.is_cool_path ? "Ready · COOL" : "Ready") : h.model_error ? "Model error" : "Warming up");
     if (!h.model_loaded && !h.model_error) setTimeout(loadHealth, 1500);   // re-poll until warm
   } catch (e) {
     $("#pillCv").textContent = "backend offline";
     $("#pillCv").className = "pill pill-bad";
+    setSys("bad", "Offline");
   }
 }
 
@@ -114,7 +175,7 @@ function renderGuarantees(c) {
   const g = c.guarantees || {}, v = g.verified_on_test || {};
   const pct = x => x == null ? "—" : `${Math.round(x * 100)}%`;
   const held = ok => ok == null ? "" : ok ? `<span class="g-held">held on test</span>` : `<span class="g-miss">NOT held on test</span>`;
-  meta.textContent = "95% confidence";
+  meta.textContent = `≥ ${pct(g.recall_promise)} of pots${v.recall_promise_held === true ? " · held" : ""}`;
   if (gate) gate.textContent = `${(c.detector_floor ?? c.tau_review).toFixed(2)} (floor) · review ≥ ${c.tau_review.toFixed(2)}`;
   if (tiers) tiers.textContent = `${c.method ? "conformal (CP · LTT)" : "calibrated"}${c.policy ? " · " + c.policy : ""}`;
   panel.innerHTML = `
@@ -122,7 +183,7 @@ function renderGuarantees(c) {
       <span class="g-txt">of real pots reach a person<br>${held(v.recall_promise_held)}</span></div>
     <div class="g-row"><span class="g-badge g-prec">${g.precision_promise ? "≥ " + pct(g.precision_promise) : "none"}</span>
       <span class="g-txt">${g.precision_promise ? `of confirmed finds are real<br>${held(v.precision_promise_held)}` : "no auto-confirm: every find is checked by a person"}</span></div>
-    <p class="panel-note">Fit on validation, verified once on test · <a href="https://github.com/madhesh60/depth/blob/main/${escapeHtml(g.report || "docs/")}" target="_blank" rel="noopener">report</a></p>`;
+    <p class="panel-note">95% confidence · fit on validation, verified once on test · <a href="https://github.com/madhesh60/depth/blob/main/${escapeHtml(g.report || "docs/")}" target="_blank" rel="noopener">report</a></p>`;
 }
 
 async function loadSamples() {
@@ -144,7 +205,7 @@ async function loadSamples() {
     const thumb = document.createElement("div");
     thumb.className = "sc-thumb";
     const img = document.createElement("img");
-    img.alt = s.name; img.loading = "lazy";
+    img.alt = s.name; img.loading = "lazy"; img.decoding = "async";
     img.src = `${API}/api/sample_thumb/${encodeURIComponent(s.id)}`;
     img.onerror = () => img.replaceWith(sonarGlyph());
     thumb.appendChild(img);
@@ -184,6 +245,7 @@ function wireModes() {
     cancelTour();
     $$(".mode-btn").forEach(x => x.classList.toggle("is-active", x === b));
     $("#workspace").dataset.mode = b.dataset.mode; document.body.dataset.mode = b.dataset.mode;
+    Pop.closeAll(); Tabs.render();
     if (b.dataset.mode === "survey" && state.map) setTimeout(refitIfLost, 80);
     if (b.dataset.mode === "study") { loadStudySummary(); }
     if (b.dataset.mode === "audit") { loadAuditSummary(); }
@@ -201,7 +263,8 @@ function wireViewerControls() {
   $("#zoomFit").onclick = () => { cancelTour(); Viewer.fit(); };
   $("#tourBtn").onclick = () => (state._tour ? cancelTour() : playGazeTour(true));
   const gate = $("#confGate");
-  gate.oninput = () => { state.gate = parseFloat(gate.value); $("#confGateVal").textContent = state.gate.toFixed(2); applyFilters(); };
+  gate.oninput = () => { state.gate = parseFloat(gate.value); $("#confGateVal").textContent = state.gate.toFixed(2); applyFilters();
+    const bv = $("#gateBtnVal"); if (bv) bv.textContent = state.gate.toFixed(2); };
 }
 
 function wireInputs() {
@@ -460,6 +523,7 @@ function renderAnalyze(d) {
   const ordered = state._boxes.slice().sort((a, b) =>
     (order[a.verdict] - order[b.verdict]) || ((b.cand.evidence?.evidence_score || 0) - (a.cand.evidence?.evidence_score || 0)));
   ordered.forEach(b => grid.appendChild(evidenceCard(b.cand, b.id)));
+  const first = grid.querySelector(".ev-card"); if (first) first.classList.add("is-linked");   // the strongest find opens
   buildClassLegend(ordered);
   applyFilters();
   streamLog(d, ordered);
@@ -607,7 +671,7 @@ function playGazeTour() {
   };
   step();
 }
-function endTour() { state._tour = false; clearTimeout(_tourTimer); _tourTimer = null; const btn = $("#tourBtn"); if (btn) { btn.classList.remove("is-on"); btn.innerHTML = "Agent tour"; } }
+function endTour() { state._tour = false; clearTimeout(_tourTimer); _tourTimer = null; setTimeout(toastHide, 1200); const btn = $("#tourBtn"); if (btn) { btn.classList.remove("is-on"); btn.innerHTML = "Agent tour"; } }
 function cancelTour() { if (state._tour) state._tourOptOut = true; endTour(); hideAgentEye(); }
 
 // Height is RELATIVE to sonar altitude unless the altitude was measured (never an assumed 10 m).
@@ -626,10 +690,16 @@ function evidenceCard(c, id) {
   const arrowCls = sc > c.conf + 1e-6 ? "up" : (sc < c.conf - 1e-6 ? "down" : "");
   const shCls = sh.quality === "clear" ? "chip-clear" : sh.quality === "weak" ? "chip-weak" : "chip-none";
   const height = heightText(sh.height_m, sh.height_rel, sh.run_px);
+  const pp = ev.p_pot != null ? `${Math.round(ev.p_pot * 100)}%` : "—";
   card.innerHTML = `
+    <button type="button" class="ev-sum" aria-label="show the evidence for find ${id}">
+      ${c.crop_png ? `<img src="${c.crop_png}" alt="" loading="lazy" decoding="async"/>` : `<span class="ev-sum-ph"></span>`}
+      <span class="ev-sum-txt"><span class="ev-sum-v">${escapeHtml(VLABEL[v] || v)}</span>
+        <span class="ev-sum-m">score ${sc.toFixed(2)} · P(pot) ${pp}</span></span>
+    </button>
     <div class="ev-crop${c.relook_view ? " has-enh" : ""}">
-      ${c.crop_png ? `<img class="ev-img raw" alt="evidence crop" src="${c.crop_png}"/>` : `<div style="aspect-ratio:1"></div>`}
-      ${c.relook_view ? `<img class="ev-img enh" alt="CLAHE re-look (what the agent saw)" src="${c.relook_view.enhanced_png}"/>` : ""}
+      ${c.crop_png ? `<img class="ev-img raw" alt="evidence crop" src="${c.crop_png}" decoding="async"/>` : `<div style="aspect-ratio:1"></div>`}
+      ${c.relook_view ? `<img class="ev-img enh" alt="CLAHE re-look (what the agent saw)" src="${c.relook_view.enhanced_png}" loading="lazy" decoding="async"/>` : ""}
       <span class="ev-badge b-${v}">${v}</span>
       ${c.relook_view ? `<button class="cmp-chip" title="toggle raw / CLAHE re-look">Enhanced</button>` : ""}
       <button class="gaze-btn" title="replay what the agent saw (G)">Replay gaze</button>
@@ -670,6 +740,7 @@ function evidenceCard(c, id) {
   card.addEventListener("mouseenter", () => Viewer.highlight(id, true));
   card.addEventListener("mouseleave", () => Viewer.highlight(id, false));
   card.querySelector(".ev-crop").addEventListener("click", () => selectCandidate(id));
+  card.querySelector(".ev-sum").addEventListener("click", () => selectCandidate(id));
   card.querySelector(".gaze-btn").addEventListener("click", e => { e.stopPropagation(); gazeTo(id); });
   const chip = card.querySelector(".cmp-chip");
   if (chip) chip.addEventListener("click", e => { e.stopPropagation(); card.querySelector(".ev-crop").classList.toggle("show-enh"); });
@@ -936,7 +1007,7 @@ const Dock = {
   },
   init() {
     const saved = localStorage.getItem("depth.dockMin");
-    this.set(saved != null ? saved === "1" : window.innerHeight < 860);    // short screens start slim
+    this.set(saved != null ? saved === "1" : true);    // slim by default: the log opens on request
     $("#dockToggle").onclick = () => this.set(!document.body.classList.contains("dock-min"));
   },
 };
@@ -1071,7 +1142,7 @@ function showProvenance(p) {
 }
 function renderThumbs(d) {
   $("#thumbStrip").innerHTML = d.frames.filter(f => f.thumb_png)
-    .map(f => `<img class="thumb" title="${f.frame_id} · ${cShort(f.counts)}" src="${f.thumb_png}" alt="${f.frame_id}"/>`).join("");
+    .map(f => `<img class="thumb" title="${f.frame_id} · ${cShort(f.counts)}" src="${f.thumb_png}" alt="${f.frame_id}" loading="lazy" decoding="async"/>`).join("");
 }
 function renderHazards(d) {
   const rows = d.tracked;

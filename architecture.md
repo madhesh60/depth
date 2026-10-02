@@ -193,25 +193,31 @@ Hardening:
 * **Map:** Leaflet vendored (SRI-checked); keyless basemaps with an offline grid fallback.
 
 UI: a zero-build studio with five modes (Analyze · Survey · Study · Audit · Connect)
-(`webui/styles.css`).
+(`webui/styles.css`, `webui/app.js`).
 
-- **Look:** three floating ocean-glass layers (sources, canvas, inspector) over a deep-sea chart:
-  - depth contours generated with OpenCV (`webui/img/make_bathymetry.py` → `bathymetry.svg`, 10 KB);
-  - light from the surface and faint marine snow.
-
-  Inside a layer, sections are divided by hairlines rather than nested boxes.
-- **Less text:** each panel's explanation folds behind a small (i), and the model registry is
-  collapsed by default.
-- **Colour:** a marine palette kept in step with `app.js` and `twin3d.js`: deep-ocean blues, aqua for
-  the one call to action, seafoam (confirmed), sand (review), slate (low risk), coral (alerts).
-- **Fonts** are vendored (`webui/vendor/fonts`, OFL, SHA-256 listed), so nothing loads from a third
-  party:
-  - **Poppins** for the brand, navigation, headings and large numbers;
-  - **Inter** for interface and reading text;
-  - **JetBrains Mono** only for numbers, code and logs.
-- **Actions:** each screen has one aqua primary action; other controls are hairline pills.
-- **Dock and motion:** the pipeline dock collapses to a slim status bar, and motion respects
-  `prefers-reduced-motion`.
+- **Look:** three floating ocean-glass layers over a static nautical chart. The depth contours are
+  made with OpenCV (`webui/img/make_bathymetry.py`). Marine palette: aqua is the single call to
+  action; seafoam / sand / slate / coral mark the verdicts. It is synced with `app.js` and `twin3d.js`.
+- **Type:** one family, **Inter** (vendored, OFL), on a fixed scale (11 / 12 / 13 / 14 / 16 / 20 /
+  28 px) with Inter's size-dependent tracking, weights 400 / 500 / 600, tabular figures for numbers.
+  **JetBrains Mono** is used only for code and the agent log.
+- **Progressive disclosure** — what an analyst needs is visible; the rest is one click away:
+  - system status is one indicator, with details in a popover;
+  - class filters, "mark a missed pot" and the confidence gate sit behind small popovers;
+  - evidence is a compact row per find, and the selected find opens into its full card;
+  - the right column shows tabs when a mode has several sections (survey: Brief · Hazards ·
+    Approvals · Exports · Effort);
+  - the guarantee and model sections fold to a one-line summary, and advanced survey options fold
+    away;
+  - panel explanations sit behind an (i), and the agent log opens from a slim status dock.
+- **Performance and robustness:**
+  - one font file (48 KB) is preloaded;
+  - images use lazy loading and async decoding;
+  - `content-visibility` skips rendering evidence rows that are off screen;
+  - the background is static (no animated layers under the blur);
+  - `/vendor/` and `/img/` are cached for a week, while the app shell revalidates on every load;
+  - fallbacks are provided for `prefers-reduced-motion`, `prefers-reduced-transparency` and missing
+    `backdrop-filter`.
 
 ## 10. Cloud + COOL (`infra/`)
 
