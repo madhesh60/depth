@@ -255,7 +255,9 @@ DEPTH's order equals confidence order for EXP-001 (STUDY-07); its measurable ext
   - **EXP-003**: full frames + fixed tiles (4,839 images), 150 epochs;
   - **EXP-003f**: full frames only (1,773 images), 300 epochs.
 - Pass bar before onboarding (`python -m src.detection.diagnose`):
-  - ghost AP ≥ 0.70 on its own training frames;
+  - ghost AP@0.3 ≥ 0.65 on its own training frames (not underfit). The bar was set before any
+    EXP-003 result, from the reference: EXP-001, a working model, scores 0.71 there (0.57 at IoU 0.5,
+    because the 14–36 px label boxes disagree by a few pixels); underfit EXP-002 scores 0.57;
   - validation ghost AP clearly above EXP-002's 0.29;
   - wreck recall ceiling > 0.5.
   

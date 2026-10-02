@@ -112,7 +112,7 @@ checks) and the census in [`exp002_diagnosis.md`](exp002_diagnosis.md).
 **Next data fixes, in order:**
 
 1. Run the blinded audit on val, then add the confirmed missing pots as **v2c** labels. Never edit test.
-2. Report AP at IoU 0.3 beside 0.5.
+2. ~~Report AP at IoU 0.3 beside 0.5.~~ Done: `python -m src.detection.diagnose` reports both.
 3. Drop or crop the black-bordered rotated copies.
 4. EXP-004 hypothesis: luminance-normalised training (one palette), because the target recordings are
    grayscale.

@@ -30,6 +30,10 @@ EXP-003 vs EXP-003f answers whether tiles help.
   selection picked a checkpoint.
 - **Packaging:** the ONNX export passed the `cv2.dnn` check, and the zip was complete.
 - **Monitor cell:** tested against a simulated process list.
+- **Dry run of the exact EXP-003f flags** (640 px, batch 16, SGD 0.01, `--close-mosaic 10`) on the
+  `--no-tiles` set: training, recorded optimizer `SGD lr 0.01`, shortlist selection, ONNX + `cv2.dnn`,
+  zip and `diagnose` all passed (CPU, 1% of the data, 1 epoch; this checks the path, not accuracy).
+- **Full test suite:** 150 passed.
 
 ---
 
@@ -92,8 +96,9 @@ about 2 GB.
 
 ## 2. Back on your machine — check first, then plug in
 
-Download both zips from **Output** into the repo root. Then run the check: per-source validation,
-plus the fit on each model's own training frames. It never touches test.
+Download both zips from **Output** into the repo root. Then run the check: per-source validation
+(AP at IoU 0.5 and at the product's loose match, IoU 0.3), plus the fit on each model's own training
+frames. It never touches test.
 
 ```bash
 python -m src.detection.diagnose --zip EXP-003_complete.zip --zip EXP-003f_complete.zip
@@ -101,7 +106,9 @@ python -m src.detection.diagnose --zip EXP-003_complete.zip --zip EXP-003f_compl
 
 **Pass bar:**
 
-- ghost AP ≥ 0.70 on its own training frames;
+- ghost AP@0.3 ≥ 0.65 on its own training frames (not underfit). The bar was set before any
+  EXP-003 result, from the reference: EXP-001, a working model, scores 0.71 there (0.57 at IoU 0.5,
+  because the 14–36 px label boxes disagree by a few pixels); underfit EXP-002 scores 0.57;
 - validation ghost AP clearly above EXP-002's 0.29;
 - wreck recall ceiling above 0.5.
 

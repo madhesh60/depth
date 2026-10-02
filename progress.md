@@ -75,6 +75,21 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ## 4. Session log
 
+### 2026-10-02 (sweep 38) — EXP-003 pre-flight: suite green, exact flags dry-run, pass bar calibrated
+- **Full test suite: 150 passed** (5 min) on the pushed EXP-003 kit and the redesigned studio.
+- **Dry run of the exact EXP-003f notebook flags** (640 px, batch 16, SGD 0.01, `--close-mosaic 10`)
+  on the `--no-tiles` set: training, recorded optimizer `SGD lr 0.01`, shortlist selection,
+  ONNX + `cv2.dnn`, zip and `diagnose` all passed (CPU, 1% of the data, 1 epoch: the path, not
+  accuracy). The fixed tile set had been smoke-tested before.
+- **`diagnose` reports AP at the product's loose match (IoU 0.3)** next to IoU 0.5. EXP-002's
+  validation ghost AP only rises to 0.38 / 0.40 at IoU 0.3 (EXP-001: 0.72), so loose boxes were not
+  its problem.
+- **Pass bar recalibrated before any EXP-003 result.** The fit check now uses AP@0.3, with underfit
+  below 0.65. On these training frames EXP-001, a working model, scores 0.71 at IoU 0.3 but only
+  0.57 at IoU 0.5, because the 14–36 px label boxes disagree by a few pixels. The old 0.70 at IoU 0.5
+  would have flagged even a healthy model. EXP-002 scores 0.57 / 0.54, so it is still underfit.
+  The EXP-002 tables were regenerated with both columns.
+
 ### 2026-10-02 (sweep 37) — Studio redesign: calm glass, purposeful type, simpler buttons
 - `webui/styles.css` was rewritten as one design system: translucent glass over a deep-ocean field,
   thin soft strokes, gentle depth, one accent (sea-glass teal), and calm verdict colours, synced into

@@ -130,6 +130,8 @@ seabed. That fits the wreck collapse, and it penalised partial pots too.
 
 - **Export / deploy path:** ultralytics' own validation (0.25) and our `cv2.dnn` evaluation (0.26)
   agree.
+- **Loose boxes:** at the product's loose match (IoU 0.3), validation ghost AP rises only to 0.38
+  (EXP-002) and 0.40 (EXP-002s); EXP-001 reaches 0.72. Box tightness is not why they failed.
 - **Validation labels:** EXP-001 scores 0.66 on them, so they are usable. The val set is the same
   for every model.
 - **Resolution:** 1024 px did not beat 640 px (0.25 vs 0.25). Because both runs were underfit,
@@ -148,7 +150,9 @@ seabed. That fits the wreck collapse, and it penalised partial pots too.
 
 **Pass bar before onboarding** (`python -m src.detection.diagnose`):
 
-- ghost AP **≥ 0.70 on its own training frames** (not underfit);
+- ghost **AP@0.3 ≥ 0.65 on its own training frames** (not underfit). The bar was set before any
+  EXP-003 result, from the reference: EXP-001, a working model, scores 0.71 there (0.57 at IoU 0.5,
+  because the 14–36 px label boxes disagree by a few pixels); underfit EXP-002 scores 0.57;
 - validation ghost AP clearly above 0.29;
 - wreck recall ceiling above 0.5.
 

@@ -168,12 +168,17 @@ def test_diagnose_sources_and_verdicts():
     from src.detection import diagnose as dg
     assert dg.group("Rec07_Sensor_x.jpg") == "crabpot_Rec7" and dg.group("BC_POST_T2_01.jpg") == "crabpot_bc_post"
     assert dg.group("seabed_train_natform_3.jpg") == "seabed_natform" and dg.group("TI0040_png.jpg") == "crabpot_other"
-    rec = lambda tp, fp, n: {"group": "g", "pc": {"0": {"pts": [(0.9, 1)] * tp + [(0.8, 0)] * fp, "n_gt": n},
-                                                  "1": {"pts": [], "n_gt": 0}}}
+    pcs = lambda tp, fp, n: {"0": {"pts": [(0.9, 1)] * tp + [(0.8, 0)] * fp, "n_gt": n}, "1": {"pts": [], "n_gt": 0}}
+    rec = lambda tp, fp, n: {"group": "g", "pc": pcs(tp, fp, n), "pc30": pcs(tp, fp, n)}
     m = dg.Model("M", Path("x.onnx"), 640, ["ghost_gear", "wreck_debris"])
     under = {("M", "train"): [rec(4, 0, 10)], ("M", "val"): [rec(3, 0, 10)]}
     gap = {("M", "train"): [rec(9, 0, 10)], ("M", "val"): [rec(3, 0, 10)]}
     good = {("M", "train"): [rec(9, 0, 10)], ("M", "val"): [rec(8, 0, 10)]}
     assert "UNDERFIT" in dg.verdict(m, under) and "GAP" in dg.verdict(m, gap) and "ready" in dg.verdict(m, good)
+    # the loose-match column: a box that only overlaps at IoU 0.3 counts there, not at 0.5
+    r = {"group": "g", "pc": {"0": {"pts": [(0.9, 0)], "n_gt": 1}, "1": {"pts": [], "n_gt": 0}},
+         "pc30": {"0": {"pts": [(0.9, 1)], "n_gt": 1}, "1": {"pts": [], "n_gt": 0}}}
+    s = dg.stats([r], 0)
+    assert s["ap50"] == 0.0 and s["ap30"] == 1.0 and dg._cell(s).startswith("0.000 / 1.00")
     assert dg.Model("B", Path("x"), 640, ["fishing_gear", "pipe_cylinder", "structural_fragment",
                                           "natural_formation"]).cmap == {0: 0, 1: 1, 2: 1}
