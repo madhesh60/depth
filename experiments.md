@@ -242,10 +242,10 @@ DEPTH's order equals confidence order for EXP-001 (STUDY-07); its measurable ext
 (when to stop) and a forecast that held (slightly conservative). Status: **study pending** (needs
 3+ people). A higher recall ceiling (EXP-002) moves the promise and the card count.
 
-### EXP-004 / EXP-004g — EXP-003's recipe on cleaned data (+ a ghost-gear-only arm) — READY TO RUN
+### EXP-004 / EXP-004g — EXP-003's recipe on cleaned data (+ a ghost-gear-only arm) — DONE (NEGATIVE for ghost gear)
 
-- Status: **kit ready and tested** (`notebooks/exp004_kaggle.ipynb`, [`docs/kaggle_training.md`](docs/kaggle_training.md));
-  GPU run pending.
+- Status: **trained (Kaggle T4 ×2, 2026-10-03), diagnosed; not onboarded** (no gain over EXP-003; test not
+  scored). Record: [`docs/exp004_diagnosis.md`](docs/exp004_diagnosis.md).
 - Why: after EXP-003, what is left is data ([`docs/exp003_diagnosis.md`](docs/exp003_diagnosis.md)):
   - the wreck class learned from 389 off-domain colour fish-finder screenshots;
   - the side-scan shipwreck labels are loose;
@@ -255,7 +255,21 @@ DEPTH's order equals confidence order for EXP-001 (STUDY-07); its measurable ext
   gear only. Val and test are untouched.
 - Pass bar: fit AP@0.3 ≥ 0.65; validation ghost AP clearly above EXP-003's 0.39; for the 2-class arm,
   a wreck recall ceiling > 0.5.
-- Result: _pending._
+- Result (validation, deploy path):
+  - **EXP-004 ≈ EXP-003** for ghost gear: AP@0.5 0.365 vs 0.394, paired bootstrap Δ −0.03
+    [95% CI −0.11, +0.05]; recall ceiling 0.74 vs 0.77.
+  - **EXP-004g is worse** (Δ −0.07, P(better) 0.03). It overfits (fit 0.86 vs val 0.45) and produces
+    twice the false alarms: the wreck class absorbs pot-like structure.
+  - **Wreck improved but still fails**: recall ceiling 0.10 → 0.30 (bar 0.5); false wrecks on rocky
+    seabed 36 → 4.
+- Learning:
+  - The detector finds 85% of validation pots at the floor, and misses are not size- or
+    contrast-driven, so 1024 px / YOLO11m are not the lever and would cost 2.5–3× latency.
+  - The score is held down by ranking against false alarms: half the top false alarms overlap a
+    labelled pot with a disagreeing box, and several look like unlabelled pots.
+  - Validation noise is ±0.07 AP.
+  - Next: a blinded label audit → v2c labels (train/val only) → EXP-005 = EXP-003's recipe on v2c,
+    two seeds.
 
 ### EXP-003 / EXP-003f — v2b at 640 px with the EXP-002 causes fixed — DONE (EXP-003 onboarded, not yet the default)
 

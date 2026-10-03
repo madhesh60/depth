@@ -68,9 +68,13 @@ Legend: `[x]` done · `[ ]` open · **(YOU)** needs a person / an account / a GP
 - [x] **EXP-003 on Kaggle**, diagnosed and onboarded. Recall promise 65% → **79%** (held on test at
       81%), fewer review cards. Wreck fails, and official-split F1 is 0.41 vs GhostVision 0.71–0.73
       ([`docs/exp003_diagnosis.md`](docs/exp003_diagnosis.md)).
-- [ ] **(YOU) EXP-004 on Kaggle** (~2.5 h, T4 ×2). Import `notebooks/exp004_kaggle.ipynb`, add
-      **depth-v2b**, Save & Run All ([`docs/kaggle_training.md`](docs/kaggle_training.md)). Download
-      `EXP-004_complete.zip` + `EXP-004g_complete.zip`, then tell Claude "EXP-004 done".
+- [x] **EXP-004 on Kaggle**: no gain for ghost gear (Δ −0.03 [−0.11, +0.05]). Wreck improved but still
+      fails. EXP-003 stays the best ([`docs/exp004_diagnosis.md`](docs/exp004_diagnosis.md)).
+- [ ] **Label audit → v2c → EXP-005.**
+  - **(Claude)** Build an audit set from EXP-003's confident false alarms (train + val).
+  - **(YOU + 1–2 people)** Tag them in the Audit tab.
+  - **(Claude)** Write the v2c labels (train/val only; test never edited) and prepare EXP-005 (EXP-003's
+    recipe on v2c, two seeds).
 - [ ] `python -m src.detection.diagnose --zip EXP-003_complete.zip --zip EXP-003f_complete.zip`.
 - [ ] `onboard_model` for the models that pass:
   - guarantees fit on val, verified once on test;

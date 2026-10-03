@@ -75,6 +75,27 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ## 4. Session log
 
+### 2026-10-03 (sweep 45) — EXP-004 analysed: no gain for pots; what limits the detector now
+- **EXP-004 / EXP-004g trained** (SGD 0.01 recorded; cleaned data). `diagnose` was run against
+  EXP-003 on the deploy path.
+  - **EXP-004 ≈ EXP-003** for ghost gear: paired bootstrap ΔAP −0.03 [−0.11, +0.05].
+  - **EXP-004g worse** (−0.07, overfits, 2× the false alarms).
+  - Wreck: recall ceiling 0.10 → 0.30 (bar 0.5); false wrecks on rocks 36 → 4.
+- **Deep analysis** (validation only):
+  - **Recall:** EXP-003 finds 85% of val pots at the floor, and misses are flat across size and
+    contrast. Resolution or capacity is not the lever.
+  - **False alarms:** 393 vs 246 matches; real pots' median confidence is 0.21 and 89 false alarms
+    score above it. Of the top 40, 19 overlap a labelled pot with a disagreeing box, several look like
+    unlabelled pots, and few are clutter.
+  - **Labels:** box shapes are mostly head-only everywhere (val a bit taller), so this is
+    localisation noise plus missing labels rather than one convention bug.
+  - **Noise:** validation AP has a 95% CI of ±0.07.
+- **Conclusions:**
+  - EXP-003 remains the best clean model.
+  - The next run that can move the number is EXP-005, on audited labels (v2c, train/val only), with
+    two seeds.
+  - Record: `docs/exp004_diagnosis.md` (+ tables).
+
 ### 2026-10-02 (sweep 44) — Apple-like type: SF Pro on Apple devices, sentence case everywhere
 - **Font stack:** `-apple-system` / SF Pro first, so Mac and iOS show Apple's own font. SF Pro cannot
   be redistributed for other platforms, so Inter follows, with stylistic alternates removed
