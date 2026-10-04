@@ -10,8 +10,8 @@
 import * as THREE from "three";
 import { OrbitControls } from "./vendor/three/addons/OrbitControls.js";
 
-const VCOL = { confirmed: 0x6fe3b4, review: 0xf2c879, low_risk: 0x8aa1b4, rejected: 0x8aa1b4 };
-const CYAN = 0x5ff2c6, VIOLET = 0xb3a8ff;
+const VCOL = { confirmed: 0x9ecbff, review: 0xe6c48a, low_risk: 0x7f8a97, rejected: 0x7f8a97 };
+const CYAN = 0x9ecbff, VIOLET = 0xb3a8ff;
 
 class TwinViewer {
   constructor(el, opts = {}) {
@@ -251,7 +251,7 @@ class TwinViewer {
       if (dashed) l.computeLineDistances(); g.add(l);
     };
     line(tw.routes.recovery, CYAN, 0.25, false);
-    line(tw.routes.inspection, 0xf2c879, 0.2, true);
+    line(tw.routes.inspection, 0xe6c48a, 0.2, true);
     (tw.resurvey || []).forEach(r => {                                     // planned passes, at boat height
       line([r.a, r.b], VIOLET, alt, true);
       const a = xz(r.a).setY(alt), b = xz(r.b).setY(alt), dir = b.clone().sub(a).normalize();

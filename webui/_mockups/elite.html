@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>DEPTH — elite / minimal (mockup only)</title>
+<style>
+/* ===================================================================== DEPTH · elite minimal (mock)
+   The language from the references: near-black cinematic panels, a bright hairline rounded edge, an
+   ambient corner glow (NOT frosted glass), light + large type, uppercase tracked micro-labels, token
+   chips (outlined rounded rects), a line-number gutter, and extreme colour restraint. Shown on real
+   DEPTH content in two temperatures — WARM (like the reference) and COOL (keeps the marine identity).
+   Nothing ships; pick a temperature and I roll the language across all five modes. */
+
+@font-face { font-family:"Inter"; font-weight:100 900; font-display:swap; src:url("../vendor/fonts/inter-latin-var.woff2") format("woff2"); }
+
+:root{
+  --sans: "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+  --ease: cubic-bezier(.2,.8,.2,1);
+}
+*{ box-sizing:border-box; margin:0; padding:0; }
+body{
+  font-family:var(--sans); color:#f4f4f5; background:#060607; min-height:100vh;
+  -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale; text-rendering:optimizeLegibility;
+  letter-spacing:-.006em;
+}
+.wrap{ max-width:1500px; margin:0 auto; padding:34px 34px 60px; }
+
+/* page lede */
+.lede{ max-width:760px; margin-bottom:26px; }
+.lede .ey{ font:500 11px/1 var(--sans); letter-spacing:.2em; text-transform:uppercase; color:rgba(255,255,255,.4); }
+.lede h1{ font:300 28px/1.25 var(--sans); letter-spacing:-.02em; margin:12px 0 10px; }
+.lede p{ font:300 15px/1.65 var(--sans); color:rgba(255,255,255,.55); }
+.lede .dna{ margin-top:16px; display:flex; flex-wrap:wrap; gap:8px; }
+.lede .dna b{ font:400 11px/1 var(--sans); letter-spacing:.02em; color:rgba(255,255,255,.62);
+  border:1px solid rgba(255,255,255,.14); border-radius:999px; padding:7px 12px; }
+
+/* two temperature worlds */
+.cols{ display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+@media (max-width:1040px){ .cols{ grid-template-columns:1fr; max-width:620px; } }
+
+.world{ position:relative; overflow:hidden; border-radius:26px; padding:26px; background:var(--world);
+  min-height:560px; display:flex; flex-direction:column; gap:20px; }
+.world::before{ content:""; position:absolute; inset:0; background:var(--glow); pointer-events:none; }
+.world > *{ position:relative; z-index:1; }
+
+.wtag{ display:flex; align-items:center; gap:10px; }
+.wtag .d{ font:500 11px/1 var(--sans); letter-spacing:.18em; text-transform:uppercase; color:rgba(255,255,255,.5); }
+.wtag .s{ margin-left:auto; display:inline-flex; align-items:center; gap:8px; font:500 10.5px/1 var(--sans);
+  letter-spacing:.16em; text-transform:uppercase; color:rgba(255,255,255,.44); }
+.wtag .s i{ width:6px; height:6px; border-radius:50%; background:var(--accent); box-shadow:0 0 10px -1px var(--accent); }
+
+/* topbar */
+.bar{ display:flex; align-items:center; gap:16px; padding:2px 4px; }
+.word{ font:300 19px/1 var(--sans); letter-spacing:.14em; color:#fff; }
+.word b{ font-weight:500; }
+.mid{ margin:0 auto; font:500 11px/1 var(--sans); letter-spacing:.22em; text-transform:uppercase; color:rgba(255,255,255,.42); }
+
+/* ---- the signature panel: hairline rounded edge + ambient, gutter, light-large type, token chips ---- */
+.panel{ position:relative; border-radius:22px; background:var(--panel); padding:28px 30px 30px; }
+/* bright hairline, brightest at the top, fading down — the reference's polished edge */
+.panel::before{ content:""; position:absolute; inset:0; border-radius:inherit; padding:1px; pointer-events:none;
+  background:linear-gradient(180deg, var(--edge-top), rgba(255,255,255,.05) 34%, rgba(255,255,255,.025));
+  -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor; mask-composite:exclude; }
+.panel-shadow{ box-shadow:0 50px 120px -50px rgba(0,0,0,.95); }
+
+.plabel{ font:500 11px/1 var(--sans); letter-spacing:.2em; text-transform:uppercase; color:rgba(255,255,255,.44);
+  margin-bottom:26px; }
+
+/* editor body: gutter + statement lines */
+.editor{ display:grid; grid-template-columns:auto 1fr; column-gap:28px; }
+.gutter{ display:flex; flex-direction:column; gap:22px; padding-right:24px; border-right:1px solid rgba(255,255,255,.08);
+  font:400 14px/1 var(--sans); font-variant-numeric:tabular-nums; color:rgba(255,255,255,.3); text-align:right; }
+.gutter span{ height:40px; display:flex; align-items:center; justify-content:flex-end; }
+.lines{ display:flex; flex-direction:column; gap:22px; }
+.line{ min-height:40px; display:flex; align-items:center; flex-wrap:wrap; gap:10px;
+  font:300 26px/1.2 var(--sans); letter-spacing:-.01em; color:rgba(255,255,255,.92); }
+.line .mut{ color:rgba(255,255,255,.52); }
+/* token chip */
+.k{ display:inline-flex; align-items:center; font:400 24px/1 var(--sans); letter-spacing:-.01em; color:#fff;
+  border:1px solid rgba(255,255,255,.26); border-radius:9px; padding:5px 13px; background:rgba(255,255,255,.035); white-space:nowrap; }
+.k.acc{ border-color:var(--accent-line); color:var(--accent-txt); background:var(--accent-soft); }
+
+/* secondary strip: a second surface (sources / actions) in the same language */
+.strip{ position:relative; border-radius:18px; background:var(--panel); padding:20px 22px; }
+.strip::before{ content:""; position:absolute; inset:0; border-radius:inherit; padding:1px; pointer-events:none;
+  background:linear-gradient(180deg, var(--edge-top), rgba(255,255,255,.04) 40%);
+  -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor; mask-composite:exclude; }
+.strip .sl{ font:500 11px/1 var(--sans); letter-spacing:.2em; text-transform:uppercase; color:rgba(255,255,255,.44); margin-bottom:16px; }
+.chips{ display:flex; flex-wrap:wrap; align-items:center; gap:10px; }
+.chip{ font:400 13.5px/1 var(--sans); color:rgba(255,255,255,.82); border:1px solid rgba(255,255,255,.2);
+  border-radius:8px; padding:7px 13px; background:rgba(255,255,255,.03); }
+.spacer{ flex:1; }
+.btn{ font:500 13px/1 var(--sans); letter-spacing:.01em; border-radius:9px; padding:10px 18px; cursor:pointer;
+  border:1px solid rgba(255,255,255,.16); background:transparent; color:rgba(255,255,255,.72);
+  transition:border-color .18s var(--ease), color .18s var(--ease), background .18s var(--ease); }
+.btn:hover{ color:#fff; border-color:rgba(255,255,255,.34); }
+.btn.primary{ background:rgba(245,245,247,.95); color:#08090b; border-color:transparent; font-weight:600; }
+.btn.primary:hover{ background:#fff; }
+
+.note{ font:300 12.5px/1.6 var(--sans); color:rgba(255,255,255,.4); letter-spacing:0; }
+.wname{ font:500 10.5px/1 var(--sans); letter-spacing:.2em; text-transform:uppercase; color:rgba(255,255,255,.5); }
+
+/* ============================================================================ WARM (reference-like) */
+.warm{
+  --world:#070605;
+  --glow:
+    radial-gradient(44% 38% at 92% -4%, rgba(255,186,110,.22), transparent 62%),
+    radial-gradient(40% 34% at 4% 2%, rgba(255,150,90,.1), transparent 58%),
+    radial-gradient(60% 46% at 50% 108%, rgba(120,90,60,.1), transparent 66%);
+  --panel:#0b0a09;
+  --edge-top:rgba(255,226,196,.6);
+  --accent:#ffcf9b; --accent-line:rgba(255,207,155,.5); --accent-txt:#ffe6cd; --accent-soft:rgba(255,207,155,.08);
+}
+/* ============================================================================ COOL (marine identity) */
+.cool{
+  --world:#050607;
+  --glow:
+    radial-gradient(44% 38% at 92% -4%, rgba(120,180,255,.2), transparent 62%),
+    radial-gradient(40% 34% at 4% 2%, rgba(90,220,210,.1), transparent 58%),
+    radial-gradient(60% 46% at 50% 108%, rgba(60,90,120,.12), transparent 66%);
+  --panel:#090b0d;
+  --edge-top:rgba(200,228,255,.58);
+  --accent:#9ecbff; --accent-line:rgba(158,203,255,.5); --accent-txt:#d8ecff; --accent-soft:rgba(158,203,255,.08);
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="lede">
+    <div class="ey">DEPTH · elite / minimal</div>
+    <h1>The reference language, on real DEPTH content</h1>
+    <p>Near-black cinematic panels with a bright hairline edge and an ambient glow — not frosted glass.
+       Light, large type. Uppercase tracked labels. Values as outlined token chips. A line-number gutter.
+       Colour only as atmosphere. Two temperatures below — pick one and I roll it across all five modes.</p>
+    <div class="dna">
+      <b>Near-black</b><b>Hairline edge</b><b>Light + large type</b><b>Tracked labels</b>
+      <b>Token chips</b><b>Gutter + rule</b><b>Colour restraint</b><b>Zero-build vanilla</b>
+    </div>
+  </div>
+  <div class="cols" id="cols"></div>
+</div>
+
+<template id="tpl">
+  <div class="world">
+    <div class="wtag"><span class="d">— temperature</span><span class="s"><i></i>live</span></div>
+
+    <div class="bar">
+      <div class="word"><b>DEPTH</b></div>
+      <div class="mid">Analyze</div>
+    </div>
+
+    <div class="panel panel-shadow">
+      <div class="plabel">DEPTH · analysis</div>
+      <div class="editor">
+        <div class="gutter"><span>01</span><span>02</span><span>03</span></div>
+        <div class="lines">
+          <div class="line">Found <span class="k">fishing gear</span> <span class="mut">at</span> <span class="k">0.73</span> <span class="mut">confidence</span></div>
+          <div class="line">height <span class="k">0.4 m</span> <span class="mut">·</span> shadow <span class="k">strong</span></div>
+          <div class="line">tier <span class="k acc">confirmed</span> <span class="mut">— routed to a person</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="strip">
+      <div class="sl">Sources · 8 frames</div>
+      <div class="chips">
+        <span class="chip">Rec19 · crab pots</span>
+        <span class="chip">Rec12 · ghost gear</span>
+        <span class="spacer"></span>
+        <button class="btn">Browse</button>
+        <button class="btn primary">Analyze frame</button>
+      </div>
+    </div>
+
+    <p class="note">Position ± 12 m · Rec19 · every number traces to the survey. A named person approves every action.</p>
+    <div class="wtag" style="margin-top:auto"><span class="wname"></span></div>
+  </div>
+</template>
+
+<script>
+const DIRS = [
+  { cls:"warm", name:"Warm · reference-like" },
+  { cls:"cool", name:"Cool · marine identity" },
+];
+const tpl = document.getElementById("tpl"), host = document.getElementById("cols");
+for (const d of DIRS){
+  const node = tpl.content.firstElementChild.cloneNode(true);
+  node.classList.add(d.cls);
+  node.querySelector(".wtag .d").textContent = "— " + d.name;
+  node.querySelector(".wname").textContent = d.name;
+  host.appendChild(node);
+}
+</script>
+</body>
+</html>

@@ -8,11 +8,11 @@ const API = ""; // same-origin (served by FastAPI)
 const SVGNS = "http://www.w3.org/2000/svg";
 
 const VERDICTS = ["confirmed", "review", "low_risk"];
-const VCOLOR = { confirmed: "#6fe3b4", review: "#f2c879", low_risk: "#8aa1b4", rejected: "#8aa1b4" };
+const VCOLOR = { confirmed: "#9ecbff", review: "#e6c48a", low_risk: "#7f8a97", rejected: "#7f8a97" };
 const VLABEL = { confirmed: "Confirmed", review: "Review", low_risk: "Low risk", rejected: "Low risk" };
 /* display text: sentence case, no snake_case ("fishing_gear" -> "Fishing gear") */
 const human = s => { s = String(s ?? "").replace(/_/g, " ").trim(); return s ? s[0].toUpperCase() + s.slice(1) : s; };
-const CLASS_SW = ["#5ff2c6", "#f2c879", "#a99cf5", "#7fd0ff", "#ff9fbf"];
+const CLASS_SW = ["#9ecbff", "#e6c48a", "#b3a8e6", "#86cfc2", "#e6a6be"];
 
 const state = {
   samples: [], selected: null, survey: null, map: null, mapLayers: [],
@@ -228,7 +228,7 @@ async function loadSamples() {
 
 function sonarGlyph() {
   const d = document.createElement("div");
-  d.style.cssText = "aspect-ratio:1;display:grid;place-items:center;background:radial-gradient(circle at 50% 35%,#0a2e3a,#02101a);color:#5ff2c6";
+  d.style.cssText = "aspect-ratio:1;display:grid;place-items:center;background:radial-gradient(circle at 50% 35%,#0d1013,#050607);color:#9ecbff";
   d.innerHTML = `<svg viewBox="0 0 24 24" width="28" height="28" opacity=".7"><path d="M12 3a9 9 0 1 0 9 9h-9V3Z" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg>`;
   return d;
 }
@@ -891,7 +891,7 @@ function renderMap(d, keepView) {
   state.mapLayers.forEach(l => state.map.removeLayer(l)); state.mapLayers = [];
   const byId = Object.fromEntries(d.tracked.map(t => [t.oid, t])), latlngs = [];
   geoObjs.forEach(t => {
-    const hc = { confirmed: "#6fe3b4", recovered: "#6fe3b4", rejected: "#8aa1b4", not_found: "#8aa1b4" }[t.human];
+    const hc = { confirmed: "#9ecbff", recovered: "#9ecbff", rejected: "#7f8a97", not_found: "#7f8a97" }[t.human];
     const color = hc || VCOLOR[t.verdict] || "#8ba6c2";
     const onRoute = t.human === "confirmed" || (t.verdict === "confirmed" && !t.human);
     const mk = L.circleMarker([t.lat, t.lon], { radius: onRoute ? 8 : (t.human === "rejected" || t.human === "not_found") ? 4 : 6,
@@ -905,15 +905,15 @@ function renderMap(d, keepView) {
   });
   const routePts = m.recovery_route.map(id => byId[id]).filter(t => t && t.lat != null).map(t => [t.lat, t.lon]);
   if (routePts.length > 1) {
-    const line = L.polyline(routePts, { color: "#5ff2c6", weight: 2.2, dashArray: "6 6", opacity: .9 }).addTo(state.map); state.mapLayers.push(line);
+    const line = L.polyline(routePts, { color: "#9ecbff", weight: 2.2, dashArray: "6 6", opacity: .9 }).addTo(state.map); state.mapLayers.push(line);
     routePts.forEach((p, i) => {
-      const badge = L.marker(p, { icon: L.divIcon({ className: "", html: `<div style="background:#5ff2c6;color:#04231b;font:600 10px/18px var(--sans,sans-serif);width:18px;height:18px;border-radius:50%;text-align:center;border:1.5px solid rgba(7,26,43,.6);box-shadow:0 2px 6px rgba(0,0,0,.4)">${i + 1}</div>`, iconSize: [18, 18], iconAnchor: [9, 9] }) }).addTo(state.map);
+      const badge = L.marker(p, { icon: L.divIcon({ className: "", html: `<div style="background:#9ecbff;color:#061018;font:600 10px/18px var(--sans,sans-serif);width:18px;height:18px;border-radius:50%;text-align:center;border:1.5px solid rgba(7,26,43,.6);box-shadow:0 2px 6px rgba(0,0,0,.4)">${i + 1}</div>`, iconSize: [18, 18], iconAnchor: [9, 9] }) }).addTo(state.map);
       state.mapLayers.push(badge);
     });
   }
   const inspPts = (m.inspection_route || []).map(id => byId[id]).filter(t => t && t.lat != null).map(t => [t.lat, t.lon]);
   if (inspPts.length > 1) {
-    const il = L.polyline(inspPts, { color: "#f2c879", weight: 2, dashArray: "2 6", opacity: .85 })
+    const il = L.polyline(inspPts, { color: "#e6c48a", weight: 2, dashArray: "2 6", opacity: .85 })
       .bindTooltip("Inspection route: review cards to check first (pending human approval)").addTo(state.map);
     state.mapLayers.push(il);
   }
@@ -1522,7 +1522,7 @@ function twinPanel(wrap, kind) {
       ${survey ? `<button class="tw-btn" data-a="replay" title="replay: the boat sweeps its sonar fans; finds appear as it passes them">Replay</button>` : ""}
       <button class="tw-btn" data-a="home" title="reset view">⌂ home</button><button class="tw-btn" data-a="snap" title="save a PNG of this view">⤓ PNG</button>
     </div><div class="twin-canvas"></div>
-    <div class="twin-foot"><span class="twin-legend"><span><i style="background:#6fe3b4"></i>confirmed</span><span><i style="background:#f2c879"></i>review</span><span><i style="background:#8aa1b4"></i>low-risk</span>${survey ? `<span><i style="background:#5ff2c6"></i>track · recovery</span><span><i style="background:#b3a8ff"></i>re-survey</span>` : `<span><i style="background:#5ff2c6"></i>sonar at tracked altitude</span><span><i style="background:#000;border:1px solid #445"></i>measured shadow</span>`}</span><span class="tw-note"></span></div>
+    <div class="twin-foot"><span class="twin-legend"><span><i style="background:#9ecbff"></i>confirmed</span><span><i style="background:#e6c48a"></i>review</span><span><i style="background:#7f8a97"></i>low-risk</span>${survey ? `<span><i style="background:#9ecbff"></i>track · recovery</span><span><i style="background:#b3a8ff"></i>re-survey</span>` : `<span><i style="background:#9ecbff"></i>sonar at tracked altitude</span><span><i style="background:#000;border:1px solid #445"></i>measured shadow</span>`}</span><span class="tw-note"></span></div>
     <div class="twin-empty" hidden></div>`;
   const ui = { canvas: wrap.querySelector(".twin-canvas"), note: wrap.querySelector(".tw-note"), empty: wrap.querySelector(".twin-empty"), wrap };
   return ui;

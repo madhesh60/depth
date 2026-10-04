@@ -75,6 +75,29 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ## 4. Session log
 
+### 2026-10-04 (sweep 48) — Studio theme: Elite / minimal (Cool · marine) — replaces Abyssal
+- **Ask:** reference frames (a dark code-editor panel + a light email) → "elite and simple", focus on
+  style / font / design, not content. Extracted the language: near-black cinematic panels, a bright
+  hairline edge, an ambient glow (**not** frosted glass), light + large type, uppercase tracked
+  micro-labels, token chips (outlined rounded rects), a line-number gutter, extreme colour restraint.
+- **Mocked** the language on real DEPTH content in two temperatures (`webui/_mockups/elite.html`,
+  warm vs cool); chose **Cool · marine**.
+- **Rolled across the studio** (the CSS is token-driven, so it cascades to all five modes):
+  - surfaces → flat near-black `#0a0c0e` with a crisp cool-white hairline edge (`--edge`); the glass
+    blur is removed; body → near-black `#050607` + an icy-blue / faint-teal ambient glow; the
+    OpenCV bathymetry chart (`.sea`) is hidden (the glow replaces it);
+  - colour restraint → **white is the primary action**; a single **blue-white `#9ecbff` accent**
+    carries focus, links, 'confirmed' and live signals; verdicts muted (confirmed = accent,
+    review `#e6c48a`, rejected `#7f8a97`); the old mint / amber tints reconciled throughout;
+  - type → lighter display headings, and **every panel title is now an uppercase tracked micro-label**;
+  - synced into `app.js` (class palette → 5 distinct cool-muted hues; verdict colours; map route +
+    numbered badges; placeholder) and `twin3d.js` (accent + verdict colours).
+- Replaces **Abyssal** (sweep 47). Kept: per-mode forms, progressive disclosure, responsive
+  breakpoints, and the `prefers-reduced-motion` / `prefers-reduced-transparency` fallbacks.
+- **Checks:** `styles.css` brace-balanced (620/620); no old-palette literals remain in
+  styles / app / twin; `theme-color` → `#050607`. No Python touched (suite green at 153 last run).
+  **Browser eyeball still to do — this is a from-scratch language shift, expect tuning.**
+
 ### 2026-10-04 (sweep 47) — Studio theme: Abyssal (chosen from three mocked directions)
 - **Ask:** a *new* visual direction, not a repaint. The front end was already glassmorphic / Apple /
   marine with per-mode forms, progressive disclosure, responsive breakpoints and
