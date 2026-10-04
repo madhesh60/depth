@@ -75,6 +75,30 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ## 4. Session log
 
+### 2026-10-04 (sweep 47) — Studio theme: Abyssal (chosen from three mocked directions)
+- **Ask:** a *new* visual direction, not a repaint. The front end was already glassmorphic / Apple /
+  marine with per-mode forms, progressive disclosure, responsive breakpoints and
+  reduced-motion/-transparency fallbacks — so this is a palette + material change, not a rebuild.
+- **Mocked three directions** as one side-by-side style tile (`webui/_mockups/style-tiles.html`, the
+  same component cluster rendered three ways): **A · Surface** (light frosted glass), **B · Abyssal**
+  (deeper dark, glassier, luminous), **C · Chart** (flat instrument). Chose **B**.
+- **Abyssal applied** (tokens only — layout, type scale and components unchanged):
+  - background → an abyss gradient (surface light → black, `#082231`→`#01050a`) with a teal bloom
+    bottom-left and an indigo bloom top-right; the nautical chart under the glass dropped to 30%;
+  - glass heavier — base `rgba(9,26,37,.52)`, `blur(36px) saturate(185%)`; edges and sheen tinted
+    teal; label colours shifted to a faint teal-white;
+  - accent ocean-cyan `#64d2ff` → **bioluminescent teal `#5ff2c6`** (ink `#04231b`); the focus ring
+    gains an **indigo `#8b7bff` glow**.
+  - Synced into `app.js` (hero-class box → teal; the old mint class recoloured sky so the five class
+    hues stay distinct; map route + numbered badges; empty-state placeholder) and `twin3d.js` (`CYAN`
+    const + boat-hull emissive). Twin + map legend swatches follow.
+- **Left unchanged on purpose:** the verdict palette (confirmed/review/rejected), the host-neutral
+  `depth-embed` panel (it blends into third-party consoles), and the `prefers-reduced-motion` /
+  `prefers-reduced-transparency` fallbacks.
+- Added `theme-color` / `color-scheme` meta for mobile browser chrome.
+- **Checks:** no stray old-accent literals remain in `webui/`; `styles.css` brace-balanced (621/621);
+  served directly from `webui/` (zero-build — takes effect on reload). **Browser eyeball still to do.**
+
 ### 2026-10-04 (sweep 46) — EXP-005 prepared from the evidence; two levers tested and rejected
 - **Duplicate-box suppression** (validation, EXP-003 / EXP-004):
   - 35% / 28% of false alarms are a second box on an already-matched pot, nested;

@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>DEPTH — visual directions (mockup only)</title>
+<style>
+/* ============================================================== DEPTH · style tiles (mockup only)
+   Three candidate visual directions for the studio, rendered with the SAME component cluster so the
+   choice is apples-to-apples. Nothing here ships: this is a mood board. Each tile is a self-contained
+   theme driven entirely by CSS custom properties — whichever is chosen, its token set drops into
+   styles.css. Zero build, vanilla, marine, Apple-grade. */
+
+@font-face { font-family:"Inter"; font-weight:100 900; font-display:swap; src:url("../vendor/fonts/inter-latin-var.woff2") format("woff2"); }
+@font-face { font-family:"JetBrains Mono"; font-weight:100 800; font-display:swap; src:url("../vendor/fonts/jetbrains-mono-latin-var.woff2") format("woff2"); }
+
+:root{
+  --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", "SF Mono", ui-monospace, Consolas, monospace;
+  --ease: cubic-bezier(.2,.8,.2,1);
+  --t:.24s; --t-fast:.15s;
+}
+*{ box-sizing:border-box; margin:0; padding:0; }
+body{
+  font-family:var(--sans); letter-spacing:-.003em; color:#e8eef5; background:#080c12;
+  -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale; text-rendering:optimizeLegibility;
+  min-height:100vh;
+}
+.wrap{ max-width:1460px; margin:0 auto; padding:30px 30px 56px; }
+
+/* page header -------------------------------------------------------------------------------------- */
+.lede{ max-width:720px; margin-bottom:22px; }
+.lede .ey{ font:600 11px/1 var(--sans); letter-spacing:.14em; text-transform:uppercase; color:#5fd0ff; }
+.lede h1{ font:600 26px/1.2 var(--sans); letter-spacing:-.02em; margin:10px 0 8px; }
+.lede p{ font:400 14px/1.6 var(--sans); color:rgba(232,238,245,.66); }
+.lede .fixed{ margin-top:14px; display:flex; flex-wrap:wrap; gap:8px; }
+.lede .fixed b{ font:500 11.5px/1 var(--sans); color:rgba(232,238,245,.78); background:rgba(255,255,255,.05);
+  border:1px solid rgba(255,255,255,.1); border-radius:999px; padding:6px 11px; }
+
+/* tile grid ---------------------------------------------------------------------------------------- */
+.tiles{ display:grid; grid-template-columns:repeat(3,1fr); gap:18px; align-items:start; }
+@media (max-width:1120px){ .tiles{ grid-template-columns:1fr; max-width:460px; } }
+
+/* a tile is a self-contained themed mini-studio with its own world ---------------------------------- */
+.tile{
+  position:relative; overflow:hidden; border-radius:22px; padding:16px;
+  background:var(--bg); color:var(--txt);
+  border:1px solid var(--edge, rgba(255,255,255,.06));
+  box-shadow:0 30px 80px -40px rgba(0,0,0,.9);
+  display:flex; flex-direction:column; gap:12px;
+}
+.tile::before{ content:""; position:absolute; inset:0; background:var(--sea); pointer-events:none; }
+.tile > *{ position:relative; z-index:1; }
+
+.tile-id{ display:flex; align-items:center; gap:11px; padding:2px 2px 4px; }
+.tile-letter{ flex:0 0 auto; width:30px; height:30px; border-radius:9px; display:grid; place-items:center;
+  font:600 14px/1 var(--sans); color:var(--accent-ink); background:var(--accent-btn); box-shadow:var(--sheen); }
+.tile-name{ font:600 15px/1.1 var(--sans); letter-spacing:-.01em; }
+.tile-tag{ font:400 12px/1.3 var(--sans); color:var(--txt-3); }
+
+/* topbar ------------------------------------------------------------------------------------------- */
+.bar{
+  display:flex; align-items:center; gap:10px; padding:0 8px 0 13px; height:46px; border-radius:14px;
+  background:var(--panel); -webkit-backdrop-filter:var(--blur); backdrop-filter:var(--blur);
+  border:1px solid var(--border); box-shadow:var(--sheen), var(--shadow);
+}
+.word{ font:600 15px/1 var(--sans); letter-spacing:.02em; display:flex; align-items:baseline; gap:6px; color:var(--txt); }
+.word span{ font-weight:400; color:var(--txt-3); letter-spacing:-.01em; }
+.nav{ display:flex; gap:2px; margin:0 auto; padding:3px; border-radius:999px; background:var(--track); border:1px solid var(--border); }
+.np{ font:500 11.5px/1 var(--sans); color:var(--txt-2); padding:6px 11px; border-radius:999px; cursor:pointer; transition:background var(--t) var(--ease), color var(--t-fast); }
+.np:hover{ color:var(--txt); background:var(--hover); }
+.np.on{ color:var(--nav-on-txt, var(--txt)); background:var(--nav-on-bg); box-shadow:var(--nav-on-sh, none); border-bottom:var(--nav-on-rule, none); border-radius:var(--nav-on-radius, 999px); }
+.status{ display:inline-flex; align-items:center; gap:7px; font:500 11.5px/1 var(--sans); color:var(--txt-2);
+  border:1px solid var(--border); border-radius:999px; padding:6px 11px; }
+.status i{ width:7px; height:7px; border-radius:50%; background:var(--confirmed); box-shadow:0 0 8px -1px var(--confirmed); }
+
+/* panel -------------------------------------------------------------------------------------------- */
+.panel{
+  background:var(--panel); -webkit-backdrop-filter:var(--blur); backdrop-filter:var(--blur);
+  border:1px solid var(--border); border-radius:var(--r-panel); box-shadow:var(--sheen), var(--shadow);
+  padding:15px 15px 16px;
+}
+.panel.tight{ padding:13px 15px; }
+.ph-head{ display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+.ph-title{ font:600 13px/1 var(--sans); letter-spacing:-.003em; color:var(--txt); }
+.ph-meta{ margin-left:auto; font:500 12px/1 var(--sans); color:var(--txt-3); font-variant-numeric:tabular-nums; }
+.note{ font:400 12px/1.5 var(--sans); color:var(--txt-3); margin-bottom:12px; }
+
+/* sample cards ------------------------------------------------------------------------------------- */
+.cards{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:11px; }
+.card{ border:1px solid var(--border); border-radius:var(--r-ctl); overflow:hidden; background:var(--card-bg);
+  transition:border-color var(--t-fast), transform var(--t) var(--ease), box-shadow var(--t); cursor:pointer; }
+.card:hover{ transform:translateY(-1px); border-color:var(--accent-line); box-shadow:var(--shadow); }
+.thumb{ position:relative; aspect-ratio:1; display:block;
+  background:radial-gradient(42% 36% at 62% 40%, rgba(150,210,255,.55), rgba(150,210,255,0) 70%),
+             radial-gradient(28% 22% at 61% 41%, rgba(255,255,255,.85), rgba(255,255,255,0) 72%),
+             linear-gradient(160deg, #0b1a26, #05101a 70%); }
+.thumb.t2{ background:radial-gradient(40% 30% at 38% 58%, rgba(150,210,255,.5), rgba(150,210,255,0) 70%),
+             radial-gradient(26% 18% at 38% 57%, rgba(255,255,255,.8), rgba(255,255,255,0) 72%),
+             linear-gradient(160deg, #0a1823, #050e17 70%); }
+.cnt{ position:absolute; left:7px; bottom:7px; font:500 10.5px/1 var(--sans); font-variant-numeric:tabular-nums;
+  color:#fff; background:rgba(4,10,18,.62); border:1px solid rgba(255,255,255,.16); border-radius:999px; padding:3px 8px; }
+.cn{ font:500 11.5px/1.3 var(--sans); color:var(--txt-2); padding:7px 9px 8px; }
+
+.drop{ display:flex; align-items:center; justify-content:center; gap:7px; border:1px dashed var(--border-2, var(--border));
+  border-radius:var(--r-ctl); padding:10px; font:400 12px/1 var(--sans); color:var(--txt-3); cursor:pointer;
+  transition:border-color var(--t-fast), color var(--t-fast), background var(--t-fast); }
+.drop:hover{ color:var(--txt-2); border-color:var(--accent-line); background:var(--hover); }
+.drop u{ text-decoration:none; color:var(--txt-2); }
+
+/* buttons ------------------------------------------------------------------------------------------ */
+.btn{ display:inline-flex; align-items:center; justify-content:center; gap:7px; width:100%;
+  font:500 13px/1 var(--sans); letter-spacing:-.003em; padding:10px 15px; border-radius:var(--r-ctl);
+  border:1px solid var(--border-2, var(--border)); background:var(--btn-bg); color:var(--txt); cursor:pointer;
+  transition:background var(--t-fast), border-color var(--t-fast), transform var(--t-fast) var(--ease); }
+.btn:hover{ background:var(--hover); border-color:var(--accent-line); }
+.btn:active{ transform:scale(.985); }
+.btn.primary{ background:var(--accent-btn); color:var(--accent-ink); border-color:transparent; font-weight:600;
+  box-shadow:var(--btn-glow); }
+.btn.primary:hover{ filter:brightness(1.06); background:var(--accent-btn); }
+.btn:disabled{ opacity:.45; cursor:not-allowed; background:var(--track); color:var(--txt-3); box-shadow:none; border-color:var(--border); }
+.row2{ display:grid; grid-template-columns:1fr 1fr; gap:9px; margin:9px 0 14px; }
+
+/* fields ------------------------------------------------------------------------------------------- */
+.field{ display:flex; flex-direction:column; gap:6px; font:500 11.5px/1 var(--sans); color:var(--txt-3); margin-bottom:11px; }
+.field > span{ display:flex; align-items:center; justify-content:space-between; }
+.field b{ font-weight:600; color:var(--txt-2); }
+.field input, .field select{ font:400 13px/1 var(--sans); font-variant-numeric:tabular-nums; color:var(--txt);
+  padding:9px 11px; border-radius:var(--r-ctl); background:var(--field); border:1px solid var(--field-border); width:100%; }
+.field input:focus, .field select:focus{ outline:none; border-color:var(--accent-line); box-shadow:var(--focus); }
+.field select{ appearance:none; cursor:pointer; }
+.field.range input{ -webkit-appearance:none; appearance:none; padding:0; height:4px; background:var(--track); border:0; border-radius:999px; }
+.field.range input::-webkit-slider-thumb{ -webkit-appearance:none; width:16px; height:16px; border-radius:50%; background:var(--accent-btn); border:2px solid var(--thumb-ring, #fff); box-shadow:0 1px 4px rgba(0,0,0,.4); cursor:pointer; }
+
+.tier{ margin-top:12px; font:500 11.5px/1.4 var(--sans); color:var(--tier-txt, var(--txt-2));
+  background:var(--accent-soft); border:1px solid var(--accent-line); border-radius:999px; padding:8px 13px; text-align:center; }
+
+/* verdict chips + log ------------------------------------------------------------------------------ */
+.chips{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:11px; }
+.chip{ display:inline-flex; align-items:center; gap:7px; font:500 11.5px/1 var(--sans); font-variant-numeric:tabular-nums;
+  color:var(--txt-2); border:1px solid var(--border); border-radius:999px; padding:6px 11px; background:var(--track); }
+.chip i{ width:8px; height:8px; border-radius:50%; }
+.chip.ok i{ background:var(--confirmed); } .chip.rev i{ background:var(--review); } .chip.rej i{ background:var(--rejected); }
+.log{ font:500 11.5px/1.5 var(--mono); color:var(--txt-3); letter-spacing:-.01em; }
+.log .lk{ color:var(--accent); font-weight:600; } .log .lt{ color:var(--txt-2); }
+
+@media (prefers-reduced-motion: reduce){ *,*::before,*::after{ transition-duration:.001ms !important; animation-duration:.001ms !important; } }
+
+/* ============================================================================= A · Surface (light) */
+.tile-a{
+  --bg: radial-gradient(130% 92% at 50% -12%, #eef7ff 0%, #ddeefb 42%, #cde4f3 100%);
+  --sea: radial-gradient(52% 40% at 84% 14%, rgba(70,150,205,.16), transparent 62%),
+         radial-gradient(44% 34% at 10% 96%, rgba(40,110,160,.12), transparent 60%);
+  --edge: rgba(20,70,110,.12);
+  --txt:#0a2233; --txt-2:#35546b; --txt-3:#6b8498;
+  --panel: linear-gradient(180deg, rgba(255,255,255,.74), rgba(255,255,255,.56));
+  --blur: blur(26px) saturate(150%);
+  --border: rgba(12,48,80,.11); --border-2: rgba(12,48,80,.2);
+  --sheen: inset 0 1px 0 rgba(255,255,255,.85);
+  --shadow: 0 18px 42px -26px rgba(20,70,120,.5);
+  --track: rgba(12,48,80,.06); --hover: rgba(12,48,80,.05);
+  --card-bg: rgba(255,255,255,.55); --field: rgba(255,255,255,.72); --field-border: rgba(12,48,80,.16);
+  --accent:#0a84c7; --accent-btn:#0a6ea5; --accent-ink:#ffffff;
+  --accent-soft: rgba(10,132,199,.1); --accent-line: rgba(10,132,199,.42);
+  --btn-bg: rgba(255,255,255,.6); --btn-glow: 0 10px 22px -12px rgba(10,110,165,.7);
+  --focus: 0 0 0 3px rgba(10,132,199,.3); --thumb-ring:#fff;
+  --nav-on-bg:#fff; --nav-on-sh: 0 2px 8px -3px rgba(20,70,120,.4); --nav-on-txt:#0a2233;
+  --confirmed:#15935f; --review:#ad7a1a; --rejected:#6b8498; --tier-txt:#0a5a86;
+  --r-panel:16px; --r-ctl:10px;
+}
+/* ========================================================== B · Abyssal (deep, glassier, luminous) */
+.tile-b{
+  --bg: radial-gradient(135% 100% at 50% -22%, #0c2f41 0%, #071b29 44%, #01060c 100%);
+  --sea: radial-gradient(50% 34% at 14% 88%, rgba(40,150,135,.16), transparent 62%),
+         radial-gradient(44% 30% at 88% 8%, rgba(96,78,210,.15), transparent 60%);
+  --edge: rgba(130,235,215,.1);
+  --txt:#ecfbf6; --txt-2: rgba(230,250,244,.72); --txt-3: rgba(230,250,244,.46);
+  --panel: linear-gradient(180deg, rgba(255,255,255,.065), rgba(255,255,255,.015)), rgba(9,26,37,.5);
+  --blur: blur(36px) saturate(185%);
+  --border: rgba(130,235,215,.14); --border-2: rgba(130,235,215,.22);
+  --sheen: inset 0 .5px 0 rgba(185,255,245,.16);
+  --shadow: 0 28px 72px -30px rgba(0,0,0,.82);
+  --track: rgba(0,0,0,.32); --hover: rgba(130,235,215,.08);
+  --card-bg: rgba(255,255,255,.03); --field: rgba(0,12,16,.42); --field-border: rgba(130,235,215,.18);
+  --accent:#5ff2c6; --accent-btn:#5ff2c6; --accent-ink:#04231b;
+  --accent-soft: rgba(95,242,198,.13); --accent-line: rgba(95,242,198,.42);
+  --btn-bg: rgba(255,255,255,.04); --btn-glow: 0 0 24px -4px rgba(95,242,198,.5), 0 10px 26px -14px rgba(95,242,198,.5);
+  --focus: 0 0 0 3px rgba(95,242,198,.26), 0 0 20px -4px rgba(95,242,198,.4); --thumb-ring:#04231b;
+  --nav-on-bg: rgba(255,255,255,.12); --nav-on-sh: inset 0 .5px 0 rgba(185,255,245,.2);
+  --confirmed:#5ff2c6; --review:#ffd27a; --rejected:#7fa0b0;
+  --r-panel:18px; --r-ctl:11px;
+}
+/* ============================================================= C · Chart (flat, crisp, instrument) */
+.tile-c{
+  --bg:
+    linear-gradient(rgba(130,165,185,.045) 1px, transparent 1px) 0 0/23px 23px,
+    linear-gradient(90deg, rgba(130,165,185,.045) 1px, transparent 1px) 0 0/23px 23px,
+    radial-gradient(80% 54% at 50% -4%, rgba(30,74,100,.42), transparent 72%), #0d141b;
+  --sea: radial-gradient(60% 40% at 86% 94%, rgba(224,163,75,.07), transparent 62%);
+  --edge: rgba(150,180,200,.16);
+  --txt:#dde8ef; --txt-2: rgba(221,232,239,.72); --txt-3: rgba(221,232,239,.46);
+  --panel: rgba(18,27,37,.9);
+  --blur: blur(7px) saturate(115%);
+  --border: rgba(150,182,202,.18); --border-2: rgba(150,182,202,.28);
+  --sheen: none;
+  --shadow: 0 10px 28px -18px rgba(0,0,0,.72);
+  --track: rgba(0,0,0,.26); --hover: rgba(150,182,202,.08);
+  --card-bg: rgba(12,19,27,.6); --field: rgba(9,15,21,.6); --field-border: rgba(150,182,202,.24);
+  --accent:#4fc3d6; --accent-btn:#2f9fb0; --accent-ink:#021417;
+  --accent-soft: rgba(79,195,214,.1); --accent-line: rgba(79,195,214,.4);
+  --btn-bg: rgba(150,182,202,.06); --btn-glow: none;
+  --focus: 0 0 0 2px rgba(79,195,214,.5); --thumb-ring:#0d141b;
+  /* instrument identity: amber marker underline on the active tab */
+  --nav-on-bg: transparent; --nav-on-radius: 3px; --nav-on-rule: 2px solid #e0a34b; --nav-on-txt:#fff;
+  --confirmed:#3bbf8f; --review:#e0a34b; --rejected:#7f94a3; --tier-txt:#8fd7e4;
+  --r-panel:10px; --r-ctl:7px;
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="lede">
+    <div class="ey">DEPTH · visual directions</div>
+    <h1>Three looks, one studio</h1>
+    <p>Same component cluster rendered three ways so you can compare like-for-like. This is a mockup —
+       nothing in the real studio has changed. Pick one and I'll apply its token set across all five modes.</p>
+    <div class="fixed">
+      <b>Zero-build vanilla</b><b>Marine</b><b>Apple-grade type</b><b>Glass fallbacks kept</b><b>Responsive</b>
+    </div>
+  </div>
+  <div class="tiles" id="tiles"></div>
+</div>
+
+<template id="tpl">
+  <div class="tile">
+    <header class="tile-id">
+      <span class="tile-letter"></span>
+      <div><div class="tile-name"></div><div class="tile-tag"></div></div>
+    </header>
+
+    <div class="bar">
+      <div class="word">DEPTH<span>Studio</span></div>
+      <nav class="nav"><span class="np on">Analyze</span><span class="np">Survey</span><span class="np">Study</span></nav>
+      <span class="status"><i></i>Ready</span>
+    </div>
+
+    <section class="panel">
+      <div class="ph-head"><span class="ph-title">Sources</span><span class="ph-meta">8 frames</span></div>
+      <p class="note">One click — no sonar files needed, or drop your own frame.</p>
+      <div class="cards">
+        <div class="card"><div class="thumb"><span class="cnt">3 pots</span></div><div class="cn">Rec19 · crab pots</div></div>
+        <div class="card"><div class="thumb t2"><span class="cnt">1 pot</span></div><div class="cn">Rec12 · ghost gear</div></div>
+      </div>
+      <div class="drop">⤓&nbsp; Drop a sonar frame or <u>browse</u></div>
+    </section>
+
+    <section class="panel">
+      <div class="ph-head"><span class="ph-title">Run &amp; decide</span></div>
+      <button class="btn primary">Analyze frame</button>
+      <div class="row2"><button class="btn">Agent tour</button><button class="btn primary" disabled>Analyze frame</button></div>
+      <label class="field"><span>Analyst budget (minutes)</span><input type="number" value="5" /></label>
+      <label class="field"><span>GPS source</span><select><option>Synthetic demo track</option></select></label>
+      <label class="field range"><span>Confidence gate <b>0.05</b></span><input type="range" min="0" max="100" value="12" /></label>
+      <div class="tier">Guaranteed tier · ≥ 65% of pots reach a human</div>
+    </section>
+
+    <section class="panel tight">
+      <div class="chips">
+        <span class="chip ok"><i></i>Confirmed 4</span><span class="chip rev"><i></i>Review 7</span><span class="chip rej"><i></i>Rejected 2</span>
+      </div>
+      <div class="log"><span class="lk">see</span> · yolo11 · 11 boxes · <span class="lt">182 ms</span></div>
+    </section>
+  </div>
+</template>
+
+<script>
+const DIRS = [
+  { cls:"tile-a", L:"A", name:"Surface",  tag:"Light frosted glass · daylight" },
+  { cls:"tile-b", L:"B", name:"Abyssal",  tag:"Deeper dark · glassier · luminous" },
+  { cls:"tile-c", L:"C", name:"Chart",    tag:"Flat · crisp · instrument" },
+];
+const tpl = document.getElementById("tpl"), host = document.getElementById("tiles");
+for (const d of DIRS){
+  const node = tpl.content.firstElementChild.cloneNode(true);
+  node.classList.add(d.cls);
+  node.querySelector(".tile-letter").textContent = d.L;
+  node.querySelector(".tile-name").textContent = d.name;
+  node.querySelector(".tile-tag").textContent = d.tag;
+  host.appendChild(node);
+}
+</script>
+</body>
+</html>
