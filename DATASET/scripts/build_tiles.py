@@ -252,9 +252,11 @@ def main():
     ap.add_argument("--drop-sources", default="", help="comma list of filename prefixes to leave out of TRAIN, e.g. seabed")
     ap.add_argument("--drop-rotated", action="store_true", help="leave out rotated copies (black corners) from TRAIN")
     ap.add_argument("--keep-classes", default="", help="e.g. 0 = single-class ghost-gear set (val/test copied to match)")
+    ap.add_argument("--extra-labels", default="", help="JSON label patch for TRAIN frames: {image file name: [[cls, cx, cy, w, h], ...]}")
     a = ap.parse_args()
     drop = tuple(x.strip().lower() for x in a.drop_sources.split(",") if x.strip())
     keep = [int(x) for x in a.keep_classes.split(",") if x.strip()] or None
+    patch = json.loads(Path(a.extra_labels).read_text(encoding="utf-8"))["labels"] if a.extra_labels else {}
     random.seed(a.seed)
     src, out = Path(a.src), Path(a.out)
     (out / "train" / "images").mkdir(parents=True, exist_ok=True)
@@ -273,6 +275,9 @@ def main():
                 stats["dropped_rotated"] += 1
                 continue
         raw = read_labels(src / "train" / "labels" / f"{ip.stem}.txt")
+        if ip.name in patch:                                  # reviewed pseudo-labels: missing pots added (train only)
+            raw = raw + [(int(c), float(x), float(y), float(w), float(h)) for c, x, y, w, h in patch[ip.name]]
+            stats["boxes_patched"] = stats.get("boxes_patched", 0) + len(patch[ip.name])
         labels = keep_labels(raw, keep)
         stats["boxes_dropped_class"] += len(raw) - len(labels)
         stats["frames"] += 1

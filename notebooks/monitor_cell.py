@@ -11,8 +11,8 @@ import csv, json, os, re, shutil, subprocess, sys, time
 
 WORK = "/kaggle/working"
 RUNS_DIR, LOGS = f"{WORK}/depth/runs", f"{WORK}/logs"
-NAMES = ["EXP-004", "EXP-004g"]          # cleaned 2-class, cleaned ghost-gear only
-EPOCHS = {"EXP-004": 150, "EXP-004g": 150}   # cell 4 (early stopping may end a run sooner)
+NAMES = ["EXP-005", "EXP-005a"]          # the same recipe, seeds 42 and 7
+EPOCHS = {"EXP-005": 150, "EXP-005a": 150}   # cell 4 (early stopping may end a run sooner)
 CHECK_EVERY_MIN = 5
 QUIET_WARN_MIN = 30                       # alive but nothing written for this long -> "may be stuck"
 

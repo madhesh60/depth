@@ -75,6 +75,28 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ## 4. Session log
 
+### 2026-10-04 (sweep 46) — EXP-005 prepared from the evidence; two levers tested and rejected
+- **Duplicate-box suppression** (validation, EXP-003 / EXP-004):
+  - 35% / 28% of false alarms are a second box on an already-matched pot, nested;
+  - containment suppression: ΔAP@0.5 −0.08 / −0.05;
+  - keeping the inner box: −0.21 / −0.19;
+  - rejected: it is box-extent ambiguity, and the deploy NMS is unchanged.
+- **Pseudo-labels:** both models fire confidently on only 9 unlabelled spots in 1,131 crab-pot
+  training frames. 8 passed visual review, against 1,345 labels. The training labels are nearly
+  complete, so they are not used; the missing pots are concentrated in validation.
+- **EXP-005 / EXP-005a:**
+  - EXP-003's recipe on EXP-004's cleaned data;
+  - **stronger brightness and scale jitter** (`--hsv-v 0.4 --scale 0.6`), targeting the
+    train-vs-new-recording gap;
+  - two seeds, because validation noise is ±0.07.
+- Kit:
+  - `train.py --hsv-v/--scale` (recorded in `model_meta`);
+  - `build_tiles.py --extra-labels` (reviewed label patch, train only);
+  - `notebooks/exp005_kaggle.ipynb`;
+  - the guide was rewritten around what each run established.
+
+  The exact EXP-005a command was dry-run on CPU. Kit tests: 14 passed.
+
 ### 2026-10-03 (sweep 45) — EXP-004 analysed: no gain for pots; what limits the detector now
 - **EXP-004 / EXP-004g trained** (SGD 0.01 recorded; cleaned data). `diagnose` was run against
   EXP-003 on the deploy path.

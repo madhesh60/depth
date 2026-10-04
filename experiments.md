@@ -95,7 +95,8 @@ focus first, aug-ablation demoted.
 | ✅ EXP-001 | Baseline (**done** — 40 ep) | YOLO11s detect, v1, 640, sonar aug → mAP@0.5 0.822 (aggregate), sonar fishing_gear R 0.47 |
 | ❌ EXP-002 | Higher resolution + tiles on clean v2b (run 2026-09-30) | **Underfit**: auto-optimizer AdamW 0.00167 + tile label poisoning. Val ghost AP 0.25 → rejected (see log) |
 | ✅ EXP-003 | The EXP-002 causes fixed: explicit SGD 0.01, fixed tiles; tiles vs full frames at 640 | **Recall promise 65% → 79%** (held on test at 81%), fewer review cards; wreck fails; official-split F1 0.41 |
-| **EXP-004** (next) | Clean data: no fish-finder screenshots, no rotated copies; + a ghost-only arm | `notebooks/exp004_kaggle.ipynb` |
+| ❌ EXP-004 | Clean data: no fish-finder screenshots, no rotated copies; + a ghost-only arm | No gain for pots (Δ −0.03 [−0.11, +0.05]); wreck ceiling 0.10 → 0.30 |
+| **EXP-005** (next) | Cleaned data + stronger brightness/scale jitter, two seeds | `notebooks/exp005_kaggle.ipynb` |
 | ✅ (in v2b) | **Sonar-only** training raises the target-domain numbers + removes the optical→natural_formation shortcut (optical debris is 0% and off-product) | filter to crabpot/uatd/mpulse/seabed/shipwreck |
 | (EXP-003 arms) | **Tiled train+infer** (SAHI-style slicing) beats one large frame for tiny targets — doubles as Stage-1's reframed tiling role | slice → detect per tile → merge |
 | EXP-005 | Oversampling fishing_gear + small-object aug (copy_paste>0, scale-up mosaic) lifts recall | minority oversample + aug |
@@ -241,6 +242,29 @@ card review under ~8 s and/or imperfect manual recall — both are exactly what 
 DEPTH's order equals confidence order for EXP-001 (STUDY-07); its measurable extras are the promise
 (when to stop) and a forecast that held (slightly conservative). Status: **study pending** (needs
 3+ people). A higher recall ceiling (EXP-002) moves the promise and the card count.
+
+### EXP-005 / EXP-005a — cleaned data + stronger brightness/scale jitter, two seeds — READY TO RUN
+
+- Status: **kit ready** (`notebooks/exp005_kaggle.ipynb`, [`docs/kaggle_training.md`](docs/kaggle_training.md)).
+  The exact command was dry-run on CPU. GPU run pending.
+- Why: the remaining measured weakness is generalisation to new recordings. Fit on training frames is
+  AP@0.3 0.74 vs 0.49 on validation, and validation peaks mid-run. Sonar gain differs per recording.
+- Recipe: EXP-003's (SGD 0.01, fixed tiles, 640 px, 150 ep, 2 classes) on EXP-004's cleaned data, with
+  `--hsv-v 0.4 --scale 0.6` (was 0.2 / 0.5). Seeds 42 (EXP-005) and 7 (EXP-005a).
+- Levers tested before the run and rejected, on validation:
+  - **Duplicate-box suppression:** 35% of EXP-003's false alarms are a second box on a matched pot,
+    usually a nested head box inside a head-and-shadow box.
+    - Suppressing the weaker box: ΔAP@0.5 −0.08 (EXP-003) and −0.05 (EXP-004), P(gain) 0.00.
+    - Keeping the inner box: −0.21 / −0.19.
+    - It is box-extent ambiguity, not a rule post-processing can fix. The deploy NMS is unchanged.
+  - **Pseudo-labels for missing pots:** EXP-003 and EXP-004 both fire at ≥ 0.5 with no label nearby on
+    only 9 spots in 1,131 crab-pot training frames; 8 were accepted on visual review, against 1,345
+    labels. The training labels are nearly complete, so they are not used. (The kit option
+    `--extra-labels` stays.) Missing labels are concentrated in validation (19 confident orphans),
+    which depresses every model's validation score equally.
+- Pass bar: fit AP@0.3 ≥ 0.65; validation ghost AP above EXP-003's 0.39 by the paired bootstrap; wreck
+  recall ceiling > 0.5.
+- Result: _pending._
 
 ### EXP-004 / EXP-004g — EXP-003's recipe on cleaned data (+ a ghost-gear-only arm) — DONE (NEGATIVE for ghost gear)
 

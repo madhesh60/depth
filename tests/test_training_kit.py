@@ -75,10 +75,10 @@ def test_notebook_pins_the_tested_ultralytics():
     repo = Path(__file__).resolve().parents[1]
     pin = next(l.split("==")[1].strip() for l in (repo / "requirements-train.txt").read_text().splitlines()
                if l.startswith("ultralytics=="))
-    nb = json.loads((repo / "notebooks" / "exp004_kaggle.ipynb").read_text(encoding="utf-8"))
+    nb = json.loads((repo / "notebooks" / "exp005_kaggle.ipynb").read_text(encoding="utf-8"))
     src = "".join("".join(c["source"]) for c in nb["cells"])
-    assert f"ultralytics=={pin}" in src and "--cache\", \"none\"" in src and "EXP-004g" in src
-    assert "\"--optimizer\", \"SGD\"" in src and "--drop-rotated" in src and "--keep-classes 0" in src
+    assert f"ultralytics=={pin}" in src and "--cache\", \"none\"" in src and "EXP-005a" in src
+    assert "\"--optimizer\", \"SGD\"" in src and "--drop-rotated" in src and "\"--hsv-v\", \"0.4\"" in src
 
 
 def test_notebook_monitor_cell_reports_and_collects(tmp_path, monkeypatch):
@@ -87,44 +87,44 @@ def test_notebook_monitor_cell_reports_and_collects(tmp_path, monkeypatch):
     bug that broke the first Kaggle run (stale variables, wrong unpacking) would fail here."""
     import json, subprocess, zipfile
     repo = Path(__file__).resolve().parents[1]
-    nb = json.loads((repo / "notebooks" / "exp004_kaggle.ipynb").read_text(encoding="utf-8"))
+    nb = json.loads((repo / "notebooks" / "exp005_kaggle.ipynb").read_text(encoding="utf-8"))
     cell = next("".join(c["source"]) for c in nb["cells"] if "STATUS / WAIT / COLLECT" in "".join(c["source"]))
     w = tmp_path
-    (w / "logs").mkdir(); (w / "depth/runs/EXP-004").mkdir(parents=True); (w / "depth/runs/EXP-004g").mkdir(parents=True)
+    (w / "logs").mkdir(); (w / "depth/runs/EXP-005").mkdir(parents=True); (w / "depth/runs/EXP-005a").mkdir(parents=True)
     hdr = "epoch,metrics/recall(B),metrics/mAP50(B)\n"
-    (w / "depth/runs/EXP-004/results.csv").write_text(hdr + "1,0.3,0.2\n2,0.4,0.3\n")
-    (w / "depth/runs/EXP-004g/results.csv").write_text(hdr + "1,0.2,0.1\n")
-    (w / "depth/runs/EXP-004/model_meta.json").write_text(json.dumps(
+    (w / "depth/runs/EXP-005/results.csv").write_text(hdr + "1,0.3,0.2\n2,0.4,0.3\n")
+    (w / "depth/runs/EXP-005a/results.csv").write_text(hdr + "1,0.2,0.1\n")
+    (w / "depth/runs/EXP-005/model_meta.json").write_text(json.dumps(
         {"train_minutes": 1.0, "selection": {"picked": {"checkpoint": "epoch1.pt", "ghost_ap50": 0.5}}}))
-    zipfile.ZipFile(w / "depth/runs/EXP-004_complete.zip", "w").close()
-    (w / "logs/EXP-004g.log").write_text("1/30\rTraceback (most recent call last):\nRuntimeError: boom\n")
+    zipfile.ZipFile(w / "depth/runs/EXP-005_complete.zip", "w").close()
+    (w / "logs/EXP-005a.log").write_text("1/30\rTraceback (most recent call last):\nRuntimeError: boom\n")
     monkeypatch.setattr(subprocess, "run", lambda cmd, **kw: subprocess.CompletedProcess(cmd, 0, stdout="", stderr=""))
     ns = {}
     exec(cell.replace('WORK = "/kaggle/working"', f'WORK = "{w.as_posix()}"'), ns)
-    assert (w / "EXP-004_complete.zip").exists() and not (w / "EXP-004g_complete.zip").exists()
+    assert (w / "EXP-005_complete.zip").exists() and not (w / "EXP-005a_complete.zip").exists()
 
     # the live process list: a training, its data-loader worker (same args, parent = the training), a
     # duplicate launch, the other run, a zombie and a one-GPU launcher shell
     t = "src/detection/train.py --data d.yaml --name"
-    ps = "\n".join([f"  100     1 Sl  3600 python {t} EXP-004 --imgsz 1024",
-                    f"  101   100 Sl  3590 python {t} EXP-004 --imgsz 1024",
-                    f"  200     1 Sl   600 python -u {t} EXP-004 --imgsz 1024",
-                    f"  300   400 Rl  3000 /usr/bin/python3 {t} EXP-004g --imgsz 640",
-                    f"  301   300 Z      5 python {t} EXP-004g --imgsz 640",
-                    f"  400     1 S   3600 bash -c python {t} EXP-004 ; python {t} EXP-004g",
-                    "  500     1 S   9999 python other_script.py --name EXP-004"])
+    ps = "\n".join([f"  100     1 Sl  3600 python {t} EXP-005 --imgsz 1024",
+                    f"  101   100 Sl  3590 python {t} EXP-005 --imgsz 1024",
+                    f"  200     1 Sl   600 python -u {t} EXP-005 --imgsz 1024",
+                    f"  300   400 Rl  3000 /usr/bin/python3 {t} EXP-005a --imgsz 640",
+                    f"  301   300 Z      5 python {t} EXP-005a --imgsz 640",
+                    f"  400     1 S   3600 bash -c python {t} EXP-005 ; python {t} EXP-005a",
+                    "  500     1 S   9999 python other_script.py --name EXP-005"])
     monkeypatch.setattr(subprocess, "run", lambda cmd, **kw: subprocess.CompletedProcess(
         cmd, 0, stdout=ps if "ps -eo" in cmd[-1] else "", stderr=""))
     runs, any_alive = ns["processes"]()
-    assert any_alive and runs == {"EXP-004": [(100, 3600), (200, 600)], "EXP-004g": [(300, 3000)]}
+    assert any_alive and runs == {"EXP-005": [(100, 3600), (200, 600)], "EXP-005a": [(300, 3000)]}
 
     # a live run in its checkpoint-selection phase is reported as such, not as "training"
-    (w / "depth/runs/EXP-004g/weights").mkdir()
+    (w / "depth/runs/EXP-005a/weights").mkdir()
     for p in ("epoch1.pt", "epoch2.pt", "best.pt", "last.pt"):
-        (w / "depth/runs/EXP-004g/weights" / p).write_bytes(b"")
-    (w / "depth/runs/EXP-004g/select/epoch1").mkdir(parents=True)
-    assert ns["phase"]("EXP-004g") == "CHOOSING THE BEST CHECKPOINT (validating 1 of 4)"
-    assert ns["phase"]("EXP-004") == "TRAINING"
+        (w / "depth/runs/EXP-005a/weights" / p).write_bytes(b"")
+    (w / "depth/runs/EXP-005a/select/epoch1").mkdir(parents=True)
+    assert ns["phase"]("EXP-005a") == "CHOOSING THE BEST CHECKPOINT (validating 1 of 4)"
+    assert ns["phase"]("EXP-005") == "TRAINING"
     assert ns["status"]() is True
 
 
@@ -202,3 +202,29 @@ def test_keep_classes_renumbers_and_drops():
     assert bt.keep_labels(lab, None) == lab
     assert bt.keep_labels(lab, [0]) == [lab[0], lab[2]]
     assert bt.keep_labels(lab, [1]) == [(0, .5, .5, .3, .3)]
+
+
+def test_label_patch_and_aug_knobs(tmp_path, monkeypatch):
+    """EXP-005 kit: a reviewed label patch is merged into TRAIN labels at build time (val/test untouched),
+    and the augmentation knobs reach ultralytics."""
+    import json, subprocess
+    import numpy as np
+    import cv2
+    src = tmp_path / "src"
+    for d in ("train", "val", "test"):
+        (src / d / "images").mkdir(parents=True); (src / d / "labels").mkdir(parents=True)
+        cv2.imwrite(str(src / d / "images" / "Rec1_a.jpg"), np.full((64, 64, 3), 90, np.uint8))
+        (src / d / "labels" / "Rec1_a.txt").write_text("0 0.2 0.2 0.1 0.1")
+    (src / "data.yaml").write_text("nc: 2\nnames:\n- ghost_gear\n- wreck_debris\n", encoding="utf-8")
+    patch = tmp_path / "patch.json"
+    patch.write_text(json.dumps({"labels": {"Rec1_a.jpg": [[0, 0.7, 0.7, 0.1, 0.1]]}}))
+    out = tmp_path / "out"
+    subprocess.run([sys.executable, str(REPO / "DATASET" / "scripts" / "build_tiles.py"), "--src", str(src), "--out", str(out),
+                    "--no-tiles", "--extra-labels", str(patch)], check=True, capture_output=True)
+    lines = (out / "train" / "labels" / "Rec1_a.txt").read_text().splitlines()
+    assert len(lines) == 2 and lines[1].startswith("0 0.700000")
+    assert (src / "val" / "labels" / "Rec1_a.txt").read_text() == "0 0.2 0.2 0.1 0.1"      # val untouched
+    import src.detection.train as tr
+    monkeypatch.setattr(sys, "argv", ["train.py", "--hsv-v", "0.35", "--scale", "0.6"])
+    a = tr.parse_args()
+    assert a.hsv_v == 0.35 and a.scale == 0.6

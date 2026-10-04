@@ -85,6 +85,8 @@ def parse_args():
     p.add_argument("--device", default=None, help="0 | cpu | auto")
     p.add_argument("--name", default="EXP-002", help="run name under runs/")
     p.add_argument("--seed", type=int, default=42)
+    p.add_argument("--hsv-v", type=float, default=None, help="brightness jitter (sonar gain differs per recording); default 0.2")
+    p.add_argument("--scale", type=float, default=None, help="scale jitter; default 0.5")
     p.add_argument("--opset", type=int, default=12)
     p.add_argument("--no-export", action="store_true")
     p.add_argument("--notes", default="", help="free text stored in model_meta.json")
@@ -213,6 +215,7 @@ def main():
     t0 = time.time()
     model = YOLO(a.model)
     tracker = GhostTracker(ghost_class(names))
+    aug = dict(SONAR_AUG, **{k: v for k, v in (("hsv_v", a.hsv_v), ("scale", a.scale)) if v is not None})
     if a.select == "ghost_ap50":
         model.add_callback("on_train_start", tracker.on_train_start)
         model.add_callback("on_model_save", tracker.on_model_save)
@@ -222,7 +225,7 @@ def main():
         project=str(REPO / "runs"), name=a.name, exist_ok=True, optimizer=a.optimizer,
         cos_lr=not a.no_cos_lr, lr0=a.lr0, close_mosaic=a.close_mosaic, fraction=a.fraction,
         workers=a.workers, cache=(False if a.cache == "none" else a.cache), plots=True, save_period=-1,
-        **SONAR_AUG,
+        **aug,
     )
     run = REPO / "runs" / a.name
     best = run / "weights" / "best.pt"
@@ -233,7 +236,7 @@ def main():
     meta = {
         "name": a.name, "names": names, "imgsz": a.imgsz, "data": str(data), "base": a.model,
         "args": vars(a), "patience_used": patience, "optimizer_built": tracker.optimizer,
-        "ghost_ap50_per_epoch": tracker.rows, "augmentation": SONAR_AUG, "best": _best_epoch(run),
+        "ghost_ap50_per_epoch": tracker.rows, "augmentation": aug, "best": _best_epoch(run),
         "train_minutes": round((time.time() - t0) / 60, 1),
         "ultralytics": ultralytics.__version__, "python": platform.python_version(),
         "created": time.strftime("%Y-%m-%dT%H:%M:%S"), "notes": a.notes,
