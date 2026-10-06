@@ -75,6 +75,49 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ## 4. Session log
 
+### 2026-10-06 (sweep 52) — Agentic Vision made visible: decision chains, failure drills, overrides, audit log
+- **Ask:** show the rubric's SEE → PROVE → DECIDE → ACT as a real agent workflow. The agent has to weigh
+  confidence, evidence quality and the analyst + boat budgets, choose its tools and record skipped ones,
+  explain itself, handle failures safely, and leave every operational decision to a person (the LLM
+  only writes). Map: [`docs/agentic_loop.md`](docs/agentic_loop.md).
+- **Per candidate:** every trace is now one chain: `voi_check` ("can another observation change the
+  decision?") → evidence tools, each **done / skipped / failed** with the reason (`AgentStep.status`) →
+  `update_belief` (P(pot) before → after) → `decide` → `handoff`. Per-frame **compute budget / stop rule**
+  (`$DEPTH_MAX_RELOOKS`, 16): over-budget band finds are recorded as skipped. A failed tool never
+  raises: the find falls back to the detector score and goes to a person, **never auto-confirmed**.
+- **Honest finding:** EXP-003's calibration found re-looks do not move the calibrated score
+  (`relook_mode: null`), so the agent says "no" and skips them for every find. The observation that
+  *can* change a card is an opposite-side sonar pass. That is where the survey-level agent spends its
+  value of information.
+- **Per survey:** `mission.planner_log` covers triage → open uncertainty Σp(1−p) → analyst budget check →
+  **stop rule** (where it stops, what it defers) → person overrides kept → inspection / recovery route →
+  re-survey passes chosen **and skipped** (boat budget) → dispatch gate. The agent **files its own
+  approval requests**. After every person's decision it re-plans, records the diff
+  (`MissionPlan.replans`), and **withdraws stale requests and asks again** (`approvals.withdraw`; never
+  a decided one).
+- **Human in the loop:** evidence cards → **Approve / Reject / Override tier** (→ labels: override to
+  confirmed = positive, low risk = hard negative, review = none) + **Mark missed** in the Evidence
+  header. Survey hazards → **↑ prioritise / ↓ deprioritise / reset** (the agent never re-orders them).
+  Survey ✓ / ✕ are written as training labels server-side (`source: survey`).
+- **Failure handling (`src/agentic/incidents.py`):** one incident shape `{code, severity, stage, title,
+  message, fallback, human_action}`. Covered: no detection, low-confidence only, corrupt / blank frame
+  (skipped; a survey survives a bad upload; analyze answers 422), missing GPS, invalid geometry
+  (position **withheld** if non-finite, out of range or > 2 km uncertain), orientation unknown, model
+  unavailable (503, never a bare 500), tool failure, S3 failure (`jobs.storage`), LLM failure (template
+  served), view failure. **Failure drills:** `?simulate=<code>` on analyze / survey / brief, and in
+  the studio under System → Failure drills.
+- **Audit log:** `GET /api/survey/{id}/log` merges agent plan steps, incidents, approval requests,
+  decisions and withdrawals, people's decisions, re-plans and the brief writer, each with its actor
+  (agent / person / system / llm). The JSONL trace export gains plan / incident / replan lines.
+- **Studio:** a decision chain on every evidence card; a Survey **Agent** tab (dispatch gate, last
+  re-plan, incidents, plan step by step) and a **Log** tab (the timeline); a notice stack for
+  incidents; route-change toasts; a "Positions withheld" state instead of an empty map; drills menu.
+  Analyst budget default 5 → 2 min so the stop rule is visible on the 8-frame demo (15 of 27 cards).
+- **Tests:** `tests/test_agentic_loop.py` (18). API / MCP / agent tests updated for the chain (the trace
+  now ends with `handoff`) and the structured 422. **Test isolation fixed:** `conftest.py` points the
+  approvals and feedback stores at a temp dir. The first run had written 9 agent requests and 1 label
+  into `runs/`; those exact lines were removed.
+
 ### 2026-10-06 (sweep 51) — EXP-003 is the default model; held-out demo frames; release prepared
 - **Default:** `calibration.SHIPPED_MODEL = "EXP-003"` is the one place the default lives.
   - `infer`, `fetch_model`, the app and the infra scripts read it.
