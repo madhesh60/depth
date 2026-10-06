@@ -46,6 +46,9 @@
           <div class="pop-row"><span>OpenCV</span><span class="pill" id="pillCv">…</span></div>
           <div class="pop-row"><span>Detector</span><span class="pill" id="pillModel">…</span></div>
           <span class="pill pill-live" id="pillLive" hidden><span class="dot"></span>live</span>
+          <div class="pop-title">Failure drills</div>
+          <div class="drills" id="drills"></div>
+          <p class="pop-note">Each drill runs a real failure path. Watch the fallback and what a person is asked to do.</p>
         </div>
       </div>
     </div>
@@ -84,7 +87,7 @@
         <details class="opts">
           <summary>Options</summary>
           <label class="field"><span>Analyst budget (minutes)</span>
-            <input type="number" id="budgetMin" min="1" max="600" step="1" value="5" />
+            <input type="number" id="budgetMin" min="1" max="600" step="1" value="2" />
           </label>
           <label class="field" title="boat time for second-look passes (opposite side, mid-swath); empty = plan every pass"><span>Re-survey boat time (minutes)</span>
             <input type="number" id="boatMin" min="1" max="1440" step="1" value="10" />
@@ -343,13 +346,19 @@
       </section>
       <!-- analyze: evidence -->
       <section class="panel evidence-panel" data-when="analyze">
-        <div class="panel-head"><span class="panel-title">Evidence</span><span class="panel-meta"></span></div>
+        <div class="panel-head"><span class="panel-title">Evidence</span><span class="panel-meta" id="evMeta"></span>
+          <button class="mini-btn" id="missedBtn2" title="draw a box around an object the detector missed - it becomes a training label (M)">Mark missed</button></div>
+        <div class="inc-inline" id="frameIncidents"></div>
         <div class="evidence-grid" id="evidenceGrid">
           <p class="empty-hint">Analyze a frame to see the evidence for each find.</p>
         </div>
       </section>
 
-      <!-- survey: one tab at a time - hand-over, hazards, approvals (agents ask, a person decides), exports, effort -->
+      <!-- survey: one tab at a time - agent, hand-over, hazards, approvals (agents ask, a person decides), exports, effort, log -->
+      <section class="panel" data-when="survey">
+        <div class="panel-head"><span class="panel-title" data-tab="Agent">Agent decisions</span><span class="panel-meta" id="agentMeta"></span></div>
+        <div id="agentPanel"><p class="empty-hint">Run a survey. The agent's plan appears here: budget checks, where it stopped, route changes, what it asked a person to approve and anything that failed.</p></div>
+      </section>
       <section class="panel" data-when="survey">
         <div class="panel-head"><span class="panel-title" data-tab="Brief">Mission brief</span><span class="panel-meta mono" id="briefMeta"></span></div>
         <div id="briefBody" class="brief"><p class="empty-hint">The crew hand-over appears here after a survey.</p></div>
@@ -383,6 +392,10 @@
         <div class="panel-head"><span class="panel-title" data-tab="Effort">Analyst effort</span><span class="panel-meta mono" id="effortMeta"></span></div>
         <div id="effortPanel"><p class="empty-hint">Run a survey to see what your review time buys.</p></div>
       </section>
+      <section class="panel" data-when="survey">
+        <div class="panel-head"><span class="panel-title" data-tab="Log">Audit log</span><span class="panel-meta" id="auditMeta"></span></div>
+        <div id="auditLog" class="audit"><p class="empty-hint">Every agent step, approval, person's decision, re-plan and incident, in order.</p></div>
+      </section>
     </aside>
   </div>
 
@@ -413,6 +426,7 @@
   <div class="demo-dots" id="demoDots"></div>
   <button class="demo-stop" id="demoStop">Stop</button>
 </div>
+<div class="notices" id="notices" aria-live="polite"></div>
 <div class="run-toast" id="runToast" hidden><span class="spin"></span><span id="runToastTxt">working…</span></div>
 
 <script src="vendor/leaflet/leaflet.js"

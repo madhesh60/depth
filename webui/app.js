@@ -41,6 +41,8 @@ window.addEventListener("DOMContentLoaded", async () => {
   tidyPanels();
   Pop.init();
   Tabs.render();
+  Drills.init();
+  $("#missedBtn2").onclick = () => { if (state._ready) toggleMissed(); };
   await Promise.all([loadHealth(), loadSamples(), loadMetrics(), loadLabelStats()]);
 });
 
@@ -91,9 +93,128 @@ const Tabs = {
     bar.innerHTML = tabbed.map((p, i) => `<button type="button" role="tab" class="tab${i === cur ? " is-active" : ""}" aria-selected="${i === cur}" data-i="${i}">${escapeHtml(p.querySelector("[data-tab]").dataset.tab)}</button>`).join("");
     tabbed.forEach((p, i) => p.classList.toggle("tab-off", i !== cur));
     ins.classList.add("tabbed");
+    const on = bar.querySelector(".tab.is-active");            // a long strip scrolls; keep the open tab in view
+    if (on) bar.scrollLeft = Math.max(0, on.offsetLeft - (bar.clientWidth - on.offsetWidth) / 2);
     bar.onclick = e => { const b = e.target.closest(".tab"); if (!b) return; this.active[mode] = +b.dataset.i; this.render(); ins.scrollTop = 0; };
   },
+  go(label) {                                          // open a tab by its label ("Approvals", "Log" ...)
+    const mode = $("#workspace").dataset.mode;
+    const tabbed = $$(".inspector > .panel").filter(p => (!p.dataset.when || p.dataset.when.split(" ").includes(mode)) && p.querySelector("[data-tab]"));
+    const i = tabbed.findIndex(p => p.querySelector("[data-tab]").dataset.tab === label);
+    if (i >= 0) { this.active[mode] = i; this.render(); }
+  },
 };
+
+/* ------------------------------------------------------------------ incidents: every failure is told to a person
+   (src/agentic/incidents.py): what happened, the safe fallback the system took, and what YOU should do */
+const Notices = {
+  seen: new Set(),
+  show(list, ctx = "") {
+    const box = $("#notices"); if (!box) return;
+    (list || []).forEach(inc => {
+      const key = `${ctx}|${inc.code}|${inc.frame_id || ""}|${inc.message}`;
+      if (this.seen.has(key)) return; this.seen.add(key);
+      const el = document.createElement("div");
+      el.className = `notice sev-${inc.severity || "warning"}`;
+      el.setAttribute("role", inc.severity === "error" ? "alert" : "status");
+      el.innerHTML = `<div class="nt-head"><span class="nt-dot"></span><b>${escapeHtml(inc.title || human(inc.code))}</b>`
+        + `${inc.simulated ? `<span class="nt-drill">Drill</span>` : ""}<button class="nt-x" aria-label="dismiss">×</button></div>`
+        + `<div class="nt-msg">${escapeHtml(inc.message || "")}</div>`
+        + (inc.fallback ? `<div class="nt-row"><span>Fallback</span><p>${escapeHtml(inc.fallback)}</p></div>` : "")
+        + (inc.human_action ? `<div class="nt-row"><span>You</span><p>${escapeHtml(inc.human_action)}</p></div>` : "");
+      el.querySelector(".nt-x").onclick = () => el.remove();
+      box.prepend(el);
+      if (inc.severity === "info") setTimeout(() => { el.classList.add("nt-out"); setTimeout(() => el.remove(), 400); }, 9000);
+    });
+    while (box.children.length > 4) box.lastChild.remove();
+  },
+};
+function incidentRow(inc) {
+  return `<div class="inc sev-${inc.severity || "warning"}"><div class="inc-h"><span class="nt-dot"></span><b>${escapeHtml(inc.title || human(inc.code))}</b>`
+    + `${inc.simulated ? `<span class="nt-drill">Drill</span>` : ""}</div><div class="inc-m">${escapeHtml(inc.message || "")}</div>`
+    + `<div class="inc-f"><span>Fallback</span> ${escapeHtml(inc.fallback || "")}</div>`
+    + `<div class="inc-f"><span>You</span> ${escapeHtml(inc.human_action || "")}</div></div>`;
+}
+/* fetch JSON; a failed call throws with the server's incident attached (never a bare status code) */
+async function apiJSON(url, opts) {
+  const r = await fetch(url, opts);
+  const b = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    const d = b.detail;
+    const e = new Error((d && (d.message || (typeof d === "string" ? d : ""))) || `HTTP ${r.status}`);
+    e.incident = d && d.incident; e.status = r.status; throw e;
+  }
+  return b;
+}
+function whoAmI() { return ($("#apprName") && $("#apprName").value.trim()) || localStorage.getItem("depth.approver") || ""; }
+
+/* the agent's decision chain: Ask -> Evidence (done / skipped / failed) -> Update -> Decide -> Next */
+const STEP = {
+  voi_check: ["Ask", "Can another look change it?"], zoom_relook: ["Evidence", "Re-look"],
+  mosaic_relook: ["Evidence", "Re-look (batched)"], enhance_relook: ["Evidence", "CLAHE re-look"],
+  water_column_check: ["Evidence", "Water column"], shadow_check: ["Evidence", "Acoustic shadow"],
+  estimate_height: ["Evidence", "Height"], stitch_boundary: ["Evidence", "Chunk stitch"],
+  update_belief: ["Update", "P(pot)"], decide: ["Decide", "Tier"], handoff: ["Next", "Hand-off"],
+};
+const PLAN_STEP = {
+  triage: ["Triage", "Hazards"], voi_check: ["Ask", "Can more looking help?"], budget_check: ["Budget", "Analyst time"],
+  stop_rule: ["Stop", "Where to stop"], human_override: ["Person", "Overrides kept"], route_update: ["Route", "Inspection route"],
+  recovery_route: ["Route", "Recovery route"], resurvey_plan: ["Re-survey", "Boat time"], dispatch_gate: ["Gate", "Dispatch"],
+  request_approval: ["Ask person", "Approval"],
+};
+/* display text: the question is the step's name, so show only the answer; arrows typeset */
+function chainText(s) {
+  let t = String(s.rationale || "");
+  if (s.tool === "voi_check") t = t.replace(/^.*?change (the decision|these \d+ card\(s\))\? /, "");
+  t = t.replace(/ -> /g, " → ").replace(/ <= /g, " ≤ ").replace(/ >= /g, " ≥ ")
+    .replace(/^(yes|no) - (\w)/, (m, w, c) => (w === "yes" ? "Yes. " : "No. ") + c.toUpperCase());
+  return t ? t[0].toUpperCase() + t.slice(1) : t;
+}
+function chainBlock(steps, map = STEP) {
+  if (!steps || !steps.length) return "";
+  let prev = "";
+  return `<ol class="chain">${steps.map(s => {
+    const [stage, name] = map[s.tool] || ["Step", human(s.tool)], st = s.status || "done";
+    const head = stage !== prev; prev = stage;
+    return `<li class="ch ch-${st}${head ? " ch-first" : ""}"><span class="ch-stage">${head ? stage : ""}</span>`
+      + `<span class="ch-node"></span><div class="ch-body"><div class="ch-name">${escapeHtml(name)}`
+      + `${st !== "done" ? `<span class="ch-st">${st}</span>` : ""}${s.latency_ms ? `<span class="ch-ms">${fmt(s.latency_ms)} ms</span>` : ""}</div>`
+      + `<div class="ch-why">${escapeHtml(chainText(s))}</div></div></li>`;
+  }).join("")}</ol>`;
+}
+
+/* failure drills: trigger a real failure path on purpose and watch the fallback (?simulate=<code>) */
+const DRILLS = [
+  { code: "model_unavailable", label: "Detector offline", where: "analyze" },
+  { code: "corrupt_frame", label: "Corrupt frame", where: "analyze" },
+  { code: "tool_failed", label: "Evidence tool fails", where: "analyze" },
+  { code: "no_detection", label: "Empty frame", where: "analyze" },
+  { code: "missing_gps", label: "No GPS", where: "survey" },
+  { code: "invalid_geometry", label: "Bad GPS fix", where: "survey" },
+  { code: "storage_failed", label: "S3 upload fails", where: "survey" },
+  { code: "llm_failed", label: "LLM outage", where: "brief" },
+];
+const Drills = {
+  init() {
+    const el = $("#drills"); if (!el) return;
+    el.innerHTML = DRILLS.map(d => `<button class="drill" data-code="${d.code}" data-close="1"><b>${d.label}</b><span>${d.where === "brief" ? "survey brief" : d.where}</span></button>`).join("");
+    el.onclick = e => { const b = e.target.closest(".drill"); if (b) this.run(DRILLS.find(d => d.code === b.dataset.code)); };
+  },
+  run(d) {
+    Pop.closeAll();
+    if (d.where === "analyze") {
+      setMode("analyze");
+      if (!state.selected) { const c = $(".sample-card"); if (c) c.click(); }
+      if (state.selected) runAnalyze(d.code);
+    } else if (d.where === "survey") { setMode("survey"); runSurvey(d.code); }
+    else {
+      setMode("survey");
+      if (state.survey) { Tabs.go("Brief"); loadBrief(state.survey.survey_id, d.code); }
+      else Notices.show([{ code: "drill", severity: "info", title: "Run a survey first", message: "The LLM drill rewrites a survey's mission brief.", fallback: "", human_action: "" }]);
+    }
+  },
+};
+function setMode(mode) { const b = $(`.mode-btn[data-mode="${mode}"]`); if (b && !b.classList.contains("is-active")) b.click(); }
 
 /* calm panels: a panel's explanation folds behind a small (i); collapsible sections open on click */
 function tidyPanels() {
@@ -502,8 +623,9 @@ const Busy = {
 };
 
 /* ------------------------------------------------------------------ ANALYZE */
-async function runAnalyze() {
+async function runAnalyze(simulate) {
   if (!state.selected) return;
+  simulate = typeof simulate === "string" ? simulate : "";
   $("#analyzeBtn").disabled = true;
   $("#analyzePlaceholder").hidden = true;
   Busy.start("Analyzing frame");
@@ -514,7 +636,8 @@ async function runAnalyze() {
     let url = `${API}/api/analyze`, opts = { method: "POST" };
     if (state.selected.file) { const fd = new FormData(); fd.append("file", state.selected.file); opts.body = fd; }
     else url += `?sample=${encodeURIComponent(state.selected.id)}`;
-    const d = await fetch(url, opts).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); });
+    if (simulate) url += `${url.includes("?") ? "&" : "?"}simulate=${simulate}`;
+    const d = await apiJSON(url, opts);
     state._analyze = d;
     renderAnalyze(d);
     showProvenance(d.provenance);
@@ -523,9 +646,14 @@ async function runAnalyze() {
     stepperFinish(["stage1", "see", "prove", "decide"]);
   } catch (e) {
     stepperReset();
+    const inc = e.incident;
+    if (inc) Notices.show([inc], "analyze" + Date.now());
+    Log.now({ stage: true, tool: "FAILED", msg: inc ? `${inc.title} → ${inc.fallback}` : e.message, t: "" });
     $("#analyzePlaceholder").hidden = false;
-    $("#analyzePlaceholder").querySelector("p").innerHTML =
-      `<b style="color:var(--danger)">Analyze failed (${e.message}).</b><br/>Is the backend running and the model present?`;
+    $("#analyzePlaceholder").querySelector("h3").textContent = inc ? inc.title : "Analyze failed";
+    $("#analyzePlaceholder").querySelector("p").innerHTML = inc
+      ? `${escapeHtml(inc.message)}<br/><span class="muted">${escapeHtml(inc.fallback)}.</span>`
+      : `${escapeHtml(e.message)}<br/><span class="muted">Is the backend running and the model present?</span>`;
   } finally { Busy.done(); $("#analyzeBtn").disabled = false; }
 }
 
@@ -547,9 +675,14 @@ function renderAnalyze(d) {
   Viewer.render(d, state._boxes);
   $("#viewerEmpty").hidden = d.candidates.length > 0;
 
+  const ph = $("#analyzePlaceholder"); ph.querySelector("h3").textContent = "Choose a sonar frame";
+  const incs = d.incidents || [];
+  $("#frameIncidents").innerHTML = incs.map(incidentRow).join("");
+  if (incs.some(i => i.severity !== "info" || i.simulated)) Notices.show(incs, d.frame_id);
+  $("#evMeta").textContent = d.candidates.length ? `${d.candidates.length} find${d.candidates.length > 1 ? "s" : ""}` : "";
   const grid = $("#evidenceGrid"); grid.innerHTML = "";
   if (!d.candidates.length) {
-    grid.innerHTML = `<p class="empty-hint">No candidates on this frame — the detector found nothing to prove. (For the "no labelled pot" samples, that is the correct, honest result.)</p>`;
+    grid.innerHTML = `<p class="empty-hint">Nothing to prove on this frame. If you can see an object, use <b>Mark missed</b>; it becomes a training label.</p>`;
     buildClassLegend([]); applyFilters(); streamLog(d, []); return;
   }
   const order = { confirmed: 0, review: 1, low_risk: 2, rejected: 2 };
@@ -609,7 +742,7 @@ function streamLog(d, ordered) {
   ordered.forEach(b => {
     const c = b.cand;
     entries.push({ stage: true, tool: `cand #${b.id}`, msg: `${c.cls_name} · det ${c.conf.toFixed(2)}`, t: "" });
-    (c.trace || []).forEach(s => entries.push({ tool: s.tool, msg: s.rationale, t: fmt(s.latency_ms) + "ms" }));
+    (c.trace || []).forEach(s => entries.push({ tool: (s.status && s.status !== "done" ? s.status + " · " : "") + s.tool, msg: s.rationale, t: fmt(s.latency_ms) + "ms" }));
     entries.push({ verdict: c.verdict, tool: "→ " + c.verdict, msg: verdictReason(c), t: "" });
   });
   Log.push(entries);
@@ -753,24 +886,37 @@ function evidenceCard(c, id) {
         <div class="fact"><span class="k">Position</span><span class="v ${c.in_water_column ? "chip-weak" : ""}">${c.in_water_column == null ? "—" : c.in_water_column ? "Water column" : "On seabed"}${c.ground_range_px != null ? ` · ${Math.round(c.ground_range_px)} px gnd` : ""}</span></div>
         <div class="fact"><span class="k">P(pot)</span><span class="v">${ev.p_pot != null ? Math.round(ev.p_pot * 100) + "%" : "—"}</span></div>
       </div>
-      <div class="ev-label"><span class="lbl-k">Your label</span>
-        <button class="ok" title="a real pot — saved as a training label">Real pot</button>
-        <button class="no" title="not a pot — saved as a hard negative">Not a pot</button></div>
-      ${(ev.notes || []).length ? `<details class="ev-why"><summary>Why this tier</summary><ul class="ev-notes">${ev.notes.map(n => `<li>${escapeHtml(n)}</li>`).join("")}</ul></details>` : ""}
-      ${traceBlock(c.trace || [])}
+      <div class="ev-chain"><div class="ev-chain-h">Agent decision<span>${(c.trace || []).filter(s => s.status === "skipped").length} skipped · ${(c.trace || []).filter(s => s.status === "failed").length} failed</span></div>
+        ${chainBlock(c.trace || [])}</div>
+      ${(ev.notes || []).length ? `<details class="ev-why"><summary>Evidence notes</summary><ul class="ev-notes">${ev.notes.map(n => `<li>${escapeHtml(n)}</li>`).join("")}</ul></details>` : ""}
+      <div class="ev-label"><span class="lbl-k">Your call</span>
+        <button class="ok" data-a="confirm" title="a real object - saved as a positive training label">Approve</button>
+        <button class="no" data-a="reject" title="not an object - saved as a hard negative">Reject</button>
+        <span class="ov-wrap"><button class="ov" data-a="override" aria-haspopup="menu" title="override the agent's tier">Override</button>
+          <span class="ov-menu" role="menu" hidden>${VERDICTS.filter(x => x !== v).map(x => `<button role="menuitem" data-to="${x}">${VLABEL[x]}</button>`).join("")}</span></span></div>
+      <p class="ev-saved" hidden></p>
     </div>`;
-  card.querySelectorAll(".ev-label button").forEach(b => b.addEventListener("click", async e => {
-    e.stopPropagation();
-    const ok = b.classList.contains("ok");
-    const res = await sendLabel({ bbox: c.bbox, cls_name: c.cls_name, decision: ok ? "confirm" : "reject",
-      verdict_before: c.verdict, conf: c.conf, p_pot: ev.p_pot, source: "analyze" });
-    if (res) {
-      card.querySelectorAll(".ev-label button").forEach(x => x.classList.toggle("on", x === b));
-      let sv = card.querySelector(".ev-label .saved");
-      if (!sv) { sv = document.createElement("span"); sv.className = "saved"; card.querySelector(".ev-label").appendChild(sv); }
-      sv.textContent = "saved ✓";
-    }
+  const saved = (txt) => { const el = card.querySelector(".ev-saved"); el.hidden = false; el.textContent = txt; };
+  const label = async (rec, btn) => {
+    const res = await sendLabel(Object.assign({ bbox: c.bbox, cls_name: c.cls_name, verdict_before: c.verdict, conf: c.conf,
+      p_pot: ev.p_pot, source: "analyze", annotator: whoAmI() || "anon" }, rec));
+    if (!res) return;
+    card.querySelectorAll(".ev-label button").forEach(x => x.classList.toggle("on", x === btn));
+    const who = whoAmI();
+    saved(rec.decision === "override"
+      ? `Override recorded: ${VLABEL[c.verdict]} → ${VLABEL[rec.override_to]}${who ? " by " + who : ""}. The agent's verdict is kept beside it.`
+      : `${rec.decision === "confirm" ? "Approved" : "Rejected"}${who ? " by " + who : ""} · saved as a training label`);
+    Log.push([{ tool: "human_label", msg: `${rec.decision}${rec.override_to ? " → " + rec.override_to : ""} on ${c.cls_name} ${c.conf.toFixed(2)}`, t: "" }]);
+  };
+  card.querySelectorAll(".ev-label [data-a=confirm], .ev-label [data-a=reject]").forEach(b => b.addEventListener("click", e => {
+    e.stopPropagation(); label({ decision: b.dataset.a }, b);
   }));
+  const ovBtn = card.querySelector(".ov"), ovMenu = card.querySelector(".ov-menu");
+  ovBtn.addEventListener("click", e => { e.stopPropagation(); ovMenu.hidden = !ovMenu.hidden; });
+  ovMenu.addEventListener("click", e => {
+    e.stopPropagation(); const b = e.target.closest("[data-to]"); if (!b) return;
+    ovMenu.hidden = true; label({ decision: "override", override_to: b.dataset.to }, ovBtn);
+  });
   card.addEventListener("mouseenter", () => Viewer.highlight(id, true));
   card.addEventListener("mouseleave", () => Viewer.highlight(id, false));
   card.querySelector(".ev-crop").addEventListener("click", () => selectCandidate(id));
@@ -780,43 +926,39 @@ function evidenceCard(c, id) {
   if (chip) chip.addEventListener("click", e => { e.stopPropagation(); card.querySelector(".ev-crop").classList.toggle("show-enh"); });
   return card;
 }
-function traceBlock(trace) {
-  if (!trace.length) return "";
-  const steps = trace.map(s => `
-    <li class="trace-step ${s.tool === "decide" ? "t-decide" : ""}">
-      <span class="trace-tool">${s.tool}</span><span class="trace-ms">${fmt(s.latency_ms)} ms</span>
-      <div class="trace-why">${escapeHtml(s.rationale)}</div></li>`).join("");
-  return `<details class="trace"><summary>Agent trace · ${trace.length} steps</summary><ol>${steps}</ol></details>`;
-}
 
 /* ------------------------------------------------------------------ SURVEY */
-async function runSurvey() {
+async function runSurvey(simulate) {
+  simulate = typeof simulate === "string" ? simulate : "";
   const btn = $("#surveyBtn"); btn.disabled = true;
   $("#surveyPlaceholder").hidden = true; $("#missionBanner").hidden = true;
+  $("#surveyPlaceholder").classList.remove("ph-nogps"); $("#surveyPlaceholder").querySelector("h3").textContent = "Run a survey";
   Busy.start("Running survey");
   stepperRun(["stage1", "see", "prove", "decide", "act"]);
   Log.reset(); Log.now({ stage: true, tool: "SURVEY", msg: "running See→Prove→Decide→Act over all sample frames …", t: "run" });
   const gps = $("#gpsMode").value;
-  const budget = Math.max(1, Math.min(600, parseFloat($("#budgetMin").value) || 5));
+  const budget = Math.max(1, Math.min(600, parseFloat($("#budgetMin").value) || 2));
   const boat = parseFloat($("#boatMin").value);
   const boatQ = Number.isFinite(boat) && boat > 0 ? `&boat_minutes=${Math.min(1440, boat)}` : "";
   try {
     // Surveys run as background jobs (no proxy timeouts, the server stays responsive); poll progress.
-    const job = await fetch(`${API}/api/jobs/survey?use_samples=1&gps=${gps}&budget_minutes=${budget}${boatQ}`, { method: "POST" })
-      .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); });
+    const job = await apiJSON(`${API}/api/jobs/survey?use_samples=1&gps=${gps}&budget_minutes=${budget}${boatQ}${simulate ? "&simulate=" + simulate : ""}`, { method: "POST" });
     Log.now({ tool: "queue_job", msg: `${job.job_id} · ${job.frames} frames queued`, t: "" });
     const d = await pollJob(job.job_id);
     state.survey = d;
     renderSurvey(d);
+    Notices.show(surveyIncidents(d).filter(i => i.severity !== "info" || i.simulated), d.survey_id);
     showProvenance(d.provenance);
     if (Twin.sv === "3d") showSurveyTwin();
     loadMetrics();
     stepperFinish(["stage1", "see", "prove", "decide", "act"]);
   } catch (e) {
     stepperReset();
+    if (e.incident) Notices.show([e.incident], "survey" + Date.now());
     $("#surveyPlaceholder").hidden = false;
-    $("#surveyPlaceholder").querySelector("p").innerHTML =
-      `<b style="color:var(--danger)">Survey failed (${e.message}).</b><br/>The backend needs the model + local samples.`;
+    $("#surveyPlaceholder").querySelector("p").innerHTML = e.incident
+      ? `<b>${escapeHtml(e.incident.title)}</b><br/>${escapeHtml(e.incident.fallback)}.`
+      : `<b style="color:var(--danger)">Survey failed (${escapeHtml(e.message)}).</b><br/>The backend needs the model + local samples.`;
   } finally { Busy.done(); btn.disabled = false; }
 }
 
@@ -855,7 +997,9 @@ function renderSurvey(d, opts = {}) {
         : (m.recovery_route.length ? `${m.route_length_m} m · confirmed finds` : "none yet — a person confirms"))}
     </div>
     <div class="mb-tags">${gpsTag}${m.repeat_merges ? `<span class="mb-tag">${m.repeat_merges} repeat sighting${m.repeat_merges > 1 ? "s" : ""} merged</span>` : ""}<span class="mb-tag mb-gate">● Human approval required — nothing is dispatched automatically</span></div>`;
-  renderMap(d, opts.keepView); renderDownloads(d.survey_id, m); renderThumbs(d); renderHazards(d); renderEffort(d); loadBrief(d.survey_id);
+  renderMap(d, opts.keepView); renderDownloads(d.survey_id, m); renderThumbs(d); renderHazards(d); renderEffort(d);
+  renderAgentPanel(d); loadAudit(d.survey_id);
+  if (!opts.keepView) loadBrief(d.survey_id);
   if (!opts.keepView) Log.push([
     { stage: true, tool: "ACT", msg: `${cc.confirmed || 0} confirmed · ${cc.review || 0} review · ${cc.low_risk || 0} low-risk (kept for audit)`, t: "" },
     ...(m.budget && m.budget.cards_total != null ? [{ tool: "budget_plan", msg: `${m.budget.cards_affordable}/${m.budget.cards_total} review cards fit ${m.budget.minutes} min → ~${m.budget.expected_pots_in_budget} of ~${m.budget.expected_pots_in_queue} expected real pots`, t: "" }] : []),
@@ -866,9 +1010,62 @@ function renderSurvey(d, opts = {}) {
   ]);
 }
 
+function surveyIncidents(d) {
+  return [...((d.mission || {}).incidents || []), ...(d.frames || []).flatMap(f => f.incidents || [])];
+}
+const ACTION_LABEL = { inspect: "Inspection route", recover: "Recovery route", resurvey: "Re-survey passes" };
+/* the Agent tab: dispatch gate, last re-plan, incidents, and the planner's decisions step by step */
+function renderAgentPanel(d) {
+  const m = d.mission, disp = d.dispatch || {}, incs = surveyIncidents(d);
+  const rp = (m.replans || []).slice(-1)[0];
+  const gate = ["inspect", "recover", "resurvey"].filter(a => disp[a]).map(a => `<div class="gate-row">
+      <span class="gate-a">${ACTION_LABEL[a]}</span><span class="gate-n">${disp[a].targets} target${disp[a].targets === 1 ? "" : "s"}</span>
+      <span class="st ${disp[a].status}">${disp[a].status}${disp[a].by ? " · " + escapeHtml(disp[a].by) : ""}</span></div>`).join("");
+  const pending = Object.values(disp).filter(x => x.status === "pending").length;
+  $("#agentMeta").textContent = `${(m.agent_log || []).length} steps${incs.length ? ` · ${incs.length} incident${incs.length > 1 ? "s" : ""}` : ""}`;
+  $("#agentPanel").innerHTML = `
+    <div class="gate">
+      <div class="gate-h">Dispatch gate<span>${pending ? `${pending} waiting for a person` : "nothing waiting"}</span></div>
+      ${gate || `<p class="empty-hint">Nothing to dispatch.</p>`}
+      <p class="gate-note">The agent asks; only a named person approves. The LLM writes the brief and never decides.</p>
+      ${pending ? `<button class="mini-btn" id="toApprovals">Review approvals</button>` : ""}
+    </div>
+    ${rp ? `<div class="replan"><div class="gate-h">Last re-plan<span>${new Date(rp.t * 1000).toLocaleTimeString()}</span></div><p>${escapeHtml(chainText({ rationale: rp.rationale }))}</p>
+      ${(rp.requests || []).length ? `<p class="muted">${rp.requests.map(c => c.requested ? `asked again: ${c.action} (${c.requested})` : `withdrew ${c.withdrawn}`).join(" · ")}</p>` : ""}</div>` : ""}
+    ${incs.length ? `<div class="inc-list"><div class="gate-h">Incidents<span>${incs.length}</span></div>${incs.map(incidentRow).join("")}</div>` : ""}
+    <div class="gate-h plan-h">Plan, step by step</div>${chainBlock(m.agent_log || [], PLAN_STEP)}`;
+  const ta = $("#toApprovals"); if (ta) ta.onclick = () => Tabs.go("Approvals");
+}
+/* the audit log: agent, person, system and LLM entries on one timeline */
+async function loadAudit(surveyId) {
+  try {
+    const j = await apiJSON(`${API}/api/survey/${encodeURIComponent(surveyId)}/log`);
+    const E = j.entries || [];
+    const cnt = a => E.filter(e => e.actor === a).length;
+    $("#auditMeta").textContent = `${E.length} entries`;
+    $("#auditLog").innerHTML = `<div class="audit-sum"><span class="who who-agent">Agent ${cnt("agent")}</span><span class="who who-person">Person ${cnt("person")}</span>`
+      + `<span class="who who-system">System ${cnt("system")}</span>${cnt("llm") ? `<span class="who who-llm">LLM ${cnt("llm")}</span>` : ""}</div>`
+      + `<ol class="tl">${E.slice().reverse().map(e => `<li class="tl-i tl-${e.actor}${e.severity ? " sev-" + e.severity : ""}">
+          <div class="tl-h"><span class="who who-${e.actor}">${human(e.actor)}</span><b>${escapeHtml(human(e.title || e.kind))}</b>
+          <time>${new Date(e.t * 1000).toLocaleTimeString()}</time></div>
+          ${e.text ? `<div class="tl-t">${escapeHtml(chainText({ tool: e.kind, rationale: e.text }))}</div>` : ""}${e.by ? `<div class="tl-by">by ${escapeHtml(e.by)}</div>` : ""}</li>`).join("")}</ol>`
+      + `<p class="gate-note">${escapeHtml(j.llm_authority || "")}</p>`;
+  } catch (e) { $("#auditLog").innerHTML = `<p class="empty-hint">${escapeHtml(e.message)}</p>`; }
+}
+
 function renderMap(d, keepView) {
   const m = d.mission, geoObjs = d.tracked.filter(t => t.lat != null && t.lon != null), note = $("#mapNote");
-  if (!m.gps_available || !geoObjs.length) { $("#mapWrap").style.display = "none"; $("#cfBtn").hidden = $("#cfSum").hidden = true; CF.clear(); return; }
+  const ph = $("#surveyPlaceholder");
+  if (!m.gps_available || !geoObjs.length) {
+    $("#mapWrap").style.display = "none"; $("#cfBtn").hidden = $("#cfSum").hidden = true; CF.clear();
+    ph.hidden = false; ph.classList.add("ph-nogps");                 // say why the map is empty, never a blank void
+    ph.querySelector("h3").textContent = "Positions withheld";
+    ph.querySelector("p").textContent = !m.gps_available
+      ? "This survey has no GPS, so no map, route or re-survey pass is drawn. The hazards are listed in frame order under Hazards."
+      : "No position passed the geometry check. The hazards are still in the queue under Hazards.";
+    return;
+  }
+  ph.classList.remove("ph-nogps");
   $("#mapWrap").style.display = "";
   const rc = d.recording && d.recording.available ? d.recording : null;
   note.textContent = m.gps_synthetic
@@ -1012,13 +1209,13 @@ function mdLite(md) {
   });
   close(); return out.join("");
 }
-async function loadBrief(surveyId) {
+async function loadBrief(surveyId, simulate) {
   const pub = $("#pubShare") && $("#pubShare").checked;
   $("#briefMeta").textContent = "writing …";
   try {
-    const r = await fetch(`${API}/api/brief?survey_id=${encodeURIComponent(surveyId)}${pub ? "&public=1" : ""}`);
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    const b = await r.json(); const g = b.grounding || {};
+    const b = await apiJSON(`${API}/api/brief?survey_id=${encodeURIComponent(surveyId)}${pub ? "&public=1" : ""}${simulate ? "&simulate=" + simulate : ""}`);
+    const g = b.grounding || {};
+    if (b.incident) { Notices.show([b.incident], surveyId + Date.now()); loadAudit(surveyId); }
     $("#briefBody").innerHTML = mdLite(b.text || "");
     $("#briefMeta").innerHTML = `<span class="writer-tag ${b.writer === "llm" ? "llm" : ""}">${b.writer === "llm" ? "Claude · Bedrock" : "template"}</span>${pub ? " · public" : ""}`;
     $("#briefGround").innerHTML = `<b class="${g.ok ? "ok" : "warn"}">${g.ok ? "✓" : "!"} ${g.numbers_checked} numbers traced to the survey</b> · ${g.words} words`
@@ -1142,7 +1339,7 @@ const Appr = {
     try {
       const r = await fetch(`${API}/api/approvals`).then(x => x.json());
       const c = r.counts || {}, list = r.requests || [];
-      $("#apprMeta").textContent = `${c.pending || 0} pending · ${c.approved || 0} approved · ${c.declined || 0} declined`;
+      $("#apprMeta").textContent = `${c.pending || 0} pending · ${c.approved || 0} approved · ${c.declined || 0} declined${c.withdrawn ? ` · ${c.withdrawn} withdrawn` : ""}`;
       if (!list.length) return;
       $("#apprList").innerHTML = list.slice(0, 30).map(q => `<div class="appr" data-id="${escapeHtml(q.id)}">
         <div class="appr-top"><span class="act">${escapeHtml(q.action)}</span><span>${escapeHtml(q.targets.slice(0, 6).join(", "))}${q.targets.length > 6 ? " …" : ""}</span><span class="st ${q.status}">${q.status}</span></div>
@@ -1160,6 +1357,9 @@ const Appr = {
     const r = await fetch(`${API}/api/approvals/${encodeURIComponent(id)}/decide`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ decision, by }) });
     const body = await r.json().catch(() => ({}));
     Log.push([{ tool: "human_gate", msg: r.ok ? `${id} ${decision} by ${by}` : `${id}: ${body.detail || r.status}`, t: "" }]);
+    if (r.ok && body.dispatch && state.survey && body.survey_id === state.survey.survey_id) {
+      state.survey.dispatch = body.dispatch; renderAgentPanel(state.survey); loadAudit(state.survey.survey_id);
+    }
     this.load();
   },
   start() {
@@ -1190,7 +1390,8 @@ function renderHazards(d) {
   const body = $("#hazBody"); body.innerHTML = "";
   rows.forEach(t => {
     const tr = document.createElement("tr"); tr.dataset.oid = t.oid;
-    const coords = t.lat != null ? `${t.lat.toFixed(5)}, ${t.lon.toFixed(5)}` : `<span class="muted">no GPS</span>`;
+    const coords = t.lat != null ? `${t.lat.toFixed(5)}, ${t.lon.toFixed(5)}`
+      : t.position_withheld ? `<span class="chip-weak" title="${escapeHtml(t.position_withheld)}">withheld</span>` : `<span class="muted">no GPS</span>`;
     tr.innerHTML = `<td>${t.oid}${t.sightings > 1 ? ` <span class="muted" title="seen on ${t.sightings} frames/passes">×${t.sightings}</span>` : ""}</td><td>${human(t.cls_name)}</td>
       <td><span class="v-tag" style="color:${VCOLOR[t.verdict]};background:${VCOLOR[t.verdict]}22">${VLABEL[t.verdict] || t.verdict}</span></td>
       <td>${t.conf}</td><td>${t.evidence_score}</td><td>${t.p_pot != null ? Math.round(t.p_pot * 100) + "%" : "—"}</td><td>${heightText(t.height_m, t.height_rel, t.height_rel ? 1 : 0)}</td>
@@ -1209,7 +1410,10 @@ function reviewCell(t) {
   if (t.human && !onRoute) return `<span class="rev-btns"><span class="h-chip h-${t.human}" title="by ${escapeHtml(t.human_by || "")}">${HUM[t.human]}</span><button data-d="undo" title="re-open this card">undo</button></span>`;
   if (onRoute) return `<span class="rev-btns">${t.human ? `<span class="h-chip h-confirmed" title="by ${escapeHtml(t.human_by || "")}">✓</span>` : ""}<button class="ok" data-d="recovered" title="the crew brought it up">recovered</button><button data-d="not_found" title="the crew went - nothing there">not found</button>${t.human ? `<button data-d="undo" title="re-open">undo</button>` : ""}</span>`;
   if (t.verdict !== "review") return `<span class="muted">—</span>`;
-  return `<span class="rev-btns"><button class="ok" data-d="confirm" title="a real pot - put it on the recovery route">✓</button><button class="no" data-d="reject" title="not a pot - take it off the queue">✕</button></span>`;
+  const pri = t.human_priority
+    ? `<span class="h-chip h-pri" title="a person's override - the agent keeps this order">${t.human_priority === "high" ? "↑ first" : "↓ last"}</span><button data-d="reset_priority" title="give the order back to the agent">reset</button>`
+    : `<button data-d="prioritize" title="override the agent: inspect this first">↑</button><button data-d="deprioritize" title="override the agent: end of the queue">↓</button>`;
+  return `<span class="rev-btns"><button class="ok" data-d="confirm" title="a real pot - put it on the recovery route">✓</button><button class="no" data-d="reject" title="not a pot - take it off the queue">✕</button><span class="rev-sep"></span>${pri}</span>`;
 }
 /* a PERSON's decision -> the agent re-plans (recovery route, queue, budget, passes); also a training label */
 async function decideHazard(d, t, decision) {
@@ -1219,15 +1423,15 @@ async function decideHazard(d, t, decision) {
   const r = await fetch(`${API}/api/survey/${encodeURIComponent(d.survey_id)}/decide`, { method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ hazard_id: t.oid, decision, by }) });
   const b = await r.json().catch(() => ({}));
-  if (!r.ok) { toast(b.detail || `not saved (${r.status})`); setTimeout(toastHide, 2200); return; }
-  if (decision === "confirm" || decision === "reject")
-    sendLabel({ bbox: t.bbox, cls_name: t.cls_name, decision, verdict_before: t.verdict, conf: t.conf, p_pot: t.p_pot,
-      source: "survey", frame_id: t.frame_id, frame_ref: (d.frame_refs || {})[t.frame_id] });
-  state.survey.tracked = b.tracked; state.survey.mission = b.mission;
-  const m = b.mission;
-  Log.push([{ tool: "human_gate", msg: `${t.oid} ${decision} by ${by}`, t: "" },
-            { tool: "replan", msg: `recovery route ${m.recovery_route.length} stop(s)${m.route_length_m ? " · " + m.route_length_m + " m" : ""} · queue ${m.review_queue.length} · ${(m.resurvey_plan.lines || []).length} re-survey pass(es)`, t: "" }]);
+  if (!r.ok) { toast(typeof b.detail === "string" ? b.detail : `not saved (${r.status})`); setTimeout(toastHide, 2200); return; }
+  state.survey.tracked = b.tracked; state.survey.mission = b.mission; state.survey.dispatch = b.dispatch;
+  const m = b.mission, rp = b.replan;
+  Log.push([{ tool: "human_gate", msg: `${t.oid} ${decision} by ${by}${b.label ? " · saved as a training label" : ""}`, t: "" },
+            { tool: "replan", msg: rp ? rp.rationale : `queue ${m.review_queue.length}`, t: "" }]);
+  if (rp) { toast(chainText({ rationale: rp.rationale })); setTimeout(toastHide, 4200); }
+  if (b.label) loadLabelStats();
   renderSurvey(state.survey, { keepView: true });
+  Appr.load();
 }
 
 /* ------------------------------------------------------------------ human labels (every decision is a training label) */
