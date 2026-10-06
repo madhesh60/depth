@@ -24,15 +24,15 @@ from typing import Optional, Sequence
 import cv2
 import numpy as np
 
-from src.detection.calibration import load_calibration
+from src.detection.calibration import SHIPPED_MODEL, load_calibration
 
 REPO = Path(__file__).resolve().parents[2]
 def _default_onnx() -> Path:
     """``$DEPTH_ONNX``, else ``models/<MODEL>/best.onnx``, else ``runs/<MODEL>/weights/best.onnx``
-    (``<MODEL>`` = ``$DEPTH_MODEL``, default EXP-001). Weights are git-ignored; calibration is tracked."""
+    (``<MODEL>`` = ``$DEPTH_MODEL``, default ``calibration.SHIPPED_MODEL``). Weights are git-ignored; calibration is tracked."""
     if os.environ.get("DEPTH_ONNX"):
         return Path(os.environ["DEPTH_ONNX"])
-    model = os.environ.get("DEPTH_MODEL", "EXP-001")
+    model = os.environ.get("DEPTH_MODEL", SHIPPED_MODEL)
     for p in (REPO / "models" / model / "best.onnx", REPO / "runs" / model / "weights" / "best.onnx"):
         if p.exists():
             return p

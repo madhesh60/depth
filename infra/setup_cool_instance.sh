@@ -2,7 +2,7 @@
 # setup_cool_instance.sh — turn a fresh COOL AMI instance (Ubuntu 24.04, Graviton, OpenCV 5 under
 # /opt/cool) into the live DEPTH server. Idempotent; run as root (EC2 user-data or SSM Run Command).
 #
-#   DEPTH_MODEL_S3=s3://<bucket>/models/EXP-001/best.onnx  DEPTH_MODEL_SHA256=<hex>  \
+#   DEPTH_MODEL_S3=s3://<bucket>/models/EXP-003/best.onnx  DEPTH_MODEL_SHA256=<hex>  \
 #   DEPTH_S3_BUCKET=<bucket>  ./infra/setup_cool_instance.sh
 #
 # What it does (review I-1 / X-6):
@@ -20,7 +20,7 @@ REPO_URL="${DEPTH_REPO_URL:-https://github.com/madhesh60/depth.git}"
 BRANCH="${DEPTH_BRANCH:-main}"
 APP=/opt/depth
 PORT="${DEPTH_PORT:-8000}"
-MODEL_NAME="${DEPTH_MODEL:-EXP-001}"          # models/<name>/: calibration.json tracked, best.onnx fetched
+MODEL_NAME="${DEPTH_MODEL:-EXP-003}"          # models/<name>/: calibration.json tracked, best.onnx fetched
 COOL_PY="${COOL_PY:-$(ls -d /opt/cool/venvs/python_3.1*/bin/python 2>/dev/null | sort -V | tail -1)}"
 [ -x "$COOL_PY" ] || { echo "ERROR: COOL interpreter not found under /opt/cool/venvs — use the COOL AMI" >&2; exit 2; }
 

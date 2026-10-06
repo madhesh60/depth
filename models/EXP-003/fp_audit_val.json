@@ -1,0 +1,914 @@
+{
+ "model": "EXP-003",
+ "split": "val",
+ "created": "2026-10-06",
+ "n_fp": 60,
+ "n_catch": 15,
+ "conf_cut": 0.2465,
+ "band_tp": 95,
+ "band_fp": 60,
+ "band_precision_raw": 0.6129,
+ "items": [
+  {
+   "id": "a000",
+   "kind": "fp",
+   "frame": "Rec12_Sensor_Depth_wcp_ss_star_00051_png_jpg.rf.0379eea6f3f0da8c246907dd05631de9.jpg",
+   "bbox": [
+    409,
+    68,
+    428,
+    95
+   ],
+   "conf": 0.4824
+  },
+  {
+   "id": "a001",
+   "kind": "fp",
+   "frame": "Rec16_wcp_ss_port_00035_png_jpg.rf.6887699c20d0e36eb6d8dde0bc68957f.jpg",
+   "bbox": [
+    556,
+    284,
+    630,
+    375
+   ],
+   "conf": 0.4863
+  },
+  {
+   "id": "a002",
+   "kind": "fp",
+   "frame": "Rec12_Sensor_Depth_wcp_ss_star_00064_png_jpg.rf.0fb5954b279e09bd7919309335a4ad07.jpg",
+   "bbox": [
+    223,
+    66,
+    283,
+    135
+   ],
+   "conf": 0.3219
+  },
+  {
+   "id": "a003",
+   "kind": "fp",
+   "frame": "Rec16_wcp_ss_port_00038_png_jpg.rf.7e252e72a82640dd6a5c23dfe2c317ae.jpg",
+   "bbox": [
+    364,
+    568,
+    389,
+    598
+   ],
+   "conf": 0.276
+  },
+  {
+   "id": "a004",
+   "kind": "fp",
+   "frame": "Rec16_wcp_ss_port_00056_png_jpg.rf.9a32edec0d53f29cb5bab965d8d4c83e.jpg",
+   "bbox": [
+    454,
+    136,
+    499,
+    175
+   ],
+   "conf": 0.3471
+  },
+  {
+   "id": "a005",
+   "kind": "fp",
+   "frame": "Rec16_wcp_ss_star_00054_png_jpg.rf.8e45c9fe2c6436b1cbc3541c6c5e71d3.jpg",
+   "bbox": [
+    93,
+    452,
+    123,
+    481
+   ],
+   "conf": 0.4296
+  },
+  {
+   "id": "a006",
+   "kind": "fp",
+   "frame": "Rec16_wcp_ss_star_00056_png_jpg.rf.e9ed9e8814cc691dc7a780e8d3813453.jpg",
+   "bbox": [
+    410,
+    211,
+    463,
+    252
+   ],
+   "conf": 0.3295
+  },
+  {
+   "id": "a007",
+   "kind": "fp",
+   "frame": "Rec16_wcp_ss_star_00054_png_jpg.rf.8e45c9fe2c6436b1cbc3541c6c5e71d3.jpg",
+   "bbox": [
+    333,
+    207,
+    356,
+    228
+   ],
+   "conf": 0.3026
+  },
+  {
+   "id": "a008",
+   "kind": "fp",
+   "frame": "Rec16_wcp_ss_star_00015_png_jpg.rf.dcf58652a9fc5d8de2d8959dc41562dc.jpg",
+   "bbox": [
+    386,
+    193,
+    426,
+    245
+   ],
+   "conf": 0.2803
+  },
+  {
+   "id": "a009",
+   "kind": "fp",
+   "frame": "Rec16_wcp_ss_star_00056_png_jpg.rf.e9ed9e8814cc691dc7a780e8d3813453.jpg",
+   "bbox": [
+    504,
+    501,
+    555,
+    545
+   ],
+   "conf": 0.2505
+  },
+  {
+   "id": "a010",
+   "kind": "fp",
+   "frame": "Rec16_wcp_ss_port_00013_png_jpg.rf.6d39e8b1e2b7226d45af5ef79b90a540.jpg",
+   "bbox": [
+    361,
+    432,
+    408,
+    494
+   ],
+   "conf": 0.2682
+  },
+  {
+   "id": "a011",
+   "kind": "catch",
+   "frame": "Rec16_wcp_ss_star_00054_png_jpg.rf.8e45c9fe2c6436b1cbc3541c6c5e71d3.jpg",
+   "bbox": [
+    150,
+    111,
+    215,
+    168
+   ],
+   "conf": 0.3746
+  },
+  {
+   "id": "a012",
+   "kind": "fp",
+   "frame": "Rec16_wcp_ss_port_00063_png_jpg.rf.db7330b1e2fddc0c61fb4d54914a366e.jpg",
+   "bbox": [
+    98,
+    51,
+    121,
+    72
+   ],
+   "conf": 0.2607
+  },
+  {
+   "id": "a013",
+   "kind": "catch",
+   "frame": "Rec10_wcp_ss_star_00011_png_jpg.rf.04248ec7dc037e1c0b100263eb9c6a68.jpg",
+   "bbox": [
+    39,
+    136,
+    91,
+    195
+   ],
+   "conf": 0.2899
+  },
+  {
+   "id": "a014",
+   "kind": "fp",
+   "frame": "Rec16_wcp_ss_star_00015_png_jpg.rf.dcf58652a9fc5d8de2d8959dc41562dc.jpg",
+   "bbox": [
+    295,
+    556,
+    333,
+    582
+   ],
+   "conf": 0.6094
+  },
+  {
+   "id": "a015",
+   "kind": "fp",
+   "frame": "Rec16_wcp_ss_port_00020_png_jpg.rf.7d595fe60e643f156ef0ef119a4d12c6.jpg",
+   "bbox": [
+    89,
+    158,
+    152,
+    232
+   ],
+   "conf": 0.3037
+  },
+  {
+   "id": "a016",
+   "kind": "fp",
+   "frame": "Rec16_wcp_ss_star_00031_png_jpg.rf.98ef30ef00fa49cec7fc0e6ac6cb22d0.jpg",
+   "bbox": [
+    188,
+    115,
+    240,
+    209
+   ],
+   "conf": 0.3374
+  },
+  {
+   "id": "a017",
+   "kind": "fp",
+   "frame": "Rec12_wcp_ss_port_00016_png_jpg.rf.3a0b6f6a73257806ac7e8d2af0dddb9c.jpg",
+   "bbox": [
+    135,
+    127,
+    150,
+    155
+   ],
+   "conf": 0.5008
+  },
+  {
+   "id": "a018",
+   "kind": "fp",
+   "frame": "Rec12_Sensor_Depth_wcp_ss_star_00014_png_jpg.rf.86a012d3d849a4998b170be05665c71b.jpg",
+   "bbox": [
+    245,
+    71,
+    263,
+    90
+   ],
+   "conf": 0.3021
+  },
+  {
+   "id": "a019",
+   "kind": "fp",
+   "frame": "Rec16_wcp_ss_star_00057_png_jpg.rf.f5daf1e0e92616255622e0008575e0c3.jpg",
+   "bbox": [
+    597,
+    561,
+    622,
+    590
+   ],
+   "conf": 0.2765
+  },
+  {
+   "id": "a020",
+   "kind": "fp",
+   "frame": "Rec12_Sensor_Depth_wcp_ss_port_00057_png_jpg.rf.d955a90225f35fdafbd60a81a1c8920c.jpg",
+   "bbox": [
+    119,
+    249,
+    150,
+    285
+   ],
+   "conf": 0.3342
+  },
+  {
+   "id": "a021",
+   "kind": "fp",
+   "frame": "Rec12_wcp_ss_star_00017_png_jpg.rf.486ddff30b45d5bf663a10fe7441b26c.jpg",
+   "bbox": [
+    456,
+    221,
+    488,
+    267
+   ],
+   "conf": 0.2731
+  },
+  {
+   "id": "a022",
+   "kind": "fp",
+   "frame": "Rec12_Sensor_Depth_wcp_ss_star_00065_png_jpg.rf.5ac7089f4106cf00f0e6327b71a1ea3f.jpg",
+   "bbox": [
+    97,
+    171,
+    157,
+    264
+   ],
+   "conf": 0.3331
+  },
+  {
+   "id": "a023",
+   "kind": "catch",
+   "frame": "Rec12_wcp_ss_star_00019_png_jpg.rf.4de421369a4c62c5c045235c3c0456b6.jpg",
+   "bbox": [
+    136,
+    442,
+    171,
+    479
+   ],
+   "conf": 0.2093
+  },
+  {
+   "id": "a024",
+   "kind": "catch",
+   "frame": "Rec16_wcp_ss_star_00021_png_jpg.rf.dcb420ba37c5d408c2a8d7de9968cdf9.jpg",
+   "bbox": [
+    89,
+    262,
+    130,
+    301
+   ],
+   "conf": 0.1833
+  },
+  {
+   "id": "a025",
+   "kind": "fp",
+   "frame": "Rec16_wcp_ss_port_00053_png_jpg.rf.1293c6940d80fd2e23c99138bc6e9d94.jpg",
+   "bbox": [
+    617,
+    231,
+    635,
+    252
+   ],
+   "conf": 0.259
+  },
+  {
+   "id": "a026",
+   "kind": "fp",
+   "frame": "Rec10_Sensor_Depth_wcp_ss_star_00024_png_jpg.rf.1f45daab33884c92f6b34ce790ec8806.jpg",
+   "bbox": [
+    384,
+    151,
+    400,
+    177
+   ],
+   "conf": 0.2551
+  },
+  {
+   "id": "a027",
+   "kind": "fp",
+   "frame": "Rec16_wcp_ss_star_00013_png_jpg.rf.d6ca0bcb7dd7e4170c0477dbb794146d.jpg",
+   "bbox": [
+    609,
+    281,
+    638,
+    299
+   ],
+   "conf": 0.2552
+  },
+  {
+   "id": "a028",
+   "kind": "fp",
+   "frame": "Rec12_wcp_ss_port_00015_png_jpg.rf.8daa6453e0e8e182d63c57ef18fca928.jpg",
+   "bbox": [
+    563,
+    198,
+    582,
+    225
+   ],
+   "conf": 0.4782
+  },
+  {
+   "id": "a029",
+   "kind": "fp",
+   "frame": "Rec12_wcp_ss_port_00014_png_jpg.rf.ac0e7dbb05c4f1daf538127e9d713cff.jpg",
+   "bbox": [
+    0,
+    580,
+    75,
+    634
+   ],
+   "conf": 0.2521
+  },
+  {
+   "id": "a030",
+   "kind": "fp",
+   "frame": "Rec12_Sensor_Depth_wcp_ss_star_00017_png_jpg.rf.39855accfc6ed64ad0460a3549f53f8b.jpg",
+   "bbox": [
+    171,
+    282,
+    188,
+    310
+   ],
+   "conf": 0.595
+  },
+  {
+   "id": "a031",
+   "kind": "fp",
+   "frame": "Rec12_Sensor_Depth_wcp_ss_star_00007_png_jpg.rf.a28b7b42840c741977d7553f7c82defd.jpg",
+   "bbox": [
+    55,
+    403,
+    68,
+    424
+   ],
+   "conf": 0.2536
+  },
+  {
+   "id": "a032",
+   "kind": "catch",
+   "frame": "Rec12_wcp_ss_star_00026_png_jpg.rf.dbf490ffc03bd9ae09f29747d05584a0.jpg",
+   "bbox": [
+    366,
+    552,
+    420,
+    599
+   ],
+   "conf": 0.2025
+  },
+  {
+   "id": "a033",
+   "kind": "fp",
+   "frame": "Rec12_Sensor_Depth_wcp_ss_port_00065_png_jpg.rf.678c9ec26b636215c124f829aa8671a7.jpg",
+   "bbox": [
+    608,
+    538,
+    629,
+    561
+   ],
+   "conf": 0.3015
+  },
+  {
+   "id": "a034",
+   "kind": "fp",
+   "frame": "Rec12_Sensor_Depth_wcp_ss_star_00042_png_jpg.rf.84631f340ea6655ae83466fdfa21f8f2.jpg",
+   "bbox": [
+    183,
+    110,
+    235,
+    175
+   ],
+   "conf": 0.4043
+  },
+  {
+   "id": "a035",
+   "kind": "catch",
+   "frame": "Rec16_wcp_ss_star_00021_png_jpg.rf.dcb420ba37c5d408c2a8d7de9968cdf9.jpg",
+   "bbox": [
+    396,
+    579,
+    416,
+    604
+   ],
+   "conf": 0.1447
+  },
+  {
+   "id": "a036",
+   "kind": "fp",
+   "frame": "Rec12_Sensor_Depth_wcp_ss_port_00018_png_jpg.rf.90d1dc7172bcaa631e1e38c07ed2bf20.jpg",
+   "bbox": [
+    408,
+    57,
+    426,
+    82
+   ],
+   "conf": 0.5324
+  },
+  {
+   "id": "a037",
+   "kind": "catch",
+   "frame": "Rec16_wcp_ss_port_00043_png_jpg.rf.fb982ba408bb7ec225621e445b94978d.jpg",
+   "bbox": [
+    459,
+    383,
+    509,
+    451
+   ],
+   "conf": 0.3705
+  },
+  {
+   "id": "a038",
+   "kind": "fp",
+   "frame": "Rec12_Sensor_Depth_wcp_ss_star_00034_png_jpg.rf.599f26f60b145bace465fcbe35318396.jpg",
+   "bbox": [
+    308,
+    346,
+    327,
+    362
+   ],
+   "conf": 0.3964
+  },
+  {
+   "id": "a039",
+   "kind": "fp",
+   "frame": "Rec16_wcp_ss_port_00056_png_jpg.rf.9a32edec0d53f29cb5bab965d8d4c83e.jpg",
+   "bbox": [
+    146,
+    121,
+    231,
+    213
+   ],
+   "conf": 0.3405
+  },
+  {
+   "id": "a040",
+   "kind": "fp",
+   "frame": "Rec10_Sensor_Depth_wcp_ss_port_00029_png_jpg.rf.a810956a448acfd1c3bb0fd215524847.jpg",
+   "bbox": [
+    592,
+    405,
+    618,
+    444
+   ],
+   "conf": 0.3145
+  },
+  {
+   "id": "a041",
+   "kind": "catch",
+   "frame": "Rec16_wcp_ss_port_00063_png_jpg.rf.db7330b1e2fddc0c61fb4d54914a366e.jpg",
+   "bbox": [
+    87,
+    47,
+    132,
+    94
+   ],
+   "conf": 0.3253
+  },
+  {
+   "id": "a042",
+   "kind": "fp",
+   "frame": "Rec12_Sensor_Depth_wcp_ss_port_00039_png_jpg.rf.66636d7ea6ad29d4c0422cf60ad6f697.jpg",
+   "bbox": [
+    549,
+    396,
+    578,
+    432
+   ],
+   "conf": 0.2648
+  },
+  {
+   "id": "a043",
+   "kind": "fp",
+   "frame": "Rec16_wcp_ss_star_00027_png_jpg.rf.802c7e4882e8da792576faae6da354ed.jpg",
+   "bbox": [
+    472,
+    564,
+    492,
+    584
+   ],
+   "conf": 0.2465
+  },
+  {
+   "id": "a044",
+   "kind": "catch",
+   "frame": "Rec16_wcp_ss_port_00032_png_jpg.rf.b46d9d7634a8450e5964707f1354f4da.jpg",
+   "bbox": [
+    59,
+    436,
+    96,
+    480
+   ],
+   "conf": 0.3575
+  },
+  {
+   "id": "a045",
+   "kind": "catch",
+   "frame": "Rec12_wcp_ss_star_00013_png_jpg.rf.962444a90c33cbff35438e9e12aaea95.jpg",
+   "bbox": [
+    515,
+    150,
+    553,
+    196
+   ],
+   "conf": 0.2782
+  },
+  {
+   "id": "a046",
+   "kind": "fp",
+   "frame": "Rec16_wcp_ss_star_00036_png_jpg.rf.1a5ef5578dadf3b30cf65ac1640d8ab2.jpg",
+   "bbox": [
+    518,
+    188,
+    572,
+    287
+   ],
+   "conf": 0.3321
+  },
+  {
+   "id": "a047",
+   "kind": "fp",
+   "frame": "Rec12_wcp_ss_port_00004_png_jpg.rf.a2c95936cb1ce94d2f3aa131876c5c6c.jpg",
+   "bbox": [
+    174,
+    555,
+    213,
+    599
+   ],
+   "conf": 0.2736
+  },
+  {
+   "id": "a048",
+   "kind": "fp",
+   "frame": "Rec10_wcp_ss_port_00017_png_jpg.rf.6bf75be983aff2e9b22c8914671cd39a.jpg",
+   "bbox": [
+    36,
+    148,
+    90,
+    203
+   ],
+   "conf": 0.5125
+  },
+  {
+   "id": "a049",
+   "kind": "fp",
+   "frame": "Rec10_wcp_ss_star_00007_png_jpg.rf.bd3f0373299f1de8e6a765fdd1acb49f.jpg",
+   "bbox": [
+    545,
+    563,
+    601,
+    617
+   ],
+   "conf": 0.7586
+  },
+  {
+   "id": "a050",
+   "kind": "fp",
+   "frame": "Rec10_wcp_ss_star_00008_png_jpg.rf.2cad0874b5c872631239a73df4349a09.jpg",
+   "bbox": [
+    116,
+    537,
+    183,
+    617
+   ],
+   "conf": 0.251
+  },
+  {
+   "id": "a051",
+   "kind": "fp",
+   "frame": "Rec16_wcp_ss_port_00043_png_jpg.rf.fb982ba408bb7ec225621e445b94978d.jpg",
+   "bbox": [
+    11,
+    61,
+    72,
+    143
+   ],
+   "conf": 0.5442
+  },
+  {
+   "id": "a052",
+   "kind": "fp",
+   "frame": "Rec16_wcp_ss_star_00042_png_jpg.rf.8a2b2c75076a564780339042b06ce1e9.jpg",
+   "bbox": [
+    452,
+    125,
+    469,
+    150
+   ],
+   "conf": 0.3895
+  },
+  {
+   "id": "a053",
+   "kind": "fp",
+   "frame": "Rec16_wcp_ss_port_00063_png_jpg.rf.db7330b1e2fddc0c61fb4d54914a366e.jpg",
+   "bbox": [
+    433,
+    461,
+    464,
+    512
+   ],
+   "conf": 0.3055
+  },
+  {
+   "id": "a054",
+   "kind": "fp",
+   "frame": "Rec16_wcp_ss_port_00054_png_jpg.rf.05486a0158f9c806ca23f2954fd7b074.jpg",
+   "bbox": [
+    0,
+    460,
+    84,
+    524
+   ],
+   "conf": 0.3242
+  },
+  {
+   "id": "a055",
+   "kind": "fp",
+   "frame": "Rec12_Sensor_Depth_wcp_ss_star_00027_png_jpg.rf.674bbaa573a1c51b5de8e9a8ac7287ce.jpg",
+   "bbox": [
+    306,
+    49,
+    322,
+    77
+   ],
+   "conf": 0.316
+  },
+  {
+   "id": "a056",
+   "kind": "fp",
+   "frame": "Rec12_Sensor_Depth_wcp_ss_star_00065_png_jpg.rf.5ac7089f4106cf00f0e6327b71a1ea3f.jpg",
+   "bbox": [
+    334,
+    83,
+    397,
+    150
+   ],
+   "conf": 0.3035
+  },
+  {
+   "id": "a057",
+   "kind": "fp",
+   "frame": "Rec16_wcp_ss_port_00031_png_jpg.rf.6a9fe90310750848dafa9c744282b5cc.jpg",
+   "bbox": [
+    21,
+    14,
+    91,
+    59
+   ],
+   "conf": 0.4084
+  },
+  {
+   "id": "a058",
+   "kind": "fp",
+   "frame": "Rec12_Sensor_Depth_wcp_ss_port_00061_png_jpg.rf.9970dab09401a302646055d1a653ab84.jpg",
+   "bbox": [
+    336,
+    191,
+    362,
+    215
+   ],
+   "conf": 0.2471
+  },
+  {
+   "id": "a059",
+   "kind": "fp",
+   "frame": "Rec16_wcp_ss_star_00037_png_jpg.rf.59b6e02d4f047df3af6698162eef6f01.jpg",
+   "bbox": [
+    582,
+    474,
+    640,
+    527
+   ],
+   "conf": 0.2851
+  },
+  {
+   "id": "a060",
+   "kind": "catch",
+   "frame": "Rec12_wcp_ss_star_00048_png_jpg.rf.256adbdea64110e2c2e63597ad238fe4.jpg",
+   "bbox": [
+    417,
+    574,
+    447,
+    612
+   ],
+   "conf": 0.2639
+  },
+  {
+   "id": "a061",
+   "kind": "fp",
+   "frame": "Rec12_wcp_ss_port_00049_png_jpg.rf.7451ba680005eaf8e44ed706ca0d5537.jpg",
+   "bbox": [
+    155,
+    9,
+    231,
+    66
+   ],
+   "conf": 0.344
+  },
+  {
+   "id": "a062",
+   "kind": "fp",
+   "frame": "Rec12_wcp_ss_port_00016_png_jpg.rf.3a0b6f6a73257806ac7e8d2af0dddb9c.jpg",
+   "bbox": [
+    346,
+    301,
+    414,
+    374
+   ],
+   "conf": 0.3267
+  },
+  {
+   "id": "a063",
+   "kind": "fp",
+   "frame": "Rec10_wcp_ss_star_00008_png_jpg.rf.2cad0874b5c872631239a73df4349a09.jpg",
+   "bbox": [
+    0,
+    488,
+    25,
+    544
+   ],
+   "conf": 0.2759
+  },
+  {
+   "id": "a064",
+   "kind": "catch",
+   "frame": "Rec12_wcp_ss_port_00027_png_jpg.rf.5e50c3c480dc1983a51f040f95d58d37.jpg",
+   "bbox": [
+    482,
+    317,
+    559,
+    417
+   ],
+   "conf": 0.2604
+  },
+  {
+   "id": "a065",
+   "kind": "catch",
+   "frame": "Rec16_wcp_ss_port_00020_png_jpg.rf.7d595fe60e643f156ef0ef119a4d12c6.jpg",
+   "bbox": [
+    507,
+    131,
+    542,
+    174
+   ],
+   "conf": 0.283
+  },
+  {
+   "id": "a066",
+   "kind": "fp",
+   "frame": "Rec12_Sensor_Depth_wcp_ss_port_00034_png_jpg.rf.5aab5f677a1032409d47aaff21628409.jpg",
+   "bbox": [
+    65,
+    467,
+    85,
+    500
+   ],
+   "conf": 0.2783
+  },
+  {
+   "id": "a067",
+   "kind": "fp",
+   "frame": "Rec12_wcp_ss_port_00010_png_jpg.rf.b3266573f1cf0219c9949e6dc690b9ab.jpg",
+   "bbox": [
+    237,
+    385,
+    290,
+    459
+   ],
+   "conf": 0.4791
+  },
+  {
+   "id": "a068",
+   "kind": "catch",
+   "frame": "Rec12_Sensor_Depth_wcp_ss_star_00042_png_jpg.rf.84631f340ea6655ae83466fdfa21f8f2.jpg",
+   "bbox": [
+    201,
+    114,
+    214,
+    132
+   ],
+   "conf": 0.1327
+  },
+  {
+   "id": "a069",
+   "kind": "fp",
+   "frame": "Rec16_wcp_ss_star_00036_png_jpg.rf.1a5ef5578dadf3b30cf65ac1640d8ab2.jpg",
+   "bbox": [
+    29,
+    144,
+    106,
+    241
+   ],
+   "conf": 0.2943
+  },
+  {
+   "id": "a070",
+   "kind": "fp",
+   "frame": "Rec12_Sensor_Depth_wcp_ss_star_00027_png_jpg.rf.674bbaa573a1c51b5de8e9a8ac7287ce.jpg",
+   "bbox": [
+    552,
+    73,
+    567,
+    89
+   ],
+   "conf": 0.3561
+  },
+  {
+   "id": "a071",
+   "kind": "catch",
+   "frame": "Rec16_wcp_ss_port_00057_png_jpg.rf.832325edccd6ee6ececcbc3fe20591cd.jpg",
+   "bbox": [
+    11,
+    191,
+    72,
+    295
+   ],
+   "conf": 0.2733
+  },
+  {
+   "id": "a072",
+   "kind": "fp",
+   "frame": "Rec16_wcp_ss_port_00056_png_jpg.rf.9a32edec0d53f29cb5bab965d8d4c83e.jpg",
+   "bbox": [
+    452,
+    478,
+    530,
+    534
+   ],
+   "conf": 0.3142
+  },
+  {
+   "id": "a073",
+   "kind": "fp",
+   "frame": "Rec16_wcp_ss_port_00034_png_jpg.rf.22448594769c43fbce10c6061c775dfe.jpg",
+   "bbox": [
+    313,
+    40,
+    375,
+    142
+   ],
+   "conf": 0.4295
+  },
+  {
+   "id": "a074",
+   "kind": "fp",
+   "frame": "Rec12_wcp_ss_port_00010_png_jpg.rf.b3266573f1cf0219c9949e6dc690b9ab.jpg",
+   "bbox": [
+    382,
+    419,
+    441,
+    495
+   ],
+   "conf": 0.3726
+  }
+ ],
+ "license": "CC-BY-SA-4.0 (crops of the PINGEcosystem crab-pot dataset; see webui/samples/ATTRIBUTION.md)"
+}

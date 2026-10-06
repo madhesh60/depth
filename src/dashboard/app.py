@@ -54,7 +54,7 @@ from src.agentic.shadow import ShadowProver
 from src.agentic.geo import synthetic_track, stage1_counterfactual
 from src.agentic.mission import export
 from src.agentic.types import SurveyResult
-from src.detection.calibration import load_calibration
+from src.detection.calibration import SHIPPED_MODEL, load_calibration
 from src.detection.infer import configure_runtime, DEFAULT_ONNX
 from . import samples as samples_mod
 from .jobs import JobStore, REPORT_FORMATS, PUBLIC_FORMATS
@@ -396,7 +396,9 @@ def health():
     return {
         "status": "ok", "opencv": cv2.__version__,
         "cv2_file": cv2_file, "is_cool_path": "/opt/cool" in cv2_file,
-        "runtime": _RUNTIME, "model": DEFAULT_ONNX.parent.parent.name,
+        "runtime": _RUNTIME,
+        # models/<M>/best.onnx (fetch_model) or runs/<M>/weights/best.onnx (a training run)
+        "model": DEFAULT_ONNX.parent.name if DEFAULT_ONNX.parent.parent.name == "models" else DEFAULT_ONNX.parent.parent.name,
         "model_loaded": _MODEL_STATE["loaded"], "model_loading": _MODEL_STATE["loading"],
         "model_error": _MODEL_STATE["error"], "warmup_ms": _MODEL_STATE["warmup_ms"],
         "samples": len(samples_mod.list_samples()), "calibration": summary, "jobs": _JOBS.counts(),
@@ -487,7 +489,7 @@ def effort(sec_per_frame: Optional[float] = Query(None, gt=0, le=600),
            manual_recall: Optional[float] = Query(None, gt=0, le=1),
            card_accuracy: Optional[float] = Query(None, gt=0, le=1)):
     """Recall-vs-minutes curves for manual review / detector list / DEPTH queue with any timings."""
-    ep = REPO / "models" / load_calibration().data.get("model", "EXP-001") / "effort_curve.json"
+    ep = REPO / "models" / load_calibration().data.get("model", SHIPPED_MODEL) / "effort_curve.json"
     if not ep.exists():
         raise HTTPException(404, "no effort data for this model - run python -m src.agentic.effort")
     E = json.loads(ep.read_text(encoding="utf-8"))
@@ -503,7 +505,7 @@ def effort(sec_per_frame: Optional[float] = Query(None, gt=0, le=600),
 
 # ---- blinded false-alarm audit (src/detection/fp_audit.py) ------------------------------------
 def _audit_model() -> str:
-    return load_calibration().data.get("model", "EXP-001")
+    return load_calibration().data.get("model", SHIPPED_MODEL)
 
 
 @app.get("/api/audit/items")

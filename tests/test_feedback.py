@@ -76,3 +76,30 @@ def test_api_feedback_roundtrip(tmp_path, monkeypatch):
     assert r.status_code == 200 and r.json()["saved"]["frame_ref"] == {"sample": "sample-02"}
     assert c.get("/api/feedback/stats").json()["missed"] == 1
     assert c.post("/api/feedback", json={"decision": "nope", "bbox": [0, 0, 9, 9], "frame_ref": {"sample": "x"}}).status_code == 400
+
+
+def test_heldout_samples_never_reach_a_finetune_set(tmp_path):
+    """The shipped samples are v2b TEST frames (unseen by the default model); reviewer labels on them
+    are scored (agreement) but never exported as training data."""
+    from src.dashboard import samples as samples_mod
+    man = json.loads((Path(__file__).resolve().parents[1] / "webui" / "samples" / "manifest.json").read_text(encoding="utf-8"))
+    assert man["samples"] and all(s.get("heldout") and s.get("split") == "v2b test" for s in man["samples"])
+    assert samples_mod.is_heldout("sample-02") and not samples_mod.is_heldout("no-such-sample")
+    st = FeedbackStore(tmp_path / "fb")
+    img = np.full((100, 200, 3), 90, np.uint8)
+    st.add(_rec("confirm", [10, 10, 30, 30], {"sample": "sample-02"}))
+    st.add(_rec("missed", [50, 10, 70, 30], {"upload": "up1"}), img)
+    out = st.export(tmp_path / "ds", ["ghost_gear", "wreck_debris"])
+    assert out["skipped_heldout_frames"] == 1 and out["frames"] == 1 and out["positives"] == 1
+    assert not (tmp_path / "ds" / "images" / "s_sample-02.jpg").exists()
+
+
+def test_default_model_is_shipped_and_audit_reads_its_own_split():
+    from src.detection import calibration, fp_audit
+    from src.detection.fetch_model import RELEASES
+    root = Path(__file__).resolve().parents[1]
+    assert (root / "models" / calibration.SHIPPED_MODEL / "calibration.json").exists()
+    assert calibration.SHIPPED_MODEL in RELEASES
+    assert fp_audit.split_root("EXP-003").as_posix().endswith("03_yolo_ready_dataset_v2b/val")
+    assert fp_audit.split_root("EXP-003", "test").as_posix().endswith("03_yolo_ready_dataset_v2b/test")
+    assert fp_audit.split_root("EXP-001").as_posix().endswith("03_yolo_ready_dataset_v1/val")

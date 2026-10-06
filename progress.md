@@ -75,7 +75,42 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ## 4. Session log
 
-### 2026-10-06 (sweep 49) — EXP-005 analysed: stronger jitter made pots worse; the recipe search is done
+### 2026-10-06 (sweep 51) — EXP-003 is the default model; held-out demo frames; release prepared
+- **Default:** `calibration.SHIPPED_MODEL = "EXP-003"` is the one place the default lives.
+  - `infer`, `fetch_model`, the app and the infra scripts read it.
+  - `$DEPTH_MODEL` still overrides; EXP-001 stays switchable.
+  - Health now names the model correctly for `models/<M>/best.onnx`; it used to report "models".
+- **Demo frames were training frames.**
+  - The 8 shipped samples (Rec6) were chosen as unseen by EXP-001, but they are in v2b *train*, so
+    EXP-003 learned from them.
+  - Replaced by 8 v2b **test** frames: Rec9 port 10–15 and starboard 5–6, 14 labelled pots, picked by
+    structure only (`DATASET/scripts/build_samples.py`, byte-for-byte copies).
+  - No labelled crab-pot frame is unseen by both models: EXP-001 trained on most v2b test frames
+    through v1. The manifest says so.
+  - Samples are flagged `heldout`; `feedback.export` skips them, so demo labels can never become
+    training data (test).
+- **Studio files for EXP-003:**
+  - Blinded audit set: 60 top validation false alarms + 15 catch trials (`fp_audit build`). Its data
+    root is read from the model's calibration record, so v2b, not v1.
+  - Effort curve, on the v2b test split.
+- **Effort, an honest finding:**
+  - Reaching EXP-003's 79% promise takes 491 cards on 199 test frames.
+  - With the placeholder timings (20 s per frame manual, 8 s per card) DEPTH needs 65.5 min vs 56.3
+    min for manual review.
+  - The break-even is 6.9 s per card; EXP-001 at its 65% promise was 7.95 s. The timed study decides.
+- **Release `exp003-v1` prepared, not published:** `fetch_model` entry with the SHA-256, and
+  `docs/release_exp003.md` with the numbers, the licence question and the publish command.
+- **What a validation label audit would change** (measured on validation, upper bounds):
+  - Confirming 6 to 28 confident unlabelled detections raises EXP-004's AP@0.5 by +0.03 to +0.09.
+  - EXP-003's own column is inflated (they are its own detections).
+  - The ruler moves as much as the gap between models.
+  - The training labels are nearly complete (8 missing vs 1,345), so retraining after an audit is not
+    expected to beat EXP-003.
+- Verified in the studio (port 8010): health EXP-003, the 79% promise, 8 held-out samples, the
+  analyze path stamps the `71339e99…` weights, no console errors.
+- Tests: 155 passed (2 new).
+
+### 2026-10-06 (sweep 50) — EXP-005 analysed: stronger jitter made pots worse; the recipe search is done
 - **Runs** (Kaggle T4 ×2): EXP-005 (seed 42) and EXP-005a (seed 7).
   - EXP-003's recipe on EXP-004's cleaned data, with `--hsv-v 0.4 --scale 0.6`.
   - SGD 0.01 was built and the flags were recorded.

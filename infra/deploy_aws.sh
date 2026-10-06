@@ -13,7 +13,7 @@
 #   1. Subscribe to "COOL - Cloud Optimized OpenCV Library" in AWS Marketplace (Graviton listing)
 #      and copy the AMI id for us-east-1 → COOL_AMI_ID.
 #   2. aws login / credentials for profile $AWS_PROFILE.
-#   3. Upload the model once: aws s3 cp runs/EXP-001/weights/best.onnx s3://$BUCKET/models/EXP-001/
+#   3. Upload the model once: aws s3 cp models/EXP-003/best.onnx s3://$BUCKET/models/EXP-003/
 #
 #   AWS_PROFILE=hackathon COOL_AMI_ID=ami-xxxx ALERT_EMAIL=you@example.com ./infra/deploy_aws.sh        # dry run
 #   APPLY=1 AWS_PROFILE=hackathon COOL_AMI_ID=ami-xxxx ALERT_EMAIL=you@example.com ./infra/deploy_aws.sh
@@ -95,7 +95,7 @@ echo "== [5/8] EC2 $INSTANCE_TYPE from the COOL AMI (IMDSv2, user-data = setup s
 cat > /tmp/depth-userdata.sh <<EOF
 #!/bin/bash
 set -e
-export DEPTH_MODEL=${DEPTH_MODEL:-EXP-001} DEPTH_MODEL_S3=s3://$BUCKET/models/${DEPTH_MODEL:-EXP-001}/best.onnx DEPTH_S3_BUCKET=$BUCKET
+export DEPTH_MODEL=${DEPTH_MODEL:-EXP-003} DEPTH_MODEL_S3=s3://$BUCKET/models/${DEPTH_MODEL:-EXP-003}/best.onnx DEPTH_S3_BUCKET=$BUCKET
 ${DEPTH_MODEL_SHA256:+export DEPTH_MODEL_SHA256=$DEPTH_MODEL_SHA256}
 command -v git >/dev/null || (apt-get update -y && apt-get install -y git)
 git clone -q https://github.com/madhesh60/depth.git /opt/depth || git -C /opt/depth pull -q

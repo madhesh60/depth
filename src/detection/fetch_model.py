@@ -1,8 +1,8 @@
 """
 fetch_model.py — get the trained detector a fresh clone needs (weights are not in git: 38 MB).
 
-    python -m src.detection.fetch_model                  # EXP-001 (the deployed model)
-    python -m src.detection.fetch_model --model EXP-002  # once it is released
+    python -m src.detection.fetch_model                  # the deployed model ($DEPTH_MODEL, default EXP-003)
+    python -m src.detection.fetch_model --model EXP-001  # the earlier 4-class model
     python -m src.detection.fetch_model --url <url> --sha256 <hex>   # a mirror (S3, Zenodo, …)
 
 Downloads to ``models/<MODEL>/best.onnx`` (the first place the runtime looks, see
@@ -19,11 +19,16 @@ import sys
 import urllib.request
 from pathlib import Path
 
+from src.detection.calibration import SHIPPED_MODEL
+
 REPO = Path(__file__).resolve().parents[2]
 RELEASES = {
     "EXP-001": {"url": "https://github.com/madhesh60/depth/releases/download/exp001-v1/best.onnx",
                 "sha256": "55f827db9bd5cbf89a87d50c767ecbf17594b9c8c654a428a80118ab3537c19e",
                 "bytes": 37932951, "license": "AGPL-3.0 (Ultralytics YOLO11s, trained on dataset v1)"},
+    "EXP-003": {"url": "https://github.com/madhesh60/depth/releases/download/exp003-v1/best.onnx",
+                "sha256": "71339e99ad2b4b29f8d516967ce02e1fb5895434bf6f483cb517efe6750ba2f2",
+                "bytes": 37929805, "license": "AGPL-3.0 (Ultralytics YOLO11s, trained on dataset v2b)"},
 }
 
 
@@ -35,7 +40,7 @@ def sha256_of(p: Path) -> str:
     return h.hexdigest()
 
 
-def fetch(model: str = "EXP-001", url: str | None = None, sha256: str | None = None,
+def fetch(model: str = SHIPPED_MODEL, url: str | None = None, sha256: str | None = None,
           dest: Path | None = None, quiet: bool = False) -> Path:
     rel = RELEASES.get(model, {})
     url, want = url or rel.get("url"), (sha256 or rel.get("sha256") or "").lower()
@@ -68,7 +73,7 @@ def fetch(model: str = "EXP-001", url: str | None = None, sha256: str | None = N
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[1])
-    ap.add_argument("--model", default=os.environ.get("DEPTH_MODEL", "EXP-001"))
+    ap.add_argument("--model", default=os.environ.get("DEPTH_MODEL", SHIPPED_MODEL))
     ap.add_argument("--url")
     ap.add_argument("--sha256")
     a = ap.parse_args()

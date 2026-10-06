@@ -96,7 +96,7 @@ Local reference (this laptop, x86, stock OpenCV 5.0.0): see `docs/cool_benchmark
 ## Deploy checklist (the AWS day)
 
 1. `aws login` (profile `hackathon`, us-east-1); subscribe to the COOL Graviton listing; note the AMI id.
-2. `aws s3 cp runs/EXP-001/weights/best.onnx s3://<bucket>/models/EXP-001/` (+ record its sha256).
+2. `aws s3 cp models/EXP-003/best.onnx s3://<bucket>/models/EXP-003/` (+ record its sha256; `fetch_model` installs it there).
 3. `AWS_PROFILE=hackathon COOL_AMI_ID=… ALERT_EMAIL=… ./infra/deploy_aws.sh` → read the plan →
    `APPLY=1 …` → wait for CloudFront → `curl https://<cf>/api/health` shows `is_cool_path: true`.
 4. SSM into the instance → `bench_cool.sh` (C). Launch a c7i.xlarge for (A) and a stock Ubuntu c8g

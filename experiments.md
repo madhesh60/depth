@@ -320,7 +320,7 @@ DEPTH's order equals confidence order for EXP-001 (STUDY-07); its measurable ext
   - Next: a blinded label audit → v2c labels (train/val only) → EXP-005 = EXP-003's recipe on v2c,
     two seeds.
 
-### EXP-003 / EXP-003f — v2b at 640 px with the EXP-002 causes fixed — DONE (EXP-003 onboarded, not yet the default)
+### EXP-003 / EXP-003f — v2b at 640 px with the EXP-002 causes fixed — DONE (EXP-003 is the default since 2026-10-06)
 
 - Status: **kit fixed, CPU smoke-tested, notebook ready** (`notebooks/exp004_kaggle.ipynb`,
   `docs/kaggle_training.md`); the GPU run is pending (Kaggle T4 ×2).

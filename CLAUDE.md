@@ -23,7 +23,7 @@ for AWS Graviton + COOL):
 3. **Prove** — thin-line shadow, relative height vs the tracked altitude, water-column check,
    agent's-eye re-look view (display). Evidence, never a silent gate.
 4. **Decide** — **guaranteed tiers** fit on held-out recordings (Clopper–Pearson / LTT,
-   `src/agentic/calibrate.py`): EXP-001 promises ≥ 65% of pots reach a human (held on test);
+   `src/agentic/calibrate.py`): EXP-003 promises ≥ 79% of pots reach a human (held on test at 81%);
    no precision promise → nothing auto-confirmed. Value-of-information tool use, P(pot), budgets.
 5. **Act** — per-ping ground-range geotag (real recordings: the object's own ping fix + the measured
    scale; heights in metres from the sonar's measured depth), chunk stitching, repeat-sighting merge, recovery /
@@ -39,11 +39,12 @@ for AWS Graviton + COOL):
    component, per-client rate limits (`ratelimit.py`). Docs: `docs/mcp.md`, `docs/integrations.md`.
 
 Every runtime threshold comes from **`models/<MODEL>/calibration.json`** (`$DEPTH_MODEL`, default
-`EXP-001`): class names, input size, per-class floors, guaranteed class, tiers. Never hard-code a
+`EXP-003` = `calibration.SHIPPED_MODEL`): class names, input size, per-class floors, guaranteed class, tiers. Never hard-code a
 class name or threshold.
 
-Classes: EXP-001 (deployed) is 4-class `fishing_gear, pipe_cylinder, structural_fragment,
-natural_formation`; EXP-002/003 (v2b) are 2-class `ghost_gear, wreck_debris`. EXP-002 was rejected on val
+Classes: EXP-003 (**deployed** since 2026-10-06; best of six clean runs, `docs/exp005_diagnosis.md`) and
+EXP-002–005 (v2b) are 2-class `ghost_gear, wreck_debris`; EXP-001 (earlier) is 4-class `fishing_gear,
+pipe_cylinder, structural_fragment, natural_formation`. EXP-002 was rejected on val
 (underfit: `optimizer=auto` → AdamW 0.00167; tile label poisoning — `docs/exp002_diagnosis.md`). Always
 pass an explicit optimizer. The runtime is
 model-agnostic.
@@ -64,6 +65,8 @@ Details: [infra/README.md](infra/README.md).
 - `03_yolo_ready_dataset_v1/` — 4-class, train 26,533 · val 1,204 · test 1,276; **EXP-001 trained
   on it**. Its unseen crab-pot sonograms (v1 val Rec19 = calibration, v1 test = verification,
   unique frames) host EXP-001's guarantees.
+- The 8 shipped demo frames (`webui/samples/`, `DATASET/scripts/build_samples.py`) are v2b **test**
+  frames (Rec9), unseen by EXP-003, flagged `heldout` so feedback export never trains on them.
 - **`03_yolo_ready_dataset_v2b/`** — **EXP-002/003 train on this** (`build_dataset_v2b.py`): 2-class,
   sonar-only, one copy per Roboflow frame, val = held-out recordings Rec10/12/16, test = 214 unique
   crab-pot frames, `test_official398/` (GhostVision head-to-head), `test_xsonar/` (cross-sonar),

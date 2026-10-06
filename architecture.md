@@ -95,7 +95,7 @@ reader for Humminbird `.DAT` + `B00x.SON/IDX`:
 
 YOLO11s exported to ONNX and run by **`cv2.dnn`** (OpenCV 5 new engine with fallback), letterbox →
 decode → class-aware `NMSBoxesBatched`. Everything model-specific comes from
-`models/<MODEL>/calibration.json` (`$DEPTH_MODEL`, default EXP-001): class names, input size,
+`models/<MODEL>/calibration.json` (`$DEPTH_MODEL`, default EXP-003 since 2026-10-06): class names, input size,
 per-class floors, the guaranteed class, detector input, tiers. Weights resolve from `$DEPTH_ONNX` →
 `models/<MODEL>/best.onnx` → `runs/<MODEL>/weights/best.onnx`. Threads: `$DEPTH_THREADS`.
 
@@ -119,7 +119,10 @@ per-class floors, the guaranteed class, detector input, tiers. Weights resolve f
 * **P(pot)** bins for queue order and budget forecasts; seven scoring policies compared at the same
   promise, a re-look policy is adopted only with a significant paired-bootstrap gain.
 
-EXP-001: **≥ 65% of pots reach a human, held on test (86.2%, LCB 80.5%)**; 90% not achievable
+EXP-003 (deployed): **≥ 79% of pots reach a human, held on test (81.1%, LCB 76.7%)**; 90% not
+achievable (recall ceiling 0.85 on the calibration recordings).
+
+EXP-001 (earlier): **≥ 65% of pots reach a human, held on test (86.2%, LCB 80.5%)**; 90% not achievable
 (recall ceiling 0.72 on the calibration recording); no precision promise → nothing auto-confirmed;
 re-look did not beat confidence (1 inference/frame). The agent re-looks only where it could change a
 tier (value of information); every call — including the ones it chose not to make — is in the trace.
@@ -246,8 +249,8 @@ workers (Spot) → S3.
 
 | dataset | role |
 |---|---|
-| v1 (4 classes, 29k images) | trained EXP-001 (the deployed model); its unseen crab-pot sonograms (v1 val Rec19, v1 test) host EXP-001's calibration/verification |
-| **v2b** (2 classes, sonar only, deduped) | EXP-002/003: val = held-out recordings Rec10/12/16; test = 214 unique crab-pot frames; `test_official398` (GhostVision head-to-head); `test_xsonar` (orange Contact crops) |
+| v1 (4 classes, 29k images) | trained EXP-001 (the earlier model); its unseen crab-pot sonograms (v1 val Rec19, v1 test) host EXP-001's calibration/verification |
+| **v2b** (2 classes, sonar only, deduped) | EXP-002–005 (EXP-003 deployed); the shipped demo frames are v2b test frames: val = held-out recordings Rec10/12/16; test = 214 unique crab-pot frames; `test_official398` (GhostVision head-to-head); `test_xsonar` (orange Contact crops) |
 
 EXP-002 (1024 px and a 640-px twin, full frames + tiles) ran on Kaggle and was **rejected on
 validation** (ghost AP 0.25). It was underfit, because `optimizer=auto` silently swapped in AdamW at lr
@@ -289,7 +292,8 @@ DATASET/scripts/  audit_dataset · build_dataset_v1/v2/v2b · build_tiles · vis
 
 ## 13. Known limits (stated in the product)
 
-* Recall ceiling of EXP-001 (0.72–0.86 by recording) caps the promise at 65% → EXP-003 (EXP-002 was underfit).
+* Recall ceiling: EXP-003 reaches 0.85 on the calibration recordings, so the promise is 79%, not 90%. Five
+  later runs did not beat it; the limit is data (3 validation recordings, label noise), not the recipe.
 * No precision promise yet → every find goes to a human.
 * Synthetic GPS for the shipped crab-pot frames (the HF frames carry none). The raw recording has
   real GPS and a measured scale, but it is a river with no known pots (a false-alarm measurement, not a

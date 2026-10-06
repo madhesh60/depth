@@ -1,7 +1,7 @@
 # Sample sonar frames — attribution
 
-These 8 side-scan sonar frames (and their YOLO labels) are taken, unmodified except for JPEG
-re-encoding, from the **Ghost Pot Side-Scan Sonar Detection Dataset**
+These 8 side-scan sonar frames (recording Rec9, chunks port 10–15 and starboard 5–6) and their YOLO
+labels are taken, byte-for-byte, from the **Ghost Pot Side-Scan Sonar Detection Dataset**
 (PINGEcosystem, Hugging Face: `PINGEcosystem/sss-crab-pot-detection-ds`), licensed
 **CC BY-SA 4.0** (https://creativecommons.org/licenses/by-sa/4.0/).
 

@@ -28,6 +28,7 @@ import json
 import math
 import os
 import random
+import re
 import threading
 import time
 from collections import Counter
@@ -37,9 +38,21 @@ from typing import Optional
 import cv2
 import numpy as np
 
+from src.detection.calibration import DEFAULT_MODEL
+
 REPO = Path(__file__).resolve().parents[2]
 TAGS = ("real", "clutter", "noise", "unsure")
 V1 = REPO / "DATASET" / "03_yolo_ready_dataset_v1"
+
+
+def split_root(model: str, split: str = "val") -> Optional[Path]:
+    """The dataset folder this model was calibrated on (``val``) or verified on (``test``), read from
+    the backticked path its ``calibration.json`` records, so the audit crops come from the model's own
+    held-out frames (EXP-001: v1, EXP-003: v2b)."""
+    from src.detection.calibration import load_calibration
+    fit = load_calibration(model).data.get("fit") or {}
+    m = re.search(r"`(DATASET/[^`]+)`", str(fit.get("split" if split == "val" else "verified_on") or ""))
+    return REPO / m.group(1) if m else None
 
 
 def audit_dir(model: str = "EXP-001", split: str = "val") -> Path:
@@ -79,7 +92,7 @@ def build(model: str = "EXP-001", split: str = "val", n: int = 60, catch: int = 
           root: Optional[Path] = None) -> dict:
     from src.agentic.calibrate import label
     blob = json.loads((REPO / "runs" / "calib" / f"{model}_{split}.json").read_text())
-    root = Path(root or (V1 / split))
+    root = Path(root or split_root(model, split) or (V1 / split))
     frames = blob["frames"]
     items = []
     for fi, fr in enumerate(frames):
@@ -220,10 +233,10 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[1])
     sub = ap.add_subparsers(dest="cmd", required=True)
     b = sub.add_parser("build")
-    b.add_argument("--model", default="EXP-001"); b.add_argument("--split", default="val")
+    b.add_argument("--model", default=DEFAULT_MODEL); b.add_argument("--split", default="val")
     b.add_argument("--n", type=int, default=60); b.add_argument("--catch", type=int, default=15)
     s = sub.add_parser("summary")
-    s.add_argument("--model", default="EXP-001"); s.add_argument("--split", default="val")
+    s.add_argument("--model", default=DEFAULT_MODEL); s.add_argument("--split", default="val")
     a = ap.parse_args()
     if a.cmd == "build":
         m = build(a.model, a.split, a.n, a.catch)

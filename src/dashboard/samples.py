@@ -2,9 +2,12 @@
 samples.py — curated sample sonar frames so a judge sees results in one click (no sonar files needed).
 
 Order of preference:
-1. **Shipped samples** in ``webui/samples/`` (``manifest.json``) — 8 crab-pot sonograms EXP-001 never
-   trained on, one un-rotated copy each, consecutive chunks so stitching shows up, CC-BY-SA-4.0 with
-   ``ATTRIBUTION.md``. They make a fresh server (no ``DATASET/``) fully demo-able.
+1. **Shipped samples** in ``webui/samples/`` (``manifest.json``, built by
+   ``DATASET/scripts/build_samples.py``) — 8 crab-pot sonograms from the v2b **test** split, which the
+   default model (EXP-003) never trained or tuned on. One un-rotated copy each, consecutive chunks so
+   stitching shows up, CC-BY-SA-4.0 with ``ATTRIBUTION.md``. They make a fresh server (no ``DATASET/``)
+   fully demo-able. Each is flagged ``heldout``: :func:`is_heldout` keeps reviewer labels on them out
+   of any fine-tune set.
 2. ``$SAMPLES_DIR`` or the local v1 test split (developer fallback).
 
 ``list_samples()`` never raises: with neither source it returns ``[]`` and uploads still work.
@@ -39,7 +42,8 @@ def _shipped() -> list[dict]:
         p = SHIPPED / s["file"]
         if p.exists():
             out.append({"id": s["id"], "name": s["name"], "kind": s["kind"],
-                        "has_gps": bool(s.get("has_gps")), "license": data.get("license", ""),
+                        "has_gps": bool(s.get("has_gps")), "heldout": bool(s.get("heldout")),
+                        "split": s.get("split", ""), "license": data.get("license", ""),
                         "attribution": "samples/ATTRIBUTION.md", "path": str(p)})
     return out
 
@@ -75,6 +79,12 @@ def sample_path(sample_id: str) -> Path | None:
         if s["id"] == sample_id:
             return Path(s["path"])
     return None
+
+
+def is_heldout(sample_id: str) -> bool:
+    """True when the sample comes from a held-out evaluation split: its labels may be reviewed and
+    scored, never trained on."""
+    return any(s["id"] == sample_id and s.get("heldout") for s in _catalog())
 
 
 def frame_id(sample_id: str) -> str | None:

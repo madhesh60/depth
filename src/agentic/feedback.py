@@ -14,6 +14,8 @@ exactly where the model is uncertain or blind — so DEPTH keeps them:
 * ``export()`` → a YOLO fine-tune set: positives = confirmed + missed boxes; explicitly rejected boxes
   are written to ``hard_negatives.json`` (the next training run can weight / mine them); frames where
   the human only saw some candidates are flagged ``partial`` in the manifest, never silently mixed in;
+  shipped samples from a held-out test split are skipped (``skipped_heldout_frames``), so the demo can
+  never leak test frames into training;
 * ``agreement()`` — where ground truth exists (the shipped samples), how often reviewers agree with
   it: reviewer precision/recall is the ceiling on what the human-in-the-loop can deliver.
 
@@ -137,9 +139,13 @@ class FeedbackStore:
         by_frame: dict[str, list[dict]] = {}
         for r in self.latest():
             by_frame.setdefault(json.dumps(r["frame_ref"], sort_keys=True), []).append(r)
-        manifest, hard_neg, n_pos = [], [], 0
+        from src.dashboard import samples as samples_mod
+        manifest, hard_neg, n_pos, held = [], [], 0, 0
         for key, recs in sorted(by_frame.items()):
             ref = json.loads(key)
+            if ref.get("sample") and samples_mod.is_heldout(ref["sample"]):
+                held += 1                    # a held-out test frame: never training data
+                continue
             ip = self.image_path(ref)
             im = cv2.imread(str(ip)) if ip else None
             if im is None:
@@ -168,6 +174,7 @@ class FeedbackStore:
                                        f"nc: {len(names)}\nnames:\n" + "".join(f"- {n}\n" for n in names),
                                        encoding="utf-8")
         summary = {"frames": len(manifest), "positives": n_pos, "hard_negatives": len(hard_neg),
+                   "skipped_heldout_frames": held,
                    "created": time.strftime("%Y-%m-%dT%H:%M:%S"), "frames_detail": manifest}
         (out / "manifest.json").write_text(json.dumps(summary, indent=1))
         return summary

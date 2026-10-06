@@ -20,7 +20,8 @@ Schema (all keys optional — anything missing falls back to :data:`DEFAULTS`)::
       "fit": {"split": "...", "frames": .., "created": "..."}
     }
 
-The active model is ``$DEPTH_MODEL`` (default ``EXP-001``); a different file can be forced with
+The active model is ``$DEPTH_MODEL`` (default :data:`SHIPPED_MODEL`, ``EXP-003`` since 2026-10-06 —
+``EXP-001`` is the earlier 4-class model); a different file can be forced with
 ``$DEPTH_CALIBRATION``.
 """
 from __future__ import annotations
@@ -35,7 +36,8 @@ from typing import Any, Optional
 
 REPO = Path(__file__).resolve().parents[2]
 MODELS_DIR = REPO / "models"
-DEFAULT_MODEL = os.environ.get("DEPTH_MODEL", "EXP-001")
+SHIPPED_MODEL = "EXP-003"          # the model used when $DEPTH_MODEL is unset (docs/exp005_diagnosis.md)
+DEFAULT_MODEL = os.environ.get("DEPTH_MODEL", SHIPPED_MODEL)
 
 # Built-in fallback == the values the product shipped with before calibration.json existed, so a
 # missing/partial file can never change behaviour silently.

@@ -8,7 +8,7 @@ Legend: `[x]` done · `[ ]` open · **(YOU)** needs a person / an account / a GP
 **Order that unblocks the most:**
 
 1. Grant check-in (due 2 Oct).
-2. Switch the default model to EXP-003; validation label audit.
+2. Validation label audit (Audit tab, now on EXP-003's false alarms).
 3. AWS day.
 4. Study and audit with real people.
 5. README numbers, diagram and screenshots last.
@@ -75,8 +75,10 @@ Legend: `[x]` done · `[ ]` open · **(YOU)** needs a person / an account / a GP
       ([`docs/exp005_diagnosis.md`](docs/exp005_diagnosis.md)).
 - [ ] Label audit (blinded, Audit tab) of the validation false alarms. Missing labels are concentrated
       there and understate every model's score. Needs 1–2 people.
-- [ ] **(YOU: say yes)** Make EXP-003 the default model (`DEPTH_MODEL`) and publish its weights as a
-      GitHub Release (`fetch_model`).
+- [x] EXP-003 is the default model (`calibration.SHIPPED_MODEL`). The demo frames are now held-out v2b
+      test frames.
+- [ ] **(YOU) Publish the EXP-003 weights.** Decide the licence wording first, then run the one command
+      in [`docs/release_exp003.md`](docs/release_exp003.md).
 - [ ] After the label audit: re-score EXP-001/003/004/005 on the corrected validation labels (v2c, val
       only, never test).
 - [ ] Optional GPU run: EXP-003's exact recipe with a second seed, to report its run-to-run spread. No

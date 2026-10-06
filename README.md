@@ -70,12 +70,26 @@ Press **▶ 60-s demo** in the top bar for a guided walk through everything belo
 * **Connect** — MCP, OGC API – Features, signed webhooks and the drop-in panel, with live URLs and snippets.
 
 The 8 sample frames ship with the app (CC-BY-SA, [`webui/samples/ATTRIBUTION.md`](webui/samples/ATTRIBUTION.md)).
+They come from the v2b **test** split, so the default model never trained or tuned on them.
 Their GPS is synthetic and labelled as such (the public frames carry none). The raw recording is real:
 PINGMapper's sample data (MIT code, Zenodo 10.5281/zenodo.6604666), fetched hash-checked, not redistributed.
 
 ## 3. Results (honest — every number names its split)
 
-**Detector — EXP-001 (YOLO11s, 640 px, dataset v1), deploy-faithful `cv2.dnn` evaluation**
+**Detector — EXP-003, the deployed model** (YOLO11s, 640 px, dataset v2b, 2 classes), `cv2.dnn`
+([`docs/onboard_exp003.md`](docs/onboard_exp003.md)):
+
+| | value | split |
+|---|--:|---|
+| crab pots (ghost gear) on sonar: AP@0.5 (95% CI) | **0.482** (0.43–0.55) | v2b test, 285 pots |
+| wreck debris: AP@0.5 | 0.156 (weak) | v2b test, 70 boxes |
+| GhostVision head-to-head: F1 | 0.41 (GhostVision reports 0.71–0.73) | official 398-frame split |
+| cross-sonar: ghost gear AP@0.5 | 0.34 | `test_xsonar` |
+
+Five training runs after it (EXP-003f, 004, 004g, 005, 005a) did not beat it on the held-out
+recordings ([`docs/exp005_diagnosis.md`](docs/exp005_diagnosis.md)).
+
+**Earlier baseline — EXP-001 (YOLO11s, 640 px, dataset v1, 4 classes), deploy-faithful `cv2.dnn` evaluation**
 ([`docs/eval_exp001.md`](docs/eval_exp001.md)):
 
 | | value |
@@ -84,7 +98,8 @@ PINGMapper's sample data (MIT code, Zenodo 10.5281/zenodo.6604666), fetched hash
 | crab pots on **sonar** — AP@0.5 / recall | **0.473 / 0.599** — the number that matters |
 | recall ceiling on unseen recordings (any proposal ≥ 0.05) | 0.72 (Rec19) – 0.86 (Rec3/4/6/10) |
 
-**Agent** — recall promise ≥ 65% held on test; nothing auto-confirmed (no precision promise is
+**Agent** — recall promise **≥ 79%** with EXP-003 (fit on the validation recordings, held on test at
+81.1%, lower bound 76.7%; EXP-001's was ≥ 65%); nothing auto-confirmed (no precision promise is
 supportable); 1 inference/frame (re-look did not beat confidence on unseen data; the old
 test-tuned "CONFIRMED 0.737" is 0.58 unseen — retired).
 
