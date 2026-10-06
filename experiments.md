@@ -96,11 +96,11 @@ focus first, aug-ablation demoted.
 | ❌ EXP-002 | Higher resolution + tiles on clean v2b (run 2026-09-30) | **Underfit**: auto-optimizer AdamW 0.00167 + tile label poisoning. Val ghost AP 0.25 → rejected (see log) |
 | ✅ EXP-003 | The EXP-002 causes fixed: explicit SGD 0.01, fixed tiles; tiles vs full frames at 640 | **Recall promise 65% → 79%** (held on test at 81%), fewer review cards; wreck fails; official-split F1 0.41 |
 | ❌ EXP-004 | Clean data: no fish-finder screenshots, no rotated copies; + a ghost-only arm | No gain for pots (Δ −0.03 [−0.11, +0.05]); wreck ceiling 0.10 → 0.30 |
-| **EXP-005** (next) | Cleaned data + stronger brightness/scale jitter, two seeds | `notebooks/exp005_kaggle.ipynb` |
+| ❌ EXP-005 | Cleaned data + stronger brightness/scale jitter, two seeds | Worse for pots, both seeds: Δ −0.10 / −0.07 vs EXP-003; false alarms ×1.6–2.1 |
 | ✅ (in v2b) | **Sonar-only** training raises the target-domain numbers + removes the optical→natural_formation shortcut (optical debris is 0% and off-product) | filter to crabpot/uatd/mpulse/seabed/shipwreck |
 | (EXP-003 arms) | **Tiled train+infer** (SAHI-style slicing) beats one large frame for tiny targets — doubles as Stage-1's reframed tiling role | slice → detect per tile → merge |
-| EXP-005 | Oversampling fishing_gear + small-object aug (copy_paste>0, scale-up mosaic) lifts recall | minority oversample + aug |
-| EXP-006 | Aug ablation: are the ~62% baked-in v0 augs helping or just doubling online aug? | originals-only vs baked-aug (demoted) |
+| (old plan) | Oversampling fishing_gear + small-object aug (copy_paste>0, scale-up mosaic) lifts recall | minority oversample + aug |
+| (old plan) | Aug ablation: are the ~62% baked-in v0 augs helping or just doubling online aug? | originals-only vs baked-aug (demoted) |
 
 **Already banked (no retrain):** per-class confidence thresholds in `infer.py` — fishing_gear
 recall 0.47→0.69 at conf 0.10. Report metrics **split sonar vs optical**, not just aggregate.
@@ -243,10 +243,10 @@ DEPTH's order equals confidence order for EXP-001 (STUDY-07); its measurable ext
 (when to stop) and a forecast that held (slightly conservative). Status: **study pending** (needs
 3+ people). A higher recall ceiling (EXP-002) moves the promise and the card count.
 
-### EXP-005 / EXP-005a — cleaned data + stronger brightness/scale jitter, two seeds — READY TO RUN
+### EXP-005 / EXP-005a — cleaned data + stronger brightness/scale jitter, two seeds — DONE (NEGATIVE)
 
-- Status: **kit ready** (`notebooks/exp005_kaggle.ipynb`, [`docs/kaggle_training.md`](docs/kaggle_training.md)).
-  The exact command was dry-run on CPU. GPU run pending.
+- Status: **trained (Kaggle T4 ×2, 2026-10-04), diagnosed; not onboarded** (worse than EXP-003; test not
+  scored). Record: [`docs/exp005_diagnosis.md`](docs/exp005_diagnosis.md).
 - Why: the remaining measured weakness is generalisation to new recordings. Fit on training frames is
   AP@0.3 0.74 vs 0.49 on validation, and validation peaks mid-run. Sonar gain differs per recording.
 - Recipe: EXP-003's (SGD 0.01, fixed tiles, 640 px, 150 ep, 2 classes) on EXP-004's cleaned data, with
@@ -264,7 +264,32 @@ DEPTH's order equals confidence order for EXP-001 (STUDY-07); its measurable ext
     which depresses every model's validation score equally.
 - Pass bar: fit AP@0.3 ≥ 0.65; validation ghost AP above EXP-003's 0.39 by the paired bootstrap; wreck
   recall ceiling > 0.5.
-- Result: _pending._
+- Result (validation, deploy path, paired frame-level bootstrap vs EXP-003, 2,000 resamples):
+  - **Both seeds are worse for ghost gear.**
+
+    | run | AP@0.5 | ΔAP@0.5 vs EXP-003 | P(gain) | AP@0.3 |
+    |---|--:|---|--:|--:|
+    | EXP-003 | 0.394 | — | — | 0.51 |
+    | EXP-005 (seed 42) | 0.292 | −0.10 [−0.17, −0.03] | 0.00 | 0.44 |
+    | EXP-005a (seed 7) | 0.327 | −0.07 [−0.13, −0.005] | 0.02 | 0.44 |
+
+    The seeds agree (Δ +0.035 [−0.02, +0.09]). EXP-005 and EXP-004 share the data and the seed, so the
+    jitter is the cause.
+  - **The hypothesis is refuted.** The fit-vs-validation gap (AP@0.3) did not shrink: 0.25 for EXP-003,
+    0.35 for EXP-005; EXP-005a stays at 0.24 only by fitting less (0.68).
+  - **Ranking got worse; finding did not.**
+    - Recall ceiling: 0.77 → 0.70 / 0.75.
+    - Confident false alarms (conf 0.25): 80 → 169 / 131. They rose in the crab-pot recordings and on
+      natural-formation frames (2 → 24 / 28).
+    - The rise on natural-formation frames comes from the cleanup, which dropped the screenshots that
+      also served as rock negatives.
+  - **Wreck still fails:** recall ceiling 0.30 / 0.00 (bar 0.5).
+  - Pass bar: fit passes (0.79 / 0.68 ≥ 0.65); validation fails; wreck fails.
+- Conclusion:
+  - Six clean runs since EXP-003 have measured every training-recipe lever, and none beats it.
+  - EXP-003 stays the best and should become the default.
+  - What is left is data: a validation label audit, more recordings, and side-scan wreck boxes. A
+    second EXP-003 seed is worth running only to report run-to-run spread.
 
 ### EXP-004 / EXP-004g — EXP-003's recipe on cleaned data (+ a ghost-gear-only arm) — DONE (NEGATIVE for ghost gear)
 

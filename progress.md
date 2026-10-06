@@ -75,6 +75,30 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ## 4. Session log
 
+### 2026-10-06 (sweep 49) — EXP-005 analysed: stronger jitter made pots worse; the recipe search is done
+- **Runs** (Kaggle T4 ×2): EXP-005 (seed 42) and EXP-005a (seed 7).
+  - EXP-003's recipe on EXP-004's cleaned data, with `--hsv-v 0.4 --scale 0.6`.
+  - SGD 0.01 was built and the flags were recorded.
+  - Early stop at 103 and 139 epochs.
+- **Validation** (deploy path, ghost gear):
+  - AP@0.5 0.292 / 0.327 vs EXP-003's 0.394.
+  - Paired bootstrap Δ −0.10 [−0.17, −0.03] and −0.07 [−0.13, −0.005].
+  - The seeds agree within noise (Δ +0.035 [−0.02, +0.09]).
+  - Training-time curves sit about 0.07 below EXP-003 from epoch 60 on.
+- **Why:**
+  - The train-vs-new-recording gap widened (AP@0.3 0.25 → 0.35), so the gap is not gain or scale.
+  - Confident false alarms 80 → 169 / 131, with the recall ceiling about flat (0.77 → 0.70 / 0.75): a
+    ranking failure.
+  - The cleanup's dropped screenshots were also rock negatives: false pots on natural-formation frames
+    2 → 24 / 28.
+  - Wreck ceiling 0.30 / 0.00.
+- **Decision:**
+  - Neither run onboarded; test not scored. EXP-003 stays the best.
+  - Stop recipe search (six clean runs).
+  - Next: switch the default to EXP-003, audit the validation labels; an optional second EXP-003 seed
+    for run-to-run spread.
+- Record: `docs/exp005_diagnosis.md` (+ tables).
+
 ### 2026-10-04 (sweep 48) — Studio theme: Elite / minimal (Cool · marine) — replaces Abyssal
 - **Ask:** reference frames (a dark code-editor panel + a light email) → "elite and simple", focus on
   style / font / design, not content. Extracted the language: near-black cinematic panels, a bright

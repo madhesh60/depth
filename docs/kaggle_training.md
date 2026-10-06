@@ -1,4 +1,4 @@
-# Training on Kaggle — the current run is EXP-005
+# Training on Kaggle — the procedure (last run: EXP-005, negative)
 
 This page is the procedure for every training run: train on Kaggle, check with `diagnose`, then plug
 in with ONE command.
@@ -9,6 +9,8 @@ History:
 - EXP-003 fixed that and raised the recall promise from 65% to 79%
   ([`exp003_diagnosis.md`](exp003_diagnosis.md)).
 - EXP-004's data cleanup helped wrecks but not pots ([`exp004_diagnosis.md`](exp004_diagnosis.md)).
+- EXP-005's stronger brightness/scale jitter made pots **worse** on both seeds (Δ −0.10 / −0.07). The
+  recipe search is done; EXP-003 stays the best ([`exp005_diagnosis.md`](exp005_diagnosis.md)).
 
 **What EXP-005 builds on** (all measured on the held-out validation recordings):
 
@@ -21,7 +23,7 @@ History:
 | misses are not small-object misses (85% found at the floor) | analysis | no 1024 px / bigger model |
 | duplicate boxes on one pot: suppression rules make AP worse (−0.05 to −0.21) | analysis | none |
 | pseudo-labels: only 8 confident unlabelled pots in train, vs 1,345 labels | analysis | not used |
-| **fit on training frames ≫ fit on new recordings** (AP@0.3 0.74 vs 0.49; val peaks mid-run) | EXP-003/004 | **stronger brightness + scale jitter** |
+| **fit on training frames ≫ fit on new recordings** (AP@0.3 0.74 vs 0.49; val peaks mid-run) | EXP-003/004 | stronger brightness + scale jitter → **worse** (EXP-005) |
 
 | | EXP-005 | EXP-005a |
 |---|---|---|

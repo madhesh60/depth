@@ -1,4 +1,4 @@
-# TODO — DEPTH (updated 2026-10-02)
+# TODO — DEPTH (updated 2026-10-06)
 
 Deadline **2026-10-26 23:59 PT** (27 Oct 12:29 IST). Judging 27 Oct – 9 Nov (keep the demo up).
 The review's roadmap lives in the local `NEEDTOIMPROVE.md`; this is the working backlog.
@@ -8,7 +8,7 @@ Legend: `[x]` done · `[ ]` open · **(YOU)** needs a person / an account / a GP
 **Order that unblocks the most:**
 
 1. Grant check-in (due 2 Oct).
-2. EXP-004 on Kaggle.
+2. Switch the default model to EXP-003; validation label audit.
 3. AWS day.
 4. Study and audit with real people.
 5. README numbers, diagram and screenshots last.
@@ -70,22 +70,17 @@ Legend: `[x]` done · `[ ]` open · **(YOU)** needs a person / an account / a GP
       ([`docs/exp003_diagnosis.md`](docs/exp003_diagnosis.md)).
 - [x] **EXP-004 on Kaggle**: no gain for ghost gear (Δ −0.03 [−0.11, +0.05]). Wreck improved but still
       fails. EXP-003 stays the best ([`docs/exp004_diagnosis.md`](docs/exp004_diagnosis.md)).
-- [ ] **(YOU) EXP-005 on Kaggle** (~2.5 h, T4 ×2). Import `notebooks/exp005_kaggle.ipynb`, add **depth-v2b**,
-      Save & Run All. Download `EXP-005_complete.zip` + `EXP-005a_complete.zip`, then tell Claude "EXP-005 done".
+- [x] **EXP-005 on Kaggle**: stronger brightness/scale jitter made pots **worse** on both seeds
+      (Δ −0.10 / −0.07 vs EXP-003). Not onboarded; the recipe search is done
+      ([`docs/exp005_diagnosis.md`](docs/exp005_diagnosis.md)).
 - [ ] Label audit (blinded, Audit tab) of the validation false alarms. Missing labels are concentrated
       there and understate every model's score. Needs 1–2 people.
-- [ ] `python -m src.detection.diagnose --zip EXP-003_complete.zip --zip EXP-003f_complete.zip`.
-- [ ] `onboard_model` for the models that pass:
-  - guarantees fit on val, verified once on test;
-  - GhostVision head-to-head on the official 398-frame split;
-  - the cross-sonar `test_xsonar` table;
-  - the speed gate.
-- [ ] If it passes: switch `DEPTH_MODEL`, publish its weights as a GitHub Release (`fetch_model`), and
-      log EXP-003 in `experiments.md`.
-- [ ] If it fails: diagnose, then EXP-004. Candidates:
-  - luminance-normalised training (one palette);
-  - audit-confirmed missing labels (v2c, val only, never test);
-  - dropping the rotated black-bordered copies.
+- [ ] **(YOU: say yes)** Make EXP-003 the default model (`DEPTH_MODEL`) and publish its weights as a
+      GitHub Release (`fetch_model`).
+- [ ] After the label audit: re-score EXP-001/003/004/005 on the corrected validation labels (v2c, val
+      only, never test).
+- [ ] Optional GPU run: EXP-003's exact recipe with a second seed, to report its run-to-run spread. No
+      more augmentation or cleanup runs.
 - [ ] **(YOU) Publish the EXP-001 weights.** GitHub → Releases → tag `exp001-v1`, attach
       `runs/EXP-001/weights/best.onnx` (37,932,951 bytes, SHA-256 `55f827db…`).
 - [ ] Fine-tune seed from human labels (`python -m src.agentic.feedback export`): a small
