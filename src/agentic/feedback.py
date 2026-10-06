@@ -7,9 +7,12 @@ exactly where the model is uncertain or blind — so DEPTH keeps them:
 
 * ``decisions.jsonl`` — append-only log, one line per decision:
   ``{id, ts, frame_id, frame_ref, bbox, cls_name, decision, verdict_before, conf, p_pot, source,
-  annotator}`` with ``decision ∈ {confirm, reject, missed}`` and ``frame_ref`` = ``{"sample": id}``
+  annotator}`` with ``decision ∈ {confirm, reject, missed, override}`` and ``frame_ref`` = ``{"sample": id}``
   or ``{"upload": sha256}`` (uploaded frames are persisted to ``frames/<sha>.jpg`` only when someone
   gives feedback on them);
+* ``override`` = a person overrides the agent's tier (``override_to`` ∈ confirmed / review / low_risk);
+  as a label it means: confirmed → a positive, low_risk → a hard negative, review → no label (it only
+  re-orders the human queue);
 * **latest decision wins** per object (same frame, IoU ≥ 0.7);
 * ``export()`` → a YOLO fine-tune set: positives = confirmed + missed boxes; explicitly rejected boxes
   are written to ``hard_negatives.json`` (the next training run can weight / mine them); frames where
@@ -38,7 +41,8 @@ import cv2
 import numpy as np
 
 REPO = Path(__file__).resolve().parents[2]
-DECISIONS = ("confirm", "reject", "missed")
+DECISIONS = ("confirm", "reject", "missed", "override")
+OVERRIDE_TO = ("confirmed", "review", "low_risk")
 SOURCES = ("analyze", "survey", "study", "audit")
 
 
@@ -68,6 +72,8 @@ class FeedbackStore:
         ref = rec.get("frame_ref") or {}
         if not (ref.get("sample") or ref.get("upload")):
             raise ValueError("frame_ref needs 'sample' or 'upload'")
+        if d == "override" and rec.get("override_to") not in OVERRIDE_TO:
+            raise ValueError(f"an override needs override_to in {OVERRIDE_TO}")
         out = {
             "id": uuid.uuid4().hex[:12], "ts": time.strftime("%Y-%m-%dT%H:%M:%S"),
             "frame_id": str(rec.get("frame_id", ""))[:200], "frame_ref": {k: str(v)[:80] for k, v in ref.items()},
@@ -76,6 +82,9 @@ class FeedbackStore:
             "source": rec.get("source") if rec.get("source") in SOURCES else "analyze",
             "annotator": str(rec.get("annotator") or "anon")[:40],
         }
+        if d == "override":
+            out["override_to"] = rec["override_to"]
+            out["note"] = str(rec.get("note") or "")[:300]
         with self._lock:
             self.root.mkdir(parents=True, exist_ok=True)
             if image is not None and ref.get("upload"):
@@ -118,6 +127,7 @@ class FeedbackStore:
         return {"decisions": len(self.all()), "objects": len(lat),
                 "frames": len({json.dumps(r["frame_ref"], sort_keys=True) for r in lat}),
                 "confirm": c.get("confirm", 0), "reject": c.get("reject", 0), "missed": c.get("missed", 0),
+                "override": c.get("override", 0),
                 "by_source": dict(Counter(r["source"] for r in lat))}
 
     # -- image resolution ------------------------------------------------------------------
@@ -156,9 +166,12 @@ class FeedbackStore:
             lines = []
             for r in recs:
                 x1, y1, x2, y2 = r["bbox"]
-                if r["decision"] == "reject":
+                to = r.get("override_to")
+                if r["decision"] == "reject" or to == "low_risk":
                     hard_neg.append({"image": f"{stem}.jpg", "bbox": r["bbox"], "cls_name": r["cls_name"]})
                     continue
+                if r["decision"] == "override" and to != "confirmed":
+                    continue                     # an override to REVIEW only re-orders the queue: no label
                 cls = r["cls_name"] if r["cls_name"] in names else default_cls
                 lines.append(f"{names.index(cls)} {(x1 + x2) / 2 / W:.6f} {(y1 + y2) / 2 / H:.6f} "
                              f"{(x2 - x1) / W:.6f} {(y2 - y1) / H:.6f}")

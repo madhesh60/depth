@@ -110,6 +110,9 @@ class AgentStep:
     conf_before: Optional[float] = None
     conf_after: Optional[float] = None
     detail: dict = field(default_factory=dict)
+    # done = the tool ran; skipped = the agent chose NOT to call it (rationale says why);
+    # failed = it raised, and the agent fell back (incidents.py) - every one is recorded
+    status: str = "done"
 
     def to_dict(self) -> dict:
         return _json(asdict(self))
@@ -138,6 +141,7 @@ class Candidate:
     n_pings: Optional[int] = None
     ground_range_px: Optional[float] = None
     in_water_column: Optional[bool] = None
+    position_withheld: Optional[str] = None   # why lat/lon were withheld (pipeline.check_geometry)
 
     @property
     def center(self) -> tuple[float, float]:
@@ -160,6 +164,7 @@ class Candidate:
             "continuation_of": self.continuation_of,
             "ground_range_px": None if self.ground_range_px is None else round(self.ground_range_px, 1),
             "in_water_column": self.in_water_column,
+            "position_withheld": self.position_withheld,
         }
 
 
@@ -174,6 +179,7 @@ class FrameResult:
     nadir: str = "unknown"                                     # resolved nadir edge (or "unknown")
     orientation: dict = field(default_factory=dict)            # {nadir, rule, source} provenance
     stage1: dict = field(default_factory=dict)                 # Stage-1 canonicalisation record
+    incidents: list = field(default_factory=list)             # failures + fallbacks (incidents.py)
 
     def by_verdict(self, v: Verdict) -> list[Candidate]:
         return [c for c in self.candidates if c.verdict is v]
@@ -193,6 +199,7 @@ class FrameResult:
             "counts": self.counts,
             "stage_ms": {k: round(v, 2) for k, v in self.stage_ms.items()},
             "candidates": [c.to_dict() for c in self.candidates],
+            "incidents": list(self.incidents),
         }
 
 
@@ -219,6 +226,9 @@ class TrackedObject:
     # recovered (a crew brought it up) | not_found (a crew went, nothing there); None = undecided
     human: Optional[str] = None
     human_by: Optional[str] = None
+    # a PERSON's override of the agent's ordering: "high" (inspect first) | "low" (end of the queue)
+    human_priority: Optional[str] = None
+    position_withheld: Optional[str] = None             # why lat/lon were withheld (geometry check)
 
     def to_dict(self) -> dict:
         return _json(asdict(self))
@@ -243,6 +253,9 @@ class MissionPlan:
     repeat_merges: int = 0                                 # detections merged as repeat sightings
     human_log: list = field(default_factory=list)          # every person's decision, in order
     impact: dict = field(default_factory=dict)             # ledger: confirmed / rejected / recovered …
+    agent_log: list = field(default_factory=list)          # the planner's decisions (budget, stop, routes)
+    replans: list = field(default_factory=list)            # route / queue changes after each human decision
+    incidents: list = field(default_factory=list)          # survey-level failures + fallbacks
 
     def to_dict(self) -> dict:
         return _json(asdict(self))

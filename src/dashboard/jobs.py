@@ -41,6 +41,7 @@ class JobStore:
         self._pool = ThreadPoolExecutor(max_workers=workers, thread_name_prefix="depth-job")
         self.persist_dir = Path(persist_dir or os.environ.get("DEPTH_JOBS_DIR", REPO / "runs" / "jobs"))
         self.bucket = os.environ.get("DEPTH_S3_BUCKET") or None
+        self.storage: dict[str, dict] = {}            # survey_id -> where its results were stored
 
     # -- lifecycle -----------------------------------------------------------------------
     def submit(self, fn: Callable[[Callable[[dict], None]], dict], total: int, kind: str = "survey") -> str:
@@ -90,14 +91,21 @@ class JobStore:
             self._jobs.pop(victim)
 
     # -- persistence -----------------------------------------------------------------------
-    def persist(self, survey_id: str, result_json: dict, reports: dict[str, str]) -> Path:
+    def persist(self, survey_id: str, result_json: dict, reports: dict[str, str],
+                simulate_storage_failure: bool = False) -> Path:
         d = self.persist_dir / survey_id
         d.mkdir(parents=True, exist_ok=True)
         (d / "result.json").write_text(json.dumps(result_json), encoding="utf-8")
         for fmt, body in reports.items():
             (d / f"mission.{fmt}").write_text(body, encoding="utf-8")
-        if self.bucket:
-            self._upload(d, survey_id)
+        err = None
+        if simulate_storage_failure:
+            err = "simulated S3 failure (failure drill)"
+        elif self.bucket:
+            err = self._upload(d, survey_id)
+        self.storage[survey_id] = {"local": str(d), "s3_bucket": self.bucket,
+                                   "s3": "failed" if err else ("uploaded" if self.bucket else "not configured"),
+                                   "error": err}
         return d
 
     def report(self, survey_id: str, fmt: str) -> Optional[str]:
@@ -106,11 +114,14 @@ class JobStore:
         p = self.persist_dir / survey_id / f"mission.{fmt}"
         return p.read_text(encoding="utf-8") if p.exists() else None
 
-    def _upload(self, d: Path, survey_id: str) -> None:
+    def _upload(self, d: Path, survey_id: str) -> Optional[str]:
+        """None on success, else the reason (logged + surfaced as a storage_failed incident)."""
         try:
             import boto3                               # optional dependency
             s3 = boto3.client("s3")
             for f in d.iterdir():
                 s3.upload_file(str(f), self.bucket, f"results/{survey_id}/{f.name}")
+            return None
         except Exception as e:                         # best-effort; local copy is authoritative
             log.warning("S3 upload skipped for %s: %s", survey_id, e)
+            return f"{type(e).__name__}: {e}"[:300]

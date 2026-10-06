@@ -78,7 +78,7 @@ def _cand_summary(c, i: int) -> dict:
             "shadow": ev.shadow.quality.value if ev else None,
             "relative_height": ev.shadow.height_rel if ev and ev.shadow.has_shadow else None,
             "in_water_column": c.in_water_column, "notes": list(ev.notes) if ev else [],
-            "why": c.trace[-1].rationale if c.trace else None}
+            "why": next((s.rationale for s in c.trace if s.tool == "decide"), None)}
 
 
 # ---- tools -------------------------------------------------------------------------------------

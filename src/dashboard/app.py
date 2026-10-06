@@ -12,6 +12,13 @@ Endpoints
     POST /api/survey?use_samples=1   — synchronous survey for small runs (≤ MAX_SYNC_FRAMES)
     GET  /api/report/{fmt}?survey_id — geojson | gpx | kml | csv | json (memory, else disk)
     GET  /api/metrics                — rolling per-stage p50/p95 on THIS host + arch / EC2 type / COOL
+    GET  /api/survey/{id}/log        — the audit log: agent plan, incidents, approvals, people, re-plans
+    GET  /api/incidents              — the failure modes handled + the drills (?simulate=<code>)
+
+Failure handling (``src/agentic/incidents.py``): every failure is an incident with a safe fallback and a
+human action; a failed tool sends a find to a person, never auto-confirms; a bad frame is skipped, not
+fatal; a missing / implausible position is withheld; an unavailable model answers 503 with the reason.
+``?simulate=<code>`` on analyze / survey / brief runs a failure drill so the fallback can be watched.
 
 Hardening (review §3.8 / I-9):
 * endpoints are plain ``def`` (FastAPI runs them in a thread pool) and every inference is guarded by
@@ -67,6 +74,8 @@ from src.detection import fp_audit
 from src.agentic.twin import frame_twin, survey_twin
 from src.agentic import brief as brief_mod
 from src.agentic.approvals import ApprovalStore, ApprovalError
+from src.agentic.incidents import DRILLS, catalogue as incident_catalogue, incident, parse_simulate
+from src.agentic.pipeline import validate_frame
 from .mcp_server import ENDPOINT as MCP_ENDPOINT
 from .integrations import Webhooks, WebhookError, EVENTS as WEBHOOK_EVENTS
 from .ratelimit import RateLimitMiddleware
@@ -195,6 +204,31 @@ async def _revalidate_static(request, call_next):
 
 
 # ---- helpers ----------------------------------------------------------------------------------
+def _fail(status: int, inc: dict) -> HTTPException:
+    """An API error that carries the incident (what happened, the fallback, what a person should do)."""
+    return HTTPException(status, detail={"message": inc["message"], "incident": inc})
+
+
+def _drills(simulate: Optional[str]) -> set:
+    if not isinstance(simulate, str):                 # called as a function (MCP): the Query default
+        return set()
+    want = parse_simulate(simulate)
+    bad = want - set(DRILLS)
+    if bad:
+        raise HTTPException(400, f"unknown drill(s) {sorted(bad)} - choose from {list(DRILLS)}")
+    return want
+
+
+def _pipeline_or_503(faults: set = frozenset()) -> AgenticPipeline:
+    """The loaded pipeline, or a 503 ``model_unavailable`` incident (never a bare 500)."""
+    if "model_unavailable" in faults:
+        raise _fail(503, incident("model_unavailable", "detector unavailable (failure drill)", simulated=True))
+    try:
+        return get_pipeline()
+    except Exception as e:
+        raise _fail(503, incident("model_unavailable", f"the detector could not be loaded: {type(e).__name__}: {e}"[:300]))
+
+
 def _b64(img: np.ndarray, quality: int = 85) -> str:
     ok, buf = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, quality])
     return "data:image/jpeg;base64," + base64.b64encode(buf).decode() if ok else ""
@@ -316,16 +350,26 @@ def _recording_summary() -> dict:
                       "recording, real per-ping GPS; downloaded hash-checked, not redistributed"}
 
 
-def _collect_frames(use_samples: bool, files: Optional[list[UploadFile]]) -> list[tuple[str, np.ndarray]]:
+def _collect_frames(use_samples: bool, files: Optional[list[UploadFile]],
+                    problems: Optional[list] = None) -> list[tuple[str, np.ndarray]]:
+    """Frames for a survey. An undecodable upload is reported in ``problems`` (a ``corrupt_frame``
+    incident) and skipped, so one bad file does not sink the survey; type / size limits still refuse."""
     if use_samples:
         frames = _sample_frames()
     else:
         files = files or []
         if len(files) > MAX_FRAMES:
             raise HTTPException(413, f"at most {MAX_FRAMES} frames per survey (got {len(files)})")
-        frames = [_decode_upload(f) for f in files]
+        frames = []
+        for f in files:
+            try:
+                frames.append(_decode_upload(f))
+            except HTTPException as e:
+                if e.status_code != 400 or problems is None:
+                    raise
+                problems.append(incident("corrupt_frame", str(e.detail), frame_id=Path(f.filename or "upload").stem))
     if not frames:
-        raise HTTPException(400, "no frames (use ?use_samples=1 or upload files)")
+        raise HTTPException(400, "no readable frames (use ?use_samples=1 or upload files)")
     return frames
 
 
@@ -338,10 +382,16 @@ def _remember(result: SurveyResult) -> None:
 
 def _run_survey(frames, gps: str, budget_minutes: Optional[float], nadir: Optional[str],
                 survey_id: str, progress: Optional[Callable[[dict], None]] = None,
-                boat_minutes: Optional[float] = None, track: Optional[dict] = None) -> dict:
+                boat_minutes: Optional[float] = None, track: Optional[dict] = None,
+                faults: frozenset = frozenset(), problems: Optional[list] = None) -> dict:
+    faults = set(faults)
+    if "corrupt_frame" in faults:                         # failure drill: an unreadable frame in the batch
+        frames = list(frames) + [("drill_corrupt_frame", None)]
+    if "missing_gps" in faults:                           # failure drill: the survey has no GPS
+        gps, track = "none", None
     if track is None:
         track = synthetic_track([fid for fid, _ in frames]) if gps == "synthetic" else None
-    pipe = get_pipeline()
+    pipe = _pipeline_or_503(faults)
     total = len(frames)
     done = {"n": 0}
 
@@ -355,21 +405,27 @@ def _run_survey(frames, gps: str, budget_minutes: Optional[float], nadir: Option
     result = pipe.run_survey(frames, track=track, survey_id=survey_id, nadir=nadir,
                              budget_minutes=budget_minutes, progress_cb=cb,
                              frame_lock=_INFER_LOCK,      # per frame: /api/analyze can interleave
-                             boat_minutes=boat_minutes)
+                             boat_minutes=boat_minutes, faults=faults, incidents=problems)
+    for inc in result.mission.incidents:
+        if inc["code"] == "missing_gps" and "missing_gps" in faults:
+            inc["simulated"] = True
+    result.plan_args["t0"] = time.time()
+    _sync_agent_requests(result, reason="survey planned")
     _remember(result)
     for fr in result.frames:
         _METRICS.record("survey", fr.frame_id, fr.stage_ms, counts=fr.counts)
-    frame_map = dict(frames)
+    frame_map = {fid: im for fid, im in frames if im is not None}
     d = result.to_dict()
     for fr, fd in zip(result.frames, d["frames"]):          # light thumbnails, not full-res base64
         thumb = cv2.resize(render(frame_map[fr.frame_id], fr), (200, 200), interpolation=cv2.INTER_AREA)
         fd["thumb_png"] = _b64(thumb, 70)
     d["frame_refs"] = {fid: _frame_ref(fid) for fid, _ in frames}
     try:
-        d["twin"] = survey_twin(frames, result, track, nadir=nadir)
+        d["twin"] = survey_twin([(f, im) for f, im in frames if im is not None], result, track, nadir=nadir)
     except Exception as e:
         log.exception("survey twin failed")
         d["twin"] = {"available": False, "reason": f"twin error: {type(e).__name__}"}
+        _add_incident(result, d, incident("view_failed", f"3D survey twin: {type(e).__name__}"))
     if gps == "recording":
         d["recording"] = _recording_summary()
     try:                                                    # STUDY-12, live: where pins go without Stage 1
@@ -377,13 +433,100 @@ def _run_survey(frames, gps: str, budget_minutes: Optional[float], nadir: Option
     except Exception as e:
         log.exception("stage-1 counterfactual failed")
         d["stage1_counterfactual"] = {"available": False, "reason": f"error: {type(e).__name__}"}
+        _add_incident(result, d, incident("view_failed", f"Stage-1 counterfactual: {type(e).__name__}"))
     prov = provenance_stamp()
     d["provenance"] = prov
     reports = {fmt: export(fmt, result, prov=prov) for fmt in REPORT_FORMATS}
     reports.update({f"public.{fmt}": export(fmt, result, public=True, prov=prov) for fmt in PUBLIC_FORMATS})
-    _JOBS.persist(result.survey_id, {k: v for k, v in d.items() if k != "frames"}, reports)
+    _JOBS.persist(result.survey_id, {k: v for k, v in d.items() if k != "frames"}, reports,
+                  simulate_storage_failure="storage_failed" in faults)
+    d["storage"] = _JOBS.storage.get(result.survey_id, {})
+    if d["storage"].get("s3") == "failed":
+        _add_incident(result, d, incident("storage_failed", d["storage"].get("error") or "S3 upload failed",
+                                          simulated="storage_failed" in faults))
+    d["dispatch"] = _dispatch(result)
     _notify("survey.completed", _survey_event(d))
     return d
+
+
+def _add_incident(result: SurveyResult, d: dict, inc: dict) -> None:
+    result.mission.incidents.append(inc)
+    d["mission"]["incidents"] = list(result.mission.incidents)
+
+
+# ---- the dispatch gate: the agent files approval requests, a person decides -------------------------
+_AGENT = "DEPTH agent (planner)"
+
+
+def _wanted_requests(s: SurveyResult) -> dict[str, tuple[list, str]]:
+    """What the agent needs a person to approve for the CURRENT plan: action -> (targets, rationale)."""
+    m, out = s.mission, {}
+    gps = "real GPS" if m.gps_available and not m.gps_synthetic else ("SYNTHETIC demo GPS" if m.gps_available else "no GPS")
+    if m.inspection_route:
+        out["inspect"] = (list(m.inspection_route),
+                          f"inspect {len(m.inspection_route)} REVIEW card(s) first - the analyst budget's best "
+                          f"expected yield ({(m.budget or {}).get('expected_pots_in_budget', '?')} expected pots)"
+                          + (f", route {m.inspection_length_m} m" if m.inspection_length_m else "") + f"; {gps}")
+    if m.recovery_route:
+        out["recover"] = (list(m.recovery_route),
+                          f"recover {len(m.recovery_route)} confirmed hazard(s)"
+                          + (f", route {m.route_length_m} m" if m.route_length_m else "") + f"; {gps}")
+    lines = (m.resurvey_plan or {}).get("lines") or []
+    if lines:
+        tg = [t for L in lines for t in L["targets"]]
+        out["resurvey"] = (tg, f"run {len(lines)} opposite-side pass(es) ({', '.join(L['id'] for L in lines)}, "
+                               f"{(m.resurvey_plan or {}).get('boat_minutes_planned')} boat-min) - a real object's "
+                               f"shadow must flip; {gps}")
+    return out
+
+
+def _sync_agent_requests(s: SurveyResult, reason: str) -> list[dict]:
+    """Keep the agent's pending requests in step with the plan: file what is needed, withdraw what a
+    re-plan made stale. Returns what changed. Nothing here executes anything."""
+    have = s.plan_args.setdefault("requests", {})
+    changes = []
+    want = _wanted_requests(s)
+    for action in ("inspect", "recover", "resurvey"):
+        cur = _APPROVALS.get(have[action]) if action in have else None
+        targets, why = want.get(action, ([], ""))
+        if cur is not None and cur["targets"] == targets[:200]:
+            continue
+        if cur is not None and cur["status"] == "pending":
+            try:
+                _APPROVALS.withdraw(cur["id"], f"superseded - {reason}", by=_AGENT)
+                changes.append({"action": action, "withdrawn": cur["id"]})
+            except Exception:
+                log.exception("withdraw failed")
+        have.pop(action, None)
+        if targets:
+            try:
+                r = _APPROVALS.request(s.survey_id, action, targets, why, requested_by=_AGENT, channel="agent")
+                have[action] = r["id"]
+                changes.append({"action": action, "requested": r["id"], "targets": len(targets)})
+                _notify("approval.requested", r)
+            except Exception as e:                       # the gate stays closed; a person is told
+                log.exception("approval request failed")
+                s.mission.incidents.append(incident("tool_failed", f"could not file the '{action}' approval request: "
+                                                    f"{type(e).__name__}", fallback="nothing dispatched; the plan "
+                                                    "stays visible", human_action="file the request from the Approvals tab"))
+    for c in changes:
+        s.mission.agent_log.append({"tool": "request_approval", "status": "done",
+                                    "rationale": (f"asked a person to approve '{c['action']}' ({c['requested']}, "
+                                                  f"{c['targets']} target(s)) - {reason}") if "requested" in c else
+                                                 f"withdrew stale request {c['withdrawn']} ('{c['action']}') - {reason}",
+                                    "detail": c})
+    return changes
+
+
+def _dispatch(s: SurveyResult) -> dict:
+    """Per action: the agent's request and where a person has got to with it."""
+    out = {}
+    for action, rid in (s.plan_args.get("requests") or {}).items():
+        r = _APPROVALS.get(rid)
+        if r:
+            out[action] = {"id": rid, "status": r["status"], "targets": len(r["targets"]),
+                           "by": (r.get("decision") or {}).get("by")}
+    return out
 
 
 # ---- API ---------------------------------------------------------------------------------------
@@ -564,9 +707,17 @@ def sample_thumb(sample_id: str, size: int = Query(220, ge=32, le=640)):
 
 @app.post("/api/analyze")
 def analyze(sample: Optional[str] = Query(None), nadir: Optional[str] = Query(None),
-            file: Optional[UploadFile] = File(None)):
+            file: Optional[UploadFile] = File(None), simulate: Optional[str] = Query(None)):
+    faults = _drills(simulate)
+    if "corrupt_frame" in faults:
+        raise _fail(422, incident("corrupt_frame", "the frame could not be decoded (failure drill)", simulated=True))
     if file is not None:
-        frame_id, frame = _decode_upload(file)
+        try:
+            frame_id, frame = _decode_upload(file)
+        except HTTPException as e:
+            if e.status_code != 400:
+                raise
+            raise _fail(422, incident("corrupt_frame", str(e.detail)))
     elif sample:
         p = samples_mod.sample_path(sample)
         if not p or not p.exists():
@@ -578,11 +729,14 @@ def analyze(sample: Optional[str] = Query(None), nadir: Optional[str] = Query(No
         raise HTTPException(400, "provide ?sample=ID or a multipart file")
     if nadir and nadir not in ("top", "bottom", "left", "right", "auto"):
         raise HTTPException(400, "nadir must be top|bottom|left|right|auto")
+    bad = validate_frame(frame)
+    if bad:
+        raise _fail(422, incident(bad, f"{frame_id}: not a usable sonogram"))
 
     t0 = time.perf_counter()
-    pipe = get_pipeline()
+    pipe = _pipeline_or_503(faults)
     with _INFER_LOCK:
-        result = pipe.run_frame(frame, frame_id=frame_id, nadir=nadir)
+        result = pipe.run_frame(frame, frame_id=frame_id, nadir=nadir, faults=faults)
     payload = _frame_payload(frame, result)
     payload["wall_ms"] = round((time.perf_counter() - t0) * 1000, 1)
     payload["guarantees"] = pipe.guarantees()
@@ -593,6 +747,7 @@ def analyze(sample: Optional[str] = Query(None), nadir: Optional[str] = Query(No
     except Exception as e:                                              # the twin is a view; never fail analyze
         log.exception("frame twin failed")
         payload["twin"] = {"available": False, "reason": f"twin error: {type(e).__name__}"}
+        payload["incidents"].append(incident("view_failed", f"3D twin: {type(e).__name__}"))
     _METRICS.record("analyze", frame_id, result.stage_ms, payload["wall_ms"], result.counts)
     return JSONResponse(payload)
 
@@ -602,7 +757,10 @@ def submit_survey(use_samples: bool = Query(False), gps: str = Query("synthetic"
                   budget_minutes: Optional[float] = Query(None, ge=0, le=600),
                   nadir: Optional[str] = Query(None),
                   boat_minutes: Optional[float] = Query(None, ge=0, le=1440),
-                  files: Optional[list[UploadFile]] = File(None)):
+                  files: Optional[list[UploadFile]] = File(None), simulate: Optional[str] = Query(None)):
+    faults = _drills(simulate)
+    if "model_unavailable" in faults:
+        _pipeline_or_503(faults)
     busy = _JOBS.counts()
     if busy["queued"] + busy["running"] >= int(os.environ.get("DEPTH_MAX_QUEUED_JOBS", "4")):
         raise HTTPException(503, "the survey queue is full - try again in a minute")
@@ -612,10 +770,12 @@ def submit_survey(use_samples: bool = Query(False), gps: str = Query("synthetic"
             raise HTTPException(404, "no raw recording on this server (python -m src.cv_pipeline.humminbird fetch)")
         frames, track, _, _ = _recording()
     else:
-        frames = _collect_frames(use_samples, files)
+        problems: list = []
+        frames = _collect_frames(use_samples, files, problems)
     survey_id = f"survey-{time.strftime('%Y%m%d-%H%M%S')}-{len(frames)}f{'-rec' if track else ''}"
+    probs = problems if gps != "recording" else []
     jid = _JOBS.submit(lambda progress: _run_survey(frames, gps, budget_minutes, nadir, survey_id, progress,
-                                                    boat_minutes, track), total=len(frames))
+                                                    boat_minutes, track, frozenset(faults), probs), total=len(frames))
     return {"job_id": jid, "survey_id": survey_id, "frames": len(frames)}
 
 
@@ -631,19 +791,22 @@ def job_status(job_id: str):
 def survey(use_samples: bool = Query(False), gps: str = Query("synthetic"),
            budget_minutes: Optional[float] = Query(None, ge=0, le=600),
            nadir: Optional[str] = Query(None),
-           files: Optional[list[UploadFile]] = File(None)):
-    track = None
+           files: Optional[list[UploadFile]] = File(None), simulate: Optional[str] = Query(None),
+           boat_minutes: Optional[float] = Query(None, ge=0, le=1440)):
+    faults = _drills(simulate)
+    track, problems = None, []
     if gps == "recording":
         if not _recording_summary().get("available"):
             raise HTTPException(404, "no raw recording on this server (python -m src.cv_pipeline.humminbird fetch)")
         frames, track, _, _ = _recording()
     else:
-        frames = _collect_frames(use_samples, files)
+        frames = _collect_frames(use_samples, files, problems)
     if len(frames) > MAX_SYNC_FRAMES:
         raise HTTPException(413, f"{len(frames)} frames: use POST /api/jobs/survey for more than "
                                  f"{MAX_SYNC_FRAMES} (runs in the background, poll /api/jobs/<id>)")
     survey_id = f"survey-{time.strftime('%Y%m%d-%H%M%S')}-{len(frames)}f{'-rec' if track else ''}"
-    return JSONResponse(_run_survey(frames, gps, budget_minutes, nadir, survey_id, track=track))
+    return JSONResponse(_run_survey(frames, gps, budget_minutes, nadir, survey_id, track=track,
+                                    boat_minutes=boat_minutes, faults=frozenset(faults), problems=problems))
 
 
 @app.get("/api/recording")
@@ -677,7 +840,8 @@ def report(fmt: str, survey_id: str = Query(...), public: bool = Query(False)):
 
 @app.get("/api/brief")
 def mission_brief(survey_id: str = Query(...), public: bool = Query(False),
-                  writer: str = Query("auto", pattern="^(auto|template|llm)$")):
+                  writer: str = Query("auto", pattern="^(auto|template|llm)$"),
+                  simulate: Optional[str] = Query(None)):
     """The mission brief + how it was written. ``auto`` uses Claude on Amazon Bedrock when
     ``DEPTH_BRIEF_LLM=bedrock`` (it writes, never decides; every number must be a survey fact or the
     deterministic template is served instead — ``writer`` / ``fallback_reason`` / ``grounding`` say which)."""
@@ -694,8 +858,14 @@ def mission_brief(survey_id: str = Query(...), public: bool = Query(False),
             raise HTTPException(404, "unknown survey_id (run a survey first)")
         d = json.loads(raw)
         prov = d.get("provenance")
-    out = brief_mod.write(d, prov, public=public, writer=writer)
+    faults = _drills(simulate)
+    out = brief_mod.write(d, prov, public=public, writer=writer, simulate_failure="llm_failed" in faults)
     out["llm_enabled"] = brief_mod.llm_enabled()
+    if survey_id in _SURVEYS:
+        _SURVEYS[survey_id].plan_args.setdefault("events", []).append(
+            {"t": time.time(), "actor": "llm" if out["writer"] == "llm" else "system", "kind": "brief",
+             "title": f"Mission brief written by the {out['writer']}",
+             "text": out.get("fallback_reason") or out["authority"], "incident": out.get("incident")})
     return out
 
 
@@ -718,7 +888,14 @@ def survey_decide(survey_id: str, body: dict = Body(...)):
     except KeyError:
         raise HTTPException(404, "unknown hazard_id")
     except ValueError as e:
-        raise HTTPException(409 if "already" in str(e) or "not on the" in str(e) or "no decision" in str(e) else 400, str(e))
+        msg = str(e)
+        raise HTTPException(409 if any(k in msg for k in ("already", "not on the", "no decision", "no priority")) else 400, msg)
+    label = _survey_label(s, t, str(body.get("decision", "")))
+    replan = s.mission.replans[-1] if s.mission.replans else None
+    requests = _sync_agent_requests(s, reason=f"re-planned after {t.human_by or body.get('by')} chose "
+                                              f"'{body.get('decision')}' on {t.oid}")
+    if replan is not None:
+        replan["requests"] = requests
     d = s.to_dict()
     d.pop("frames", None)
     try:                                              # the persisted copy follows (OGC, reports)
@@ -733,12 +910,78 @@ def survey_decide(survey_id: str, body: dict = Body(...)):
     _notify("survey.replanned", {"survey_id": survey_id, "hazard_id": t.oid, "decision": body.get("decision"),
                                  "by": t.human_by, "recovery_route": s.mission.recovery_route,
                                  "route_length_m": s.mission.route_length_m, "impact": s.mission.impact})
-    return {"hazard": t.to_dict(), "tracked": d["tracked"], "mission": d["mission"]}
+    return {"hazard": t.to_dict(), "tracked": d["tracked"], "mission": d["mission"], "replan": replan,
+            "label": label, "dispatch": _dispatch(s)}
+
+
+def _survey_label(s: SurveyResult, t, decision: str) -> Optional[dict]:
+    """A person's confirm / reject on a survey hazard is also a training label (feedback.py)."""
+    dec = {"confirm": "confirm", "reject": "reject"}.get(decision)
+    if dec is None:
+        return None
+    ref = _frame_ref(t.frame_id)
+    if not ref:
+        return None
+    try:
+        return _FEEDBACK.add({"frame_id": t.frame_id, "frame_ref": ref, "bbox": list(t.bbox), "cls_name": t.cls_name,
+                              "decision": dec, "verdict_before": t.verdict.value, "conf": t.conf, "p_pot": t.p_pot,
+                              "source": "survey", "annotator": t.human_by or "anon"})
+    except Exception:
+        log.exception("survey label not saved")
+        return None
+
+
+# ---- the audit log: one timeline of who did what, and why -------------------------------------------
+@app.get("/api/survey/{survey_id}/log")
+def survey_log(survey_id: str):
+    """Agent plan steps, incidents, approval requests / decisions / withdrawals, people's decisions,
+    re-plans and brief writers - merged, oldest first. Actors: agent | person | system | llm."""
+    s = _SURVEYS.get(survey_id)
+    if s is None:
+        raise HTTPException(404, "unknown survey_id (this log lives with the survey in memory - re-run it)")
+    t0, m, E = s.plan_args.get("t0") or 0.0, s.mission, []
+    for fr in s.frames:
+        for inc in fr.incidents:
+            E.append({"t": t0, "actor": "system", "kind": "incident", "title": inc["title"], "text": inc["message"],
+                      "severity": inc["severity"], "incident": inc})
+    for inc in m.incidents:
+        E.append({"t": t0, "actor": "system", "kind": "incident", "title": inc["title"], "text": inc["message"],
+                  "severity": inc["severity"], "incident": inc})
+    for st in m.agent_log:
+        E.append({"t": t0, "actor": "agent", "kind": st["tool"], "title": st["tool"].replace("_", " "),
+                  "text": st["rationale"], "status": st["status"]})
+    for r in _APPROVALS.list(survey_id=survey_id, limit=500):
+        E.append({"t": r["t"], "actor": "agent" if r.get("channel") == "agent" else "system", "kind": "approval_request",
+                  "title": f"Approval requested: {r['action']} ({len(r['targets'])})", "text": r["rationale"], "id": r["id"],
+                  "by": r.get("requested_by")})
+        if r.get("decision"):
+            dd = r["decision"]
+            E.append({"t": dd["t"], "actor": "agent" if r["status"] == "withdrawn" else "person",
+                      "kind": "approval_" + r["status"], "title": f"{r['action']} {r['status']}",
+                      "text": dd.get("note") or "", "id": r["id"], "by": dd.get("by")})
+    for h in m.human_log:
+        E.append({"t": h["t"], "actor": "person", "kind": "decision", "title": f"{h['decision']} {h['hazard']}",
+                  "text": h.get("note") or f"{h.get('before') or 'open'} -> {h.get('after') or 'open'}"
+                          + (" (priority)" if h["decision"].endswith("priority") or h["decision"].endswith("prioritize") else ""),
+                  "by": h.get("by")})
+    for r in m.replans:
+        E.append({"t": r["t"] + 0.01, "actor": "agent", "kind": "replan", "title": "Re-planned", "text": r["rationale"]})
+    for ev in s.plan_args.get("events", []):
+        E.append(dict(ev))
+    E.sort(key=lambda e: e["t"])
+    return {"survey_id": survey_id, "entries": E, "dispatch": _dispatch(s),
+            "llm_authority": "writer only - the LLM never decides, approves or dispatches"}
+
+
+@app.get("/api/incidents")
+def incidents_catalogue():
+    """The failure modes DEPTH handles (fallback + human action) and the drills the studio can run."""
+    return {"catalogue": incident_catalogue(), "drills": list(DRILLS)}
 
 
 # ---- human-approval requests: agents ask, people decide (src/agentic/approvals.py) ---------------
 @app.get("/api/approvals")
-def approvals(status: Optional[str] = Query(None, pattern="^(pending|approved|declined)$"),
+def approvals(status: Optional[str] = Query(None, pattern="^(pending|approved|declined|withdrawn)$"),
               survey_id: Optional[str] = Query(None)):
     return {"requests": _APPROVALS.list(status=status, survey_id=survey_id), "counts": _APPROVALS.counts()}
 
@@ -767,6 +1010,9 @@ def approval_decide(rid: str, body: dict = Body(...)):
     except ApprovalError as e:
         raise HTTPException(409 if "already" in str(e) else 400, str(e))
     _notify("approval.decided", r)
+    s = _SURVEYS.get(r.get("survey_id"))
+    if s is not None and rid in (s.plan_args.get("requests") or {}).values():
+        r = {**r, "dispatch": _dispatch(s)}
     return r
 
 

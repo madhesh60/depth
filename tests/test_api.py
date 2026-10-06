@@ -50,7 +50,8 @@ def test_upload_rejects_non_images():
 
 def test_upload_rejects_undecodable_image():
     r = client.post("/api/analyze", files={"file": ("broken.png", b"not really a png", "image/png")})
-    assert r.status_code == 400
+    assert r.status_code == 422                                  # a structured corrupt_frame incident
+    assert r.json()["detail"]["incident"]["code"] == "corrupt_frame"
 
 
 def test_survey_frame_limit(monkeypatch):
@@ -91,7 +92,8 @@ def test_analyze_and_report_path():
     assert "counts" in body and "overlay_png" in body and body["overlay_png"].startswith("data:image")
     for c in body["candidates"]:
         assert c["verdict"] in ("confirmed", "review", "low_risk")
-        assert c["trace"] and c["trace"][-1]["tool"] == "decide"
+        tools = [st["tool"] for st in c["trace"]]          # voi_check ... decide -> handoff
+        assert tools[0] == "voi_check" and "decide" in tools and tools[-1] == "handoff"
 
     s = client.post("/api/survey?use_samples=1&gps=synthetic")
     assert s.status_code == 200

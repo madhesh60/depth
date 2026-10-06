@@ -307,26 +307,35 @@ def llm_enabled() -> bool:
 
 
 def write(survey: dict, prov: Optional[dict] = None, public: bool = False, writer: str = "auto",
-          client=None) -> dict:
-    """The brief + how it was written. ``writer``: ``template`` | ``llm`` | ``auto`` (LLM when enabled)."""
+          client=None, simulate_failure: bool = False) -> dict:
+    """The brief + how it was written. ``writer``: ``template`` | ``llm`` | ``auto`` (LLM when enabled).
+    The LLM has **no authority**: it writes prose from the survey's facts; it cannot decide, approve,
+    or dispatch anything, and an ungrounded or failed draft is replaced by the template (an
+    ``llm_failed`` incident says so). ``simulate_failure`` = the studio's failure drill."""
+    from .incidents import incident
     F = facts(survey, prov, public)
     tpl = template_brief(F)
     out = {"text": tpl, "writer": "template", "model": None, "fallback_reason": None,
-           "grounding": check(tpl, F), "facts": F}
-    want_llm = writer == "llm" or (writer == "auto" and (llm_enabled() or client is not None))
+           "grounding": check(tpl, F), "facts": F,
+           "authority": "writer only - the LLM never decides, approves or dispatches"}
+    want_llm = simulate_failure or writer == "llm" or (writer == "auto" and (llm_enabled() or client is not None))
     if not want_llm:
         return out
     model = os.environ.get("DEPTH_BRIEF_MODEL", DEFAULT_MODEL)
     try:
+        if simulate_failure:
+            raise ConnectionError("simulated LLM outage (failure drill)")
         text = llm_brief(F, client=client, model=model)
     except Exception as e:                                # SDK missing, no creds, API error, refusal …
         log.warning("LLM brief failed: %s", e)
         out["fallback_reason"] = f"{type(e).__name__}: {e}"[:300]
+        out["incident"] = incident("llm_failed", out["fallback_reason"], simulated=simulate_failure)
         return out
     g = check(text, F)
     if not g["ok"]:
         out["fallback_reason"] = "LLM brief failed the grounding check"
         out["rejected"] = {"text": text, "grounding": g}
+        out["incident"] = incident("llm_failed", "the LLM draft cited numbers that are not survey facts - rejected")
         return out
     out.update(text=text, writer="llm", model=model, grounding=g)
     return out

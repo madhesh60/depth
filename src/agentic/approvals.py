@@ -25,6 +25,7 @@ from typing import Optional
 
 ACTIONS = ("inspect", "recover", "resurvey", "share_public", "other")
 DECISIONS = ("approved", "declined")
+STATUSES = ("pending", "approved", "declined", "withdrawn")
 REPO = Path(__file__).resolve().parents[2]
 
 
@@ -76,6 +77,18 @@ class ApprovalStore:
                       "by": by[:60], "note": (note or "")[:1000]})
         return self.get(rid)
 
+    def withdraw(self, rid: str, reason: str, by: str = "DEPTH agent") -> dict:
+        """The requester retracts a PENDING request (e.g. the agent re-planned and the route it asked
+        for no longer exists). Never touches a request a person already decided."""
+        cur = self.get(rid)
+        if cur is None:
+            raise KeyError(rid)
+        if cur["status"] != "pending":
+            raise ApprovalError(f"{rid} is already {cur['status']}")
+        self._append({"type": "withdrawn", "id": rid, "t": time.time(), "by": str(by)[:60],
+                      "note": (reason or "")[:1000]})
+        return self.get(rid)
+
     # -- read ------------------------------------------------------------------------------------
     def _replay(self) -> dict[str, dict]:
         state: dict[str, dict] = {}
@@ -92,6 +105,10 @@ class ApprovalStore:
                 r = state[ev["id"]]
                 r["status"] = ev["decision"]
                 r["decision"] = {"by": ev["by"], "note": ev.get("note", ""), "t": ev["t"]}
+            elif ev.get("type") == "withdrawn" and ev.get("id") in state:
+                r = state[ev["id"]]
+                r["status"] = "withdrawn"
+                r["decision"] = {"by": ev.get("by", "DEPTH agent"), "note": ev.get("note", ""), "t": ev["t"]}
         return state
 
     def get(self, rid: str) -> Optional[dict]:
@@ -106,7 +123,7 @@ class ApprovalStore:
         return rs[:limit]
 
     def counts(self) -> dict:
-        out = {"pending": 0, "approved": 0, "declined": 0}
+        out = {"pending": 0, "approved": 0, "declined": 0, "withdrawn": 0}
         for r in self._replay().values():
             out[r["status"]] = out.get(r["status"], 0) + 1
         return out

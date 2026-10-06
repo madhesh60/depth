@@ -85,7 +85,7 @@ def test_agent_asks_person_decides(client):
     q = q["cards"]
     assert not err and len(q) == 3 and q[0]["p_pot"] >= q[-1]["p_pot"]
     err, h = _call(client, "get_hazard", {"survey_id": sid, "hazard_id": q[0]["id"]})
-    assert not err and h["trace"] and h["trace"][-1]["tool"] == "decide"
+    assert not err and h["trace"] and any(s["tool"] == "decide" for s in h["trace"])
     err, b = _call(client, "get_mission_brief", {"survey_id": sid})
     assert not err and b["grounding"]["ok"]
     err, bad = _call(client, "request_human_approval", {"survey_id": sid, "action": "inspect", "targets": ["H999"],
@@ -114,7 +114,7 @@ def test_approval_store_rules(tmp_path, monkeypatch):
         st.decide(r["id"], "approved", "A. Person")                               # automated clients lack the PIN
     assert st.decide(r["id"], "declined", "A. Person", pin="4321")["status"] == "declined"
     assert len((tmp_path / "events.jsonl").read_text().splitlines()) == 2        # append-only log
-    assert st.counts() == {"pending": 0, "approved": 0, "declined": 1}
+    assert st.counts() == {"pending": 0, "approved": 0, "declined": 1, "withdrawn": 0}
 
 
 def test_stdio_with_the_official_client():

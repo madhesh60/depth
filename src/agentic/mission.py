@@ -6,7 +6,13 @@ mission.py — the **Act** stage: turn confirmed hazards into a human-approved c
 * REVIEW objects → a **resurvey list** for a human to revisit (nothing is dispatched from REVIEW).
 * Exports the plan as GeoJSON / GPX / KML / CSV / JSON that a boat crew's GPS or a GIS can open.
 
-Nothing is ever auto-dispatched: ``MissionPlan.human_approval_required`` is always True. Geometry
+Nothing is ever auto-dispatched: ``MissionPlan.human_approval_required`` is always True.
+
+The planner is an agent too, and it keeps a decision log (``MissionPlan.agent_log``): triage → "can
+another observation change these cards?" → analyst-budget check + stop rule → person overrides →
+inspection / recovery route → re-survey passes chosen *and skipped* against the boat budget → the
+dispatch gate. After every person's decision it re-plans and records what changed
+(``MissionPlan.replans``: queue, routes, passes — before → after). Geometry
 (route/waypoints) is only emitted when GPS is available; without it the plan degrades honestly to a
 frame-ordered CSV and a "no GPS" flag. When the GPS is a demo track, exports carry a clear
 ``SYNTHETIC DEMO GPS`` marker.
@@ -51,7 +57,9 @@ def _nearest_neighbour(points: list[TrackedObject]) -> list[TrackedObject]:
     return route
 
 
-HUMAN_DECISIONS = ("confirm", "reject", "recovered", "not_found", "undo")
+HUMAN_DECISIONS = ("confirm", "reject", "recovered", "not_found", "undo",
+                   "prioritize", "deprioritize", "reset_priority")    # the last three override the agent's order
+_PRIORITY_RANK = {"high": 0, None: 1, "low": 2}
 _CLOSED = ("rejected", "not_found", "recovered")         # a person closed it: off every route and queue
 
 
@@ -93,7 +101,8 @@ def review_queue(tracked: list[TrackedObject]) -> list[TrackedObject]:
     """Undecided REVIEW cards, most-likely-real first: calibrated P(pot), then evidence score, then
     confidence. Cards a person already decided leave the queue."""
     rev = [t for t in tracked if undecided_review(t)]
-    return sorted(rev, key=lambda t: (-(t.p_pot if t.p_pot is not None else -1.0),
+    return sorted(rev, key=lambda t: (_PRIORITY_RANK.get(t.human_priority, 1),        # a person's override first
+                                      -(t.p_pot if t.p_pot is not None else -1.0),
                                       -t.evidence_score, -t.conf, t.oid))
 
 
@@ -152,7 +161,8 @@ def impact_ledger(tracked: list[TrackedObject], log: list) -> dict:
 def plan_mission(tracked: list[TrackedObject], track: Optional[dict], guarantees: dict,
                  budget_minutes: Optional[float] = None, sec_per_card: float = DEFAULT_SEC_PER_CARD,
                  boat_minutes: Optional[float] = None, repeat_merges: int = 0,
-                 human_log: Optional[list] = None) -> MissionPlan:
+                 human_log: Optional[list] = None, replans: Optional[list] = None,
+                 incidents: Optional[list] = None) -> MissionPlan:
     """The whole Act plan from the current state of the hazards — used for the first plan AND after
     every person's decision (the agent re-plans; it never overrides a person)."""
     from .resurvey import plan_resurvey
@@ -169,8 +179,106 @@ def plan_mission(tracked: list[TrackedObject], track: Optional[dict], guarantees
     if gps_available:                        # the physical second look: opposite side, mid-swath
         mission.resurvey_plan = plan_resurvey([t for t in tracked if t.human is None], track, boat_minutes)
     mission.human_log = list(human_log or [])
+    mission.replans = list(replans or [])
     mission.impact = impact_ledger(tracked, mission.human_log)
+    mission.agent_log = planner_log(tracked, mission, queue, budget_minutes, boat_minutes)
+    mission.incidents = [i for i in (incidents or []) if i.get("code") != "missing_gps"]
+    if not gps_available:
+        from .incidents import incident
+        mission.incidents.append(incident("missing_gps", "no GPS fix for any frame of this survey"))
     return mission
+
+
+def _step(tool: str, why: str, status: str = "done", **detail) -> dict:
+    return {"tool": tool, "status": status, "rationale": why, "detail": detail}
+
+
+def planner_log(tracked: list[TrackedObject], m: MissionPlan, queue: list[TrackedObject],
+                budget_minutes: Optional[float], boat_minutes: Optional[float]) -> list[dict]:
+    """The Act-stage agent's decisions, in order, each with its reason (shown in the studio's Agent tab
+    and written to the decision log). Deterministic: the same survey gives the same log."""
+    L = []
+    c = m.counts
+    L.append(_step("triage", f"{len(tracked)} hazard(s): {c.get('confirmed', 0)} confirmed, {c.get('review', 0)} for "
+                             f"review, {c.get('low_risk', 0)} low-risk kept for audit",
+                   counts=dict(c)))
+    ps = [t.p_pot for t in queue if t.p_pot is not None]
+    unc = round(sum(p * (1 - p) for p in ps), 2)
+    L.append(_step("voi_check", (f"can another observation change these {len(queue)} card(s)? yes - open "
+                                 f"uncertainty sum p(1-p) = {unc}; options: a person's card "
+                                 f"(~{(m.budget or {}).get('sec_per_card', DEFAULT_SEC_PER_CARD):g} s each) or an "
+                                 f"opposite-side sonar pass (boat time)") if queue else
+                   "no open REVIEW cards - nothing left that another observation could change",
+                   status="done", open_uncertainty=unc, cards=len(queue)))
+    b = m.budget or {}
+    if b:
+        k, n = b["cards_affordable"], b["cards_total"]
+        nxt = queue[k] if k < len(queue) else None
+        why = (f"analyst budget {b['minutes']:g} min / {b['sec_per_card']:g} s per card -> {k} of {n} card(s) fit; "
+               f"expected {b['expected_pots_in_budget']} of {b['expected_pots_in_queue']} real pots in the queue")
+        if b.get("share_of_expected_pots") is not None:
+            why += f" ({b['share_of_expected_pots']:.0%})"
+        L.append(_step("budget_check", why, cards_affordable=k, cards_total=n,
+                       sec_per_card_source=b.get("sec_per_card_source")))
+        if nxt is not None and nxt.p_pot is not None:
+            L.append(_step("stop_rule", f"stop at card {k}: the next card ({nxt.oid}) is worth ~{nxt.p_pot:.2f} expected pots "
+                                        f"and does not fit the budget; {n - k} card(s) deferred, lowest P(pot) first",
+                           deferred=n - k, next_p_pot=nxt.p_pot))
+        else:
+            L.append(_step("stop_rule", "the whole queue fits the analyst budget - nothing deferred", deferred=0))
+    else:
+        L.append(_step("budget_check", "no analyst budget given -> the whole queue is the plan", status="skipped"))
+    hi = [t.oid for t in tracked if t.human_priority == "high"]
+    lo = [t.oid for t in tracked if t.human_priority == "low"]
+    if hi or lo:
+        L.append(_step("human_override", f"a person's order is kept: {len(hi)} prioritised"
+                                         + (f" ({', '.join(hi[:6])})" if hi else "")
+                                         + f", {len(lo)} deprioritised - the agent never re-orders them",
+                       prioritized=hi, deprioritized=lo))
+    if m.gps_available:
+        L.append(_step("route_update", f"inspection route through {len(m.inspection_route)} card(s), "
+                                       f"{m.inspection_length_m or 0:g} m, nearest-neighbour order",
+                       stops=len(m.inspection_route), length_m=m.inspection_length_m))
+    else:
+        L.append(_step("route_update", "no GPS -> no route drawn; the cards are listed in frame order (positions withheld)",
+                       status="skipped", stops=len(m.inspection_route)))
+    if m.recovery_route:
+        L.append(_step("recovery_route", f"{len(m.recovery_route)} confirmed stop(s), "
+                                         f"{m.route_length_m if m.route_length_m is not None else '?'} m",
+                       stops=len(m.recovery_route)))
+    else:
+        L.append(_step("recovery_route", "empty - nothing is confirmed (no precision promise for this model, and no "
+                                         "person has confirmed a card yet)", status="skipped", stops=0))
+    rp = m.resurvey_plan or {}
+    if m.gps_available:
+        lines, skipped = rp.get("lines") or [], rp.get("skipped") or []
+        if lines:
+            L.append(_step("resurvey_plan", f"{len(lines)} opposite-side pass(es) planned, "
+                                            f"{rp.get('boat_minutes_planned')} boat-min"
+                                            + (f" of {boat_minutes:g}" if boat_minutes is not None else "")
+                                            + f"; they resolve {rp.get('voi_covered')} of {rp.get('voi_total')} open "
+                                              f"uncertainty (the shadow must flip on a real object)",
+                           passes=[x["id"] for x in lines]))
+        elif not skipped:
+            L.append(_step("resurvey_plan", rp.get("note") or "no pass needed", status="skipped"))
+        for sk in skipped:
+            L.append(_step("resurvey_plan", f"pass over {', '.join(sk['targets'][:4])} not planned - {sk['reason']}",
+                           status="skipped", targets=sk["targets"], voi=sk["voi"]))
+    n_pass = len(rp.get("lines") or [])
+    L.append(_step("dispatch_gate", f"nothing dispatched: the inspection route ({len(m.inspection_route)} stops), "
+                                    f"the recovery route ({len(m.recovery_route)} stops) and {n_pass} re-survey "
+                                    f"pass(es) wait for a named person's approval", status="done",
+                   awaiting_approval=True))
+    return L
+
+
+def plan_summary(m: MissionPlan) -> dict:
+    """The figures a re-plan compares (before -> after)."""
+    rp = m.resurvey_plan or {}
+    return {"queue": len(m.review_queue), "inspection_stops": len(m.inspection_route),
+            "inspection_m": m.inspection_length_m, "recovery_stops": len(m.recovery_route),
+            "recovery_m": m.route_length_m, "passes": len(rp.get("lines") or []),
+            "cards_affordable": (m.budget or {}).get("cards_affordable")}
 
 
 def apply_human(survey: SurveyResult, oid: str, decision: str, by: str, note: str = "") -> TrackedObject:
@@ -193,17 +301,41 @@ def apply_human(survey: SurveyResult, oid: str, decision: str, by: str, note: st
         raise ValueError(f"{oid} is not on the recovery route (confirm it first)")
     if decision == "undo" and t.human is None:
         raise ValueError(f"{oid} has no decision to undo")
-    before = t.human
-    t.human = {"confirm": "confirmed", "reject": "rejected", "recovered": "recovered",
-               "not_found": "not_found", "undo": None}[decision]
-    t.human_by = by[:60] if t.human else None
-    log = list(survey.mission.human_log) + [{"t": round(_t.time(), 1), "hazard": oid, "decision": decision,
-                                             "before": before, "after": t.human, "by": by[:60], "note": (note or "")[:300],
-                                             "agent_verdict": t.verdict.value, "p_pot": t.p_pot}]
+    if decision in ("prioritize", "deprioritize") and t.human is not None:
+        raise ValueError(f"{oid} is already {t.human} - it is not in the queue")
+    if decision == "reset_priority" and t.human_priority is None:
+        raise ValueError(f"{oid} has no priority override to reset")
+    old = survey.mission
+    if decision in ("prioritize", "deprioritize", "reset_priority"):
+        before = t.human_priority
+        t.human_priority = {"prioritize": "high", "deprioritize": "low", "reset_priority": None}[decision]
+        after = t.human_priority
+    else:
+        before = t.human
+        t.human = {"confirm": "confirmed", "reject": "rejected", "recovered": "recovered",
+                   "not_found": "not_found", "undo": None}[decision]
+        t.human_by = by[:60] if t.human else None
+        after = t.human
+    now = round(_t.time(), 1)
+    log = list(old.human_log) + [{"t": now, "hazard": oid, "decision": decision,
+                                  "before": before, "after": after, "by": by[:60], "note": (note or "")[:300],
+                                  "agent_verdict": t.verdict.value, "p_pot": t.p_pot}]
     a = survey.plan_args or {}
-    survey.mission = plan_mission(survey.tracked, survey.track, survey.mission.guarantees,
-                                  a.get("budget_minutes"), a.get("sec_per_card", DEFAULT_SEC_PER_CARD),
-                                  a.get("boat_minutes"), survey.mission.repeat_merges, log)
+    new = plan_mission(survey.tracked, survey.track, old.guarantees,
+                       a.get("budget_minutes"), a.get("sec_per_card", DEFAULT_SEC_PER_CARD),
+                       a.get("boat_minutes"), old.repeat_merges, log, old.replans, old.incidents)
+    b0, b1 = plan_summary(old), plan_summary(new)
+    changed = {k: [b0[k], b1[k]] for k in b0 if b0[k] != b1[k]}
+    words = {"queue": "queue", "inspection_stops": "inspection stops", "inspection_m": "inspection m",
+             "recovery_stops": "recovery stops", "recovery_m": "recovery m", "passes": "re-survey passes",
+             "cards_affordable": "cards in budget"}
+    why = (f"re-planned after {by[:60]} chose '{decision}' on {oid}: "
+           + ("; ".join(f"{words[k]} {v[0] if v[0] is not None else '-'} -> {v[1] if v[1] is not None else '-'}"
+                        for k, v in changed.items()) if changed else "no route or queue change"))
+    new.replans.append({"t": now, "hazard": oid, "decision": decision, "by": by[:60], "changed": changed,
+                        "rationale": why, "inspection_route": list(new.inspection_route),
+                        "recovery_route": list(new.recovery_route)})
+    survey.mission = new
     return t
 
 
@@ -376,8 +508,14 @@ def to_trace(survey: SurveyResult, prov: Optional[dict] = None) -> str:
               "resurvey_lines": [{k: L_[k] for k in ("id", "targets", "voi", "boat_min", "status")}
                                  for L_ in (m.resurvey_plan or {}).get("lines", [])],
               "human_approval_required": m.human_approval_required, "impact": m.impact})
+    for st in m.agent_log:
+        L.append({"type": "plan", **st})
+    for inc in m.incidents + [i for fr in survey.frames for i in fr.incidents]:
+        L.append({"type": "incident", **inc})
     for h in m.human_log:
         L.append({"type": "human", **h})
+    for r in m.replans:
+        L.append({"type": "replan", **{k: v for k, v in r.items() if k not in ("inspection_route", "recovery_route")}})
     return "\n".join(json.dumps(x, default=str) for x in L) + "\n"
 
 

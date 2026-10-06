@@ -178,9 +178,12 @@ def plan_resurvey(tracked: list[TrackedObject], track: dict[str, PingFix], boat_
         })
 
     lines.sort(key=lambda L: -L["voi_per_100m"])
-    chosen, spent = [], 0.0
+    chosen, skipped, spent = [], [], 0.0
     for L in lines:
         if boat_minutes is not None and spent + L["boat_min"] > boat_minutes:
+            skipped.append({"targets": [t for t in L["targets"]], "boat_min": L["boat_min"], "voi": L["voi"],
+                            "reason": f"boat budget: {spent:.1f} of {boat_minutes:g} min already planned, this pass "
+                                      f"needs {L['boat_min']} min"})
             continue
         chosen.append(L); spent += L["boat_min"]
     for i, L in enumerate(chosen, 1):
@@ -191,7 +194,7 @@ def plan_resurvey(tracked: list[TrackedObject], track: dict[str, PingFix], boat_
                     f"(e.g. {L['predictions'][0]['id']}: {L['predictions'][0]['shadow_was']:.0f}° → "
                     f"{L['predictions'][0]['shadow_must_point']:.0f}°)")
     total_voi = sum(d["w"] for d in info)
-    return {"lines": chosen, "boat_minutes_budget": boat_minutes, "boat_minutes_planned": round(spent, 1),
+    return {"lines": chosen, "skipped": skipped, "boat_minutes_budget": boat_minutes, "boat_minutes_planned": round(spent, 1),
             "voi_covered": round(sum(L["voi"] for L in chosen), 3), "voi_total": round(total_voi, 3),
             "targets_covered": sum(len(L["targets"]) for L in chosen), "targets_total": len(info),
             "assumptions": {"swath_m": swath_m, "mid_range_m": mid, "speed_kn": speed_kn, "turn_s": TURN_S}}

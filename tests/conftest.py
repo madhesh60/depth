@@ -4,3 +4,11 @@ them back on explicitly."""
 import os
 
 os.environ.setdefault("DEPTH_RATE_LIMITS", "0")
+
+# never write test approvals / labels into the real stores under runs/ (the agent now files approval
+# requests on every survey, and survey decisions become training labels)
+import tempfile as _tempfile
+
+_TMP = _tempfile.mkdtemp(prefix="depth-tests-")
+os.environ.setdefault("DEPTH_APPROVALS_DIR", os.path.join(_TMP, "approvals"))
+os.environ.setdefault("DEPTH_FEEDBACK_DIR", os.path.join(_TMP, "feedback"))

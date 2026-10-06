@@ -181,6 +181,11 @@ class _BatchStub(_StubPerceptor):
         return out
 
 
+def _dec(c):
+    """The decide step (the trace continues with a hand-off after it)."""
+    return next(s for s in c.trace if s.tool == "decide")
+
+
 def _tiers(**kw):
     from src.agentic.policy import GuaranteedTiers
     base = dict(tau_review=0.10, tau_confirm=0.50, relook_mode="mosaic", escalate_clahe=False,
@@ -200,9 +205,9 @@ def test_value_of_information_relooks_only_the_uncertain_band():
     assert v == [Verdict.CONFIRMED, Verdict.CONFIRMED, Verdict.LOW_RISK]
     assert stub.relooked == [0.30]                          # only the band candidate cost compute
     assert r.stage_ms["inferences"] == 2                     # detect + one mosaic pass
-    assert "no re-look spent" in r.candidates[0].trace[-1].rationale
-    assert "lifted the score" in r.candidates[1].trace[-1].rationale
-    assert r.candidates[2].trace[-1].detail["relooked"] is False
+    assert "no re-look spent" in _dec(r.candidates[0]).rationale
+    assert "lifted the score" in _dec(r.candidates[1]).rationale
+    assert _dec(r.candidates[2]).detail["relooked"] is False
 
 
 def test_review_card_carries_calibrated_p_pot_and_promise_text():
@@ -211,7 +216,7 @@ def test_review_card_carries_calibrated_p_pot_and_promise_text():
                         cfg=AgentConfig(tiers=_tiers()))
     c = agent.run_frame(_frame()).candidates[0]
     assert c.verdict is Verdict.REVIEW and c.evidence.p_pot == 0.6 and c.evidence.evidence_score == 0.35
-    assert "REVIEW card" in c.trace[-1].rationale
+    assert "REVIEW card" in _dec(c).rationale
 
 
 def test_no_precision_promise_means_nothing_is_auto_confirmed():
@@ -221,7 +226,7 @@ def test_no_precision_promise_means_nothing_is_auto_confirmed():
     c = agent.run_frame(_frame()).candidates[0]
     assert c.verdict is Verdict.REVIEW                       # even conf 0.95 is never auto-confirmed
     assert stub.relooked == [0.95]                            # re-look spent only to ORDER the queue
-    assert "no precision promise" in c.trace[-1].rationale
+    assert "no precision promise" in _dec(c).rationale
 
 
 def test_non_guaranteed_classes_never_auto_confirm():
