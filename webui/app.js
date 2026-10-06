@@ -177,7 +177,8 @@ function renderGuarantees(c) {
   const g = c.guarantees || {}, v = g.verified_on_test || {};
   const pct = x => x == null ? "—" : `${Math.round(x * 100)}%`;
   const held = ok => ok == null ? "" : ok ? `<span class="g-held">held on test</span>` : `<span class="g-miss">NOT held on test</span>`;
-  meta.textContent = `≥ ${pct(g.recall_promise)} of pots${v.recall_promise_held === true ? " · held" : ""}`;
+  meta.textContent = `≥ ${pct(g.recall_promise)}${v.recall_promise_held === true ? " · held" : ""}`;   // the rail has room for one short line
+  meta.title = `at least ${pct(g.recall_promise)} of real pots reach a person${v.recall_promise_held === true ? " — held on test" : ""}`;
   if (gate) gate.textContent = `${(c.detector_floor ?? c.tau_review).toFixed(2)} (floor) · review ≥ ${c.tau_review.toFixed(2)}`;
   if (tiers) tiers.textContent = `${c.method ? "conformal (CP · LTT)" : "calibrated"}${c.policy ? " · " + c.policy : ""}`;
   panel.innerHTML = `
@@ -194,7 +195,9 @@ async function loadSamples() {
     const j = await fetch(`${API}/api/samples`).then(r => r.json());
     state.samples = j.samples || [];
   } catch { state.samples = []; }
-  const cnt = $("#sampleCount"); if (cnt) cnt.textContent = state.samples.length ? `${state.samples.length} frames` : "";
+  const recs = new Set(state.samples.map(x => (String(x.name || "").match(/^Rec\d+/) || [""])[0]));
+  const cnt = $("#sampleCount");
+  if (cnt) cnt.textContent = state.samples.length ? (recs.size === 1 && !recs.has("") ? `${[...recs][0]} · ` : "") + `${state.samples.length} frames` : "";
   if (!state.samples.length) {
     grid.innerHTML = `<p class="empty-hint" style="grid-column:1/-1">No local samples — drop your own sonar frame below.</p>`;
     return;
@@ -219,7 +222,9 @@ async function loadSamples() {
     }
     const meta = document.createElement("div");
     meta.className = "sc-meta";
-    meta.innerHTML = `<div class="sc-name">${escapeHtml(s.name)}</div><div class="sc-kind">${escapeHtml(parts[0] || s.kind)}</div>`;
+    const short = String(s.name || "").replace(/^Rec\d+\s+/, "").replace(/^\w/, ch => ch.toUpperCase());   // "Rec6 starboard #24" → "Starboard #24"
+    card.title = s.name;
+    meta.innerHTML = `<div class="sc-name">${escapeHtml(short || s.name)}</div><div class="sc-kind">${escapeHtml(parts[0] || s.kind)}</div>`;
     card.append(thumb, meta);
     card.onclick = () => selectSample(s.id, card);
     grid.appendChild(card);
@@ -676,8 +681,9 @@ function showAgentEye(c) {
   if (!src) { hideAgentEye(); return; }
   $("#aeImg").src = src;
   const rl = (c.evidence || {}).relook || {};
-  $("#aeCap").textContent = `agent's eye${rv && rv.scale ? " · " + rv.scale.toFixed(1) + "× · CLAHE" : ""}` +
-    (!relooked(c) ? " · view only (no re-look inference)" : rl.found ? ` · re-fire ${(rl.conf || 0).toFixed(2)}` : " · no re-fire");
+  const how = [rv && rv.scale ? rv.scale.toFixed(1) + "× · CLAHE" : "",
+    !relooked(c) ? "view only, no re-look" : rl.found ? `re-fired ${(rl.conf || 0).toFixed(2)}` : "no re-fire"].filter(Boolean).join(" · ");
+  $("#aeCap").innerHTML = `<b>Agent's eye</b><small>${escapeHtml(how)}</small>`;
   ae.hidden = false; ae.classList.remove("pop"); void ae.offsetWidth; ae.classList.add("pop");
 }
 function hideAgentEye() { const ae = $("#agentEye"); if (ae) ae.hidden = true; }
@@ -895,7 +901,7 @@ function renderMap(d, keepView) {
     const color = hc || VCOLOR[t.verdict] || "#8ba6c2";
     const onRoute = t.human === "confirmed" || (t.verdict === "confirmed" && !t.human);
     const mk = L.circleMarker([t.lat, t.lon], { radius: onRoute ? 8 : (t.human === "rejected" || t.human === "not_found") ? 4 : 6,
-        color: onRoute ? "#d8ffe4" : "#02121d", weight: onRoute ? 2 : 1.5, fillColor: color, fillOpacity: (t.human === "rejected" || t.human === "not_found") ? .5 : .95 })
+        color: onRoute ? "#ffffff" : "#02121d", weight: onRoute ? 2 : 1.5, fillColor: color, fillOpacity: (t.human === "rejected" || t.human === "not_found") ? .5 : .95 })
       .bindPopup(`<b>${t.oid}</b> · ${VLABEL[t.verdict] || human(t.verdict)}<br/>${human(t.cls_name)} · conf ${t.conf}<br/>evidence ${t.evidence_score} · ${t.shadow_quality} shadow${t.height_m != null || t.height_rel ? ` · h ${heightText(t.height_m, t.height_rel, 1)}` : ""}<br/>${t.lat.toFixed(5)}, ${t.lon.toFixed(5)} ±${t.geo_error_m ?? "?"} m${t.human ? `<br/><b>person: ${t.human}</b> (${escapeHtml(t.human_by || "")})` : ""}`);
     if (t.geo_error_m) {
       const ring = L.circle([t.lat, t.lon], { radius: t.geo_error_m, color, weight: 1, opacity: .55, fillOpacity: .06, dashArray: "3 4", interactive: false });

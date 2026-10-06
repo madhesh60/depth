@@ -99,6 +99,35 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
     for run-to-run spread.
 - Record: `docs/exp005_diagnosis.md` (+ tables).
 
+### 2026-10-06 (sweep 49) — Studio polish: liquid glass + a pixel-level defect sweep
+- **Ask:** keep the current elite studio, polish every detail, bring back the glassmorphism, Apple-like
+  type and calm text. **Method:** drove headless Chrome over CDP and screenshotted every mode
+  (Analyze idle/run, Survey run + tabs, Study, Audit, Connect, popovers, dock) *before* editing —
+  the sweep-48 theme had never had its browser eyeball.
+- **Material:** panels become smoked liquid glass — translucent near-black + a top specular gradient,
+  `blur(30px) saturate(170%)`; popovers / toast / demo bar / agent's eye use a stronger
+  `blur(40px) saturate(190%)`; the OpenCV depth chart returns under the glass at 11% (masked), with
+  slightly richer ambient blooms so the glass has something to refract. Reduced-transparency and
+  no-backdrop-filter fallbacks updated.
+- **Defects found on pixels and fixed:**
+  - box labels were **blurry when zoomed** — a permanent `will-change: transform` froze the stage
+    raster at 1×; removed (labels now re-raster crisp at every zoom);
+  - the **Analyze button sat below the fold** at 1440×900 — thumbs 1:1 → 4:3 and the Run section is a
+    sticky frosted dock at the rail's foot;
+  - sample names truncated ("Rec6 starbo…") — cards show "Starboard #24"; the shared recording moves to
+    the panel meta ("Rec6 · 8 frames"), full name on hover;
+  - the collapsed Guarantee summary wrapped onto two lines — now "≥ 65% · held" (full sentence in the
+    tooltip); every panel meta is one line with an ellipsis;
+  - the inspector tabs wrapped ("Effort" alone on a second row) — one frosted scrollable strip;
+  - KPI sub-lines were cut mid-sentence — two-line clamp;
+  - the agent's-eye caption crammed three wrapped lines — a title + one quiet meta line;
+  - the evidence crop was ~500 px tall and pushed the facts off-screen — capped at 232 px;
+  - mission-brief section heads → the uppercase micro-label system; long survey ids wrap cleanly;
+  - native range sliders → hairline track + white puck; off-palette mint route stroke and lavender
+    arrows → white / accent.
+- **Checks:** `styles.css` brace-balanced (639/639); `app.js` parses; **153/153 tests pass**; every
+  mode re-screenshotted after the change.
+
 ### 2026-10-04 (sweep 48) — Studio theme: Elite / minimal (Cool · marine) — replaces Abyssal
 - **Ask:** reference frames (a dark code-editor panel + a light email) → "elite and simple", focus on
   style / font / design, not content. Extracted the language: near-black cinematic panels, a bright

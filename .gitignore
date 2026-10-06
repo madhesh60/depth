@@ -9,6 +9,7 @@ DATASET/scripts/*
 !DATASET/scripts/build_dataset_v2b.py
 !DATASET/scripts/build_tiles.py
 !DATASET/scripts/visualize_labels.py
+!DATASET/scripts/build_samples.py
 
 # Python
 __pycache__/
@@ -44,3 +45,4 @@ _to_delete/
 data_exp*.yaml
 # local UI screenshot / CDP verification scratch (not a deliverable)
 .shots/
+_shots/
