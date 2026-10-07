@@ -73,7 +73,7 @@ a notice, listed in the Agent tab / evidence panel, and written to the audit log
 | `llm_failed` | template brief served | ✓ |
 | `view_failed` | 3D twin / counterfactual hidden; decisions unaffected | |
 
-**Drills:** System (top right) → *Failure drills*, or `?simulate=<code>` on `/api/analyze`,
+**Drills:** open the studio with `?drills` (e.g. `http://localhost:8000/?drills`), then Ready (top right) → *Failure drills*; or `?simulate=<code>` on `/api/analyze`,
 `/api/survey`, `/api/jobs/survey`, `/api/brief`. Drill incidents are tagged `simulated`.
 
 ## 5 · The audit log

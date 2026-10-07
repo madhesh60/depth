@@ -75,6 +75,15 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ## 4. Session log
 
+### 2026-10-07 (sweep 53) — Calmer chrome; Connect page rebuilt as four learnable cards
+
+- Topbar: the "Studio" suffix is gone (the brand is just **DEPTH**). The status pill's popover now
+  shows only OpenCV + detector state; the failure drills are presenter-only (`/?drills`).
+- Connect: one equal card per option in a 2×2 grid — **AI agents (MCP)**, **GIS maps (OGC API)**,
+  **Event alerts (webhooks)**, **Web panel (embed)**. Each card says who it is for in one line, then
+  numbered steps with copyable commands (wrapped, never clipped); tool lists, filters, verification
+  code and delivery history fold behind "more" disclosures. Inter at 14 px body for readability.
+
 ### 2026-10-06 (sweep 52) — Agentic Vision made visible: decision chains, failure drills, overrides, audit log
 - **Ask:** show the rubric's SEE → PROVE → DECIDE → ACT as a real agent workflow. The agent has to weigh
   confidence, evidence quality and the analyst + boat budgets, choose its tools and record skipped ones,

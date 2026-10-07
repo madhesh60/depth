@@ -23,7 +23,7 @@
     <div class="progress" id="progress" role="progressbar" aria-label="working" aria-hidden="true"></div>
     <div class="brand">
       <div class="brand-txt">
-        <h1>DEPTH<span class="brand-sub">Studio</span></h1>
+        <h1>DEPTH</h1>
         <p>See · Prove · Decide · Act</p>
       </div>
     </div>
@@ -45,10 +45,10 @@
           <div class="pop-title">System</div>
           <div class="pop-row"><span>OpenCV</span><span class="pill" id="pillCv">…</span></div>
           <div class="pop-row"><span>Detector</span><span class="pill" id="pillModel">…</span></div>
-          <span class="pill pill-live" id="pillLive" hidden><span class="dot"></span>live</span>
-          <div class="pop-title">Failure drills</div>
-          <div class="drills" id="drills"></div>
-          <p class="pop-note">Each drill runs a real failure path. Watch the fallback and what a person is asked to do.</p>
+          <div id="drillBox" hidden>
+            <div class="pop-title">Failure drills</div>
+            <div class="drills" id="drills"></div>
+          </div>
         </div>
       </div>
     </div>
@@ -292,33 +292,36 @@
           <div class="st-card" id="stDoneCard"></div>
         </div>
       </div>
-      <!-- connect: standard interfaces for agents, GIS and operations consoles -->
+      <!-- connect: standard interfaces for agents, GIS and operations consoles — one card per option -->
       <div class="connect scrollable" data-when="connect" id="connectPage">
         <div class="cx-head">
-          <h2>Connect DEPTH to your systems</h2>
-          <p>Standard interfaces for agents, GIS and operations consoles. They read results and ask for actions;
-             a named person approves.</p>
-          <div class="cx-base mono" id="cxBase"></div>
+          <h2>Connect</h2>
+          <p>Four standard ways to use DEPTH from your own tools. Outside systems can read results and ask for an action — a named person always approves.</p>
+          <div class="cx-base" id="cxBase"></div>
         </div>
         <div class="cx-grid">
           <section class="cx-card" id="cxMcp">
-            <div class="cx-kicker">AI agents</div><h3>Model Context Protocol</h3>
-            <p class="cx-lead">Claude Desktop, Claude Code, IDE agents and partner agents run the sonar agent and file approval requests.</p>
+            <header class="cx-top"><span class="cx-num">1</span><div>
+              <h3>AI agents <span class="cx-proto">MCP</span></h3>
+              <p class="cx-lead">Let Claude or another agent run DEPTH and request approvals.</p></div></header>
             <div class="cx-body" id="cxMcpBody"></div>
           </section>
           <section class="cx-card" id="cxOgc">
-            <div class="cx-kicker">GIS &amp; operations consoles</div><h3>OGC API – Features</h3>
-            <p class="cx-lead">QGIS, ArcGIS Pro, OpenLayers and any GeoJSON client read hazards, re-survey passes, routes and approved work orders.</p>
+            <header class="cx-top"><span class="cx-num">2</span><div>
+              <h3>GIS maps <span class="cx-proto">OGC API</span></h3>
+              <p class="cx-lead">Show hazards, routes and work orders in QGIS or ArcGIS Pro.</p></div></header>
             <div class="cx-body" id="cxOgcBody"></div>
           </section>
-          <section class="cx-card cx-wide" id="cxHooks">
-            <div class="cx-kicker">Mission control · dispatch · ticketing</div><h3>Signed webhooks</h3>
-            <p class="cx-lead">DEPTH pushes <code>survey.completed</code>, <code>approval.requested</code> and <code>approval.decided</code> (an approved work order, with positions). Every delivery is HMAC-SHA256 signed.</p>
+          <section class="cx-card" id="cxHooks">
+            <header class="cx-top"><span class="cx-num">3</span><div>
+              <h3>Event alerts <span class="cx-proto">Webhooks</span></h3>
+              <p class="cx-lead">Get a signed message when a survey finishes or an approval is decided.</p></div></header>
             <div class="cx-body" id="cxHooksBody"></div>
           </section>
-          <section class="cx-card cx-wide" id="cxEmbed">
-            <div class="cx-kicker">Any web console</div><h3>Drop-in hazard panel</h3>
-            <p class="cx-lead">One script tag and one element. Shadow DOM, no dependencies, light or dark.</p>
+          <section class="cx-card" id="cxEmbed">
+            <header class="cx-top"><span class="cx-num">4</span><div>
+              <h3>Web panel <span class="cx-proto">Embed</span></h3>
+              <p class="cx-lead">Put a live hazard list on any web page with two lines of HTML.</p></div></header>
             <div class="cx-body" id="cxEmbedBody"></div>
           </section>
         </div>
