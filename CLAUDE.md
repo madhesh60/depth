@@ -145,8 +145,8 @@ Repository: **https://github.com/madhesh60/depth.git** (branch `main`).
   push once it's tested and the docs (`progress.md`, `experiments.md`) are updated.
 - Version the *code*, never the *data*: `DATASET/` data stays git-ignored; only the
   processing scripts under `DATASET/scripts/` are tracked (see `.gitignore`).
-- End every commit message with the co-author trailer:
-  `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`.
+- **No co-author trailer.** Never add `Co-Authored-By: Claude …` (or any AI attribution) to commits or
+  PRs: the owner does not want Claude listed as a contributor (2026-10-07).
 
 ## Key constraints
 
