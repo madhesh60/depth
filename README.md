@@ -27,8 +27,9 @@ wraps one in **promises you can check** and **measurements instead of assumption
 |---|---|---|
 | **Guaranteed tiers** | "≥ 65% of pots reach a human (95% confidence)" — fit on held-out recordings, verified once on unseen test (**held: 86.2%, LCB 80.5%**). It also says what it *cannot* promise (90% recall; any auto-confirm precision). | [`docs/calibration_exp001.md`](docs/calibration_exp001.md) |
 | **Stage 1 measures the sonar** | bottom tracking gives the sonar's altitude per ping → relative object height, slant→ground geotags. Validated with no labels: port vs starboard on the same pings agree to **1.6 px** (random pairs: 5.3 px). | [`docs/stage1_canonical.md`](docs/stage1_canonical.md) |
-| **Value-of-information agent** | re-looks only where a tier could change; orders the human queue by calibrated P(pot); **analyst budget** ("what do 10 minutes buy?") and **boat budget** | trace on every card |
-| **A physical second look** | plans re-survey passes on the **opposite side** at mid-swath, ranked by uncertainty per metre; each target predicts the bearing its **shadow must flip to** — a test speckle can't pass | map + GPX/GeoJSON |
+| **Value-of-information agent** | spends compute only where it can change an outcome; orders the human queue by calibrated P(pot); **analyst budget** ("what do 10 minutes buy?") and **boat budget** | trace on every card |
+| **Active vision** (experimental) | the agent picks its next OpenCV tool by whether the result could change its decision; evidence conflicts trigger another observation — §2. Validation failed, so it is **off by default** and labelled | [`docs/evidence_model_exp003.md`](docs/evidence_model_exp003.md) |
+| **A physical second look** | plans re-survey passes on the **opposite side** at mid-swath, ranked by **information per boat-minute**; each is approved or rejected on its own, and a rejection makes the agent re-plan; each target predicts the bearing its **shadow must flip to** | map + GPX/GeoJSON |
 | **Minutes saved — measured** | a timed, counterbalanced user study built into the app; the effort curve reports the **break-even card time** (7.95 s) instead of an invented "4 h → 10 min" | Study tab · [`docs/effort_curve.md`](docs/effort_curve.md) |
 | **Are false alarms false?** | a **blinded audit with catch trials** gives exact audited precision in a confidence band | Audit tab |
 | **People decide, the agent re-plans** | a named person's ✓ / ✕ on a card (and a crew's *recovered* / *not found*) makes the agent re-plan the recovery route, queue, budget and re-survey passes; an **impact ledger** measures the reviewed precision (95% CI) | Survey tab · [`docs/agentic_vision.md`](docs/agentic_vision.md) |
@@ -45,7 +46,53 @@ filter (STUDY-03/04), re-look vs plain confidence (STUDY-07), range-gain detecto
 seam inference across chunk boundaries (STUDY-11b), and a larger input + flipped second view
 (STUDY-13: +0.10 AP on the calibration recording, −0.06 on unseen data).
 
-## 2. Try it (no sonar files needed)
+## 2. The agentic loop — OpenCV result → decision → next action → new evidence → changed plan
+
+```
+Sonar frame ─► OpenCV 5: Stage 1 (bottom track, geometry) + YOLO11 via cv2.dnn
+           ─► evidence: confidence · geometry (water column, 0 ms) · shadow (~1 ms) · height · zoom re-look (~0.4 s)
+           ─► agent belief P(pot) ─► action: ACCEPT / REVIEW / WATCH
+           ─► next OpenCV tool = the cheapest one whose result could CHANGE that action (else stop)
+           ─► new evidence ─► belief + action updated ─► conflict? ─► another observation
+           ─► person approves ─► inspection route · opposite-side re-survey pass (rejected ─► the agent re-plans)
+```
+
+| feature | what the agent does | where |
+|---|---|---|
+| **Adaptive tool use** | not the same tools every time: a confident, consistent find is accepted after one ~1 ms check with **no re-look**; a borderline one gets the shadow check and, if that could still flip it, a zoom re-look; a find no result could move gets **no tool at all** — every skip is logged with why | `active.next_tool` |
+| **Evidence conflict** | the detector says ACCEPT but the shadow says no (or the box sits in the water column) → *"Evidence conflict detected → another observation"*: the next informative tool, else an opposite-side pass | trace step `conflict` |
+| **Active second look** | the re-look / shadow result changes the action (e.g. ACCEPT → REVIEW) and that changes the queue and the plan | `update_belief` (before → after) |
+| **Smart survey planning** | passes ranked by expected **information per boat-minute**, not confidence: the most likely target is often worth ~0 bits and does not drive the plan | Agent tab · `resurvey_rank` |
+| **Human control** | *Agent recommends: Perform opposite-side resurvey RS1 · Reason: evidence conflict on H001 · [Approve] [Reject]* — reject and the pass is dropped for good, the boat time re-ranked, its targets moved to the front of the inspection queue | Agent tab · `/api/approvals/{id}/decide` |
+| **Agent Trace** | DETECT → evidence → decision → OpenCV tool → new evidence → decision changed → approval → survey plan, on every evidence card | Analyze |
+
+**Does OpenCV matter? The same survey with vs without it** — the 8 shipped frames, 27 hazards
+(`python -m src.agentic.counterfactual` → [`docs/opencv_counterfactual.md`](docs/opencv_counterfactual.md)):
+
+| downstream | WITHOUT OpenCV | WITH OpenCV — default | WITH OpenCV — active vision (experimental) |
+|---|---|---|---|
+| decision (agent action) | detector only (8 accept) | unchanged | **3 accept; 7 of 27 hazards change action** |
+| geolocation | slant range, frame-centre ping | **median pin moves 6.5 m; 17 of 27 leave their own error circle** | same |
+| re-survey route | 6 passes, 15.5 boat-min | 6 passes, 15.4 boat-min (2 regrouped) | **3 passes, 6.9 boat-min, 0 identical** |
+| human approval | 6 pass requests, 0 conflicts | same | **3 pass requests, 7 conflicts flagged** |
+| OpenCV tool calls | — | shadow on all 31 | shadow on 23 / 31, zoom re-look on **2** / 31 |
+
+**Is it better? Measured, and the honest answer is "not proven".** Likelihood ratios fit on the
+validation recordings; replayed on every candidate ([`docs/evidence_model_exp003.md`](docs/evidence_model_exp003.md)):
+
+| split | ACCEPT precision (without → with) | real pots left in WATCH | log-loss |
+|---|---|---|---|
+| val (fit) | 64% → 70% | 27 → 10 | 0.459 → 0.449 |
+| test (once) | 67% → 73% | 49 → 36 | **0.637 → 0.648 (worse)** |
+| `test_xsonar` (fresh, another sonar) | **0.86 → 0.848** | **127 → 161** | — |
+
+Both pre-registered gates failed (test calibration; the fresh split — run 1 had a replay bug that
+guessed shadow orientation, fixed and re-run once, still failed; both runs are kept in the report).
+So **active vision is off by default**; the Stage-1 effects above (geolocation, routes) are on and
+validated (STUDY-12). Switch it on in the studio (**Active vision · experimental**) or with
+`?active=1`; every result it produces is labelled experimental.
+
+## 3. Try it (no sonar files needed)
 
 ```bash
 pip install -r requirements.txt                    # torch-free runtime: OpenCV 5.0.0.93, FastAPI
@@ -74,7 +121,7 @@ They come from the v2b **test** split, so the default model never trained or tun
 Their GPS is synthetic and labelled as such (the public frames carry none). The raw recording is real:
 PINGMapper's sample data (MIT code, Zenodo 10.5281/zenodo.6604666), fetched hash-checked, not redistributed.
 
-## 3. Results (honest — every number names its split)
+## 4. Results (honest — every number names its split)
 
 **Detector — EXP-003, the deployed model** (YOLO11s, 640 px, dataset v2b, 2 classes), `cv2.dnn`
 ([`docs/onboard_exp003.md`](docs/onboard_exp003.md)):
@@ -119,16 +166,17 @@ held-out recordings: underfit by a silent optimizer switch, plus tile label pois
 ([`docs/kaggle_training.md`](docs/kaggle_training.md)). Also pending: the timed study,
 the audit, the EC2 benchmark, and publishing the weights as a GitHub Release.
 
-## 4. How it works
+## 5. How it works
 
 ```
 frame ─► Stage 1 canonicalise ─► See (YOLO11 · cv2.dnn) ─► Prove (evidence) ─► Decide (guaranteed tiers)
+          └► active vision (experimental): value-of-information tool choice · conflict ─► another observation
 survey ─► stitch · merge repeat sightings ─► routes · budgets · opposite-side re-survey ─► exports
 human ─► labels · timed study · blinded audit          offline ─► v2b ─► train ─► onboard (one command)
 ```
 Full design: [`architecture.md`](architecture.md). Agentic writeup: [`docs/agentic_vision.md`](docs/agentic_vision.md).
 
-## 5. Reproduce
+## 6. Reproduce
 
 ```bash
 pytest -q                                              # test suite
@@ -140,19 +188,22 @@ python -m src.bench.product_bench --label my_host      # benchmark this machine 
 python -m src.detection.diagnose --zip EXP-003_complete.zip        # why a new model is (not) good: val + fit check
 python -m src.detection.onboard_model --zip EXP-003_complete.zip   # plug in a new model (+ speed gate)
 python -m src.agentic.study_causal --frames <v1>/test/images --limit 80   # STUDY-12 counterfactual
+python -m src.agentic.evidence_model                  # STUDY-15: evidence LRs (val) -> test -> fresh split
+python -m src.agentic.counterfactual                  # the same survey WITH vs WITHOUT OpenCV
 python -m src.detection.study_scale_tta               # STUDY-13 input size + flip TTA
 python -m src.cv_pipeline.humminbird report           # STUDY-14 raw recording, real GPS
 ```
 Datasets are git-ignored (large); their builders are in `DATASET/scripts/`
 ([`docs/dataset_card.md`](docs/dataset_card.md)). Deploy: [`infra/README.md`](infra/README.md).
 
-## 6. Repository
+## 7. Repository
 
 ```
 src/cv_pipeline/  Stage 1 (canonical.py) · raw Humminbird reader (humminbird.py) · retired ROI gate (STUDY-01)
 src/detection/    cv2.dnn detector, calibration, evaluation, training, onboarding (+ speed gate), model fetch,
                   false-alarm audit, failure gallery, STUDY-11b / 13
-src/agentic/      See→Prove→Decide→Act agent, guarantees, geo, routes, re-survey, person-confirmed loop,
+src/agentic/      See→Prove→Decide→Act agent, active vision (active, evidence_model, counterfactual),
+                  guarantees, geo, routes, re-survey, person-confirmed loop,
                   approvals, mission brief, 3D twin, provenance, labels, study, effort, STUDY-12
 src/bench/        COOL benchmark (product workload, provenance, comparison)
 src/dashboard/    FastAPI service (jobs, limits, rate limits, metrics) · MCP server · OGC API · webhooks
@@ -165,7 +216,7 @@ docs/             technical report, cards, calibration, evaluation, studies, MCP
 Logs: [`experiments.md`](experiments.md) (every study, including negative results) ·
 [`progress.md`](progress.md) · [`TODO.md`](TODO.md).
 
-## 7. Responsible use & license
+## 8. Responsible use & license
 
 Human approval before any dispatch; low-risk finds kept for audit, never deleted; protected-wreck
 coordinates and data retention are covered in [`docs/responsible_use.md`](docs/responsible_use.md).

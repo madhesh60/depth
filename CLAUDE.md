@@ -22,7 +22,10 @@ for AWS Graviton + COOL):
 2. **See** — YOLO11 ONNX via `cv2.dnn` (`src/detection/infer.py`), class-aware NMS.
 3. **Prove** — thin-line shadow, relative height vs the tracked altitude, water-column check,
    agent's-eye re-look view (display). Evidence, never a silent gate.
-4. **Decide** — **guaranteed tiers** fit on held-out recordings (Clopper–Pearson / LTT,
+4. **Decide** — **active vision** (`active.py` / `evidence_model.py`, STUDY-15): value-of-information
+   choice of the next OpenCV tool, evidence conflicts → another observation, ACCEPT / REVIEW / WATCH;
+   **not validated (both gates failed) → off by default**, the studio's experimental switch / `?active=1`.
+   **Guaranteed tiers** fit on held-out recordings (Clopper–Pearson / LTT,
    `src/agentic/calibrate.py`): EXP-003 promises ≥ 79% of pots reach a human (held on test at 81%);
    no precision promise → nothing auto-confirmed. Value-of-information tool use, P(pot), budgets.
 5. **Act** — per-ping ground-range geotag (real recordings: the object's own ping fix + the measured
@@ -103,6 +106,8 @@ python -m src.dashboard.mcp_server                          # MCP over stdio (HT
 python -m src.detection.fetch_model                         # the detector weights (SHA-256 checked)
 python -m src.cv_pipeline.humminbird fetch|validate|report  # raw recording with real GPS (STUDY-14)
 python -m src.detection.study_scale_tta                     # STUDY-13 (input size + flip TTA)
+python -m src.agentic.evidence_model                        # STUDY-15 active-vision evidence (val -> test -> fresh)
+python -m src.agentic.counterfactual                        # same survey WITH vs WITHOUT OpenCV
 ```
 
 ## Environment

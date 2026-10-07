@@ -45,6 +45,37 @@ flowchart LR
 
 ---
 
+### 1b. Active vision (experimental) — the agent chooses its OpenCV tools
+
+```mermaid
+flowchart TD
+  D["DETECT<br/>YOLO11 · cv2.dnn"] --> G["geometry_check<br/>Stage 1 · 0 ms"]
+  G --> B["belief P(pot) → action<br/>ACCEPT ≥ 0.60 · REVIEW · WATCH < 0.15"]
+  B --> Q{"which tool could<br/>change the action?"}
+  Q -->|"none"| S["stop - skips logged"]
+  Q -->|"cheapest informative"| T["shadow_check ~1 ms<br/>or zoom_relook ~0.4 s"]
+  T --> U["Bayes update<br/>(LRs fit on val)"]
+  U --> C{"conflict with<br/>the detector?"}
+  C -->|"no"| Q
+  C -->|"yes"| O["another observation:<br/>next tool, else opposite-side pass"]
+  O --> Q
+  S --> H["person approves<br/>inspection · pass (reject → re-plan)"]
+```
+
+`active.py` is the policy (pure; shared by the live agent and the offline replay) and
+`evidence_model.py` measures it. Per candidate the trace reads `geometry_check` → `assess` →
+(`choose_tool` → tool → `update_belief` [→ `conflict`])* → skipped tools with their reason →
+[`request_observation`] → `decide` → `handoff`. The calibrated tiers do not change.
+
+**Measured result (STUDY-15, [`evidence_model_exp003.md`](evidence_model_exp003.md)) — not validated:**
+on the test split it raised ACCEPT precision 67% → 73% and left fewer real pots at the bottom
+(49 → 36), but both registered gates failed: test log-loss got worse (0.637 → 0.648) and on the fresh
+cross-sonar split ACCEPT precision fell 0.86 → 0.848 with more real targets in WATCH (127 → 161).
+It is therefore **off by default**; the studio's *Active vision · experimental* switch (and
+`?active=1`) runs it, labelled. What OpenCV changes by default is measured separately and holds:
+Stage-1 geometry moves pins (median 6.5 m on the samples, 17 of 27 outside their own error circle)
+and regroups re-survey passes ([`opencv_counterfactual.md`](opencv_counterfactual.md), STUDY-12).
+
 ## 2. The toolbox (`tools.py`)
 
 Each tool returns `(payload, AgentStep)` — the result the agent reasons over, plus a timed,

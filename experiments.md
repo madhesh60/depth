@@ -111,6 +111,34 @@ Promote each into the log below with full results as it runs.
 
 ## Experiment log
 
+### STUDY-15 — Active vision: should OpenCV evidence change the agent's action? (NOT VALIDATED — off by default)
+
+- Tools: `python -m src.agentic.evidence_model` → `models/EXP-003/evidence_model.json` +
+  `docs/evidence_model_exp003.md`; `python -m src.agentic.counterfactual` → `docs/opencv_counterfactual.md`.
+  Policy: `src/agentic/active.py` (value of information over the action ACCEPT ≥ 0.60 / REVIEW /
+  WATCH < 0.15 — design constants, not fit; the cheapest tool that could flip the action runs next).
+- Fit (val = Rec10/12/16, 573 candidates ≥ τ_review, 157 real): per detector band, the likelihood
+  ratio of "shadow present" and "zoom re-look re-fires". Shadow ×1.82 / ×1.32 / ×1.38 (present) in
+  the low / middle / high band; re-look silent ×0.96 / ×0.56 / ×0.84.
+- Test (once, 534 candidates, 214 real): ACCEPT precision 67% → 73% (127 → 44 accepted), real pots
+  left in WATCH 49 → 36, AUC 0.732 → 0.731, **log-loss 0.637 → 0.648 (worse)** — gate 1 (registered
+  first: the probability shown to people) **failed**. The low band's shadow ratio did not replicate
+  on test (19% vs 20% real).
+- Gate 2 (registered after gate 1 failed, judged on a split never used before — `test_xsonar`,
+  another sonar, 382 candidates, 302 real): ACCEPT precision with ≥ without and no more real targets
+  in WATCH. Run 1: 0.86 → 0.632, 127 → 147 — **failed**, but the replay had guessed the shadow
+  orientation on crops the runtime never measures (orientation unknown). Fixed to follow the runtime
+  and re-run once. Run 2: 0.86 → 0.848, 127 → 161 — **failed**. The re-look ratios fit on crab-pot
+  sonograms do not transfer. Both runs are kept in the report.
+- Decision: evidence-driven actions **off by default**; the studio's *Active vision · experimental*
+  switch (`?active=1`) runs the loop, labelled on every card. What stays on: Stage-1 geometry →
+  geolocation and re-survey passes (STUDY-12; on the 8 samples the median pin moves 6.5 m and 17 of
+  27 leave their own error circle), the water-column rule, information-ranked passes, and a person's
+  declined pass making the agent re-plan.
+- Live, experimental, 8 samples / 27 hazards: 7 actions change (8 → 3 ACCEPT), 7 conflicts flagged,
+  re-survey 6 passes / 15.5 boat-min → 3 / 6.9; the shadow check ran on 23 of 31 candidates and the
+  zoom re-look on 2 (the rest could not change the action).
+
 ### STUDY-14 — A raw sonar recording with real GPS, read directly (physics-validated)
 
 - Tool: `python -m src.cv_pipeline.humminbird report` → `docs/raw_recording.md` + `docs/img/raw_recording.jpg`.

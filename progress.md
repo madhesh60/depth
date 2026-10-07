@@ -75,6 +75,25 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ## 4. Session log
 
+### 2026-10-07 (sweep 54) — Active vision: OpenCV result → decision → next tool → changed plan (STUDY-15)
+
+- `active.py`: the agent's next OpenCV tool is the cheapest one whose result could change its action
+  (ACCEPT / REVIEW / WATCH); evidence conflicts (detector vs shadow / re-look / water column) trigger
+  another observation, else an opposite-side pass. Same code drives the live agent and the replay.
+- `evidence_model.py`: likelihood ratios fit on val, verified on test, then on a fresh split.
+  **Both registered gates failed** (test log-loss 0.637 → 0.648; `test_xsonar` ACCEPT precision
+  0.86 → 0.848, run 2 after fixing a replay that guessed shadow orientation) → off by default,
+  available as **Active vision · experimental** (`?active=1`, `DEPTH_ACTIVE=off`).
+- Planning: re-survey passes ranked by information per boat-minute; one approval per pass
+  ("Agent recommends … Reason …"); a declined pass is dropped, boat time re-ranked, targets moved to
+  the front of the inspection queue (`mission.decline_resurvey`, `/api/approvals/{id}/decide`).
+- `counterfactual.py`: every survey re-plans itself WITHOUT the OpenCV evidence; the Agent tab and
+  `docs/opencv_counterfactual.md` show what changes (decision, priority, geolocation, route, approvals).
+- UI: Agent trace on every evidence card, recommendation cards with Approve / Reject, the with/without
+  table, the experimental switch; the loading indicator is now one centred card (spinning arc, the
+  step in words, a slim bar for surveys) — the top hairline sweep is gone.
+- Tests: `tests/test_active_vision.py` (15); full suite 188 passed.
+
 ### 2026-10-07 (sweep 53) — Calmer chrome; Connect page rebuilt as four learnable cards
 
 - Topbar: the "Studio" suffix is gone (the brand is just **DEPTH**). The status pill's popover now

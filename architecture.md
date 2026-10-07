@@ -47,9 +47,15 @@ dashed violet = optional. Text version:_
          │          · agent's-eye re-look view (display)                              src/agentic/{shadow,perception,tools}.py
          ─► DECIDE  guaranteed tiers (CONFIRMED / REVIEW / LOW-RISK) · value-of-information tool use
          │          · calibrated P(pot) · full trace                                  src/agentic/{agent,policy,guarantees}.py
+         │   ACTIVE VISION (experimental switch; off by default - validation failed)  src/agentic/{active,evidence_model}.py
+         │          detector belief ─► choose the cheapest OpenCV tool whose result could change the action
+         │          (geometry 0 ms · shadow ~1 ms · zoom re-look ~0.4 s) ─► Bayes update (LRs fit on val)
+         │          ─► conflict? ─► another observation (in-frame tool, else opposite-side pass) ─► ACCEPT / REVIEW / WATCH
          ─► ACT     geotag (ground range + own ping) ─┐                               src/agentic/geo.py
  SURVEY  frames ─► chunk stitching ─► repeat-sighting merge ─► recovery route · inspection route
-                   · analyst budget · boat budget ─► opposite-side re-survey passes ─► GeoJSON/GPX/KML/CSV/JSON
+                   · analyst budget · boat budget ─► opposite-side re-survey passes (ranked by information
+                   per boat-minute; one approval per pass; a declined pass re-plans) ─► GeoJSON/GPX/KML/CSV/JSON
+                   · WITH vs WITHOUT OpenCV counterfactual, live per survey   src/agentic/counterfactual.py
                                                             src/agentic/{pipeline,stitch,resurvey,mission}.py
  HUMAN LOOP  labels (✓ / ✕ / ＋missed) ─► fine-tune set     src/agentic/feedback.py
              timed study (manual vs cards) ─► effort curve  src/agentic/{study,effort}.py
@@ -127,6 +133,32 @@ EXP-001 (earlier): **≥ 65% of pots reach a human, held on test (86.2%, LCB 80.
 re-look did not beat confidence (1 inference/frame). The agent re-looks only where it could change a
 tier (value of information); every call — including the ones it chose not to make — is in the trace.
 
+### 6b. Active vision — OpenCV result → decision → next tool → new evidence (`active.py`, `evidence_model.py`)
+
+The agent holds a belief P(pot) per find (the calibrated detector-only value to start) and an ACTION:
+**accept** (P ≥ 0.60: priority inspection target, dispatch still needs a person), **review**, or
+**watch** (P < 0.15: end of the queue, still shown to a person). Tiers never change, so the recall
+promise is untouched.
+
+1. `geometry_check` — Stage 1 already measured it (0 ms). A box in the water column is an **evidence
+   conflict** and is never accepted (a physical rule).
+2. For each remaining tool, the agent computes the probability that its result **changes the action**
+   (value of information) from likelihood ratios measured on the validation recordings
+   (`models/<MODEL>/evidence_model.json`). It runs the **cheapest** tool with a non-zero chance —
+   shadow check (~1 ms) before zoom re-look (~0.4 s) — updates P (Bayes, odds form) and asks again;
+   it stops when nothing left can change the action. Tools it did not run are logged with the reason.
+3. **Conflict** — an OpenCV result that pushes against the detector (down from accept/review, or up
+   from watch) → another observation: the next informative in-frame tool, else an **opposite-side
+   pass** (a person approves it).
+4. No orientation (source rule) → no shadow tool (never guessed).
+
+**Validation (honest):** fit on val, verified once on test, then a fresh cross-sonar split. On test the
+evidence made ACCEPT more precise (67% → 73%) and left fewer real pots at the bottom (49 → 36), but
+both registered gates **failed** — test log-loss 0.637 → 0.648, and on `test_xsonar` ACCEPT precision
+0.86 → 0.848 with more real targets in WATCH (127 → 161). So it is **off by default** and the studio
+runs it only behind the **Active vision · experimental** switch (`?active=1`; `DEPTH_ACTIVE=off`
+disables it). Report: [`docs/evidence_model_exp003.md`](docs/evidence_model_exp003.md).
+
 ## 7. Act — survey level (`src/agentic/pipeline.py`, `resurvey.py`, `mission.py`, `geo.py`)
 
 * **geotag** — no GPS ⇒ no coordinates (honest). With a track: each object gets its **own ping**
@@ -142,8 +174,15 @@ tier (value of information); every call — including the ones it chose not to m
 * **routes** — nearest-neighbour recovery route (CONFIRMED) and inspection route (budgeted REVIEW).
 * **analyst budget** — which cards fit N minutes and the expected real pots (Σ P(pot)).
 * **opposite-side re-survey** — for each uncertain target, a pass on the far side with the target at
-  mid-swath; aligned targets share a pass; passes ranked by Σ p(1−p) per metre; boat-time budget;
-  each target predicts the bearing its shadow must flip to. Status always PLANNED.
+  mid-swath; aligned targets share a pass; passes ranked by **information gained per boat-minute**
+  (expected bits of one more shadow view with active vision, Σ p(1−p) otherwise) — the most
+  informative target drives the plan, not the most confident; boat-time budget; each target predicts
+  the bearing its shadow must flip to. Each pass is its own approval request ("Agent recommends:
+  Perform opposite-side resurvey · Reason: …"). **Declined** → never proposed again, the boat time is
+  re-ranked over the remaining passes and its targets move to the front of the inspection queue.
+* **WITH vs WITHOUT OpenCV** (`counterfactual.py`) — every survey re-plans itself with the OpenCV
+  outputs removed (detector action, slant-range pins) and diffs decision, priority, geolocation,
+  re-survey route and approvals; shown in the Agent tab ([`docs/opencv_counterfactual.md`](docs/opencv_counterfactual.md)).
 * **exports** — GeoJSON / GPX / KML / CSV / JSON, synthetic GPS always labelled; every format but CSV
   carries the provenance stamp; `trace` = the agent decision log (JSONL, never public); `?public=1`
   generalises protected-site (wreck) positions.
