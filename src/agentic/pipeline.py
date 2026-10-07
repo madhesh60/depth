@@ -199,6 +199,10 @@ def _to_tracked(oid: str, frame_id: str, c: Candidate) -> TrackedObject:
         p_pot=ev.p_pot if ev else None,
         shadow_quality=ev.shadow.quality.value if ev else "none",
         position_withheld=getattr(c, "position_withheld", None),
+        p_evidence=ev.p_evidence if ev else None, action=ev.action if ev else None,
+        action0=ev.action0 if ev else None, conflict=ev.conflict if ev else None,
+        request_resurvey=bool(ev.request_resurvey) if ev else False,
+        info_bits=(ev.resurvey_gain or {}).get("info_bits") if ev else None,
     )
 
 

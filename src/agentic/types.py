@@ -89,6 +89,13 @@ class Evidence:
     evidence_score: float                # 0..1 the agent score the tiers are calibrated on
     notes: list[str] = field(default_factory=list)
     p_pot: Optional[float] = None        # calibrated P(real pot | score) — budget-mode ordering
+    # active vision (active.py / evidence_model.py): what the OpenCV evidence did to the decision
+    p_evidence: Optional[float] = None   # belief after the OpenCV observations (evidence model, not a tier)
+    action: Optional[str] = None         # accept | review | watch — what happens to the find next
+    action0: Optional[str] = None        # the action from the detector alone (the counterfactual)
+    conflict: Optional[dict] = None      # detector vs OpenCV disagreement, if any
+    request_resurvey: bool = False       # the agent asks for an opposite-side pass on it
+    resurvey_gain: Optional[dict] = None # what that pass is expected to buy (P(action flips), bits)
 
     def to_dict(self) -> dict:
         return {
@@ -98,6 +105,12 @@ class Evidence:
             "evidence_score": self.evidence_score,
             "notes": list(self.notes),
             "p_pot": self.p_pot,
+            "p_evidence": self.p_evidence,
+            "action": self.action,
+            "action0": self.action0,
+            "conflict": self.conflict,
+            "request_resurvey": self.request_resurvey,
+            "resurvey_gain": self.resurvey_gain,
         }
 
 
@@ -180,6 +193,7 @@ class FrameResult:
     orientation: dict = field(default_factory=dict)            # {nadir, rule, source} provenance
     stage1: dict = field(default_factory=dict)                 # Stage-1 canonicalisation record
     incidents: list = field(default_factory=list)             # failures + fallbacks (incidents.py)
+    active: dict = field(default_factory=dict)                 # active-vision mode + its validation status
 
     def by_verdict(self, v: Verdict) -> list[Candidate]:
         return [c for c in self.candidates if c.verdict is v]
@@ -200,6 +214,7 @@ class FrameResult:
             "stage_ms": {k: round(v, 2) for k, v in self.stage_ms.items()},
             "candidates": [c.to_dict() for c in self.candidates],
             "incidents": list(self.incidents),
+            "active": dict(self.active),
         }
 
 
@@ -229,6 +244,14 @@ class TrackedObject:
     # a PERSON's override of the agent's ordering: "high" (inspect first) | "low" (end of the queue)
     human_priority: Optional[str] = None
     position_withheld: Optional[str] = None             # why lat/lon were withheld (geometry check)
+    # active vision: the agent's action from the OpenCV evidence (see Evidence)
+    p_evidence: Optional[float] = None
+    action: Optional[str] = None
+    action0: Optional[str] = None
+    conflict: Optional[dict] = None
+    request_resurvey: bool = False
+    info_bits: Optional[float] = None                   # expected information from an opposite-side pass
+    fallback: Optional[str] = None                      # "inspect": a person declined its pass -> inspect it instead
 
     def to_dict(self) -> dict:
         return _json(asdict(self))

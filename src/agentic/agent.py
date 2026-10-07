@@ -49,6 +49,8 @@ from .perception import Perceptor
 from .shadow import ShadowProver
 from .tools import Toolbox
 from .evidence import fuse_score, evidence_notes
+from . import active
+from .evidence_model import EvidenceModel
 from .incidents import incident
 from .policy import TriageConfig, GuaranteedTiers, decide
 from .types import AgentStep, Candidate, Evidence, FrameResult, RelookResult, ShadowProof, ShadowQuality, Verdict
@@ -91,6 +93,13 @@ class ReLookAgent:
         self.stage1 = Canonicaliser()                       # Stage 1: measured sonar geometry
         self.detector_input = load_calibration().detector_input
         self._faults: set[str] = set()                      # failure drills for this call (?simulate=)
+        self._active_mode = "off"
+        # active vision: the measured evidence model decides which OpenCV tool runs next (active.py).
+        # Used only when its fresh-split check passed (evidence_model.json "use"); DEPTH_ACTIVE=0 = off.
+        # Default: on only if its validation gates passed ("use"); a caller can switch it on per run as
+        # EXPERIMENTAL (faults/options token "opt:active", the studio's switch); DEPTH_ACTIVE=off disables it.
+        self.evidence_model = EvidenceModel.load() if self.cfg.tiers is not None else None
+        self.evidence = None                                # the model in force for the current run
 
     @property
     def mode(self) -> str:
@@ -108,6 +117,10 @@ class ReLookAgent:
         bottom tracking (sonar altitude in px), and the detector input ``calibration.json`` selects."""
         H, W = frame.shape[:2]
         self._faults = set(faults or ())
+        em, env = self.evidence_model, os.environ.get("DEPTH_ACTIVE", "auto").lower()
+        want = env != "off" and em is not None and (em.use or "opt:active" in self._faults or env == "on")
+        self.evidence = em if want else None
+        self._active_mode = ("off" if not want else "validated" if em.use else "experimental")
         t0 = time.perf_counter()
         cf = self.stage1.process(frame, frame_id=frame_id, nadir=nadir or self.shadow.cfg.nadir)
         det_in = self.stage1.detector_input(frame, cf, self.detector_input)
@@ -145,7 +158,18 @@ class ReLookAgent:
                       "inferences": float(n_inf)},
             nadir=orient.label, orientation=orient.to_dict(), stage1=s1,
             incidents=_frame_incidents(frame_id, candidates, cf, self._faults),
+            active=self._active_info(),
         )
+
+    def _active_info(self) -> dict:
+        em = self.evidence_model
+        if em is None:
+            return {"mode": "unavailable", "reason": "no evidence model for this detector (python -m src.agentic.evidence_model)"}
+        d = em.data
+        return {"mode": self._active_mode, "validated": bool(em.use),
+                "status": d.get("actions_reason"), "belief": d.get("belief_reason"),
+                "report": f"docs/evidence_model_{str(d.get('model', '')).lower().replace('-', '')}.md",
+                "thresholds": em.thresholds, "costs_ms": em.costs}
 
     # ======================================================================= calibrated mode
     def _decide_calibrated(self, frame, gray, dets: list[Detection], cf: CanonicalFrame,
@@ -230,6 +254,14 @@ class ReLookAgent:
             rl = relooks[i] or RelookResult(found=False, conf=0.0, gain=0.0, scale=1.0)
             if relooks[i] is not None:
                 rl.gain = round(rl.conf - det.conf, 4)
+            if self._active_ok(det):
+                # the active loop asks its own value-of-information question per tool (below)
+                trace[:] = [s for s in trace if s.tool != "voi_check" and not (
+                    s.tool in ("zoom_relook", "enhance_relook") and s.status == "skipped")]
+                proof, wc, rl_a, res, n_a = self._active(i, det, frame, gray, cf, altitude_m, trace, failed)
+                n_inf += n_a
+                out.append(self._finish_active(det, trace, proof, wc, rl_a or rl, res, failed[i]))
+                continue
             # physical evidence for the card (cheap, no inference): Stage-1 water column, shadow +
             # relative height against the TRACKED altitude
             wc = None
@@ -302,6 +334,169 @@ class ReLookAgent:
             out.append(Candidate(bbox=det.bbox, cls_id=det.cls_id, cls_name=det.cls_name,
                                  conf=det.conf, evidence=evidence, verdict=verdict, trace=trace))
         return out, n_inf
+
+    # ======================================================================= active vision
+    def _active_ok(self, det: Detection) -> bool:
+        t = self.cfg.tiers
+        return self.evidence is not None and det.cls_name == t.guaranteed_class and det.conf >= t.tau_review
+
+    def _active(self, i, det: Detection, frame, gray, cf: CanonicalFrame, altitude_m, trace, failed):
+        """OpenCV result -> belief -> the next tool, chosen by value of information (``active.py``).
+        Returns (shadow proof or None, water-column flag, re-look or None, policy result, inferences)."""
+        t, em = self.cfg.tiers, self.evidence
+        th = em.thresholds
+        p0 = t.p_pot(det.conf)
+        a0 = active.action_of(p0, th)
+        state = {"proof": None, "rl": None, "n": 0}
+        # geometry first: Stage 1 already measured it, so it costs nothing
+        wc = None
+        try:
+            wc, s = self.tools.water_column_check(cf, det.bbox)
+            if s is not None:
+                s.tool = "geometry_check"
+                trace.append(s)
+            else:
+                trace.append(AgentStep(tool="geometry_check", status="skipped", latency_ms=0.0,
+                                       rationale="seabed not tracked on this frame -> no geometry to check (not guessed)",
+                                       detail={"reason": "not_measured"}))
+        except Exception as e:
+            failed[i] = True
+            trace.append(_failed_step("geometry_check", e, None))
+        trace.append(AgentStep(
+            tool="assess", latency_ms=0.0, conf_before=round(det.conf, 4),
+            rationale=(f"detector alone: conf {det.conf:.2f} -> P(pot) {p0:.0%} (calibrated) -> {a0.upper()}"
+                       + ("; but the box sits in the WATER COLUMN - a seabed object cannot be there: "
+                          "EVIDENCE CONFLICT, it is never accepted" if wc else "")),
+            detail={"p": p0, "action": a0, "thresholds": th, "water_column": wc}))
+
+        def choose(tool, opts, p, act):
+            o = next(x for x in opts if x["tool"] == tool)
+            why = (f"P(pot) {p:.0%} -> {act.upper()}. The {tool.replace('_', ' ')} could change that "
+                   f"({o['p_flip']:.0%} chance: " + ", ".join(
+                       f"{x['outcome']} -> {x['action_after'].upper()} at P {x['p_after']:.0%}" for x in o["outcomes"])
+                   + f"); cost ~{em.cost_ms(tool):.0f} ms")
+            for x in opts:
+                if x["tool"] != tool:
+                    why += (f"; {x['tool'].replace('_', ' ')} could too, but costs ~{em.cost_ms(x['tool']):.0f} ms"
+                            if x["p_flip"] > 0 else f"; {x['tool'].replace('_', ' ')} cannot change it")
+            trace.append(AgentStep(tool="choose_tool", latency_ms=0.0, rationale=why,
+                                   detail={"chosen": tool, "options": opts, "p": round(p, 4)}))
+
+        def observe(tool):
+            try:
+                if "tool_failed" in self._faults and i == 0:
+                    raise RuntimeError(f"simulated {tool} failure (failure drill)")
+                if tool == "shadow_check":
+                    proof, s = self.tools.shadow_check(gray, det.bbox, cf.orientation.nadir,
+                                                       altitude_px=_altitude_for(cf, det.bbox), altitude_m=altitude_m)
+                    trace.append(s)
+                    state["proof"] = proof
+                    return proof.has_shadow if proof.orientation_known else None
+                rl, s = self.tools.zoom_relook(frame, det.bbox, det.cls_name, det.conf)
+                trace.append(s)
+                state["rl"], state["n"] = rl, state["n"] + 1
+                return rl.conf > 0
+            except Exception as e:
+                failed[i] = True
+                trace.append(_failed_step(tool, e, det.conf))
+                return None
+
+        def updated(st, conflict):
+            moved = st["action_after"] != st["action_before"]
+            why = (f"{st['tool'].replace('_', ' ')}: {st['result']} -> P(pot) {st['p_before']:.0%} -> "
+                   f"{st['p_after']:.0%} (likelihood ratio measured on validation) -> "
+                   + (f"decision CHANGED {st['action_before'].upper()} -> {st['action_after'].upper()}" if moved
+                      else f"still {st['action_after'].upper()}"))
+            trace.append(AgentStep(tool="update_belief", latency_ms=0.0, rationale=why,
+                                   detail={"p_prior": st["p_before"], "p_post": st["p_after"], "changed": moved,
+                                           "from": st["action_before"], "to": st["action_after"],
+                                           "tool": st["tool"], "result": st["result"]}))
+            if conflict:
+                trace.append(AgentStep(tool="conflict", latency_ms=0.0,
+                                       rationale=f"EVIDENCE CONFLICT - {conflict['why']} -> another observation is needed",
+                                       detail=conflict))
+
+        avail = active.IN_FRAME_TOOLS if cf.orientation.nadir else ("zoom_relook",)   # no orientation: no shadow
+        res = active.run_policy(em, det.conf, p0, observe, th, wc, available=avail, on_choose=choose, on_update=updated)
+        if wc and res["conflict"] is None:
+            res["conflict"] = {"between": "detector vs geometry", "why": "the box sits above the tracked seabed"}
+        ran = set(res["tools_run"])
+        last = res["steps"][-1].get("options", []) if res["steps"] else []
+        for tool in active.IN_FRAME_TOOLS:
+            if tool in ran or any(s.tool == tool for s in trace):
+                continue
+            if tool not in avail:
+                trace.append(AgentStep(tool=tool, status="skipped", latency_ms=0.0, detail={"reason": "orientation_unknown"},
+                                       rationale="frame orientation unknown -> the shadow cannot be measured (never guessed)"))
+                continue
+            o = next((x for x in last if x["tool"] == tool), None)
+            why = ("not run: value of information 0 - " + (", ".join(
+                f"{x['outcome']} -> P {x['p_after']:.0%} ({x['action_after'].upper()})" for x in o["outcomes"])
+                if o else "no measured likelihood ratio") + f" - neither result changes {res['action'].upper()}")
+            trace.append(AgentStep(tool=tool, status="skipped", latency_ms=0.0, rationale=why,
+                                   detail={"reason": "voi_zero", "saved_ms": em.cost_ms(tool)}))
+        if res["request_resurvey"]:
+            g = res["resurvey"]
+            unsettled = res["conflict"] and not res["conflict_resolved"]
+            trace.append(AgentStep(
+                tool="request_observation", latency_ms=0.0,
+                rationale=(("the conflict is not settled by the in-frame tools" if unsettled
+                            else "still uncertain after the in-frame tools")
+                           + f" -> asks for an OPPOSITE-SIDE PASS (a real object's shadow must flip): "
+                             f"{g['p_flip']:.0%} chance it changes the action, {g['info_bits']:.2f} bits expected. "
+                             f"A person approves it."),
+                detail={"observation": "opposite_side_pass", **{k: g[k] for k in ("p_flip", "info_bits")}}))
+        proof = state["proof"]
+        if proof is not None and proof.has_shadow and proof.orientation_known:
+            _, s = self.tools.estimate_height(proof)
+            trace.append(s)
+        return proof, wc, state["rl"], res, state["n"]
+
+    def _finish_active(self, det, trace, proof, wc, rl, res, failed_any) -> Candidate:
+        t = self.cfg.tiers
+        measured = proof is not None
+        proof = proof or _no_proof(det.bbox)
+        verdict, why, p = self._tier(det, det.conf, False)
+        act = res["action"]
+        if failed_any and act == "accept":
+            act = "review"
+            why += " -> an evidence tool failed, so it is not accepted on partial evidence"
+        notes = evidence_notes(det.conf, det.cls_name, rl, proof)
+        if not measured:
+            notes = [n for n in notes if not n.startswith("acoustic shadow")]
+            notes.append("acoustic shadow: not measured - it could not change the decision (value of information 0)")
+        if "zoom_relook" not in res["tools_run"]:
+            notes = [n for n in notes if not n.startswith("re-look")]
+            notes.insert(0, "re-look: not run - it could not change the decision (value of information 0)")
+        if wc:
+            notes.append("sits in the water column above the tracked seabed - not on the seabed; never accepted")
+        if res["conflict"]:
+            notes.insert(0, "evidence conflict: " + res["conflict"]["why"])
+        words = {"accept": "ACCEPT - priority inspection target (dispatch needs a person)",
+                 "review": "REVIEW - evidence card for a person", "watch": "WATCH - low-priority card (still shown)"}
+        ev = Evidence(relook=rl, shadow=proof, echo_ratio=proof.echo_ratio, evidence_score=round(res["p"], 4),
+                      notes=notes, p_pot=p, p_evidence=res["p"], action=act, action0=res["action0"],
+                      conflict=res["conflict"], request_resurvey=res["request_resurvey"],
+                      resurvey_gain={k: res["resurvey"][k] for k in ("p_flip", "info_bits")})
+        changed = act != res["action0"]
+        if self._active_mode == "experimental":
+            notes.insert(0, "active vision is EXPERIMENTAL here: its benefit failed the registered validation "
+                            "checks (see the evidence-model report) - the action is a suggestion for a person")
+        trace.append(AgentStep(
+            tool="decide", latency_ms=0.0, conf_before=round(det.conf, 4), conf_after=round(det.conf, 4),
+            rationale=(f"{why}. OpenCV evidence: P {res['p0']:.0%} -> {res['p']:.0%}; action "
+                       + (f"{res['action0'].upper()} -> {act.upper()} (changed by the evidence)" if changed
+                          else f"{act.upper()} (unchanged)")),
+            detail={"verdict": verdict.value, "score": round(det.conf, 4), "p_pot": p, "p_evidence": res["p"],
+                    "action": act, "action0": res["action0"], "changed": changed, "mode": "active",
+                    "tau_review": t.tau_review, "tau_confirm": t.tau_confirm, "tool_failed": failed_any,
+                    "active_mode": self._active_mode, "relooked": "zoom_relook" in res["tools_run"]}))
+        trace.append(AgentStep(tool="handoff", latency_ms=0.0, rationale=words[act] + (
+            "; opposite-side pass requested (a person approves it)" if res["request_resurvey"] else ""),
+            detail={"next": {"accept": "inspection_target", "review": "human_review", "watch": "human_review_low"}[act],
+                    "resurvey": res["request_resurvey"]}))
+        return Candidate(bbox=det.bbox, cls_id=det.cls_id, cls_name=det.cls_name, conf=det.conf,
+                         evidence=ev, verdict=verdict, trace=trace)
 
     def _voi(self, det: Detection) -> tuple[bool, str]:
         """Can another observation change this candidate's outcome? (the agent's first question)"""

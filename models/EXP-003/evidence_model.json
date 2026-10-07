@@ -1,0 +1,368 @@
+{
+  "model": "EXP-003",
+  "created": "2026-10-07",
+  "fit_split": "val",
+  "verify_split": "test",
+  "band_edges": [
+    0.15,
+    0.3
+  ],
+  "bands": [
+    {
+      "lo": 0.06,
+      "hi": 0.15,
+      "n": 278,
+      "n_tp": 26,
+      "shadow": {
+        "present": 1.8181,
+        "absent": 0.4608,
+        "present_tp": 0.7222,
+        "present_fp": 0.3972,
+        "absent_tp": 0.2778,
+        "absent_fp": 0.6028,
+        "counts": {
+          "present_tp": 19,
+          "tp": 26,
+          "present_fp": 100,
+          "fp": 252
+        }
+      },
+      "relook": {
+        "present": 1.018,
+        "absent": 0.9562,
+        "present_tp": 0.7222,
+        "present_fp": 0.7095,
+        "absent_tp": 0.2778,
+        "absent_fp": 0.2905,
+        "counts": {
+          "present_tp": 19,
+          "tp": 26,
+          "present_fp": 179,
+          "fp": 252
+        }
+      }
+    },
+    {
+      "lo": 0.15,
+      "hi": 0.3,
+      "n": 194,
+      "n_tp": 69,
+      "shadow": {
+        "present": 1.32,
+        "absent": 0.7714,
+        "present_tp": 0.55,
+        "present_fp": 0.4167,
+        "absent_tp": 0.45,
+        "absent_fp": 0.5833,
+        "counts": {
+          "present_tp": 38,
+          "tp": 69,
+          "present_fp": 52,
+          "fp": 125
+        }
+      },
+      "relook": {
+        "present": 1.1403,
+        "absent": 0.5607,
+        "present_tp": 0.8643,
+        "present_fp": 0.7579,
+        "absent_tp": 0.1357,
+        "absent_fp": 0.2421,
+        "counts": {
+          "present_tp": 60,
+          "tp": 69,
+          "present_fp": 95,
+          "fp": 125
+        }
+      }
+    },
+    {
+      "lo": 0.3,
+      "hi": null,
+      "n": 101,
+      "n_tp": 62,
+      "shadow": {
+        "present": 1.3793,
+        "absent": 0.7843,
+        "present_tp": 0.5,
+        "present_fp": 0.3625,
+        "absent_tp": 0.5,
+        "absent_fp": 0.6375,
+        "counts": {
+          "present_tp": 31,
+          "tp": 62,
+          "present_fp": 14,
+          "fp": 39
+        }
+      },
+      "relook": {
+        "present": 1.0736,
+        "absent": 0.8381,
+        "present_tp": 0.7381,
+        "present_fp": 0.6875,
+        "absent_tp": 0.2619,
+        "absent_fp": 0.3125,
+        "counts": {
+          "present_tp": 46,
+          "tp": 62,
+          "present_fp": 27,
+          "fp": 39
+        }
+      }
+    }
+  ],
+  "thresholds": {
+    "accept": 0.6,
+    "watch": 0.15,
+    "resurvey_flip": 0.25
+  },
+  "relook": "rl_single",
+  "costs_ms": {
+    "geometry_check": 0.0,
+    "shadow_check": 1.47,
+    "zoom_relook": 393.8
+  },
+  "use": false,
+  "assumptions": [
+    "shadow and re-look are conditionally independent given the truth within a band",
+    "an opposite-side pass is modelled as one more shadow observation (no paired passes in the data to measure it)",
+    "thresholds accept 0.60 / watch 0.15 are design constants, not fit"
+  ],
+  "validation": {
+    "candidates": 573,
+    "real_pots": 157,
+    "tools": {
+      "shadow_check": 313,
+      "zoom_relook": 98
+    },
+    "conflicts": 160,
+    "conflicts_resolved": 11,
+    "resurvey_requested": 149,
+    "no_tool_needed": 187,
+    "relook_share": 0.171,
+    "actions": {
+      "with_opencv": {
+        "accept": {
+          "n": 44,
+          "real": 31,
+          "precision": 0.705
+        },
+        "review": {
+          "n": 316,
+          "real": 116,
+          "precision": 0.367
+        },
+        "watch": {
+          "n": 213,
+          "real": 10,
+          "precision": 0.047
+        }
+      },
+      "without_opencv": {
+        "accept": {
+          "n": 96,
+          "real": 61,
+          "precision": 0.635
+        },
+        "review": {
+          "n": 190,
+          "real": 69,
+          "precision": 0.363
+        },
+        "watch": {
+          "n": 287,
+          "real": 27,
+          "precision": 0.094
+        }
+      }
+    },
+    "changed_action": 150,
+    "pots_in_first_25pct": {
+      "cards": 143,
+      "with_opencv": 88,
+      "without_opencv": 87
+    },
+    "pots_in_first_50pct": {
+      "cards": 286,
+      "with_opencv": 128,
+      "without_opencv": 130
+    },
+    "log_loss": {
+      "with_opencv": 0.4486,
+      "without_opencv": 0.4593
+    },
+    "brier": {
+      "with_opencv": 0.1459,
+      "without_opencv": 0.1487
+    },
+    "auc": {
+      "with_opencv": 0.812,
+      "without_opencv": 0.799
+    }
+  },
+  "verification": {
+    "candidates": 534,
+    "real_pots": 214,
+    "tools": {
+      "shadow_check": 294,
+      "zoom_relook": 98
+    },
+    "conflicts": 156,
+    "conflicts_resolved": 7,
+    "resurvey_requested": 140,
+    "no_tool_needed": 165,
+    "relook_share": 0.184,
+    "actions": {
+      "with_opencv": {
+        "accept": {
+          "n": 44,
+          "real": 32,
+          "precision": 0.727
+        },
+        "review": {
+          "n": 302,
+          "real": 146,
+          "precision": 0.483
+        },
+        "watch": {
+          "n": 188,
+          "real": 36,
+          "precision": 0.191
+        }
+      },
+      "without_opencv": {
+        "accept": {
+          "n": 127,
+          "real": 85,
+          "precision": 0.669
+        },
+        "review": {
+          "n": 171,
+          "real": 80,
+          "precision": 0.468
+        },
+        "watch": {
+          "n": 236,
+          "real": 49,
+          "precision": 0.208
+        }
+      }
+    },
+    "changed_action": 149,
+    "pots_in_first_25pct": {
+      "cards": 134,
+      "with_opencv": 88,
+      "without_opencv": 88
+    },
+    "pots_in_first_50pct": {
+      "cards": 267,
+      "with_opencv": 155,
+      "without_opencv": 153
+    },
+    "log_loss": {
+      "with_opencv": 0.6478,
+      "without_opencv": 0.6368
+    },
+    "brier": {
+      "with_opencv": 0.2176,
+      "without_opencv": 0.2171
+    },
+    "auc": {
+      "with_opencv": 0.731,
+      "without_opencv": 0.732
+    }
+  },
+  "use_for_belief": false,
+  "belief_reason": "test log-loss 0.6368 (detector only) -> 0.6478 (with the OpenCV evidence): not better calibrated - people keep seeing the detector-only calibrated P(pot)",
+  "fresh": {
+    "candidates": 382,
+    "real_pots": 302,
+    "tools": {
+      "shadow_check": 0,
+      "zoom_relook": 146
+    },
+    "conflicts": 86,
+    "conflicts_resolved": 0,
+    "resurvey_requested": 207,
+    "no_tool_needed": 236,
+    "relook_share": 0.382,
+    "actions": {
+      "with_opencv": {
+        "accept": {
+          "n": 46,
+          "real": 39,
+          "precision": 0.848
+        },
+        "review": {
+          "n": 117,
+          "real": 102,
+          "precision": 0.872
+        },
+        "watch": {
+          "n": 219,
+          "real": 161,
+          "precision": 0.735
+        }
+      },
+      "without_opencv": {
+        "accept": {
+          "n": 93,
+          "real": 80,
+          "precision": 0.86
+        },
+        "review": {
+          "n": 109,
+          "real": 95,
+          "precision": 0.872
+        },
+        "watch": {
+          "n": 180,
+          "real": 127,
+          "precision": 0.706
+        }
+      }
+    },
+    "changed_action": 86,
+    "pots_in_first_25pct": {
+      "cards": 96,
+      "with_opencv": 83,
+      "without_opencv": 83
+    },
+    "pots_in_first_50pct": {
+      "cards": 191,
+      "with_opencv": 165,
+      "without_opencv": 165
+    },
+    "log_loss": {
+      "with_opencv": 1.2517,
+      "without_opencv": 1.209
+    },
+    "brier": {
+      "with_opencv": 0.4329,
+      "without_opencv": 0.4207
+    },
+    "auc": {
+      "with_opencv": 0.644,
+      "without_opencv": 0.648
+    },
+    "split": "test_xsonar"
+  },
+  "use_for_actions": false,
+  "actions_reason": "on the fresh split: ACCEPT precision 0.86 -> 0.848 (FAILED); real targets left in WATCH 127 -> 161 (FAILED)",
+  "fresh_history": [
+    {
+      "run": 1,
+      "date": "2026-10-07",
+      "result": "FAILED",
+      "numbers": "ACCEPT precision 0.86 -> 0.632; real targets left in WATCH 127 -> 147; AUC 0.648 -> 0.625",
+      "harness": "the replay measured a shadow on every Contact_*_sslo crop with a GUESSED orientation ('top'); the runtime never does that (orientation unknown -> no shadow), so run 1 scored a measurement the agent cannot make. The replay was fixed to follow the runtime's orientation rule and re-run ONCE (run 2)."
+    },
+    {
+      "run": 2,
+      "date": "2026-10-07",
+      "result": "FAILED",
+      "numbers": "ACCEPT precision 0.86 -> 0.848; real targets left in WATCH 127 -> 161; AUC 0.648 -> 0.644",
+      "harness": "runtime-faithful replay (only the zoom re-look is available on these crops). The re-look ratios fit on crab-pot sonograms do not transfer to this sonar. No further runs."
+    }
+  ]
+}
