@@ -121,19 +121,35 @@ def _target_line(t: TrackedObject, fix: PingFix, side: str, mid_m: float, lat0, 
     return (cx, cy), h, new_side, old_shadow, new_shadow
 
 
+def _value(t: TrackedObject) -> tuple[float, str]:
+    """What re-imaging ``t`` from the other side is worth. With the measured evidence model: the
+    expected information (bits) of one more shadow observation, computed by the agent from its belief
+    after the OpenCV evidence (0 when no outcome could change its action). Otherwise Σ p(1-p)."""
+    if t.info_bits is not None:
+        return (t.info_bits if t.request_resurvey else 0.0), "bits"
+    p = t.p_pot if t.p_pot is not None else 0.5
+    return p * (1 - p), "p(1-p)"
+
+
 def plan_resurvey(tracked: list[TrackedObject], track: dict[str, PingFix], boat_minutes: Optional[float] = None,
-                  swath_m: float = SWATH_M, speed_kn: float = SPEED_KN) -> dict:
-    """Second-look passes for the REVIEW targets, ranked by uncertainty resolved per metre."""
-    targets = []
+                  swath_m: float = SWATH_M, speed_kn: float = SPEED_KN, exclude: Optional[set] = None) -> dict:
+    """Second-look passes for the REVIEW targets, ranked by information gained per boat-minute.
+    ``exclude``: targets whose pass a person declined (never planned again)."""
+    targets, unit, considered = [], "p(1-p)", []
     for t in tracked:
         fix = track.get(t.frame_id) if track else None
         side = parse_side(t.frame_id)
         if t.verdict is not Verdict.REVIEW or t.lat is None or fix is None or side is None:
             continue
-        p = t.p_pot if t.p_pot is not None else 0.5
-        targets.append((t, fix, side, p * (1 - p)))
+        if exclude and t.oid in exclude:
+            continue
+        w, unit = _value(t)
+        considered.append((t, w))
+        if w > 0:
+            targets.append((t, fix, side, w))
     if not targets:
-        return {"lines": [], "note": "no REVIEW targets with GPS + known side - nothing to re-survey"}
+        return {"lines": [], "note": "no REVIEW target with GPS + known side where a second look could change "
+                                     "the decision - nothing to re-survey"}
     lat0, lon0 = targets[0][0].lat, targets[0][0].lon
     mid = swath_m / 2.0
     info = []
@@ -171,13 +187,15 @@ def plan_resurvey(tracked: list[TrackedObject], track: dict[str, PingFix], boat_
             "heading_deg": _bearing360(seed["h"]), "length_m": round(length, 1),
             "targets": [d["t"].oid for _, d in sorted(members, key=lambda m: m[0])],
             "targets_on": seed["side"], "voi": round(voi, 3), "voi_per_100m": round(100 * voi / max(length, 1), 3),
-            "boat_min": round(secs / 60, 1),
+            "boat_min": round(secs / 60, 1), "info_unit": unit,
+            "info_per_boat_min": round(voi / max(secs / 60, 1e-6), 4),
+            "conflicts": [d["t"].oid for _, d in members if d["t"].conflict],
             "predictions": [{"id": d["t"].oid, "p_pot": d["t"].p_pot, "shadow_was": d["old_shadow"],
                              "shadow_must_point": d["new_shadow"]} for _, d in members],
             "synthetic": any(d["t"].frame_id and track[d["t"].frame_id].synthetic for _, d in members),
         })
 
-    lines.sort(key=lambda L: -L["voi_per_100m"])
+    lines.sort(key=lambda L: -L["info_per_boat_min"])
     chosen, skipped, spent = [], [], 0.0
     for L in lines:
         if boat_minutes is not None and spent + L["boat_min"] > boat_minutes:
@@ -189,12 +207,25 @@ def plan_resurvey(tracked: list[TrackedObject], track: dict[str, PingFix], boat_
     for i, L in enumerate(chosen, 1):
         L["id"] = f"RS{i}"
         L["status"] = "PLANNED - not executed; needs human approval"
-        L["why"] = (f"{len(L['targets'])} uncertain target(s) (Σp(1-p) = {L['voi']}) re-imaged from the other side "
+        L["recommendation"] = "Perform opposite-side resurvey"
+        L["reason"] = ("evidence conflict on " + ", ".join(L["conflicts"]) + " (detector vs OpenCV)"
+                       if L["conflicts"] else "uncertain visual evidence")
+        L["why"] = (f"{len(L['targets'])} uncertain target(s) ({L['voi']} {unit} expected) re-imaged from the other side "
                     f"at mid-swath (~{mid:.0f} m); a real object's shadow must flip "
                     f"(e.g. {L['predictions'][0]['id']}: {L['predictions'][0]['shadow_was']:.0f}° → "
                     f"{L['predictions'][0]['shadow_must_point']:.0f}°)")
     total_voi = sum(d["w"] for d in info)
+    ranking = None
+    if chosen:
+        best = max(info, key=lambda d: d["w"])
+        tc, tw = max(considered, key=lambda x: (x[0].p_evidence if x[0].p_evidence is not None else (x[0].p_pot or 0)))
+        ranking = (f"passes ranked by expected information per boat-minute ({unit}): {chosen[0]['id']} first "
+                   f"({chosen[0]['info_per_boat_min']} {unit}/min over {', '.join(chosen[0]['targets'][:4])})")
+        if tc.oid != best["t"].oid:
+            ranking += (f"; the most likely target {tc.oid} is worth only {tw:.3f} {unit} - a second look there "
+                        f"would change little, so it does not drive the plan")
     return {"lines": chosen, "skipped": skipped, "boat_minutes_budget": boat_minutes, "boat_minutes_planned": round(spent, 1),
+            "ranking": ranking, "info_unit": unit,
             "voi_covered": round(sum(L["voi"] for L in chosen), 3), "voi_total": round(total_voi, 3),
             "targets_covered": sum(len(L["targets"]) for L in chosen), "targets_total": len(info),
             "assumptions": {"swath_m": swath_m, "mid_range_m": mid, "speed_kn": speed_kn, "turn_s": TURN_S}}

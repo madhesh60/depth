@@ -434,6 +434,12 @@ def _run_survey(frames, gps: str, budget_minutes: Optional[float], nadir: Option
         log.exception("stage-1 counterfactual failed")
         d["stage1_counterfactual"] = {"available": False, "reason": f"error: {type(e).__name__}"}
         _add_incident(result, d, incident("view_failed", f"Stage-1 counterfactual: {type(e).__name__}"))
+    try:                                                    # the same survey WITH vs WITHOUT OpenCV evidence
+        from src.agentic.counterfactual import without_opencv
+        d["opencv_counterfactual"] = without_opencv(result, d.get("stage1_counterfactual"))
+    except Exception as e:
+        log.exception("opencv counterfactual failed")
+        d["opencv_counterfactual"] = {"available": False, "reason": f"error: {type(e).__name__}"}
     prov = provenance_stamp()
     d["provenance"] = prov
     reports = {fmt: export(fmt, result, prov=prov) for fmt in REPORT_FORMATS}
@@ -471,12 +477,13 @@ def _wanted_requests(s: SurveyResult) -> dict[str, tuple[list, str]]:
         out["recover"] = (list(m.recovery_route),
                           f"recover {len(m.recovery_route)} confirmed hazard(s)"
                           + (f", route {m.route_length_m} m" if m.route_length_m else "") + f"; {gps}")
-    lines = (m.resurvey_plan or {}).get("lines") or []
-    if lines:
-        tg = [t for L in lines for t in L["targets"]]
-        out["resurvey"] = (tg, f"run {len(lines)} opposite-side pass(es) ({', '.join(L['id'] for L in lines)}, "
-                               f"{(m.resurvey_plan or {}).get('boat_minutes_planned')} boat-min) - a real object's "
-                               f"shadow must flip; {gps}")
+    for L in (m.resurvey_plan or {}).get("lines") or []:          # one request per pass: each can be declined
+        out["resurvey:" + ",".join(L["targets"])] = (
+            list(L["targets"]),
+            f"Agent recommends: {L.get('recommendation', 'Perform opposite-side resurvey')} {L['id']} over "
+            f"{', '.join(L['targets'][:6])}. Reason: {L.get('reason', 'uncertain visual evidence')}. "
+            f"{L['boat_min']} boat-min, {L['voi']} {L.get('info_unit', '')} expected; a real object's shadow must "
+            f"flip. If declined, the agent re-plans; {gps}")
     return out
 
 
@@ -486,9 +493,12 @@ def _sync_agent_requests(s: SurveyResult, reason: str) -> list[dict]:
     have = s.plan_args.setdefault("requests", {})
     changes = []
     want = _wanted_requests(s)
-    for action in ("inspect", "recover", "resurvey"):
-        cur = _APPROVALS.get(have[action]) if action in have else None
-        targets, why = want.get(action, ([], ""))
+    for key in sorted(set(have) | set(want) | {"inspect", "recover"}):
+        action = key.split(":")[0]
+        cur = _APPROVALS.get(have[key]) if key in have else None
+        targets, why = want.get(key, ([], ""))
+        if cur is not None and cur["status"] == "declined" and action == "resurvey":
+            continue                                    # a person's decline stands; the plan already moved on
         if cur is not None and cur["targets"] == targets[:200]:
             continue
         if cur is not None and cur["status"] == "pending":
@@ -497,11 +507,11 @@ def _sync_agent_requests(s: SurveyResult, reason: str) -> list[dict]:
                 changes.append({"action": action, "withdrawn": cur["id"]})
             except Exception:
                 log.exception("withdraw failed")
-        have.pop(action, None)
+        have.pop(key, None)
         if targets:
             try:
                 r = _APPROVALS.request(s.survey_id, action, targets, why, requested_by=_AGENT, channel="agent")
-                have[action] = r["id"]
+                have[key] = r["id"]
                 changes.append({"action": action, "requested": r["id"], "targets": len(targets)})
                 _notify("approval.requested", r)
             except Exception as e:                       # the gate stays closed; a person is told
@@ -707,8 +717,9 @@ def sample_thumb(sample_id: str, size: int = Query(220, ge=32, le=640)):
 
 @app.post("/api/analyze")
 def analyze(sample: Optional[str] = Query(None), nadir: Optional[str] = Query(None),
-            file: Optional[UploadFile] = File(None), simulate: Optional[str] = Query(None)):
-    faults = _drills(simulate)
+            file: Optional[UploadFile] = File(None), simulate: Optional[str] = Query(None),
+            active: bool = Query(False, description="run active vision even if not validated (EXPERIMENTAL)")):
+    faults = _drills(simulate) | ({"opt:active"} if active is True else set())
     if "corrupt_frame" in faults:
         raise _fail(422, incident("corrupt_frame", "the frame could not be decoded (failure drill)", simulated=True))
     if file is not None:
@@ -757,8 +768,9 @@ def submit_survey(use_samples: bool = Query(False), gps: str = Query("synthetic"
                   budget_minutes: Optional[float] = Query(None, ge=0, le=600),
                   nadir: Optional[str] = Query(None),
                   boat_minutes: Optional[float] = Query(None, ge=0, le=1440),
-                  files: Optional[list[UploadFile]] = File(None), simulate: Optional[str] = Query(None)):
-    faults = _drills(simulate)
+                  files: Optional[list[UploadFile]] = File(None), simulate: Optional[str] = Query(None),
+                  active: bool = Query(False, description="active vision even if not validated (EXPERIMENTAL)")):
+    faults = _drills(simulate) | ({"opt:active"} if active is True else set())
     if "model_unavailable" in faults:
         _pipeline_or_503(faults)
     busy = _JOBS.counts()
@@ -792,8 +804,9 @@ def survey(use_samples: bool = Query(False), gps: str = Query("synthetic"),
            budget_minutes: Optional[float] = Query(None, ge=0, le=600),
            nadir: Optional[str] = Query(None),
            files: Optional[list[UploadFile]] = File(None), simulate: Optional[str] = Query(None),
-           boat_minutes: Optional[float] = Query(None, ge=0, le=1440)):
-    faults = _drills(simulate)
+           boat_minutes: Optional[float] = Query(None, ge=0, le=1440),
+           active: bool = Query(False, description="active vision even if not validated (EXPERIMENTAL)")):
+    faults = _drills(simulate) | ({"opt:active"} if active is True else set())
     track, problems = None, []
     if gps == "recording":
         if not _recording_summary().get("available"):
@@ -901,7 +914,7 @@ def survey_decide(survey_id: str, body: dict = Body(...)):
     try:                                              # the persisted copy follows (OGC, reports)
         prov = provenance_stamp()
         old = json.loads(_JOBS.report(survey_id, "json") or "{}")
-        keep = {k: old[k] for k in ("twin", "frame_refs", "stage1_counterfactual") if k in old}
+        keep = {k: old[k] for k in ("twin", "frame_refs", "stage1_counterfactual", "opencv_counterfactual") if k in old}
         _JOBS.persist(survey_id, {**d, **keep, "provenance": prov},
                       {fmt: export(fmt, s, prov=prov) for fmt in REPORT_FORMATS} |
                       {f"public.{fmt}": export(fmt, s, public=True, prov=prov) for fmt in PUBLIC_FORMATS})
@@ -1012,6 +1025,15 @@ def approval_decide(rid: str, body: dict = Body(...)):
     _notify("approval.decided", r)
     s = _SURVEYS.get(r.get("survey_id"))
     if s is not None and rid in (s.plan_args.get("requests") or {}).values():
+        if r["status"] == "declined" and r["action"] == "resurvey":
+            # human control: a declined pass makes the agent change its plan, visibly
+            from src.agentic.mission import decline_resurvey
+            by = (r.get("decision") or {}).get("by") or body.get("by", "")
+            entry = decline_resurvey(s, r["targets"], by, body.get("note", ""), rid)
+            entry["requests"] = _sync_agent_requests(s, reason=f"{by} declined the pass over {', '.join(r['targets'][:4])}")
+            d = s.to_dict()
+            d.pop("frames", None)
+            r = {**r, "replan": entry, "tracked": d["tracked"], "mission": d["mission"]}
         r = {**r, "dispatch": _dispatch(s)}
     return r
 

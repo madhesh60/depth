@@ -60,6 +60,7 @@ def _nearest_neighbour(points: list[TrackedObject]) -> list[TrackedObject]:
 HUMAN_DECISIONS = ("confirm", "reject", "recovered", "not_found", "undo",
                    "prioritize", "deprioritize", "reset_priority")    # the last three override the agent's order
 _PRIORITY_RANK = {"high": 0, None: 1, "low": 2}
+_ACTION_RANK = {"accept": 0, "review": 1, None: 1, "watch": 2}
 _CLOSED = ("rejected", "not_found", "recovered")         # a person closed it: off every route and queue
 
 
@@ -102,7 +103,10 @@ def review_queue(tracked: list[TrackedObject]) -> list[TrackedObject]:
     confidence. Cards a person already decided leave the queue."""
     rev = [t for t in tracked if undecided_review(t)]
     return sorted(rev, key=lambda t: (_PRIORITY_RANK.get(t.human_priority, 1),        # a person's override first
-                                      -(t.p_pot if t.p_pot is not None else -1.0),
+                                      0 if t.fallback == "inspect" else 1,           # a declined pass -> look here
+                                      _ACTION_RANK.get(t.action, 1),                  # the agent's evidence action
+                                      -(t.p_evidence if t.p_evidence is not None else
+                                        (t.p_pot if t.p_pot is not None else -1.0)),
                                       -t.evidence_score, -t.conf, t.oid))
 
 
@@ -162,10 +166,13 @@ def plan_mission(tracked: list[TrackedObject], track: Optional[dict], guarantees
                  budget_minutes: Optional[float] = None, sec_per_card: float = DEFAULT_SEC_PER_CARD,
                  boat_minutes: Optional[float] = None, repeat_merges: int = 0,
                  human_log: Optional[list] = None, replans: Optional[list] = None,
-                 incidents: Optional[list] = None) -> MissionPlan:
+                 incidents: Optional[list] = None, declined: Optional[list] = None) -> MissionPlan:
     """The whole Act plan from the current state of the hazards — used for the first plan AND after
     every person's decision (the agent re-plans; it never overrides a person)."""
     from .resurvey import plan_resurvey
+    declined_ids = {oid for d in (declined or []) for oid in d.get("targets", [])}
+    for t in tracked:                       # a person declined the pass over it -> inspect it instead
+        t.fallback = "inspect" if (t.oid in declined_ids and t.human is None) else None
     gps_available = bool(track)
     gps_synthetic = gps_available and any(f.synthetic for f in track.values())
     mission = build_mission(tracked, gps_available, gps_synthetic)
@@ -177,7 +184,9 @@ def plan_mission(tracked: list[TrackedObject], track: Optional[dict], guarantees
         mission.budget = plan_budget(queue, budget_minutes, sec_per_card)
     plan_inspection(mission, tracked, mission.budget.get("review_ids") if mission.budget else mission.review_queue)
     if gps_available:                        # the physical second look: opposite side, mid-swath
-        mission.resurvey_plan = plan_resurvey([t for t in tracked if t.human is None], track, boat_minutes)
+        mission.resurvey_plan = plan_resurvey([t for t in tracked if t.human is None], track, boat_minutes,
+                                              exclude=declined_ids)
+        mission.resurvey_plan["declined"] = list(declined or [])
     mission.human_log = list(human_log or [])
     mission.replans = list(replans or [])
     mission.impact = impact_ledger(tracked, mission.human_log)
@@ -264,7 +273,19 @@ def planner_log(tracked: list[TrackedObject], m: MissionPlan, queue: list[Tracke
         for sk in skipped:
             L.append(_step("resurvey_plan", f"pass over {', '.join(sk['targets'][:4])} not planned - {sk['reason']}",
                            status="skipped", targets=sk["targets"], voi=sk["voi"]))
-    n_pass = len(rp.get("lines") or [])
+    for d in rp.get("declined") or []:
+        moved = [oid for oid in d.get("targets", []) if oid in m.review_queue]
+        n_left = len(rp.get("lines") or [])
+        L.append(_step("human_declined", f"{d.get('by', 'a person')} declined the opposite-side pass over "
+                                         f"{', '.join(d.get('targets', [])[:5])} -> the agent dropped it (never proposed "
+                                         f"again), re-ranked the boat time over the remaining {n_left} pass(es) and moved "
+                                         f"{len(moved)} target(s) to the front of the inspection queue - a person looks "
+                                         f"there instead",
+                       targets=d.get("targets", []), by=d.get("by")))
+    lines = rp.get("lines") or []
+    if lines and rp.get("ranking"):
+        L.append(_step("resurvey_rank", rp["ranking"], status="done"))
+    n_pass = len(lines)
     L.append(_step("dispatch_gate", f"nothing dispatched: the inspection route ({len(m.inspection_route)} stops), "
                                     f"the recovery route ({len(m.recovery_route)} stops) and {n_pass} re-survey "
                                     f"pass(es) wait for a named person's approval", status="done",
@@ -320,10 +341,35 @@ def apply_human(survey: SurveyResult, oid: str, decision: str, by: str, note: st
     log = list(old.human_log) + [{"t": now, "hazard": oid, "decision": decision,
                                   "before": before, "after": after, "by": by[:60], "note": (note or "")[:300],
                                   "agent_verdict": t.verdict.value, "p_pot": t.p_pot}]
+    _replan(survey, log, oid, decision, by, now)
+    return t
+
+
+def decline_resurvey(survey: SurveyResult, targets: list[str], by: str, note: str = "", request_id: str = "") -> dict:
+    """A PERSON declined the agent's opposite-side pass over ``targets``. The agent must change its
+    plan: the pass is never proposed again, the boat time goes to the next most informative pass,
+    and the declined targets move to the front of the inspection queue (a person looks instead)."""
+    import time as _t
+    by = (by or "").strip()
+    if not by:
+        raise ValueError("the person's name is required")
+    a = survey.plan_args
+    a.setdefault("declined_resurvey", []).append({"targets": list(targets), "by": by[:60], "request": request_id,
+                                                  "note": (note or "")[:300]})
+    now = round(_t.time(), 1)
+    log = list(survey.mission.human_log) + [{"t": now, "hazard": ",".join(targets[:6]), "decision": "decline_resurvey",
+                                             "before": "pass planned", "after": "declined", "by": by[:60],
+                                             "note": (note or "")[:300], "agent_verdict": "review", "p_pot": None}]
+    return _replan(survey, log, ",".join(targets[:6]), "decline_resurvey", by, now)
+
+
+def _replan(survey: SurveyResult, log: list, oid: str, decision: str, by: str, now: float) -> dict:
+    old = survey.mission
     a = survey.plan_args or {}
     new = plan_mission(survey.tracked, survey.track, old.guarantees,
                        a.get("budget_minutes"), a.get("sec_per_card", DEFAULT_SEC_PER_CARD),
-                       a.get("boat_minutes"), old.repeat_merges, log, old.replans, old.incidents)
+                       a.get("boat_minutes"), old.repeat_merges, log, old.replans, old.incidents,
+                       declined=a.get("declined_resurvey"))
     b0, b1 = plan_summary(old), plan_summary(new)
     changed = {k: [b0[k], b1[k]] for k in b0 if b0[k] != b1[k]}
     words = {"queue": "queue", "inspection_stops": "inspection stops", "inspection_m": "inspection m",
@@ -332,11 +378,14 @@ def apply_human(survey: SurveyResult, oid: str, decision: str, by: str, note: st
     why = (f"re-planned after {by[:60]} chose '{decision}' on {oid}: "
            + ("; ".join(f"{words[k]} {v[0] if v[0] is not None else '-'} -> {v[1] if v[1] is not None else '-'}"
                         for k, v in changed.items()) if changed else "no route or queue change"))
-    new.replans.append({"t": now, "hazard": oid, "decision": decision, "by": by[:60], "changed": changed,
-                        "rationale": why, "inspection_route": list(new.inspection_route),
-                        "recovery_route": list(new.recovery_route)})
+    entry = {"t": now, "hazard": oid, "decision": decision, "by": by[:60], "changed": changed,
+             "rationale": why, "inspection_route": list(new.inspection_route),
+             "recovery_route": list(new.recovery_route),
+             "passes": [{"id": L["id"], "targets": L["targets"]} for L in (new.resurvey_plan or {}).get("lines") or []],
+             "queue_head": list(new.review_queue[:5])}
+    new.replans.append(entry)
     survey.mission = new
-    return t
+    return entry
 
 
 # ---- exporters --------------------------------------------------------------------------------
