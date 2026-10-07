@@ -20,7 +20,6 @@
 
   <!-- ============================ TOPBAR ============================ -->
   <header class="topbar">
-    <div class="progress" id="progress" role="progressbar" aria-label="working" aria-hidden="true"></div>
     <div class="brand">
       <div class="brand-txt">
         <h1>DEPTH</h1>
@@ -71,6 +70,7 @@
 
       <section class="panel run-dock" data-when="analyze">
         <div class="panel-head"><span class="panel-title">Run</span></div>
+<label class="switch-row" title="Let the agent choose its OpenCV tools by value of information. Experimental: its benefit failed the registered validation checks (docs/evidence_model_exp003.md)."><input type="checkbox" class="activeToggle" /><span class="sw" aria-hidden="true"></span><span>Active vision <em>experimental</em></span></label>
         <button class="btn btn-primary btn-block" id="analyzeBtn" disabled>Analyze frame</button>
         <p class="panel-note" id="analyzeHint">Choose a sample above to begin.</p>
       </section>
@@ -93,6 +93,7 @@
             <input type="number" id="boatMin" min="1" max="1440" step="1" value="10" />
           </label>
         </details>
+<label class="switch-row" title="Let the agent choose its OpenCV tools by value of information. Experimental: its benefit failed the registered validation checks (docs/evidence_model_exp003.md)."><input type="checkbox" class="activeToggle" /><span class="sw" aria-hidden="true"></span><span>Active vision <em>experimental</em></span></label>
         <button class="btn btn-primary btn-block" id="surveyBtn">Run survey</button>
         <p class="panel-note">Every sample → evidence-backed hazards → budgeted review queue → human-approved route + reports.</p>
       </section>
@@ -430,6 +431,11 @@
   <button class="demo-stop" id="demoStop">Stop</button>
 </div>
 <div class="notices" id="notices" aria-live="polite"></div>
+<div class="busy-card" id="busyCard" role="status" aria-live="polite" hidden>
+  <span class="busy-arc" aria-hidden="true"></span>
+  <div class="busy-txt"><b id="busyTitle">Working</b><span id="busySub"></span></div>
+  <span class="busy-bar" id="busyBar" hidden></span>
+</div>
 <div class="run-toast" id="runToast" hidden><span class="spin"></span><span id="runToastTxt">working…</span></div>
 
 <script src="vendor/leaflet/leaflet.js"

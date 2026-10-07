@@ -42,6 +42,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   Pop.init();
   Tabs.render();
   Drills.init();
+  Active.init();
   $("#missedBtn2").onclick = () => { if (state._ready) toggleMissed(); };
   await Promise.all([loadHealth(), loadSamples(), loadMetrics(), loadLabelStats()]);
 });
@@ -155,12 +156,16 @@ const STEP = {
   water_column_check: ["Evidence", "Water column"], shadow_check: ["Evidence", "Acoustic shadow"],
   estimate_height: ["Evidence", "Height"], stitch_boundary: ["Evidence", "Chunk stitch"],
   update_belief: ["Update", "P(pot)"], decide: ["Decide", "Tier"], handoff: ["Next", "Hand-off"],
+  assess: ["Detect", "Detector alone"], geometry_check: ["Evidence", "Geometry (Stage 1)"],
+  choose_tool: ["Choose", "Next OpenCV tool"], conflict: ["Conflict", "Evidence conflict"],
+  request_observation: ["Ask", "Another observation"],
 };
 const PLAN_STEP = {
   triage: ["Triage", "Hazards"], voi_check: ["Ask", "Can more looking help?"], budget_check: ["Budget", "Analyst time"],
   stop_rule: ["Stop", "Where to stop"], human_override: ["Person", "Overrides kept"], route_update: ["Route", "Inspection route"],
   recovery_route: ["Route", "Recovery route"], resurvey_plan: ["Re-survey", "Boat time"], dispatch_gate: ["Gate", "Dispatch"],
-  request_approval: ["Ask person", "Approval"],
+  request_approval: ["Ask person", "Approval"], human_declined: ["Person", "Pass declined"],
+  resurvey_rank: ["Re-survey", "Most informative first"],
 };
 /* display text: the question is the step's name, so show only the answer; arrows typeset */
 function chainText(s) {
@@ -182,6 +187,48 @@ function chainBlock(steps, map = STEP) {
       + `<div class="ch-why">${escapeHtml(chainText(s))}</div></div></li>`;
   }).join("")}</ol>`;
 }
+
+/* the Agent Trace for one find: DETECT -> evidence -> decision -> OpenCV tool -> new evidence ->
+   decision changed -> human approval -> survey plan. Built only from the agent's own logged steps. */
+const ACT = { accept: "Accept", review: "Review", watch: "Watch" };
+function agentTrace(c) {
+  const ev = c.evidence || {}, tr = c.trace || [];
+  if (!ev.action) return "";
+  const pct = p => (p == null ? "—" : Math.round(p * 100) + "%");
+  const geo = tr.find(s => s.tool === "geometry_check");
+  const chosen = tr.filter(s => s.tool === "choose_tool").map(s => human((s.detail || {}).chosen || ""));
+  const upd = tr.filter(s => s.tool === "update_belief");
+  const skipped = tr.filter(s => (s.tool === "shadow_check" || s.tool === "zoom_relook") && s.status === "skipped").map(s => human(s.tool));
+  const changed = ev.action !== ev.action0;
+  const geoTxt = !geo || geo.status === "skipped" ? "Geometry not measured" : (geo.detail || {}).in_water_column ? "Geometry: in the water column" : "Geometry: on the seabed";
+  const rows = [
+    ["Detect", `YOLO11 via cv2.dnn · confidence ${c.conf.toFixed(2)}`],
+    ["Evidence collected", geoTxt + " (Stage 1, free)"],
+    ["Agent decision", `${ACT[ev.action0]} · P ${pct(ev.p_pot)} from the detector alone`],
+    ["OpenCV tool selected", chosen.length ? chosen.join(" → ") + (skipped.length ? ` · skipped ${skipped.join(", ").toLowerCase()} (could not change it)` : "")
+                                          : "None — no tool could change the decision"],
+    ["New evidence", upd.length ? upd.map(u => `${human((u.detail || {}).tool || "")} ${(u.detail || {}).result || ""} · P ${pct(u.detail.p_prior)} → ${pct(u.detail.p_post)}`).join("; ") : "—"],
+  ];
+  if (ev.conflict) rows.push(["Evidence conflict", `${ev.conflict.why} → another observation`, "warn"]);
+  rows.push(["Decision changed", changed ? `${ACT[ev.action0]} → ${ACT[ev.action]}` : `No — stays ${ACT[ev.action]}`, changed ? "hi" : ""]);
+  rows.push(["Human approval", ev.action === "accept" ? "Dispatch waits for a named person" : "A person reviews the card"]);
+  rows.push(["New survey plan", ev.request_resurvey ? "Opposite-side pass requested (approve in Survey)"
+    : ev.action === "accept" ? "Priority inspection target" : ev.action === "watch" ? "End of the review queue" : "Review queue"]);
+  return `<div class="atrace"><div class="ev-chain-h">Agent trace${((tr.find(s => s.tool === "decide") || {}).detail || {}).active_mode === "experimental" ? `<span class="exp-tag">experimental</span>` : ""}</div><ol>${rows.map(([k, v, cls]) =>
+    `<li class="${cls || ""}"><span class="at-k">${k}</span><span class="at-v">${escapeHtml(v)}</span></li>`).join("")}</ol></div>`;
+}
+
+/* active vision: off by default (its validation checks failed); the switch runs it, labelled experimental */
+const Active = {
+  get on() { return localStorage.getItem("depth.active") === "1"; },
+  q() { return this.on ? "&active=1" : ""; },
+  init() {
+    $$(".activeToggle").forEach(x => {
+      x.checked = this.on;
+      x.onchange = () => { localStorage.setItem("depth.active", x.checked ? "1" : "0"); $$(".activeToggle").forEach(y => y.checked = x.checked); };
+    });
+  },
+};
 
 /* failure drills: trigger a real failure path on purpose and watch the fallback (?simulate=<code>) */
 const DRILLS = [
@@ -598,29 +645,24 @@ const Log = (() => {
 function toast(txt) { const t = $("#runToast"); $("#runToastTxt").textContent = txt; t.hidden = false; }
 function toastHide() { $("#runToast").hidden = true; }
 
-/* loading: a hairline progress bar under the navigation (determinate when the server reports
-   progress, a sweep otherwise) + a quiet status pill that says the step in words */
+/* loading: one quiet card in the middle of the workspace - a thin spinning arc, what is happening in
+   words, and a slim bar once the server reports progress. Nothing else moves. */
 const Busy = {
   n: 0,
   start(txt) {
     this.n++;
-    const bar = $("#progress");
-    if (bar) { bar.classList.add("indeterminate"); bar.style.setProperty("--p", 0); bar.setAttribute("aria-hidden", "false"); }
-    document.body.classList.add("is-busy");
-    toast(txt);
+    const c = $("#busyCard");
+    $("#busyTitle").textContent = txt; $("#busySub").textContent = "";
+    $("#busyBar").hidden = true; $("#busyBar").style.setProperty("--p", 0);
+    c.hidden = false; document.body.classList.add("is-busy");
   },
   set(frac, txt) {
-    const bar = $("#progress"); if (!bar) return;
-    bar.classList.toggle("indeterminate", frac == null);
-    if (frac != null) { const v = Math.max(.04, Math.min(1, frac)); bar.style.setProperty("--p", v); bar.setAttribute("aria-valuenow", String(Math.round(v * 100))); }
-    if (txt) $("#runToastTxt").textContent = txt;
+    if (txt) $("#busySub").textContent = txt;
+    if (frac != null) { const bar = $("#busyBar"); bar.hidden = false; bar.style.setProperty("--p", Math.max(.03, Math.min(1, frac))); }
   },
   done() {
     this.n = Math.max(0, this.n - 1); if (this.n) return;
-    const bar = $("#progress");
-    if (bar) { bar.classList.remove("indeterminate"); bar.style.setProperty("--p", 1); bar.setAttribute("aria-hidden", "true"); }
-    setTimeout(() => { if (!this.n) { document.body.classList.remove("is-busy"); if (bar) bar.style.setProperty("--p", 0); } }, 420);
-    toastHide();
+    $("#busyCard").hidden = true; document.body.classList.remove("is-busy");
   },
 };
 
@@ -631,6 +673,7 @@ async function runAnalyze(simulate) {
   $("#analyzeBtn").disabled = true;
   $("#analyzePlaceholder").hidden = true;
   Busy.start("Analyzing frame");
+  Busy.set(null, Active.on ? "Detect → choose OpenCV tools → decide" : "Detect → OpenCV evidence → decide");
   stepperRun(["stage1", "see", "prove", "decide"]);
   Log.reset(); Log.now({ stage: true, tool: "SEE", msg: "perceive — full-frame YOLO11 via cv2.dnn …", t: "run" });
 
@@ -638,6 +681,7 @@ async function runAnalyze(simulate) {
     let url = `${API}/api/analyze`, opts = { method: "POST" };
     if (state.selected.file) { const fd = new FormData(); fd.append("file", state.selected.file); opts.body = fd; }
     else url += `?sample=${encodeURIComponent(state.selected.id)}`;
+    if (Active.on) url += `${url.includes("?") ? "&" : "?"}active=1`;
     if (simulate) url += `${url.includes("?") ? "&" : "?"}simulate=${simulate}`;
     const d = await apiJSON(url, opts);
     state._analyze = d;
@@ -759,7 +803,7 @@ function relooked(c) {
 function decideDetail(c) { const d = (c.trace || []).find(s => s.tool === "decide"); return (d && d.detail) || {}; }
 function tierPromise(c) {
   const g = (state.calibration && state.calibration.guarantees) || {}, d = decideDetail(c);
-  if (d.mode !== "calibrated") return "Legacy rule (no calibrated promise)";
+  if (d.mode !== "calibrated" && d.mode !== "active") return "Legacy rule (no calibrated promise)";
   if (c.verdict === "confirmed") return `Confirmed tier: at least ${Math.round((g.precision_promise || 0) * 100)}% are real (95% confidence)`;
   if (c.verdict === "review") return `Review and confirmed together reach at least ${Math.round((g.recall_promise || 0) * 100)}% of pots (95% confidence)`;
   if (((state.calibration || {}).non_hazard_classes || []).includes(c.cls_name)) return "Natural seabed class: not a hazard, kept for audit";
@@ -767,7 +811,7 @@ function tierPromise(c) {
 }
 function verdictReason(c) {
   const d = decideDetail(c), p = (c.evidence || {}).p_pot;
-  if (c.verdict === "confirmed") return d.mode === "calibrated" ? "Above the confirm threshold: carries the precision promise" : "Legacy rule";
+  if (c.verdict === "confirmed") return d.mode !== "legacy" ? "Above the confirm threshold: carries the precision promise" : "Legacy rule";
   if (c.verdict === "review") return `Human review${p != null ? ` · P(pot) ~${Math.round(p * 100)}%` : ""}, ordered in the queue`;
   return "Low risk: below the review threshold, kept for audit, not surfaced";
 }
@@ -875,12 +919,17 @@ function evidenceCard(c, id) {
     </div>
     <div class="ev-body">
       <p class="ev-tier">${escapeHtml(tierPromise(c))}</p>
-      <div class="conf-flow">
+      ${ev.action ? `<div class="conf-flow">
+        <div class="conf-chip"><span class="lbl">Detector P</span><span class="val">${pp}</span></div>
+        <div class="conf-arrow ${ev.p_evidence > ev.p_pot + 1e-6 ? "up" : ev.p_evidence < ev.p_pot - 1e-6 ? "down" : ""}"><div class="track"></div>
+          <span class="tag">after OpenCV evidence</span></div>
+        <div class="conf-chip"><span class="lbl">Evidence P</span><span class="val">${Math.round(ev.p_evidence * 100)}%</span></div>
+      </div>` : `<div class="conf-flow">
         <div class="conf-chip"><span class="lbl">Detector</span><span class="val">${(c.conf).toFixed(2)}</span></div>
         <div class="conf-arrow ${arrowCls}"><div class="track"></div>
           <span class="tag">${!rlDone ? "No re-look (VoI 0)" : `re-look ${rl.found ? `${rlConf.toFixed(2)} (${gain >= 0 ? "+" : ""}${gain.toFixed(2)})` : "no re-fire"}`}</span></div>
         <div class="conf-chip"><span class="lbl">Score</span><span class="val ${arrowCls}">${(ev.evidence_score ?? c.conf).toFixed(2)}</span></div>
-      </div>
+      </div>`}
       <div class="ev-facts">
         <div class="fact"><span class="k">Shadow</span><span class="v ${shCls}">${human(sh.quality || "none")}${sh.contrast ? ` · c${sh.contrast}` : ""}</span></div>
         <div class="fact"><span class="k">Relative height</span><span class="v">${height}</span></div>
@@ -888,8 +937,10 @@ function evidenceCard(c, id) {
         <div class="fact"><span class="k">Position</span><span class="v ${c.in_water_column ? "chip-weak" : ""}">${c.in_water_column == null ? "—" : c.in_water_column ? "Water column" : "On seabed"}${c.ground_range_px != null ? ` · ${Math.round(c.ground_range_px)} px gnd` : ""}</span></div>
         <div class="fact"><span class="k">P(pot)</span><span class="v">${ev.p_pot != null ? Math.round(ev.p_pot * 100) + "%" : "—"}</span></div>
       </div>
-      <div class="ev-chain"><div class="ev-chain-h">Agent decision<span>${(c.trace || []).filter(s => s.status === "skipped").length} skipped · ${(c.trace || []).filter(s => s.status === "failed").length} failed</span></div>
-        ${chainBlock(c.trace || [])}</div>
+      ${agentTrace(c)}
+      ${(c.evidence || {}).action ? `<details class="ev-why ev-steps"><summary>Every step (${(c.trace || []).length})</summary>${chainBlock(c.trace || [])}</details>`
+        : `<div class="ev-chain"><div class="ev-chain-h">Agent decision<span>${(c.trace || []).filter(s => s.status === "skipped").length} skipped · ${(c.trace || []).filter(s => s.status === "failed").length} failed</span></div>
+        ${chainBlock(c.trace || [])}</div>`}
       ${(ev.notes || []).length ? `<details class="ev-why"><summary>Evidence notes</summary><ul class="ev-notes">${ev.notes.map(n => `<li>${escapeHtml(n)}</li>`).join("")}</ul></details>` : ""}
       <div class="ev-label"><span class="lbl-k">Your call</span>
         <button class="ok" data-a="confirm" title="a real object - saved as a positive training label">Approve</button>
@@ -944,7 +995,7 @@ async function runSurvey(simulate) {
   const boatQ = Number.isFinite(boat) && boat > 0 ? `&boat_minutes=${Math.min(1440, boat)}` : "";
   try {
     // Surveys run as background jobs (no proxy timeouts, the server stays responsive); poll progress.
-    const job = await apiJSON(`${API}/api/jobs/survey?use_samples=1&gps=${gps}&budget_minutes=${budget}${boatQ}${simulate ? "&simulate=" + simulate : ""}`, { method: "POST" });
+    const job = await apiJSON(`${API}/api/jobs/survey?use_samples=1&gps=${gps}&budget_minutes=${budget}${boatQ}${simulate ? "&simulate=" + simulate : ""}${Active.q()}`, { method: "POST" });
     Log.now({ tool: "queue_job", msg: `${job.job_id} · ${job.frames} frames queued`, t: "" });
     const d = await pollJob(job.job_id);
     state.survey = d;
@@ -1020,12 +1071,14 @@ const ACTION_LABEL = { inspect: "Inspection route", recover: "Recovery route", r
 function renderAgentPanel(d) {
   const m = d.mission, disp = d.dispatch || {}, incs = surveyIncidents(d);
   const rp = (m.replans || []).slice(-1)[0];
-  const gate = ["inspect", "recover", "resurvey"].filter(a => disp[a]).map(a => `<div class="gate-row">
+  const gate = ["inspect", "recover"].filter(a => disp[a]).map(a => `<div class="gate-row">
       <span class="gate-a">${ACTION_LABEL[a]}</span><span class="gate-n">${disp[a].targets} target${disp[a].targets === 1 ? "" : "s"}</span>
       <span class="st ${disp[a].status}">${disp[a].status}${disp[a].by ? " · " + escapeHtml(disp[a].by) : ""}</span></div>`).join("");
   const pending = Object.values(disp).filter(x => x.status === "pending").length;
   $("#agentMeta").textContent = `${(m.agent_log || []).length} steps${incs.length ? ` · ${incs.length} incident${incs.length > 1 ? "s" : ""}` : ""}`;
   $("#agentPanel").innerHTML = `
+    ${recoCards(d)}
+    ${cfTable(d.opencv_counterfactual)}
     <div class="gate">
       <div class="gate-h">Dispatch gate<span>${pending ? `${pending} waiting for a person` : "nothing waiting"}</span></div>
       ${gate || `<p class="empty-hint">Nothing to dispatch.</p>`}
@@ -1037,6 +1090,33 @@ function renderAgentPanel(d) {
     ${incs.length ? `<div class="inc-list"><div class="gate-h">Incidents<span>${incs.length}</span></div>${incs.map(incidentRow).join("")}</div>` : ""}
     <div class="gate-h plan-h">Plan, step by step</div>${chainBlock(m.agent_log || [], PLAN_STEP)}`;
   const ta = $("#toApprovals"); if (ta) ta.onclick = () => Tabs.go("Approvals");
+  $$("#agentPanel .reco [data-d]").forEach(b => b.onclick = () => Appr.decide(b.closest(".reco").dataset.id, b.dataset.d));
+}
+/* "Agent recommends" - one card per opposite-side pass, each approved or rejected on its own */
+function recoCards(d) {
+  const lines = ((d.mission || {}).resurvey_plan || {}).lines || [], disp = d.dispatch || {};
+  if (!lines.length) return "";
+  return `<div class="recos">${lines.map(L => {
+    const r = disp["resurvey:" + L.targets.join(",")] || {};
+    const st = r.status || "planned";
+    return `<div class="reco" data-id="${escapeHtml(r.id || "")}">
+      <div class="reco-k">Agent recommends</div>
+      <div class="reco-t">${escapeHtml(L.recommendation || "Perform opposite-side resurvey")} <span class="mono">${escapeHtml(L.id)}</span></div>
+      <div class="reco-r"><span>Reason</span>${escapeHtml(L.reason || "uncertain visual evidence")}</div>
+      <div class="reco-m">${L.targets.length} target${L.targets.length === 1 ? "" : "s"} (${escapeHtml(L.targets.slice(0, 5).join(", "))}${L.targets.length > 5 ? "…" : ""}) · ${L.boat_min} boat-min${L.synthetic ? " · synthetic GPS" : ""}</div>
+      ${st === "pending" && r.id ? `<div class="appr-btns"><button class="ok" data-d="approved">Approve</button><button class="no" data-d="declined">Reject</button></div>`
+        : `<div class="reco-s st ${st}">${st}${r.by ? " · " + escapeHtml(r.by) : ""}</div>`}
+    </div>`;
+  }).join("")}</div>`;
+}
+/* the same survey WITH vs WITHOUT the OpenCV evidence - what changes downstream */
+function cfTable(cf) {
+  if (!cf || !cf.available) return "";
+  return `<div class="cfx"><div class="gate-h">Does OpenCV change the plan?<span>at planning time · ${cf.active ? "active vision (experimental)" : "active vision off"}</span></div>
+    <table><thead><tr><th></th><th>Without OpenCV</th><th>With OpenCV</th></tr></thead><tbody>${cf.rows.map(r =>
+      `<tr class="${r.changed ? "chg" : ""}"><th>${escapeHtml(r.what)}</th><td>${escapeHtml(r.without)}</td><td>${escapeHtml(r.with)}<div class="cfx-d">${escapeHtml(r.detail)}</div></td></tr>`).join("")}</tbody></table>
+    ${cf.example ? `<p class="gate-note"><b>${escapeHtml(cf.example.id)}</b>: ${escapeHtml(cf.example.conflict || "")} — ${ACT[cf.example.without]} → ${ACT[cf.example.with]}${cf.example.resurvey ? ", opposite-side pass requested" : ""}.</p>` : ""}
+    <p class="gate-note">${escapeHtml(cf.note)}</p></div>`;
 }
 /* the audit log: agent, person, system and LLM entries on one timeline */
 async function loadAudit(surveyId) {
@@ -1366,7 +1446,12 @@ const Appr = {
     const body = await r.json().catch(() => ({}));
     Log.push([{ tool: "human_gate", msg: r.ok ? `${id} ${decision} by ${by}` : `${id}: ${body.detail || r.status}`, t: "" }]);
     if (r.ok && body.dispatch && state.survey && body.survey_id === state.survey.survey_id) {
-      state.survey.dispatch = body.dispatch; renderAgentPanel(state.survey); loadAudit(state.survey.survey_id);
+      state.survey.dispatch = body.dispatch;
+      if (body.mission) {                                   // a rejected pass: the agent changed its plan
+        state.survey.tracked = body.tracked; state.survey.mission = body.mission;
+        if (body.replan) { toast(chainText({ rationale: body.replan.rationale })); setTimeout(toastHide, 4200); }
+        renderSurvey(state.survey, { keepView: true });
+      } else { renderAgentPanel(state.survey); loadAudit(state.survey.survey_id); }
     }
     this.load();
   },
