@@ -322,7 +322,7 @@ input[type=range]:focus-visible::-webkit-slider-thumb { box-shadow: var(--ring);
 
 /* ---------- viewer ---------- */
 .viewer { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; padding: 12px; }
-.viewer-canvas { position: relative; flex: 1 1 auto; min-height: 0; overflow: hidden; touch-action: none; cursor: grab; border-radius: 14px 14px 0 0; border: 1px solid var(--line); border-bottom: none; background: var(--well); }
+.viewer-canvas { position: relative; flex: 1 1 auto; min-height: 0; overflow: hidden; touch-action: none; cursor: grab; border-radius: 14px 14px 0 0; border: 1px solid var(--line); border-bottom: none; background: radial-gradient(120% 90% at 50% 40%, #0a1828 0%, #060f1a 70%); }
 .viewer-canvas.grabbing { cursor: grabbing; }
 .viewer-stage { position: absolute; top: 0; left: 0; transform-origin: 0 0; }   /* no will-change: it would freeze the raster at 1× and blur labels when zoomed */
 .viewer-stage #stageImg { display: block; width: 100%; height: 100%; user-select: none; -webkit-user-drag: none; }
