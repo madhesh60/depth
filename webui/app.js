@@ -645,24 +645,60 @@ const Log = (() => {
 function toast(txt) { const t = $("#runToast"); $("#runToastTxt").textContent = txt; t.hidden = false; }
 function toastHide() { $("#runToast").hidden = true; }
 
-/* loading: one quiet card in the middle of the workspace - a thin spinning arc, what is happening in
-   words, and a slim bar once the server reports progress. Nothing else moves. */
+/* loading: one quiet card in the middle of the workspace - a spinning arc, what is happening in words,
+   the elapsed time, and a bar that always moves: an indeterminate sweep until the server reports
+   progress, then a fill that creeps toward the end of the current step (never past it) so it never
+   looks stalled, snaps to 100% on finish and fades out. Fast calls (< 180 ms) never flash it. */
 const Busy = {
-  n: 0,
+  n: 0, t0: 0, shown: 0, floor: 0, ceil: 0, determinate: false, tick: null, showT: null, hideT: null,
   start(txt) {
     this.n++;
-    const c = $("#busyCard");
     $("#busyTitle").textContent = txt; $("#busySub").textContent = "";
-    $("#busyBar").hidden = true; $("#busyBar").style.setProperty("--p", 0);
-    c.hidden = false; document.body.classList.add("is-busy");
+    if (this.n > 1) return;                       // nested: keep the running bar and clock
+    clearTimeout(this.hideT); clearTimeout(this.showT); clearInterval(this.tick);
+    Object.assign(this, { t0: performance.now(), shown: 0, floor: 0, ceil: 0, determinate: false });
+    const c = $("#busyCard"), bar = $("#busyBar");
+    bar.classList.add("is-indet"); bar.style.setProperty("--p", 0);
+    $("#busyTime").textContent = "";
+    c.classList.remove("is-leaving", "is-done");
+    document.body.classList.add("is-busy");
+    this.showT = setTimeout(() => { c.hidden = false; }, 180);
+    this.tick = setInterval(() => this._frame(), 100);
   },
-  set(frac, txt) {
+  _frame() {
+    const s = (performance.now() - this.t0) / 1000;
+    $("#busyTime").textContent = s >= 1 ? `${s.toFixed(1)} s` : "";
+    if (!this.determinate) return;
+    // ease toward the end of the current step; slows as it approaches, never reaches it
+    this.shown = Math.max(this.floor, this.shown + (this.ceil - this.shown) * 0.035);
+    $("#busyBar").style.setProperty("--p", this.shown.toFixed(4));
+  },
+  /* frac: fraction already done (0..1); next: where the step now running ends (defaults to frac). */
+  set(frac, txt, next) {
     if (txt) $("#busySub").textContent = txt;
-    if (frac != null) { const bar = $("#busyBar"); bar.hidden = false; bar.style.setProperty("--p", Math.max(.03, Math.min(1, frac))); }
+    if (frac == null) return;
+    const bar = $("#busyBar");
+    if (!this.determinate) { this.determinate = true; bar.classList.remove("is-indet"); }
+    this.floor = Math.max(this.floor, Math.min(1, frac));
+    this.ceil = Math.max(this.floor, Math.min(.98, next != null ? next : frac));
+    this.shown = Math.max(this.shown, this.floor);
+    bar.style.setProperty("--p", this.shown.toFixed(4));
+  },
+  progress(done, total, txt) {
+    if (!total) return this.set(null, txt);
+    this.set(done / total, txt, (done + .9) / total);
   },
   done() {
     this.n = Math.max(0, this.n - 1); if (this.n) return;
-    $("#busyCard").hidden = true; document.body.classList.remove("is-busy");
+    clearTimeout(this.showT); clearInterval(this.tick);
+    const c = $("#busyCard"), bar = $("#busyBar");
+    document.body.classList.remove("is-busy");
+    if (c.hidden) return;                          // finished before it was ever shown
+    bar.classList.remove("is-indet"); bar.style.setProperty("--p", 1); c.classList.add("is-done");
+    this.hideT = setTimeout(() => {
+      c.classList.add("is-leaving");
+      this.hideT = setTimeout(() => { c.hidden = true; c.classList.remove("is-leaving", "is-done"); }, 220);
+    }, 260);
   },
 };
 
@@ -1022,7 +1058,7 @@ async function pollJob(jobId) {
     const p = j.progress || {};
     if (p.done !== lastDone && p.total) {
       lastDone = p.done;
-      Busy.set(p.total ? p.done / p.total : null, `Frame ${Math.min(p.done + (j.status === "running" ? 1 : 0), p.total)} of ${p.total}`);
+      Busy.progress(p.done, p.total, `Frame ${Math.min(p.done + (j.status === "running" ? 1 : 0), p.total)} of ${p.total}`);
       if (p.done > 0) Log.now({ tool: "frame_done", msg: `${p.done}/${p.total}${p.frame ? " · " + p.frame : ""}`, t: "" });
     }
     if (j.status === "done") return j.result;

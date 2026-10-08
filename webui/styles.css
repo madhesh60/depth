@@ -762,12 +762,6 @@ body.dock-min .dock-log { display: none; }
 .demo-dots i { width: 5px; height: 5px; border-radius: 50%; background: rgba(255, 255, 255, .2); transition: background var(--t); }
 .demo-dots i.on { background: var(--accent); }
 .demo-stop { grid-row: 1 / 3; grid-column: 3; }
-/* loading: a hairline progress bar on the navigation's lower edge + a quiet status pill */
-.progress { position: absolute; left: 20px; right: 20px; bottom: -1px; height: 2px; border-radius: 2px; overflow: hidden; pointer-events: none; opacity: 0; transition: opacity .35s var(--ease); }
-body.is-busy .progress { opacity: 1; }
-.progress::before { content: ""; position: absolute; inset: 0; border-radius: 2px; transform-origin: left center; transform: scaleX(var(--p, 0)); background: linear-gradient(90deg, rgba(158, 203, 255, .15), var(--accent) 70%, #e8f3ff); box-shadow: 0 0 12px rgba(158, 203, 255, .45); transition: transform .45s var(--ease); }
-.progress.indeterminate::before { width: 32%; transform: translateX(-110%); animation: sweep 1.15s cubic-bezier(.45, 0, .2, 1) infinite; }
-@keyframes sweep { to { transform: translateX(330%); } }
 .run-toast { position: fixed; top: auto; bottom: calc(var(--dock-h) + 84px); left: 50%; transform: translateX(-50%); z-index: 40; display: flex; align-items: center; gap: 10px; max-width: min(720px, 90vw); padding: 8px 16px; border-radius: var(--r-pill); background: var(--glass-strong); border: 1px solid var(--line-2); -webkit-backdrop-filter: var(--blur-strong); backdrop-filter: var(--blur-strong); box-shadow: var(--sh-3), var(--sheen); font: 500 13px var(--sans); letter-spacing: -.003em; color: var(--txt); animation: rise var(--t) var(--ease) both; }
 .spin { display: none; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 10px var(--accent); flex: 0 0 auto; }
 body.is-busy .run-toast .spin { display: block; animation: breathe 1.2s ease-in-out infinite; }
@@ -898,17 +892,23 @@ body.is-busy .run-toast .spin { display: block; animation: breathe 1.2s ease-in-
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { :root { --glass: rgba(11, 13, 16, .96); --glass-strong: rgba(16, 19, 23, .98); } }
 
 /* ======================================================================================== busy */
-.busy-card { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 45; display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 14px; min-width: 240px; max-width: 360px; padding: 16px 20px; border-radius: 16px; background: var(--glass-strong); border: 1px solid var(--line-2); -webkit-backdrop-filter: var(--blur-strong); backdrop-filter: var(--blur-strong); box-shadow: var(--sh-3), var(--sheen); animation: busy-in .2s var(--ease) both; }
-@keyframes busy-in { from { opacity: 0; transform: translate(-50%, -48%); } }
-.busy-arc { width: 22px; height: 22px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, .1); border-top-color: var(--accent); animation: busy-spin .9s linear infinite; }
+.busy-card { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 45; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px 14px; width: min(340px, 86vw); padding: 18px 20px 16px; border-radius: 16px; background: var(--glass-strong); border: 1px solid var(--line-2); -webkit-backdrop-filter: var(--blur-strong); backdrop-filter: var(--blur-strong); box-shadow: var(--sh-3), var(--sheen); animation: busy-in .22s var(--ease) both; transition: opacity .22s var(--ease), transform .22s var(--ease); }
+.busy-card.is-leaving { opacity: 0; transform: translate(-50%, -50%) scale(.97); }
+@keyframes busy-in { from { opacity: 0; transform: translate(-50%, -50%) scale(.97); } }
+.busy-arc { width: 22px; height: 22px; border-radius: 50%; border: 2px solid rgba(158, 203, 255, .14); border-top-color: var(--accent); border-right-color: var(--accent); animation: busy-spin .8s linear infinite; transition: border-color .2s var(--ease); }
+.busy-card.is-done .busy-arc { animation: none; border-color: var(--accent); }
 @keyframes busy-spin { to { transform: rotate(360deg); } }
-.busy-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.busy-txt b { font: 500 14px/1.3 var(--sans); color: var(--txt); }
-.busy-txt span { font: 400 12px/1.4 var(--sans); color: var(--txt-3); font-variant-numeric: tabular-nums; }
+.busy-txt { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.busy-txt b { font: 500 14px/1.3 var(--sans); color: var(--txt); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.busy-txt span { font: 400 12px/1.4 var(--sans); color: var(--txt-3); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .busy-txt span:empty { display: none; }
-.busy-bar { grid-column: 1 / -1; position: relative; height: 3px; border-radius: 3px; background: rgba(255, 255, 255, .08); overflow: hidden; }
-.busy-bar::after { content: ""; position: absolute; inset: 0; transform-origin: left; transform: scaleX(var(--p, 0)); background: var(--accent); border-radius: 3px; transition: transform .4s var(--ease); }
-@media (prefers-reduced-motion: reduce) { .busy-arc { animation-duration: 2.4s; } }
+.busy-time { align-self: start; padding-top: 2px; font: 400 11.5px var(--sans); font-variant-numeric: tabular-nums; color: var(--txt-4, var(--txt-3)); min-width: 3.4em; text-align: right; }
+.busy-bar { grid-column: 1 / -1; position: relative; height: 4px; border-radius: 4px; background: rgba(255, 255, 255, .07); overflow: hidden; }
+.busy-bar::after { content: ""; position: absolute; inset: 0; transform-origin: left center; transform: scaleX(var(--p, 0)); border-radius: 4px; background: linear-gradient(90deg, var(--accent-2), var(--accent) 80%, #dcecff); box-shadow: 0 0 10px rgba(158, 203, 255, .45); transition: transform .3s linear; }
+.busy-bar.is-indet::after { width: 38%; transform: translateX(-105%); transition: none; background: linear-gradient(90deg, rgba(158, 203, 255, 0), var(--accent) 50%, rgba(158, 203, 255, 0)); animation: busy-sweep 1.4s cubic-bezier(.45, 0, .25, 1) infinite; }
+.busy-card.is-done .busy-bar::after { transition: transform .22s var(--ease); }
+@keyframes busy-sweep { to { transform: translateX(270%); } }
+@media (prefers-reduced-motion: reduce) { .busy-arc { animation-duration: 2.4s !important; animation-iteration-count: infinite !important; } .busy-bar.is-indet::after { animation: none; width: 100%; transform: none; opacity: .35; } }
 
 /* ================================================================================ active vision */
 .switch-row { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; cursor: pointer; font: 400 13px var(--sans); color: var(--txt-2); user-select: none; }

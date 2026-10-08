@@ -75,6 +75,14 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ## 4. Session log
 
+### 2026-10-08 (sweep 55) — Loader that never looks stalled
+
+- The busy card's bar was hidden for a single-frame Analyze (only a spinner) and, on a survey, sat
+  still for a whole frame then jumped. Now: an indeterminate sweep until the server reports
+  progress, then a fill that eases toward the end of the frame being processed (never past it),
+  snaps to 100 % and fades out; an elapsed-time readout after 1 s; calls under 180 ms never flash
+  the card. The dead topbar `.progress` styles are removed. Zero-build, no new dependencies.
+
 ### 2026-10-07 (sweep 54) — Active vision: OpenCV result → decision → next tool → changed plan (STUDY-15)
 
 - `active.py`: the agent's next OpenCV tool is the cheapest one whose result could change its action
