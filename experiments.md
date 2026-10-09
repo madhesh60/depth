@@ -111,6 +111,31 @@ Promote each into the log below with full results as it runs.
 
 ## Experiment log
 
+### STUDY-16 — The agent cross-checks OpenCV's seabed track against the depth sounder (ON by default for recordings)
+
+- **Why.** On a raw recording every metre (ground range, heights, the range scale) hangs on the sonar
+  altitude. On Test-Small-DS the OpenCV tracker locked onto the transducer ring-down (8 samples vs
+  ~117) with confidence 0.99, and in the last third the depth sounder lost lock (1.5 m <-> 6 m jumps).
+  Neither sensor can be trusted by rule; the tracker's own confidence does not see its failures.
+- **Loop** (`src/agentic/sensor_check.py`, per 500-ping chunk): OpenCV bottom track → sounder steady?
+  (windowed p10–p90 spread ≤ 50%) → agree (≥ 60% of pings within 15%)? → on conflict, **re-run the
+  OpenCV tracker in a ±30% window the sounder sets**; accept only a coherent edge (roughness ≤ 2% of
+  altitude, ≥ 2× speckle gradient) → unsteady sounder: trust a coherent image edge → else re-track
+  inside the other channel's line → else **not measured** (slant range, error radius + altitude bound,
+  no metres). Then the scale is re-fit from sounder-backed chunks and every chunk re-checked until it
+  moves < 2%. Thresholds set on Test-Small-DS only.
+- **Fresh check** — Test-Large-DS (Solix, Pearl River, 1 h, 280 chunks), criteria committed before the
+  first run (`35f5ddf`), run once: 104 agree · 39 corrected · 137 recovered · 0 withheld.
+  C2 scale stable across halves **PASS** (0.9% gap) · C3 gross tracker failures caught **PASS** (3 of 3
+  corrected) · C1 port vs starboard **FAIL as registered** (loop 1.39% over 139 pairs vs tracker alone
+  0.80% over 45). Post-hoc, labelled: on the same 45 pairs the loop is 0.74%; the 94 pairs only the loop
+  could measure are 2.02%. Visual audit of 16 random chunks (developer, not blind): 16/16 on the seabed.
+- **Design recording:** 4 agree · 4 corrected · 2 recovered · 4 image-trusted; scale 2.19 → 2.03
+  cm/sample (gap to beam physics 14.5% → 7.8%); heights on the lost-lock chunk 0.36 m → 0.11 m (the
+  old pipeline used the bad sounder reading).
+- **Decision:** on by default for raw recordings; the failed criterion stays in
+  [`docs/sensor_check.md`](docs/sensor_check.md). Report: `python -m src.agentic.study_sensor`.
+
 ### STUDY-15 — Active vision: should OpenCV evidence change the agent's action? (NOT VALIDATED — off by default)
 
 - Tools: `python -m src.agentic.evidence_model` → `models/EXP-003/evidence_model.json` +

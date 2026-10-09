@@ -7,6 +7,28 @@ checks the analyst and boat budgets, plans routes, and then **asks a named perso
 moves. Every failure is caught, contained and told to that person. This page is the map; the code is
 `src/agentic/` and the studio shows all of it.
 
+## 0 · Per chunk of a raw recording: the agent re-measures its own geometry (on by default)
+
+Every metre DEPTH reports hangs on the sonar's altitude, and two independent sensors measure it:
+OpenCV's bottom tracker (Stage 1) and the depth sounder in each ping header. Neither is always right,
+so `sensor_check.py` runs a loop per 500-ping chunk, each step an `AgentStep`:
+
+| step | what the agent does |
+|---|---|
+| `bottom_track` | OpenCV tracker on the native sonogram |
+| `sounder_check` | is the sounder steady (windowed spread ≤ 50%) or did it lose lock? |
+| `crosscheck` | ≥ 60% of pings within 15% → **agree**; else **conflict** |
+| `retrack_guided` | conflict + steady sounder → **re-run the OpenCV tracker** in a ±30% window the sounder sets; a coherent edge → **corrected** / **recovered**; speckle is never forced |
+| `image_check` | unsteady sounder → a coherent image edge wins → **image trusted** (sounder flagged) |
+| `retrack_cross_channel` | still nothing → re-track inside the other channel's accepted line (same pings) |
+| `resolve` | the verdict and what it means downstream; nothing coherent → **not measured** (slant range, error radius + altitude bound, no metres) |
+| `estimate_scale` | re-fit metres per sample from sounder-backed chunks; moved > 2% → re-check every chunk |
+
+The survey's plan opens with `sensor_crosscheck` → `geometry_update` / `geometry_withheld` (which
+hazards were placed with corrected geometry). Studio: Survey → Agent → **Seabed cross-check**.
+Validation: [`sensor_check.md`](sensor_check.md) (STUDY-16; fresh 1-h recording, criteria committed
+before the run; one of three failed and is reported).
+
 ## 1 · Per candidate (Analyze → evidence card → "Agent decision")
 
 Each find's trace (`agent.py`, `AgentStep.status` = `done | skipped | failed`) is one chain:

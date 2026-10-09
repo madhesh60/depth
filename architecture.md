@@ -82,8 +82,16 @@ now **measures geometry** the later stages need, ~5 ms per 640² frame:
 Validation without labels on 107 un-augmented originals (STUDY-08): port vs starboard on the same
 pings agree to a median **1.6 px** (null 5.3 px); consecutive chunks 1.2 px; 97% tracked.
 
+**Sensor cross-check** (`src/agentic/sensor_check.py`, STUDY-16 → `docs/sensor_check.md`, on by
+default for raw recordings). Per 500-ping chunk the agent checks OpenCV's bottom track against the
+depth sounder; on a conflict it re-runs the OpenCV tracker in a window the steady sounder sets
+(`canonical.edge_picks` / `line_quality`), trusts a coherent image edge where the sounder lost lock,
+re-tracks from the other channel, or withholds the geometry; then it re-fits the range scale from
+sounder-backed chunks and re-checks until it converges. The accepted line reaches Stage 1 through
+`Canonicaliser.apply_geometry`; a withheld one widens the geotag error by the altitude bound.
+
 **Raw recordings** (`src/cv_pipeline/humminbird.py`, STUDY-14 → `docs/raw_recording.md`). A defensive
-reader for Humminbird `.DAT` + `B00x.SON/IDX`:
+reader for Humminbird `.DAT` + `B00x.SON/IDX` (9xx/11xx/Helix and Solix):
 
 * **Header walking and bounds.** It walks the tag-structured ping headers (the length is derived,
   never assumed) and bounds-checks every offset and count.

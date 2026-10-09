@@ -75,6 +75,23 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ## 4. Session log
 
+### 2026-10-09 (sweep 56) — The agent re-measures: OpenCV seabed vs depth sounder (STUDY-16) + audit fixes
+
+- `sensor_check.py`: per chunk of a raw recording the agent cross-checks OpenCV's bottom track against
+  the depth sounder, re-runs the tracker in a sounder-set window on a conflict, trusts a coherent image
+  edge where the sounder lost lock, re-tracks from the other channel, else withholds the geometry; then
+  re-fits the range scale and re-checks until it converges. On by default (`frames_and_track`).
+- STUDY-16: thresholds from Test-Small-DS; fresh 1-h Solix recording (Test-Large-DS, `fetch --large`;
+  Solix DAT reader fixed) run once against criteria committed beforehand: C2, C3 pass, C1 fails as
+  registered (reported; post-hoc same-pairs analysis labelled). `docs/sensor_check.md`.
+- Studio: Survey → Agent **Seabed cross-check** (verdict chips, OpenCV overlay, per-chunk steps);
+  the **guided demo now walks the agentic loop** (active-vision conflict, drill, cross-check,
+  recommend → decline → re-plan) with EXP-003's real numbers and no COOL claim.
+- Judge-audit fixes: 0-byte upload → incident (was 500); no height without a shadow; re-survey passes
+  need a floor of information per boat-minute; VoI rounding; model-absent test guards (CI).
+- STUDY-14 regenerated: EXP-003 gives 2 cards (48 / h of sonar) on the Colorado recording, not 8 / 191.
+- Tests: `tests/test_sensor_check.py` (8) + regressions; full suite 199 passed.
+
 ### 2026-10-08 (sweep 55) — Loader that never looks stalled
 
 - The busy card's bar was hidden for a single-frame Analyze (only a spinner) and, on a survey, sat

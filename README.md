@@ -25,15 +25,16 @@ wraps one in **promises you can check** and **measurements instead of assumption
 
 | | what DEPTH does | evidence |
 |---|---|---|
-| **Guaranteed tiers** | "≥ 65% of pots reach a human (95% confidence)" — fit on held-out recordings, verified once on unseen test (**held: 86.2%, LCB 80.5%**). It also says what it *cannot* promise (90% recall; any auto-confirm precision). | [`docs/calibration_exp001.md`](docs/calibration_exp001.md) |
+| **Guaranteed tiers** | "≥ 79% of pots reach a human (95% confidence)" — fit on held-out recordings, verified once on unseen test (**held: 81.1%**; the test's own lower bound is 76.7%). It also says what it *cannot* promise (90% recall; any auto-confirm precision). | [`docs/calibration_exp003.md`](docs/calibration_exp003.md) |
 | **Stage 1 measures the sonar** | bottom tracking gives the sonar's altitude per ping → relative object height, slant→ground geotags. Validated with no labels: port vs starboard on the same pings agree to **1.6 px** (random pairs: 5.3 px). | [`docs/stage1_canonical.md`](docs/stage1_canonical.md) |
 | **Value-of-information agent** | spends compute only where it can change an outcome; orders the human queue by calibrated P(pot); **analyst budget** ("what do 10 minutes buy?") and **boat budget** | trace on every card |
 | **Active vision** (experimental) | the agent picks its next OpenCV tool by whether the result could change its decision; evidence conflicts trigger another observation — §2. Validation failed, so it is **off by default** and labelled | [`docs/evidence_model_exp003.md`](docs/evidence_model_exp003.md) |
 | **A physical second look** | plans re-survey passes on the **opposite side** at mid-swath, ranked by **information per boat-minute**; each is approved or rejected on its own, and a rejection makes the agent re-plan; each target predicts the bearing its **shadow must flip to** | map + GPX/GeoJSON |
-| **Minutes saved — measured** | a timed, counterbalanced user study built into the app; the effort curve reports the **break-even card time** (7.95 s) instead of an invented "4 h → 10 min" | Study tab · [`docs/effort_curve.md`](docs/effort_curve.md) |
+| **Minutes saved — to be measured** | a timed, counterbalanced user study built into the app (not yet run with people). Under today's *assumed* timings the DEPTH queue costs **more** than manual review at the recall promise (65.5 vs 56.3 min); break-even card time **6.88 s**. We report that instead of an invented "4 h → 10 min" | Study tab · [`docs/effort_curve.md`](docs/effort_curve.md) |
 | **Are false alarms false?** | a **blinded audit with catch trials** gives exact audited precision in a confidence band | Audit tab |
 | **People decide, the agent re-plans** | a named person's ✓ / ✕ on a card (and a crew's *recovered* / *not found*) makes the agent re-plan the recovery route, queue, budget and re-survey passes; an **impact ledger** measures the reviewed precision (95% CI) | Survey tab · [`docs/agentic_vision.md`](docs/agentic_vision.md) |
 | **Humans teach it** | ✓ / ✕ / **＋ missed pot** on any frame → fine-tune set + hard negatives | `python -m src.agentic.feedback export` |
+| **The agent re-measures its own geometry** | on a raw recording it cross-checks OpenCV's seabed track against the **depth sounder** per chunk; on a conflict it **re-runs the OpenCV tracker** where the sounder points, trusts the image where the sounder lost lock, withholds what neither supports, then re-fits the range scale until it converges. Fresh 1-h recording: 280 of 280 chunks resolved, all 3 gross tracker failures corrected; one registered criterion failed and is reported | [`docs/sensor_check.md`](docs/sensor_check.md) |
 | **Real sonar recordings, real GPS** | reads a **raw Humminbird recording** (`.DAT` + `.SON`/`.IDX`) directly — per-ping GPS, heading, speed and depth, checked against physics (GPS speed vs speed field r = 0.95, course vs heading 2.4° median) — and **measures the range scale** (sonar depth ÷ Stage-1 altitude: 2.19 cm/sample ± 14.5%), so pins and heights are in real metres | [`docs/raw_recording.md`](docs/raw_recording.md) |
 | **OpenCV output drives actions — shown by counterfactual** | the same survey re-run with each OpenCV output withheld: without Stage 1, **193 of 264** pins fall outside their own error circle and 13 of 63 re-survey passes regroup; without the shadow, nothing changes (evidence only). Live in the product: **"⊘ without Stage 1"** on the survey map draws the ghost pins | [`docs/causal_trace.md`](docs/causal_trace.md) |
 | **Plugs into any console** | **OGC API – Features** (QGIS / ArcGIS read hazards, passes, routes and approved work orders), **signed webhooks** to mission-control / dispatch systems, and a drop-in `<depth-hazards>` web component — the Connect tab has live URLs and snippets | [`docs/integrations.md`](docs/integrations.md) |
@@ -65,6 +66,7 @@ Sonar frame ─► OpenCV 5: Stage 1 (bottom track, geometry) + YOLO11 via cv2.d
 | **Smart survey planning** | passes ranked by expected **information per boat-minute**, not confidence: the most likely target is often worth ~0 bits and does not drive the plan | Agent tab · `resurvey_rank` |
 | **Human control** | *Agent recommends: Perform opposite-side resurvey RS1 · Reason: evidence conflict on H001 · [Approve] [Reject]* — reject and the pass is dropped for good, the boat time re-ranked, its targets moved to the front of the inspection queue | Agent tab · `/api/approvals/{id}/decide` |
 | **Agent Trace** | DETECT → evidence → decision → OpenCV tool → new evidence → decision changed → approval → survey plan, on every evidence card | Analyze |
+| **Sensor cross-check (on by default)** | OpenCV seabed track vs depth sounder → conflict → OpenCV re-track with a new search window → accept / trust the image / withhold → re-fit the range scale → re-check. It changes where pins go and heights in metres (0.36 m → 0.11 m on a chunk where the sounder lost lock) | Survey → Agent · Seabed cross-check · STUDY-16 |
 
 **Does OpenCV matter? The same survey with vs without it** — the 8 shipped frames, 27 hazards
 (`python -m src.agentic.counterfactual` → [`docs/opencv_counterfactual.md`](docs/opencv_counterfactual.md)):
@@ -156,15 +158,14 @@ network ≈ 86%); one survey-hour of sonar (~169 frames) processed in **43 s** (
 
 **Real recording** (raw Humminbird, Colorado River, 150.6 s, real per-ping GPS —
 [`docs/raw_recording.md`](docs/raw_recording.md)): 3,453 pings per channel parsed with 0 malformed;
-range scale measured 2.19 cm/sample ± 14.5%; the full agent in 5.8 s (26× faster than the recording);
-8 review cards = **191 cards per hour of sonar** on water with no known pots — the false-alarm load
+range scale 2.19 cm/sample first estimate → **2.03 cm/sample ± 10.2%** after the agent's sensor
+cross-check (STUDY-16); the full agent in ~4 s (~40× faster than the recording); with EXP-003,
+2 review cards = **48 cards per hour of sonar** on water with no known pots — the false-alarm load
 this model would put on an analyst there.
 
-**Pending, by design:** EXP-003, the recall lever. EXP-002 trained and **failed** (ghost AP 0.25 on the
-held-out recordings: underfit by a silent optimizer switch, plus tile label poisoning; post-mortem in
-[`docs/exp002_diagnosis.md`](docs/exp002_diagnosis.md)). The fixed kit is ready
-([`docs/kaggle_training.md`](docs/kaggle_training.md)). Also pending: the timed study,
-the audit, the EC2 benchmark, and publishing the weights as a GitHub Release.
+**Pending:** the timed study and the blinded audit with people, the EC2 / COOL benchmark, and
+publishing the weights as a GitHub Release. (EXP-003 is deployed; EXP-002/004/005 were trained and did
+not beat it — [`docs/exp005_diagnosis.md`](docs/exp005_diagnosis.md).)
 
 ## 5. How it works
 

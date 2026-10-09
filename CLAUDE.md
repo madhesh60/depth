@@ -13,7 +13,10 @@ for AWS Graviton + COOL):
 
 0. **Input** — sonogram images, or a raw recording (`src/cv_pipeline/humminbird.py`: defensive
    `.DAT`/`.SON`/`.IDX` reader, per-ping GPS / heading / speed / depth, physics checks; the range
-   scale is MEASURED as sonar depth ÷ Stage-1 altitude — STUDY-14, `docs/raw_recording.md`).
+   scale is MEASURED as sonar depth ÷ Stage-1 altitude — STUDY-14, `docs/raw_recording.md`). The agent's
+   **sensor cross-check** (`src/agentic/sensor_check.py`, STUDY-16, on by default) checks OpenCV's seabed
+   track against the depth sounder per chunk, re-tracks on conflict, trusts the image where the sounder lost
+   lock, withholds what neither supports, and re-fits the scale (`docs/sensor_check.md`).
 
 1. **Stage 1 — sonar canonicalisation** (`src/cv_pipeline/canonical.py`): palette→luminance,
    orientation by source rule (never guessed), **bottom tracking** (sonar altitude px per ping),
@@ -82,8 +85,9 @@ Details: [infra/README.md](infra/README.md).
 - `external/pingmapper_sample/` — PINGMapper's sample data (MIT code; Zenodo 10.5281/zenodo.6604666 holds
   Git-LFS pointers, the objects come from the author's repo, every file SHA-256 pinned in
   `humminbird.SAMPLE_FILES`): `Test-Small-DS` = recording R01224, Humminbird 9xx, Colorado River at
-  Horseshoe Bend, 150.6 s, real per-ping GPS. Fetched, never redistributed. (`Test-Large-DS`, the
-  1-h Solix Pearl River recording, is ~216 MB and not downloaded.)
+  Horseshoe Bend, 150.6 s, real per-ping GPS. Fetched, never redistributed.
+- `external/pingmapper_large/` — `Test-Large-DS` (Rec00002, Humminbird Solix, Pearl River, 1 h, ~216 MB;
+  `humminbird fetch --large`, SHA-256 pinned): STUDY-16's fresh recording — never used to set a threshold.
 - The raw crab-pot archive is Roboflow-augmented (crops/rotations): measure pixel geometry only on
   single-copy originals; always evaluate on **unique frames** (`src/detection/frames.py`).
 
@@ -104,7 +108,8 @@ python -m src.detection.fp_audit build|summary              # blinded false-alar
 python -m src.agentic.study_causal [--frames DIR]           # STUDY-12 counterfactual trace
 python -m src.dashboard.mcp_server                          # MCP over stdio (HTTP: /mcp on the server)
 python -m src.detection.fetch_model                         # the detector weights (SHA-256 checked)
-python -m src.cv_pipeline.humminbird fetch|validate|report  # raw recording with real GPS (STUDY-14)
+python -m src.cv_pipeline.humminbird fetch [--large]|validate|report  # raw recording with real GPS (STUDY-14)
+python -m src.agentic.study_sensor                         # STUDY-16 sensor cross-check (design + fresh recording)
 python -m src.detection.study_scale_tta                     # STUDY-13 (input size + flip TTA)
 python -m src.agentic.evidence_model                        # STUDY-15 active-vision evidence (val -> test -> fresh)
 python -m src.agentic.counterfactual                        # same survey WITH vs WITHOUT OpenCV

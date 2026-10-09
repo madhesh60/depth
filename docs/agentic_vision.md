@@ -132,9 +132,9 @@ Full, regenerable report: [`calibration_exp001.md`](calibration_exp001.md). EXP-
 crab-pot sonograms are v1 val (**66 unique frames**, calibration) and v1 test (**92 unique frames**,
 verification); Roboflow copies are removed.
 
-| Promise (95% confidence) | Requested | What EXP-001 can support | Verified on test |
+| Promise (95% confidence) | Requested | What EXP-003 (deployed) can support | Verified on test |
 |---|---|---|---|
-| **Recall** — pots that reach a human (CONFIRMED+REVIEW) | ≥ 90% | **≥ 65%** — 90% is impossible: the detector never proposes 28% of calibration pots (ceiling 0.72) | **held** — 86.2% (lower bound 80.5%) |
+| **Recall** — pots that reach a human (CONFIRMED+REVIEW) | ≥ 90% | **≥ 79%** — 90% is impossible: the detector's recall ceiling on the calibration recordings is 0.85 (EXP-001: ≥ 65%) | **held** — 81.1% (the test's own lower bound 76.7%) |
 | **Precision** — CONFIRMED finds that are real | ≥ 85% | **none** — the best any threshold supports is ~62–66% | — (nothing auto-confirmed) |
 
 So with EXP-001 **every find goes to a human**, in P(pot) order. That is the honest consequence of the
@@ -213,8 +213,9 @@ set + hard negatives; where labels exist, reviewer agreement is scored.
 **Measuring the impact instead of claiming it (`study.py`, `effort.py`).** The Study tab runs a
 counterbalanced 2×2 Latin-square user study (manual frame review vs the agent's cards, timed, scored
 against labels). The effort curve then reports minutes to the recall promise for manual review, a
-raw detector list and the DEPTH queue, plus the **break-even card time** (7.95 s at 20 s/frame) —
-with assumed timings DEPTH only ties a perfect human, and the study decides the real answer. The
+raw detector list and the DEPTH queue, plus the **break-even card time** (6.88 s for EXP-003 at 20 s/frame) —
+with assumed timings the DEPTH queue costs more than manual review at the promise (65.5 vs 56.3 min),
+and only the study with people decides the real answer. The
 agent's own forecast of "pots these minutes will buy" held on unseen data (84.5 forecast vs 90 real).
 
 **Auditing the labels (`fp_audit.py`).** A blinded audit with catch trials asks whether the
@@ -236,7 +237,7 @@ and every survey exports its decision log (`mission.trace.jsonl`).
 |---|---:|---|
 | OpenCV 5 + agent doing real work | 30% | Stage-1 bottom tracking / `cv2.remap` / luminance, `cv2.dnn` detect, re-look + CLAHE, thin-line shadow, `seamlessClone` copy-paste for training; the agent's tools *are* CV ops |
 | Orchestration & autonomy | 25% | stated objective; value-of-information tool use; analyst **and boat** budgets; stitching; repeat-sighting merge; routes; opposite-side re-survey planning (§3, §6) |
-| Task success | 20% | a recall promise that **held on unseen test** (86%); honest "no auto-confirm"; forecast held; effort measured, not assumed (§4, §6) |
+| Task success | 20% | a recall promise that **held on unseen test** (≥ 79%, held at 81.1%); honest "no auto-confirm"; forecast held; effort study built, not yet run with people (§4, §6) |
 | Failure handling & human control | 15% | bounded LOW-RISK tier, budgeted REVIEW queue, human-approval gate, missed-pot labels, blinded audit (§5, §6) |
 | User experience | 10% | calm glass studio with five modes (Analyze · Survey · Study · Audit · Connect), purposeful type roles, and a guided 60-s demo: guarantee badges, evidence cards, seabed overlay, map + routes + re-survey passes, person-confirmed recovery route, 3D twin, live effort curve, downloads |
 
