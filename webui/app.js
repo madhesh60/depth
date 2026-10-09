@@ -166,7 +166,17 @@ const PLAN_STEP = {
   recovery_route: ["Route", "Recovery route"], resurvey_plan: ["Re-survey", "Boat time"], dispatch_gate: ["Gate", "Dispatch"],
   request_approval: ["Ask person", "Approval"], human_declined: ["Person", "Pass declined"],
   resurvey_rank: ["Re-survey", "Most informative first"],
+  sensor_crosscheck: ["Sense", "Seabed: image vs sounder"], geometry_update: ["Sense", "Corrected geometry used"],
+  geometry_withheld: ["Sense", "Geometry withheld"],
 };
+/* one chunk of a raw recording: the agent's seabed cross-check (src/agentic/sensor_check.py) */
+const SENSE_STEP = {
+  bottom_track: ["Sense", "OpenCV bottom track"], sounder_check: ["Sense", "Depth sounder"],
+  crosscheck: ["Check", "Image vs sounder"], retrack_guided: ["Re-measure", "Re-track where the sounder points"],
+  image_check: ["Check", "Is the image edge coherent?"], retrack_cross_channel: ["Re-measure", "Re-track from the other channel"],
+  resolve: ["Decide", "Seabed for this chunk"], estimate_scale: ["Model", "Range scale"],
+};
+const GEO_LABEL = { agree: "Agree", corrected: "Corrected", recovered: "Recovered", image_trusted: "Image trusted", not_measured: "Not measured" };
 /* display text: the question is the step's name, so show only the answer; arrows typeset */
 function chainText(s) {
   let t = String(s.rationale || "");
@@ -1114,6 +1124,7 @@ function renderAgentPanel(d) {
   $("#agentMeta").textContent = `${(m.agent_log || []).length} steps${incs.length ? ` · ${incs.length} incident${incs.length > 1 ? "s" : ""}` : ""}`;
   $("#agentPanel").innerHTML = `
     ${recoCards(d)}
+    ${seabedBlock(d)}
     ${cfTable(d.opencv_counterfactual)}
     <div class="gate">
       <div class="gate-h">Dispatch gate<span>${pending ? `${pending} waiting for a person` : "nothing waiting"}</span></div>
@@ -1126,7 +1137,44 @@ function renderAgentPanel(d) {
     ${incs.length ? `<div class="inc-list"><div class="gate-h">Incidents<span>${incs.length}</span></div>${incs.map(incidentRow).join("")}</div>` : ""}
     <div class="gate-h plan-h">Plan, step by step</div>${chainBlock(m.agent_log || [], PLAN_STEP)}`;
   const ta = $("#toApprovals"); if (ta) ta.onclick = () => Tabs.go("Approvals");
+  const geo = d.recording && d.recording.geometry;
+  if (geo) {
+    const show = fid => {
+      const c = geo.chunks.find(x => x.frame_id === fid); if (!c) return;
+      $$("#agentPanel .geo-chip").forEach(b => b.classList.toggle("is-on", b.dataset.f === fid));
+      $("#geoDetail").innerHTML = `<figure class="geo-fig"><img src="${API}/api/recording/geometry/${encodeURIComponent(fid)}.jpg" alt="seabed cross-check overlay for ${escapeHtml(fid)}" decoding="async"/>
+        <figcaption><span class="lg lg-t"></span>tracker alone <span class="lg lg-s"></span>depth sounder <span class="lg lg-a"></span>accepted by the agent</figcaption></figure>
+        <p class="geo-why"><b>${GEO_LABEL[c.status] || human(c.status)}</b>${c.source ? ` · ${escapeHtml(c.source)}` : ""}. ${escapeHtml(chainText({ rationale: c.meaning }))}.</p>
+        ${chainBlock(c.steps || [], SENSE_STEP)}`;
+    };
+    $$("#agentPanel .geo-chip").forEach(b => b.onclick = () => show(b.dataset.f));
+    const first = geo.chunks.find(x => x.status !== "agree") || geo.chunks[0];
+    if (first) show(first.frame_id);
+  }
   $$("#agentPanel .reco [data-d]").forEach(b => b.onclick = () => Appr.decide(b.closest(".reco").dataset.id, b.dataset.d));
+}
+/* "Seabed cross-check" - per chunk, did the OpenCV seabed track agree with the depth sounder, and what
+   did the agent do when it did not (re-track, trust the image, withhold). Chips open the overlay + steps. */
+function seabedBlock(d) {
+  const g = d.recording && d.recording.geometry;
+  if (!g || !(g.chunks || []).length) return "";
+  const n = g.counts || {}, it = (g.log || []).map(s => chainText(s)).join(" ");
+  const order = ["port", "starboard"];
+  const chips = order.map(ch => {
+    const cs = g.chunks.filter(c => c.channel === ch).sort((a, b) => a.index - b.index);
+    return cs.length ? `<div class="geo-row"><span class="geo-ch">${ch === "port" ? "Port" : "Starboard"}</span>${cs.map(c =>
+      `<button class="geo-chip geo-${c.status}" data-f="${escapeHtml(c.frame_id)}" title="${escapeHtml((GEO_LABEL[c.status] || c.status) + " — chunk " + c.index)}">${c.index}</button>`).join("")}</div>` : "";
+  }).join("");
+  const parts = Object.keys(GEO_LABEL).filter(k => n[k]).map(k => `<span class="geo-k geo-${k}"><i></i>${n[k]} ${GEO_LABEL[k].toLowerCase()}</span>`).join("");
+  return `<div class="gate geo">
+    <div class="gate-h">Seabed cross-check<span>${g.trusted} of ${g.chunks.length} chunks measured</span></div>
+    <p class="geo-lead">Every metre on the map hangs on the sonar's altitude. The agent checks OpenCV's seabed track against the depth sounder,
+      re-runs the tracker where they conflict, trusts the image where the sounder lost lock, and withholds what neither supports.</p>
+    <div class="geo-legend">${parts}</div>
+    ${chips}
+    <p class="gate-note">${escapeHtml(it)}</p>
+    <div id="geoDetail"></div>
+  </div>`;
 }
 /* "Agent recommends" - one card per opposite-side pass, each approved or rejected on its own */
 function recoCards(d) {
@@ -1924,7 +1972,7 @@ function showSurveyTwin() {
 /* ------------------------------------------------------------------ GUIDED 60-SECOND DEMO (the judge path) */
 const Demo = {
   on: false, token: 0,
-  steps: 7,
+  steps: 7,                                      // the judge path: the agentic loop end to end
   async run() {
     this.on = true; const tok = ++this.token;
     $("#demoBtn").classList.add("is-on"); $("#demoBtn").textContent = "Stop demo"; $("#demoBar").hidden = false;
@@ -1940,33 +1988,54 @@ const Demo = {
       if (!alive()) throw 0;
     };
     const mode = m => $(`.mode-btn[data-mode="${m}"]`).click();
+    const wasActive = localStorage.getItem("depth.active");
+    const setActive = on => { localStorage.setItem("depth.active", on ? "1" : "0"); $$(".activeToggle").forEach(x => x.checked = on); };
+    const g = (state.calibration && state.calibration.guarantees) || {};
     try {
       mode("analyze"); if (Twin.dim === "3d") $('.dim-btn[data-dim="2d"]').click();
-      await say(1, "<b>DEPTH</b> turns side-scan sonar into a human-approved cleanup plan. First, one frame: <b>Stage 1</b> tracks the seabed (green line) — the sonar's altitude, measured per ping.", 600);
-      const card = $('.sample-card[data-id="sample-02"]') || $(".sample-card"); if (card) card.click();
-      await runAnalyze(); await wait(3200);
-      await say(2, "Every find gets <b>evidence</b> and a <b>calibrated tier</b>: ≥ 65% of pots reach a human — a promise fit on held-out recordings and <b>held on unseen test</b> (86%).", 6200);
-      cancelTour(); toastHide(); $('.dim-btn[data-dim="3d"]').click(); await wait(1600);
-      const o = (state._analyze.twin && state._analyze.twin.objects || []).find(x => x.height_px != null);
-      if (o && Twin.frame) Twin.frame.select(o.id, false);
-      await say(3, "The <b>3D twin</b>: the seabed in true ground range, the sonar at its tracked altitude — and the <b>acoustic triangle</b> a find's height is measured from (sonar → object top → end of its shadow).", 7000);
-      $('.dim-btn[data-dim="2d"]').click(); mode("survey");
-      await say(4, "Now a whole survey runs as a background job: hazards on the map with error radii, analyst + boat budgets, and <b>opposite-side re-survey passes</b> where a real object's shadow must flip.", 0);
-      await runSurvey(); await wait(3600);
-      const cf = state.survey && state.survey.stage1_counterfactual;
-      if (cf && cf.available) {
-        if (!CF.on) CF.toggle();
-        await say(4, `Why measure the seabed? Switch Stage 1 off and <b>${cf.outside} of ${cf.n}</b> pins leave their own error circle (median ${cf.median_shift_m} m) — the tiers don't change, <b>where the boat goes</b> does. Measured, not claimed (STUDY-12).`, 5200);
-        if (CF.on) CF.toggle();
-      }
-      $('.sv-btn[data-sv="3d"]').click(); await wait(1500);
-      if (Twin.survey) { Twin.survey.goHome(); setTimeout(() => Twin.survey && Twin.survey.replay(true), 900); }
-      await say(5, "<b>Replay</b>: the boat sweeps its port / starboard sonar fans along the track — finds appear as it passes them.", 9500);
-      $('.sv-btn[data-sv="map"]').click(); mode("study");
-      await say(6, "Impact is <b>measured, not assumed</b>: the timed study + effort curve report the <b>break-even card time</b> at the recall promise, and the agent's own forecast held on unseen data.", 6500);
+      await say(1, "<b>DEPTH</b> turns side-scan sonar into a human-approved cleanup plan. One frame first: <b>Stage 1</b> (OpenCV) tracks the seabed — the dashed line — the sonar's altitude, measured per ping.", 600);
+      const card = $('.sample-card[data-id="sample-01"]') || $(".sample-card"); if (card) card.click();
+      setActive(false); await runAnalyze(); await wait(3000);
+      await say(2, `Every find gets <b>evidence</b> and a <b>calibrated tier</b>: ≥ ${Math.round((g.recall_promise || 0.79) * 100)}% of pots reach a person — a promise fit on held-out recordings and <b>held on unseen test</b> (${Math.round(((g.verified_on_test || {}).recall || 0.811) * 1000) / 10}%).`, 6000);
+      cancelTour(); toastHide();
+      setActive(true); await runAnalyze(); state._tourOptOut = true; cancelTour(); await wait(400);
+      const cs = state._analyze.candidates || [];
+      const changed = c => c.evidence && c.evidence.action && c.evidence.action !== c.evidence.action0;
+      let ci = cs.findIndex(c => changed(c) && c.evidence.conflict); if (ci < 0) ci = cs.findIndex(changed);
+      if (ci >= 0) { selectCandidate(ci); await wait(500); const at = $(`.ev-card[data-id="${ci}"] .atrace`); if (at) at.scrollIntoView({ block: "center" }); }
+      const ev = ci >= 0 ? cs[ci].evidence : null;
+      await say(3, "<b>Active vision</b> (experimental, labelled): per find the agent asks which OpenCV tool could change its decision, runs only that one, and updates its belief. "
+        + (ev ? `Here the OpenCV evidence moves P(pot) ${Math.round((cs[ci].p_pot ?? ev.p_pot ?? 0) * 100)}% → ${Math.round(ev.p_evidence * 100)}%: <b>${ACT[ev.action0] || ev.action0} → ${ACT[ev.action] || ev.action}</b>${ev.request_resurvey ? ", and the agent asks for an opposite-side pass" : ""}. ` : "")
+        + "It failed its own validation, so it stays off by default.", 9000);
+      setActive(wasActive === "1"); cancelTour(); toastHide();
+      await say(4, "Failures are handled on purpose. A drill: the evidence tool crashes → the agent falls back to the detector score, sends the find to a person and <b>never auto-confirms</b>.", 0);
+      await runAnalyze("tool_failed"); await wait(4200);
+      $$(".notice .nt-x").forEach(b => b.click());
       mode("survey");
-      const bp = $("#briefBody"); if (bp) bp.closest(".panel").scrollIntoView({ block: "nearest", behavior: "smooth" });
-      await say(7, "The agent hands over a one-page <b>mission brief</b> — every number in it is machine-checked against the survey. Every report carries <b>provenance</b> (model, calibration, OpenCV build — COOL on Graviton) and a <b>decision log</b>. Nothing is dispatched without a human. ✓", 7000);
+      const rec = $("#gpsRecording") && !$("#gpsRecording").hidden;
+      if (rec) { $("#gpsMode").value = "recording"; }
+      await say(5, rec ? "A <b>raw sonar recording</b> with real GPS. Every metre on the map hangs on the sonar's altitude, so the agent <b>cross-checks OpenCV's seabed track against the depth sounder</b>, re-runs the tracker where they conflict and trusts the image where the sounder lost lock." : "Now a whole survey: hazards with error radii, analyst + boat budgets, and opposite-side re-survey passes.", 0);
+      await runSurvey(); await wait(1500);
+      const agentTab = [...$$(".tabs .tab")].find(x => x.textContent.trim() === "Agent"); if (agentTab) agentTab.click();
+      await wait(600);
+      const chip = $('#agentPanel .geo-chip.geo-corrected') || $("#agentPanel .geo-chip.geo-image_trusted");
+      if (chip) { chip.click(); await wait(300); const gd = $("#geoDetail"); if (gd) gd.scrollIntoView({ block: "start", behavior: "smooth" }); }
+      if (rec) await say(5, "Red: the tracker alone. Blue: the sounder. Green: what the agent accepted after re-measuring. Checked on a <b>1-hour recording it never saw</b> — registered criteria, one failure reported (STUDY-16).", 8000);
+      const disp = (state.survey && state.survey.dispatch) || {};
+      const k = Object.keys(disp).find(x => x.startsWith("resurvey:") && disp[x].status === "pending");
+      if (k) {
+        const reco = $("#agentPanel .recos"); if (reco) reco.scrollIntoView({ block: "start", behavior: "smooth" });
+        await say(6, "The agent <b>recommends</b> a re-survey pass — it can only ask. A person rejects it…", 3600);
+        if (!($("#apprName").value || "").trim()) $("#apprName").value = "Guided demo";
+        await Appr.decide(disp[k].id, "declined"); await wait(800);
+        const t2 = [...$$(".tabs .tab")].find(x => x.textContent.trim() === "Agent"); if (t2) t2.click();
+        await wait(300);
+        const dn = [...$$("#agentPanel .ch-name")].find(x => x.textContent.includes("Pass declined"));
+        if (dn) dn.closest("li").scrollIntoView({ block: "center", behavior: "smooth" });
+        await say(6, "…and the agent <b>re-plans</b>: the pass is dropped for good, the boat time is re-ranked, and its target moves to the front of the inspection queue. Every step is in the decision log.", 7000);
+      }
+      const bt = [...$$(".tabs .tab")].find(x => x.textContent.trim() === "Brief"); if (bt) bt.click();
+      await say(7, "The agent hands over a one-page <b>mission brief</b>; every number in it is machine-checked against the survey. Every export carries <b>provenance</b> (model, calibration, the OpenCV build) and a decision log. Nothing is dispatched without a named person. ✓", 7000);
     } catch (e) { /* stopped */ }
     if (tok === this.token) this.stop();
   },

@@ -938,3 +938,25 @@ body.is-busy .run-toast .spin { display: block; animation: breathe 1.2s ease-in-
 .cfx tr.chg th { color: var(--accent); }
 .cfx-d { font-size: 11px; color: var(--txt-3); margin-top: 2px; }
 body.is-busy .viewer-placeholder { visibility: hidden; }
+
+/* survey: the seabed cross-check (raw recordings) */
+.geo-lead { font: var(--t-12); color: var(--txt-2); margin: 0 0 10px; }
+.geo-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 10px; }
+.geo-k { display: inline-flex; align-items: center; gap: 6px; font: var(--t-11); color: var(--txt-3); }
+.geo-k i { width: 8px; height: 8px; border-radius: 2px; background: var(--geo-c); }
+.geo-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-bottom: 6px; }
+.geo-ch { flex: 0 0 100%; font: var(--t-11); color: var(--txt-3); margin-top: 2px; }
+.geo-chip { appearance: none; cursor: pointer; min-width: 26px; height: 22px; padding: 0 5px; border-radius: 6px;
+  border: 1px solid var(--line-2); background: color-mix(in srgb, var(--geo-c) 22%, transparent); color: var(--txt);
+  font: 500 10.5px var(--mono, ui-monospace, monospace); font-variant-numeric: tabular-nums; }
+.geo-chip:hover { border-color: var(--line-3); }
+.geo-chip.is-on { outline: 1.5px solid var(--geo-c); outline-offset: 1px; }
+.geo-agree { --geo-c: #7fb6e6; } .geo-corrected { --geo-c: #e6c48a; } .geo-recovered { --geo-c: #b9a6f0; }
+.geo-image_trusted { --geo-c: #8fd6b4; } .geo-not_measured { --geo-c: #f0998c; }
+.geo-fig { margin: 12px 0 8px; }
+.geo-fig img { width: 100%; max-width: 520px; height: auto; border-radius: 10px; border: 1px solid var(--line); display: block; }
+.geo-fig figcaption { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; font: var(--t-11); color: var(--txt-3); margin-top: 6px; }
+.geo-fig .lg { display: inline-block; width: 14px; height: 3px; border-radius: 2px; margin-right: -6px; }
+.lg-t { background: rgb(235, 60, 60); } .lg-s { background: rgb(40, 150, 255); } .lg-a { background: rgb(90, 210, 60); }
+.geo-why { font: var(--t-12); color: var(--txt-2); margin: 4px 0 8px; }
+.geo-why b { color: var(--txt); font-weight: 600; }

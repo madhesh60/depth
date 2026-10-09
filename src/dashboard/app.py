@@ -345,12 +345,24 @@ def _recording_summary() -> dict:
     return {"available": True, "name": _REC_CACHE.get("name"), "frames": len(frames), "dat": val["dat"],
             "duration_s": ch["duration_s"], "track_m": ch["track_m"], "bbox": ch["bbox"],
             "range_scale": meta["range_scale"],
+            "geometry": _geometry_summary(meta),
             "checks": {"speed_gps_per_unit": ch["gps_speed_per_speed_unit"], "speed_corr": ch["speed_corr"],
                        "course_vs_heading_deg_median": ch["course_vs_heading_deg_median"],
                        "course_vs_heading_deg_p90": ch["course_vs_heading_deg_p90"],
                        "records_monotonic": ch["records_monotonic"], "issues": ch["issues"]},
             "source": "PINGMapper sample data (Bodine et al., MIT; Zenodo 10.5281/zenodo.6604666) - real Humminbird "
                       "recording, real per-ping GPS; downloaded hash-checked, not redistributed"}
+
+
+def _geometry_summary(meta: dict) -> Optional[dict]:
+    """The agent's sensor cross-check of the recording (STUDY-16): the summary, the scale iterations
+    and one entry per chunk (verdict, reason, the agent's steps) - the overlay is /api/recording/geometry/<frame>.jpg."""
+    g = meta.get("geometry")
+    if not g:
+        return None
+    chunks = [{"frame_id": fid, **{k: v for k, v in (m.get("geometry") or {}).items() if k != "lines"}}
+              for fid, m in meta["frames"].items() if m.get("geometry")]
+    return {**g, "chunks": chunks, "report": "docs/sensor_check.md"}
 
 
 def _collect_frames(use_samples: bool, files: Optional[list[UploadFile]],
@@ -829,6 +841,32 @@ def survey(use_samples: bool = Query(False), gps: str = Query("synthetic"),
 def recording_info():
     """The raw recording available as a survey source (real per-ping GPS) and its validation."""
     return _recording_summary()
+
+
+@app.get("/api/recording/geometry/{frame_id}.jpg")
+def recording_geometry_overlay(frame_id: str):
+    """One chunk of the recording with the agent's seabed cross-check drawn by OpenCV: red = the
+    tracker alone, blue = the depth sounder, green = what the agent accepted (none = not measured)."""
+    if not _recording_summary().get("available"):
+        raise HTTPException(404, "no raw recording on this server")
+    frames, _, meta, _ = _recording()
+    img = dict(frames).get(frame_id)
+    geo = (meta["frames"].get(frame_id) or {}).get("geometry")
+    if img is None or not geo:
+        raise HTTPException(404, f"unknown recording frame {frame_id}")
+    vis = img.copy()
+    for key, col in (("sounder", (255, 150, 40)), ("tracker", (60, 60, 235)), ("accepted", (60, 210, 90))):
+        pts = [(int(x), int(y)) for x, y in (geo["lines"].get(key) or []) if y is not None]
+        for a, b in zip(pts, pts[1:]):
+            if key == "sounder":
+                cv2.circle(vis, a, 2, col, -1, cv2.LINE_AA)
+            else:
+                cv2.line(vis, a, b, col, 2, cv2.LINE_AA)
+    ys = [y for k in ("sounder", "tracker", "accepted") for _, y in (geo["lines"].get(k) or []) if y is not None]
+    h = int(min(vis.shape[0], max(vis.shape[0] * 0.3, 1.8 * max(ys)) if ys else vis.shape[0]))
+    vis = cv2.resize(vis[:h], (640, max(1, int(round(640 * h / vis.shape[1])))), interpolation=cv2.INTER_AREA)
+    ok, buf = cv2.imencode(".jpg", vis, [cv2.IMWRITE_JPEG_QUALITY, 85])
+    return Response(buf.tobytes(), media_type="image/jpeg", headers={"Cache-Control": "max-age=3600"})
 
 
 _MEDIA = {"geojson": "application/geo+json", "gpx": "application/gpx+xml",
