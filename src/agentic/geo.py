@@ -53,6 +53,12 @@ class PingFix:
     depth_m: Optional[float] = None
     range_m_per_px: Optional[float] = None      # measured range scale of the analysed frame (m / px)
     range_scale_rel_unc: Optional[float] = None # its relative uncertainty (robust spread / median)
+    # the seabed geometry the agent's sensor cross-check accepted (sensor_check.py): the per-column
+    # first-return row in the analysed frame's pixels, its status, and the recording's deepest
+    # sounding (bounds slant − ground range when the geometry is NOT measured)
+    bottom_line_px: Optional[list] = None
+    geometry: Optional[str] = None
+    altitude_bound_m: Optional[float] = None
 
 
 def offset_latlon(lat: float, lon: float, dist_m: float, bearing_deg: float) -> tuple[float, float]:
@@ -109,7 +115,12 @@ def geotag(cand: Candidate, fix: PingFix, nadir: str, w: int, h: int,
         lat, lon = offset_latlon(fix.ping_lat[k], fix.ping_lon[k], ground_m, hdg + (90.0 if side == "starboard" else -90.0))
         cand.lat, cand.lon = round(lat, 7), round(lon, 7)
         unc = fix.range_scale_rel_unc if fix.range_scale_rel_unc is not None else 0.25
-        cand.geo_error_m = round(GPS_ERR_M + ground_m * (unc + math.sin(math.radians(HEADING_ERR_DEG))), 1)
+        err = GPS_ERR_M + ground_m * (unc + math.sin(math.radians(HEADING_ERR_DEG)))
+        if fix.geometry == "not_measured":
+            # the agent could not resolve the seabed here: ground_range_px is the SLANT range, which
+            # overstates ground range by at most the altitude <= the recording's deepest sounding
+            err += fix.altitude_bound_m if fix.altitude_bound_m else ground_m
+        cand.geo_error_m = round(err, 1)
         return cand
     range_px = cand.ground_range_px if cand.ground_range_px is not None \
         else range_px_from_nadir(cand.bbox, nadir, w, h)

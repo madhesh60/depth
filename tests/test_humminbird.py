@@ -104,8 +104,15 @@ def test_frames_and_track_carry_real_per_ping_fixes(tmp_path):
     assert [f for f, _ in frames] == ["R00001_ss_port_00000", "R00001_ss_port_00001",
                                       "R00001_ss_star_00000", "R00001_ss_star_00001"]
     fx = track["R00001_ss_port_00000"]
-    assert fx.synthetic is False and len(fx.ping_lat) == 64 and fx.depth_m == 4.2
+    assert fx.synthetic is False and len(fx.ping_lat) == 64
     assert frames[0][1].shape == (64, 64, 3)
+    # the agent's sensor cross-check resolved every chunk; these synthetic returns hold no seabed edge,
+    # so the altitude is withheld rather than copied blindly from the sounder (STUDY-16)
+    assert fx.geometry in ("agree", "corrected", "recovered", "image_trusted", "not_measured")
+    assert (fx.depth_m is None) == (fx.geometry == "not_measured")
+    assert meta["geometry"]["chunks"] == 4 and meta["geometry"]["log"][0]["tool"] == "estimate_scale"
+    _, track0, meta0 = hb.frames_and_track(rec, nchunk=30, size=64, crosscheck=False)
+    assert track0["R00001_ss_port_00000"].depth_m == 4.2 and "geometry" not in meta0
 
 
 def test_geotag_uses_the_objects_own_ping_and_measured_scale():

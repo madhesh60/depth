@@ -190,7 +190,7 @@ def plan_mission(tracked: list[TrackedObject], track: Optional[dict], guarantees
     mission.human_log = list(human_log or [])
     mission.replans = list(replans or [])
     mission.impact = impact_ledger(tracked, mission.human_log)
-    mission.agent_log = planner_log(tracked, mission, queue, budget_minutes, boat_minutes)
+    mission.agent_log = geometry_log(track, tracked) + planner_log(tracked, mission, queue, budget_minutes, boat_minutes)
     mission.incidents = [i for i in (incidents or []) if i.get("code") != "missing_gps"]
     if not gps_available:
         from .incidents import incident
@@ -200,6 +200,34 @@ def plan_mission(tracked: list[TrackedObject], track: Optional[dict], guarantees
 
 def _step(tool: str, why: str, status: str = "done", **detail) -> dict:
     return {"tool": tool, "status": status, "rationale": why, "detail": detail}
+
+
+def geometry_log(track: Optional[dict], tracked: list[TrackedObject]) -> list[dict]:
+    """A raw recording's seabed geometry, as the agent's sensor cross-check resolved it per chunk
+    (``sensor_check.py``), and what that changed for the hazards: ground range and metres from the
+    trusted source, or a widened error radius where nothing coherent was found."""
+    st = {fid: f.geometry for fid, f in (track or {}).items() if getattr(f, "geometry", None)}
+    if not st:
+        return []
+    n = {k: sum(v == k for v in st.values()) for k in ("agree", "corrected", "recovered", "image_trusted", "not_measured")}
+    by = {}
+    for t in tracked:
+        by.setdefault(st.get(t.frame_id), []).append(t.oid)
+    changed = by.get("corrected", []) + by.get("recovered", []) + by.get("image_trusted", [])
+    why = (f"{len(st)} chunk(s): OpenCV seabed track and depth sounder agree on {n['agree']}; "
+           f"{n['corrected'] + n['recovered']} re-tracked where the steady sounder pointed; {n['image_trusted']} "
+           f"trusted the image where the sounder lost lock; {n['not_measured']} not measured")
+    out = [_step("sensor_crosscheck", why, **n)]
+    if changed:
+        out.append(_step("geometry_update", f"{len(changed)} hazard(s) placed with geometry the cross-check corrected "
+                                            f"({', '.join(changed[:6])}{'…' if len(changed) > 6 else ''}) - ground range and "
+                                            f"heights follow the trusted source, not the tracker's first pick",
+                         hazards=changed))
+    if by.get("not_measured"):
+        out.append(_step("geometry_withheld", f"{len(by['not_measured'])} hazard(s) on chunks with no coherent seabed "
+                                              f"({', '.join(by['not_measured'][:6])}): slant range, error radius widened by the "
+                                              f"altitude bound, no heights in metres", hazards=by["not_measured"]))
+    return out
 
 
 def planner_log(tracked: list[TrackedObject], m: MissionPlan, queue: list[TrackedObject],

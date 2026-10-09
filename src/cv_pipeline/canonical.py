@@ -65,6 +65,7 @@ class CanonicalFrame:
     track_conf: float = 0.0                       # share of pings with a clear water→seabed step
     step: float = 0.0                             # frame-level seabed - water-column contrast (grey levels)
     timings_ms: dict[str, float] = field(default_factory=dict)
+    geometry_status: Optional[str] = None         # set when an agent cross-check resolved the seabed (sensor_check.py)
 
     # -- geometry helpers ---------------------------------------------------------------------
     @property
@@ -120,6 +121,8 @@ class CanonicalFrame:
              "altitude_px": None if self.altitude_px is None else round(self.altitude_px, 1),
              "track_conf": round(self.track_conf, 3), "step": round(self.step, 1),
              "measured": self.measured, "timings_ms": {k: round(v, 2) for k, v in self.timings_ms.items()}}
+        if self.geometry_status:
+            d["geometry_status"] = self.geometry_status
         if self.bottom_line is not None:
             d["bottom_line_native"] = self.bottom_polyline(max_points=64)
         return d
@@ -210,6 +213,63 @@ def bottom_track(gc: np.ndarray) -> tuple[Optional[np.ndarray], Optional[float],
     return line, float(np.median(line)), track_conf, step
 
 
+def _rolling_median(a: np.ndarray, k: int) -> np.ndarray:
+    k = max(3, min(k, len(a) if len(a) % 2 else len(a) - 1))
+    p = np.pad(a, k // 2, mode="edge")
+    return np.median(np.lib.stride_tricks.sliding_window_view(p, k), axis=1)
+
+
+def smooth_line(rows: np.ndarray) -> Optional[np.ndarray]:
+    """Per-ping raw picks → a seabed line: NaN pings interpolated, median (spikes) then mean (jitter)
+    along track — the same smoothing :func:`bottom_track` applies. None if nothing was picked."""
+    ok = np.isfinite(rows)
+    if not ok.any():
+        return None
+    W = len(rows)
+    line = rows.astype(np.float32).copy()
+    if not ok.all():
+        idx = np.arange(W)
+        line[~ok] = np.interp(idx[~ok], idx[ok], rows[ok])
+    k = min(ALONG_MEDIAN, W if W % 2 else W - 1)
+    if k >= 5:
+        line = cv2.medianBlur(line.reshape(1, -1), 5).ravel()
+        line = np.convolve(np.pad(line, k // 2, mode="edge"), np.ones(k) / k, mode="valid")[:W]
+    return line
+
+
+def edge_picks(gc: np.ndarray, lo_rows: np.ndarray, hi_rows: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """The strongest dark→bright step of each ping (column) of a CANONICAL view, searched only between
+    ``lo_rows[x]`` and ``hi_rows[x]`` — the bottom tracker re-run with a search window the agent
+    chose (from another sensor or the other channel). Returns ``(rows, strength)``: raw per-ping picks
+    (NaN where the window is empty) and each pick's step in units of the frame's speckle gradient
+    (p90 of |vertical gradient| over the far half of the range axis)."""
+    H, W = gc.shape
+    sm = cv2.blur(gc, (PING_SMOOTH, 3)).astype(np.float32)
+    grad = np.zeros_like(sm)
+    grad[1:-1] = sm[2:] - sm[:-2]
+    noise = float(np.percentile(np.abs(grad[H // 2:]), 90)) + 1e-6
+    rows, strength = np.full(W, np.nan, np.float32), np.zeros(W, np.float32)
+    lo = np.clip(np.nan_to_num(lo_rows, nan=-1), 1, H - 2).astype(int)
+    hi = np.clip(np.nan_to_num(hi_rows, nan=-1), 1, H - 2).astype(int)
+    for x in np.nonzero(hi > lo + 1)[0]:
+        k = lo[x] + int(np.argmax(grad[lo[x]:hi[x], x]))
+        rows[x], strength[x] = k + 0.5, grad[k, x] / noise         # centred diff peaks 1 row early
+    return rows, strength
+
+
+def line_quality(rows: np.ndarray, strength: np.ndarray) -> dict:
+    """How coherent a seabed line is: ``roughness`` = median |pick − its along-track rolling median|
+    as a share of the altitude (a real seabed is continuous ping to ping; picks in speckle jump), and
+    ``strength`` = median step in speckle-noise units. ``coverage`` = share of pings with a pick."""
+    ok = np.isfinite(rows)
+    if ok.sum() < 5:
+        return {"roughness": None, "strength": 0.0, "coverage": float(ok.mean()) if len(rows) else 0.0}
+    r = rows[ok].astype(np.float64)
+    m = _rolling_median(r, 31)
+    return {"roughness": round(float(np.median(np.abs(r - m)) / max(float(np.median(m)), 1.0)), 4),
+            "strength": round(float(np.median(strength[ok])), 2), "coverage": round(float(ok.mean()), 3)}
+
+
 def ground_range_remap(gc: np.ndarray, bottom_line: np.ndarray) -> np.ndarray:
     """Slant-range → ground-range resampling of a canonical view (``cv2.remap``): output row g of
     ping x samples slant row ``sqrt(g² + alt_x²)``. The water column collapses to the nadir."""
@@ -265,6 +325,22 @@ class Canonicaliser:
         with self._t("bottom_track", t):
             line, alt, conf, step = bottom_track(gc)
         cf.bottom_line, cf.altitude_px, cf.track_conf, cf.step = line, alt, conf, step
+        return cf
+
+    @staticmethod
+    def apply_geometry(cf: CanonicalFrame, status: Optional[str], line: Optional[list]) -> CanonicalFrame:
+        """Replace the frame's own bottom track with the seabed the agent's sensor cross-check
+        resolved for these pings (``sensor_check.py``): a trusted line (canonical = native rows for
+        nadir-top recording frames), or NO geometry when it was not measured — never the frame's
+        own track after the agent rejected it."""
+        if not status or cf.orientation.nadir != "top":
+            return cf
+        cf.geometry_status = status
+        if status == "not_measured" or not line or len(line) != cf.width:
+            cf.bottom_line, cf.altitude_px = None, None
+            return cf
+        cf.bottom_line = np.asarray(line, np.float32)
+        cf.altitude_px = float(np.median(cf.bottom_line))
         return cf
 
     def detector_input(self, image: np.ndarray, cf: CanonicalFrame, mode: str = "raw") -> np.ndarray:

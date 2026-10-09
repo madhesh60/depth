@@ -85,6 +85,8 @@ class ChunkGeometry:
     altitude_m: Optional[float] = None       # the chunk's altitude in metres (from the trusted source)
     metrics: dict = field(default_factory=dict)
     steps: list[AgentStep] = field(default_factory=list)
+    tracker_line: Optional[np.ndarray] = None   # what the OpenCV tracker alone picked (for the overlay)
+    expected: Optional[np.ndarray] = None       # the sounder's altitude in samples at the scale used
 
     @property
     def key(self) -> str:
@@ -100,6 +102,20 @@ class ChunkGeometry:
             return None
         cols = np.linspace(0, len(self.line) - 1, size)
         return [round(float(v) * size / self.samples, 2) for v in np.interp(cols, np.arange(len(self.line)), self.line)]
+
+    def overlay_lines(self, size: int, points: int = 96) -> dict:
+        """Tracker alone / sounder / accepted lines in a ``size``-px resized frame, ``points`` per line
+        (``[x, y]``, None where undefined) — what the studio draws over the frame."""
+        xs = np.linspace(0, self.n_pings - 1, points)
+        def f(arr):
+            if arr is None:
+                return None
+            a = np.asarray(arr, float)
+            v = np.interp(xs, np.arange(len(a)), np.where(np.isfinite(a), a, np.nan))
+            return [[round(float(x) * size / max(self.n_pings - 1, 1), 1), None if not np.isfinite(y) else
+                     round(float(y) * size / self.samples, 1)] for x, y in zip(xs, v)]
+        return {"tracker": f(self.tracker_line), "sounder": f(self.expected),
+                "accepted": f(self.line) if self.trusted else None}
 
     def to_dict(self) -> dict:
         return {"channel": self.channel, "index": self.index, "status": self.status, "source": self.source,
@@ -149,9 +165,11 @@ def check_chunk(channel: str, index: int, son: np.ndarray, depths: np.ndarray, m
     g = ChunkGeometry(channel=channel, index=index, n_pings=W, samples=H)
     depths = np.asarray(depths, float)
     expected = np.where(np.isfinite(depths) & (depths > 0), depths / m_per_sample, np.nan)
+    g.expected = expected
 
     t = time.perf_counter()
     line, alt, conf, step = bottom_track(son)
+    g.tracker_line = line
     tq = None
     if line is not None:
         rows, st = edge_picks(son, line - TRACK_WIN, line + TRACK_WIN)

@@ -108,8 +108,11 @@ class ReLookAgent:
     def run_frame(self, frame: np.ndarray, frame_id: str = "frame",
                   nadir: str | None = None,
                   progress_cb: Optional[Callable[[str, dict], None]] = None,
-                  altitude_m: Optional[float] = None, faults: Optional[set] = None) -> FrameResult:
-        """``altitude_m``: a MEASURED sonar altitude in metres (a real recording's depth field) — only
+                  altitude_m: Optional[float] = None, faults: Optional[set] = None,
+                  geometry: Optional[dict] = None) -> FrameResult:
+        """``geometry``: ``{"status", "bottom_line"}`` the agent's sensor cross-check resolved for a raw
+        recording's pings (``sensor_check.py``) — it replaces this frame's own bottom track.
+        ``altitude_m``: a MEASURED sonar altitude in metres (a real recording's depth field) — only
         then are shadow heights given in metres. ``nadir`` is an explicit override; otherwise orientation comes from the source rule in
         ``src.cv_pipeline.orientation`` (or the prover's configured default) - never guessed.
 
@@ -123,6 +126,8 @@ class ReLookAgent:
         self._active_mode = ("off" if not want else "validated" if em.use else "experimental")
         t0 = time.perf_counter()
         cf = self.stage1.process(frame, frame_id=frame_id, nadir=nadir or self.shadow.cfg.nadir)
+        if geometry:
+            self.stage1.apply_geometry(cf, geometry.get("status"), geometry.get("bottom_line"))
         det_in = self.stage1.detector_input(frame, cf, self.detector_input)
         stage1_ms = (time.perf_counter() - t0) * 1000
         orient, gray = cf.orientation, cf.gray

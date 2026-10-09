@@ -86,8 +86,10 @@ class AgenticPipeline:
         faults = set(faults or ())
         # a real recording's sonar depth is a MEASURED altitude in metres -> heights in metres
         alt_m = fix.depth_m if (fix is not None and not fix.synthetic and fix.depth_m) else None
+        geometry = ({"status": fix.geometry, "bottom_line": fix.bottom_line_px}
+                    if fix is not None and fix.geometry else None)
         result = self.agent.run_frame(frame, frame_id=frame_id, nadir=nadir, progress_cb=progress_cb, altitude_m=alt_m,
-                                      faults=faults)
+                                      faults=faults, geometry=geometry)
         if fix is not None:
             if "invalid_geometry" in faults:              # failure drill: a corrupted GPS fix
                 fix = replace(fix, lat=float("nan"), ping_lat=None)

@@ -67,6 +67,17 @@ SAMPLE_FILES = {
 }
 
 
+# the 1-h Solix recording (Pearl River, ~216 MB) - STUDY-16's fresh recording; fetched only on request
+LARGE_DIR = REPO / "DATASET" / "external" / "pingmapper_large"
+LARGE_FILES = {
+    "Test-Large-DS.DAT": "7350f0dc3145d49ad9ced5325e7031dd17197c284b9ba9bd64fd77faaed9fe65",
+    "Test-Large-DS/B002.SON": "c7c6e161f787072ab2e1c808a3745065e2e7db7eb6ce8cd4de0385dfa387462c",
+    "Test-Large-DS/B002.IDX": "c897374b2b509146a0a8961b76ba8a4ddbdd86a0a2ba2065c1575ebb4ceb5e3e",
+    "Test-Large-DS/B003.SON": "091a01095019d762cf8ab8072787cdae303b5fd7d41bc9f078c92bf7525b235e",
+    "Test-Large-DS/B003.IDX": "4d3311cabf13645526ae0fa388b5c121e46f88720dab1a12c0fa4850896d06df",
+}
+
+
 class HumError(ValueError):
     """The file is not a Humminbird recording DEPTH can read (message says why)."""
 
@@ -235,15 +246,11 @@ def read_recording(dat: Path) -> Recording:
 
 
 # ---- frames + track for the DEPTH pipeline ------------------------------------------------------
-def frames_and_track(rec: Recording, nchunk: int = 500, size: int = 640,
-                     channels: tuple[str, ...] = ("port", "starboard")) -> tuple[list, dict, dict]:
-    """Sonogram frames in the training layout (PINGMapper "wcp": nadir at the top, pings left → right,
-    ``nchunk`` pings per frame, resized to ``size`` × ``size`` — ASSUMED to match the Roboflow resize of
-    the training frames) and, per frame, a REAL fix: per-column lat / lon / heading, the sonar's median
-    depth, and the recording's MEASURED range scale (``range_scale``) converted to the resized frame.
-    A last partial chunk shorter than nchunk/2 is merged into the previous one."""
-    from src.agentic.geo import PingFix
-    chunks = []                                                 # (cname, j, pings, native sonogram)
+def chunk_recording(rec: Recording, nchunk: int = 500,
+                    channels: tuple[str, ...] = ("port", "starboard")) -> list[tuple[str, int, list, np.ndarray]]:
+    """``(channel, j, pings, native sonogram)`` per chunk of ``nchunk`` pings; the sonogram's rows are
+    range samples (nadir first), columns pings. A last chunk shorter than nchunk/2 joins the previous."""
+    chunks = []
     for cname in channels:
         ch = rec.channels.get(cname)
         if ch is None:
@@ -254,9 +261,41 @@ def frames_and_track(rec: Recording, nchunk: int = 500, size: int = 640,
             starts.pop()
         for j, s0 in enumerate(starts):
             s1 = starts[j + 1] if j + 1 < len(starts) else n
-            chunks.append((cname, j, ch.pings[s0:s1], ch.returns(s0, s1).T))   # rows = range (nadir first)
+            chunks.append((cname, j, ch.pings[s0:s1], ch.returns(s0, s1).T))
+    return chunks
+
+
+def frames_and_track(rec: Recording, nchunk: int = 500, size: int = 640,
+                     channels: tuple[str, ...] = ("port", "starboard"),
+                     crosscheck: bool = True) -> tuple[list, dict, dict]:
+    """Sonogram frames in the training layout (PINGMapper "wcp": nadir at the top, pings left → right,
+    ``nchunk`` pings per frame, resized to ``size`` × ``size`` — ASSUMED to match the Roboflow resize of
+    the training frames) and, per frame, a REAL fix: per-column lat / lon / heading, the sonar's median
+    depth, and the recording's MEASURED range scale (``range_scale``) converted to the resized frame.
+    A last partial chunk shorter than nchunk/2 is merged into the previous one.
+
+    ``crosscheck`` (default): each chunk's seabed geometry is resolved by the agent's sensor
+    cross-check (OpenCV tracker vs the depth sounder, re-tracks on conflict, scale re-fit —
+    ``src/agentic/sensor_check.py``); the fix then carries the accepted line, its status and the
+    re-fit scale, and ``depth_m`` is the altitude of the TRUSTED source (None if not measured)."""
+    from src.agentic.geo import PingFix
+    chunks = chunk_recording(rec, nchunk, channels)
     scale = range_scale([(ps, son) for _, _, ps, son in chunks])
+    geo = None
+    if crosscheck:
+        # the agent cross-checks OpenCV's seabed track against the depth sounder, re-tracks on a
+        # conflict and re-fits the scale (src/agentic/sensor_check.py, STUDY-16)
+        from src.agentic.sensor_check import check_recording, summary
+        freq = next((ps[0].freq_hz for _, _, ps, _ in chunks if ps), None)
+        geo = check_recording([(c, j, son, np.array([p.depth_m if p.depth_m and p.depth_m > 0 else np.nan for p in ps]))
+                               for c, j, ps, son in chunks], scale["m_per_sample"], freq)
+        if geo["scale"]["m_per_sample"]:
+            scale = {**scale, "first_estimate_m_per_sample": scale["m_per_sample"],
+                     "m_per_sample": geo["scale"]["m_per_sample"], "rel_unc": geo["scale"]["rel_unc"],
+                     "physics_rel_gap": geo["scale"]["physics_rel_gap"], "source": geo["scale"]["source"],
+                     "iterations": geo["iterations"]}
     frames, track, meta = [], {}, {}
+    max_depth = max((p.depth_m for _, _, ps, _ in chunks for p in ps if p.depth_m), default=None)
     for cname, j, ps, son in chunks:
         img = cv2.resize(son, (size, size), interpolation=cv2.INTER_AREA)
         fid = f"{rec.name}_ss_{'port' if cname == 'port' else 'star'}_{j:05d}"
@@ -269,15 +308,24 @@ def frames_and_track(rec: Recording, nchunk: int = 500, size: int = 640,
         depths = [p.depth_m for p in ps if p.depth_m and p.depth_m > 0]
         mid = size // 2
         m_per_px = scale["m_per_sample"] * son.shape[0] / size if scale["m_per_sample"] else None
+        g = geo["chunks"].get((cname, j)) if geo else None
         track[fid] = PingFix(lat=round(lat[mid], 7), lon=round(lon[mid], 7), heading_deg=round(heading[mid], 1),
                              synthetic=False, ping_lat=lat, ping_lon=lon, ping_heading=heading,
-                             depth_m=float(np.median(depths)) if depths else None,
+                             depth_m=(g.altitude_m if g is not None else float(np.median(depths)) if depths else None),
                              range_m_per_px=round(m_per_px, 5) if m_per_px else None,
-                             range_scale_rel_unc=scale["rel_unc"])
+                             range_scale_rel_unc=scale["rel_unc"],
+                             bottom_line_px=g.line_resampled(size) if g is not None else None,
+                             geometry=g.status if g is not None else None,
+                             altitude_bound_m=max_depth)
         meta[fid] = {"channel": cname, "pings": [ps[0].record, ps[-1].record], "n_pings": len(ps),
                      "samples": int(son.shape[0]), "freq_hz": ps[0].freq_hz, "time_ms": [ps[0].time_ms, ps[-1].time_ms],
-                     "depth_m_median": track[fid].depth_m, "range_m_per_px": track[fid].range_m_per_px}
-    return frames, track, {"frames": meta, "range_scale": scale}
+                     "depth_m_median": float(np.median(depths)) if depths else None,
+                     "range_m_per_px": track[fid].range_m_per_px,
+                     "geometry": {**g.to_dict(), "lines": g.overlay_lines(size)} if g is not None else None}
+    out = {"frames": meta, "range_scale": scale}
+    if geo:
+        out["geometry"] = {**summary(geo), "log": geo["log"]}
+    return frames, track, out
 
 
 def physics_spacing(freq_hz: float = 455000, transducer_m: float = 0.108, temp_c: float = 10.0) -> float:
@@ -386,20 +434,23 @@ def validate(rec: Recording, window_s: float = 5.0) -> dict:
 
 
 # ---- fetch (reproducible, hash-pinned) -------------------------------------------------------------
-def fetch_sample(dest: Path = SAMPLE_DIR) -> Path:
+def fetch_sample(dest: Path = SAMPLE_DIR, files: Optional[dict] = None) -> Path:
+    """Fetch the PINGMapper sample recording (``files`` = LARGE_FILES for the 1-h Solix one); every
+    object is kept only if its SHA-256 matches the pinned hash."""
+    files = files or SAMPLE_FILES
     dest.mkdir(parents=True, exist_ok=True)
-    for rel, want in SAMPLE_FILES.items():
+    for rel, want in files.items():
         p = dest / rel
         if p.exists() and hashlib.sha256(p.read_bytes()).hexdigest() == want:
             continue
         p.parent.mkdir(parents=True, exist_ok=True)
-        with urllib.request.urlopen(_LFS + rel, timeout=120) as r:
-            data = r.read(64 * 1024 * 1024)
+        with urllib.request.urlopen(_LFS + rel, timeout=600) as r:
+            data = r.read(256 * 1024 * 1024)
         if hashlib.sha256(data).hexdigest() != want:
             raise HumError(f"{rel}: SHA-256 mismatch - not saved")
         p.write_bytes(data)
         print(f"  verified {rel} ({len(data)} bytes)")
-    return dest / "Test-Small-DS.DAT"
+    return dest / next(k for k in files if k.endswith(".DAT"))
 
 
 def _figure(frames, result, track, out: Path) -> None:
@@ -447,6 +498,7 @@ def report(dat: Path) -> str:
     v = validate(rec)
     frames, track, meta = frames_and_track(rec)
     sc = meta["range_scale"]
+    geo = meta.get("geometry")
     t0 = _t.perf_counter()
     res = AgenticPipeline().run_survey(frames, track=track, survey_id=f"{rec.name}-report", budget_minutes=2)
     wall = _t.perf_counter() - t0
@@ -465,7 +517,8 @@ def report(dat: Path) -> str:
          f"{P['samples_per_ping'][1]} samples per ping. The decoded track lies at "
          f"{P['bbox'][0]:.4f}–{P['bbox'][2]:.4f} °N, {P['bbox'][1]:.4f}–{P['bbox'][3]:.4f} °E: **the Colorado River in "
          f"Glen Canyon (Horseshoe Bend, Arizona)** — not the Mississippi recording the Zenodo text describes (that one is "
-         f"the ~216 MB `Test-Large-DS`, not downloaded).", "",
+         f"the ~216 MB `Test-Large-DS`, a 1-h Solix recording on the Pearl River: STUDY-16's fresh recording, "
+         f"`fetch --large`).", "",
          "## 1. Are the decoded numbers physically right? (no labels needed)", "",
          "| check | port | starboard | reading |", "|---|--:|--:|---|",
          f"| malformed pings skipped | {len(P['issues'])} | {len(S.get('issues', []))} | every ping starts with the marker and ends its header correctly |",
@@ -476,17 +529,24 @@ def report(dat: Path) -> str:
          f"| depth field (min / median / max) | {P['depth_m'][0]} / {P['depth_m'][1]} / {P['depth_m'][2]} m | | the field is in **decimetres** (confirmed below) |",
          f"| port vs starboard fixes at the same time | {v['port_vs_starboard']['fix_distance_m_max']} m apart | | both channels share each ping's fix |", "",
          "The track also lies on the river channel in satellite imagery (checked on the studio map).", "",
-         "## 2. A measured range scale", "",
-         "Metres per range sample = the sonar's own depth (m) ÷ the Stage-1 bottom-track altitude (samples), per chunk "
-         "of 500 pings; the median over confident chunks is used, and its uncertainty is the larger of the robust spread "
-         "and the gap to the beam-physics estimate (PINGMapper's formula: 0.108 m transducer, 455 kHz).", "",
+         "## 2. A measured range scale — and the agent's cross-check of the seabed", "",
+         "First estimate: metres per range sample = the sonar's own depth (m) ÷ the Stage-1 bottom-track altitude "
+         "(samples), per chunk of 500 pings, median over confident chunks. That estimate trusts the tracker, and the "
+         "tracker is not always right — so the agent then **cross-checks every chunk's seabed against the depth "
+         "sounder**, re-runs the OpenCV tracker where they conflict, trusts the image where the sounder lost lock, and "
+         "**re-fits the scale** from the sounder-backed chunks until it stops moving "
+         "([STUDY-16](sensor_check.md)). Its uncertainty is the larger of the robust spread and the gap to the "
+         "beam-physics estimate (PINGMapper's formula: 0.108 m transducer, 455 kHz).", "",
          "| | value |", "|---|--:|",
-         f"| **measured scale** (median, {sc['n_chunks']} confident chunks) | **{sc['m_per_sample'] * 100:.2f} cm / sample** |",
-         f"| robust spread (1.4826·MAD / median) | {sc['mad_rel']:.1%} |",
+         f"| first estimate (median, {sc['n_chunks']} confident chunks; {sc['track_failures']} > 3 robust σ off = "
+         f"tracker false picks) | {sc.get('first_estimate_m_per_sample', sc['m_per_sample']) * 100:.2f} cm / sample |",
+         f"| **scale after the agent's cross-check** ({len(sc.get('iterations') or [])} iteration(s)) | "
+         f"**{sc['m_per_sample'] * 100:.2f} cm / sample** |",
          f"| beam-physics estimate | {sc['physics_m_per_sample'] * 100:.2f} cm / sample ({sc['physics_rel_gap']:.1%} away) |",
          f"| uncertainty carried into every error radius | **± {sc['rel_unc']:.1%}** |",
-         f"| chunks > 3 robust σ from the median (bottom-track false picks) | {sc['track_failures']} of {sc['n_chunks']} |", "",
-         f"Per-chunk values (cm / sample): {', '.join(str(x) for x in sc['ratios_cm'])}. Reading the depth field as "
+         f"| seabed per chunk ({geo['chunks']} chunks) | " + ", ".join(f"{v} {k.replace('_', ' ')}" for k, v in geo['counts'].items() if v)
+         + " |" if geo else "| seabed per chunk | not cross-checked |", "",
+         f"First-estimate per-chunk values (cm / sample): {', '.join(str(x) for x in sc['ratios_cm'])}. Reading the depth field as "
          f"centimetres would make the scale 10× smaller than the physics estimate — the decimetre reading is the only "
          f"consistent one. With this scale, ground range is in real metres and shadow heights are "
          f"`h/H × the sonar's measured depth` (the rule: metres only with a measured altitude).", "",
@@ -506,8 +566,9 @@ def report(dat: Path) -> str:
          f"3 m GPS (assumed) + range × (scale uncertainty + sin 6°): "
          f"{min(t.geo_error_m for t in res.tracked):.1f}–{max(t.geo_error_m for t in res.tracked):.1f} m here." if res.tracked else "",
          "", "## Limits", "",
-         "- One 2.5-minute recording from one unit; the scale method needs a confident bottom track (5 of 11 chunks were "
-         "false picks here — reported, not hidden).",
+         f"- One 2.5-minute recording from one unit. The tracker alone made {sc['track_failures']} false picks among the "
+         f"first-estimate chunks; the agent's cross-check resolves them (STUDY-16), and where nothing coherent is found "
+         f"the geometry is withheld, never guessed.",
          "- Frames are resized to 640×640 like the training data (an assumption about the Roboflow export).",
          "- Positions are consumer GPS (± a few metres, assumed) — good enough to send a boat, not a survey-grade map.", "",
          "---", "_Regenerated by the script; do not edit by hand._", ""]
@@ -517,13 +578,16 @@ def report(dat: Path) -> str:
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[1])
     sub = ap.add_subparsers(dest="cmd", required=True)
-    sub.add_parser("fetch")
+    fp = sub.add_parser("fetch")
+    fp.add_argument("--large", action="store_true", help="also the 1-h Solix recording (~216 MB, STUDY-16)")
     for c in ("info", "validate", "report"):
         s = sub.add_parser(c)
         s.add_argument("dat", nargs="?", default=str(SAMPLE_DIR / "Test-Small-DS.DAT"))
     a = ap.parse_args()
     if a.cmd == "fetch":
         print(fetch_sample())
+        if a.large:
+            print(fetch_sample(LARGE_DIR, LARGE_FILES))
         return
     if a.cmd == "report":
         (REPO / "docs" / "raw_recording.md").write_text(report(Path(a.dat)), encoding="utf-8")
