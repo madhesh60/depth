@@ -126,11 +126,14 @@ class Recording:
 # ---- parsing (defensive) -------------------------------------------------------------------------
 def read_dat(path: Path) -> dict:
     b = Path(path).read_bytes()
-    if len(b) not in (64, 96) or b[0] != 0xC1:
+    # 9xx/11xx/Helix: 64 bytes, starts C1, big-endian. Solix: 96 bytes, starts C3, LITTLE-endian
+    # (its start time / easting read the same as the SON headers' big-endian fields only that way).
+    if not ((len(b) == 64 and b[0] == 0xC1) or (len(b) == 96 and b[0] in (0xC1, 0xC3))):
         raise HumError(f"{path.name}: {len(b)}-byte DAT not recognised (9xx/11xx/Helix = 64, Solix = 96; "
                        f"Onix text DATs are not supported yet)")
-    u32 = lambda o: struct.unpack(">I", b[o:o + 4])[0]
-    i32 = lambda o: struct.unpack(">i", b[o:o + 4])[0]
+    end = "<" if b[0] == 0xC3 else ">"
+    u32 = lambda o: struct.unpack(end + "I", b[o:o + 4])[0]
+    i32 = lambda o: struct.unpack(end + "i", b[o:o + 4])[0]
     lat, lon = hum_latlon(i32(24), i32(28))
     return {"family": "solix" if len(b) == 96 else "9xx/11xx/helix", "water": {0: "fresh", 1: "deep salt", 2: "shallow salt"}.get(b[1], b[1]),
             "start_unix": u32(20), "first_fix": [round(lat, 6), round(lon, 6)],
