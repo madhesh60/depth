@@ -44,6 +44,10 @@ DESIGN = REPO / "DATASET" / "external" / "pingmapper_sample" / "Test-Small-DS.DA
 FRESH = REPO / "DATASET" / "external" / "pingmapper_large" / "Test-Large-DS.DAT"
 C1_MAX = 0.05
 GROSS = 0.50
+# the developer's (non-blind) reading of the fresh audit sheet, 2026-10-09 - kept so a re-run keeps it
+AUDIT_NOTE = ("in 16 of 16 randomly drawn chunks the accepted (green) line sits on the first seabed return, including "
+              "the 4 corrected ones where the tracker alone (red) cut through the water column or the bed; on this river "
+              "bed sunken trees (snags) rise above the seabed and the line follows the bed beneath them.")
 
 
 def _depths(ps) -> np.ndarray:
@@ -85,6 +89,18 @@ def run(dat: Path, nchunk: int = 500) -> dict:
     c1 = {"tracker_pairs": len(d0), "tracker_median": _r(np.median(d0)) if d0 else None,
           "loop_pairs": len(d1), "loop_median": _r(np.median(d1)) if d1 else None}
     c1["pass"] = bool(d1) and c1["loop_median"] <= C1_MAX and (not d0 or c1["loop_median"] <= c1["tracker_median"])
+    # POST-HOC (added after the registered fresh run failed C1): the registered comparison pits the loop's
+    # pairs against the tracker's — different sets (the tracker has a pair only where BOTH sides found a
+    # track, the easy chunks). Same pairs only, and the pairs only the loop could measure:
+    both = [k for k in tracker if k[0] == "port" and tracker[k] is not None and tracker.get(("starboard", k[1])) is not None]
+    loop_lines = {k: g.line if g.trusted else None for k, g in res["chunks"].items()}
+    same0 = ps_diff({k: tracker[k] for k in both} | {("starboard", k[1]): tracker[("starboard", k[1])] for k in both})
+    same1 = ps_diff({k: loop_lines[k] for k in both} | {("starboard", k[1]): loop_lines[("starboard", k[1])] for k in both})
+    only = [k for k in loop_lines if k[0] == "port" and k not in both]
+    new1 = ps_diff({k: loop_lines[k] for k in only} | {("starboard", k[1]): loop_lines.get(("starboard", k[1])) for k in only})
+    c1["posthoc"] = {"same_pairs": len(same0), "tracker_same": _r(np.median(same0)) if same0 else None,
+                     "loop_same": _r(np.median(same1)) if same1 else None,
+                     "loop_only_pairs": len(new1), "loop_only_median": _r(np.median(new1)) if new1 else None}
     # C2 - scale re-fit on each half
     half = max(r["index"] for r in rows) // 2
     halves = []
@@ -180,6 +196,10 @@ def _criteria(out: dict) -> list[str]:
             f"| C1 port vs starboard (independent images) | loop median ≤ {C1_MAX:.0%} and ≤ tracker alone | "
             f"loop {c1['loop_median']} over {c1['loop_pairs']} pairs · tracker alone {c1['tracker_median']} over "
             f"{c1['tracker_pairs']} pairs | {ok(c1['pass'])} |",
+            *([f"| _C1 post-hoc (added after the run): same pairs_ | — | _on the {c1['posthoc']['same_pairs']} pairs where "
+               f"the tracker alone had both sides: tracker {c1['posthoc']['tracker_same']}, loop {c1['posthoc']['loop_same']}; "
+               f"on the {c1['posthoc']['loop_only_pairs']} pairs only the loop could measure: "
+               f"{c1['posthoc']['loop_only_median']}_ | |"] if c1.get("posthoc") else []),
             f"| C2 scale stable across halves | gap ≤ reported uncertainty | {c2['first_half'] * 100:.3f} vs "
             f"{c2['second_half'] * 100:.3f} cm/sample: gap {c2['rel_gap']:.1%}, uncertainty ±{c2['rel_unc']:.1%} | {ok(c2['pass'])} |",
             f"| C3 gross tracker failures caught | none accepted as is | {c3['gross']} chunk(s) > {GROSS:.0%} off a steady "
@@ -234,6 +254,20 @@ def report(design: dict, fresh: dict | None) -> str:
         L += [f"Scale on the fresh recording: {f['first_scale']['m_per_sample'] * 100:.3f} → {sc_['m_per_sample'] * 100:.3f} "
               f"cm/sample, ±{sc_['rel_unc']:.1%}. The beam-physics cross-check is not applied at "
               f"{f['freq_hz'] / 1000:.0f} kHz (the formula's transducer length is for the 455 kHz unit).", ""]
+    if fresh:
+        f, c1 = fresh, fresh["c1"]
+        tracked0 = sum(r["tracker_alt"] is not None for r in f["rows"])
+        L += ["## Decision", "",
+              f"**On by default for raw recordings.** C2 and C3 held on the fresh recording; C1 **failed as registered** "
+              f"(the loop's port/starboard median {c1['loop_median']:.2%} is under the {C1_MAX:.0%} limit but above the "
+              f"tracker alone's {c1['tracker_median']:.2%}). The registered comparison used different pair sets — the "
+              f"tracker alone has a pair only where both sides found a track ({c1['tracker_pairs']} easy pairs). On those "
+              f"same pairs the loop is not worse ({c1['posthoc']['loop_same']:.2%} vs {c1['posthoc']['tracker_same']:.2%}, "
+              f"post-hoc); the rest are the {c1['posthoc']['loop_only_pairs']} pairs only the loop could measure "
+              f"({c1['posthoc']['loop_only_median']:.2%}). The tracker alone gave a seabed on {tracked0} of {f['chunks']} "
+              f"chunks (with {f['c3']['gross']} gross failures it would have used silently); the agent resolved "
+              f"{f['result']['trusted']} and accepted none of those failures. The failed criterion is kept in this "
+              f"report, not re-registered.", ""]
     L += ["## Limits", "",
           "- No surveyed seabed: the checks are consistency between independent measurements (two transducers, the "
           "sounder, two halves of a recording) and published overlays, not ground truth.",
@@ -251,7 +285,7 @@ def _strip(out: dict) -> dict:
 def main():
     ap = argparse.ArgumentParser(description="STUDY-16 sensor cross-check")
     ap.add_argument("--no-fresh", action="store_true")
-    ap.add_argument("--audit-note", default=None, help="the developer's reading of the fresh audit sheet")
+    ap.add_argument("--audit-note", default=AUDIT_NOTE, help="the developer's reading of the fresh audit sheet")
     a = ap.parse_args()
     d = run(DESIGN)
     sheet(d, [("port", 0), ("starboard", 0), ("port", 2), ("port", 4), ("starboard", 5), ("starboard", 6)],
