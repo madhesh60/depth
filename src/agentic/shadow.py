@@ -217,8 +217,10 @@ class ShadowProver:
 
         # height from shadow geometry, RELATIVE to the sonar altitude H:  h/H = Ls / (R + Ls).
         # With a bottom-tracked altitude (px) both ends are converted slant → ground range first.
+        # only a shadow that passed the quality test carries a height (a NONE streak is speckle, and a
+        # height next to "Shadow: none" contradicts the trace - judge audit 2026-10-08)
         height_rel = 0.0
-        if run > 0:
+        if run > 0 and quality is not ShadowQuality.NONE:
             near_px = float(sy0 + start_i)                 # slant range to the shadow start
             far_px = near_px + run                         # slant range to the shadow end
             if altitude_px and 0 < altitude_px < near_px:
@@ -228,7 +230,7 @@ class ShadowProver:
             else:
                 ls, rng = float(run), max(1.0, float(echo_y))
             height_rel = ls / (rng + ls) if (rng + ls) > 0 else 0.0
-        height_m = altitude_m * height_rel if (run > 0 and altitude_m) else None
+        height_m = altitude_m * height_rel if (height_rel > 0 and altitude_m) else None
 
         # soft strength score for ranking (0 when NONE)
         strength = 0.0
@@ -266,7 +268,7 @@ class ShadowProver:
         sx1, sy1, sx2, sy2 = [int(v) for v in proof.strip]
         cv2.rectangle(vis, (sx1, sy1), (sx2, sy2), colour, 1)
         h_txt = (f", height ~{proof.height_m:.1f} m" if proof.height_m is not None
-                 else (f", height ~{100 * proof.height_rel:.0f}% alt" if proof.run_px else ""))
+                 else (f", height ~{100 * proof.height_rel:.0f}% alt" if proof.height_rel > 0 else ""))
         cv2.putText(vis, f"Shadow: {proof.quality.value}{h_txt}",
                     (x1, max(10, y1 - 4)), cv2.FONT_HERSHEY_SIMPLEX, 0.4, colour, 1, cv2.LINE_AA)
         return vis

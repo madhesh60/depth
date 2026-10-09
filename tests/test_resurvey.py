@@ -77,3 +77,19 @@ def test_grouping_and_boat_budget_prefer_uncertainty_per_metre():
 def test_no_gps_means_no_plan():
     t = _obj("H1", "Rec1_wcp_ss_port_00001", None, None)
     assert plan_resurvey([t], {})["lines"] == []
+
+
+def test_a_pass_worth_almost_nothing_is_not_planned():
+    """Judge audit 2026-10-08: a 1.8 boat-minute pass was requested for 0.014 bits. Below the floor of
+    information per boat-minute the target goes to a person's card instead."""
+    from src.agentic.resurvey import MIN_INFO_PER_BOAT_MIN
+    heading = 0.0
+    t_lat, t_lon = offset_latlon(LAT0, LON0, 10.0, 90.0)
+    track = {"Rec1_wcp_ss_star_00001": PingFix(LAT0, LON0, heading_deg=heading)}
+    sure = _obj("H1", "Rec1_wcp_ss_star_00001", t_lat, t_lon, p=0.995)          # p(1-p) ~ 0.005
+    plan = plan_resurvey([sure], track)
+    assert plan["lines"] == [] and plan["min_info_per_boat_min"] == MIN_INFO_PER_BOAT_MIN["p(1-p)"]
+    assert "below the floor" in plan["skipped"][0]["reason"]
+    unsure = _obj("H2", "Rec1_wcp_ss_star_00001", t_lat, t_lon, p=0.5)
+    plan = plan_resurvey([unsure], track)
+    assert len(plan["lines"]) == 1 and plan["voi_covered"] == plan["voi_total"]

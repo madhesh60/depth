@@ -34,6 +34,9 @@ LEAD_M = 15.0                 # run-in / run-out so the target is imaged on a st
 SPEED_KN = 3.0                # typical side-scan survey speed
 TURN_S = 90.0                 # time to turn onto each line
 MAX_LINE_M = 300.0
+# a pass must be worth at least this much per boat-minute (design constants, not fit): below it a
+# person's ~8 s card resolves the same target far more cheaply than boat time can
+MIN_INFO_PER_BOAT_MIN = {"bits": 0.02, "p(1-p)": 0.01}
 
 
 # ---- local flat-earth frame (metres east / north of a reference point) --------------------------
@@ -135,19 +138,23 @@ def plan_resurvey(tracked: list[TrackedObject], track: dict[str, PingFix], boat_
                   swath_m: float = SWATH_M, speed_kn: float = SPEED_KN, exclude: Optional[set] = None) -> dict:
     """Second-look passes for the REVIEW targets, ranked by information gained per boat-minute.
     ``exclude``: targets whose pass a person declined (never planned again)."""
-    targets, unit, considered = [], "p(1-p)", []
+    targets, unit, considered, declined = [], "p(1-p)", [], 0
     for t in tracked:
         fix = track.get(t.frame_id) if track else None
         side = parse_side(t.frame_id)
         if t.verdict is not Verdict.REVIEW or t.lat is None or fix is None or side is None:
             continue
         if exclude and t.oid in exclude:
+            declined += 1
             continue
         w, unit = _value(t)
         considered.append((t, w))
         if w > 0:
             targets.append((t, fix, side, w))
     if not targets:
+        if declined:
+            return {"lines": [], "note": f"a person declined the pass over {declined} target(s) - not proposed again; "
+                                         f"no other REVIEW target needs a second look"}
         return {"lines": [], "note": "no REVIEW target with GPS + known side where a second look could change "
                                      "the decision - nothing to re-survey"}
     lat0, lon0 = targets[0][0].lat, targets[0][0].lon
@@ -197,7 +204,13 @@ def plan_resurvey(tracked: list[TrackedObject], track: dict[str, PingFix], boat_
 
     lines.sort(key=lambda L: -L["info_per_boat_min"])
     chosen, skipped, spent = [], [], 0.0
+    floor = MIN_INFO_PER_BOAT_MIN.get(unit, 0.0)
     for L in lines:
+        if L["info_per_boat_min"] < floor:
+            skipped.append({"targets": list(L["targets"]), "boat_min": L["boat_min"], "voi": L["voi"],
+                            "reason": f"worth {L['info_per_boat_min']} {unit} per boat-minute, below the floor of "
+                                      f"{floor:g} - a person's card resolves it more cheaply than boat time"})
+            continue
         if boat_minutes is not None and spent + L["boat_min"] > boat_minutes:
             skipped.append({"targets": [t for t in L["targets"]], "boat_min": L["boat_min"], "voi": L["voi"],
                             "reason": f"boat budget: {spent:.1f} of {boat_minutes:g} min already planned, this pass "
@@ -215,6 +228,8 @@ def plan_resurvey(tracked: list[TrackedObject], track: dict[str, PingFix], boat_
                     f"(e.g. {L['predictions'][0]['id']}: {L['predictions'][0]['shadow_was']:.0f}° → "
                     f"{L['predictions'][0]['shadow_must_point']:.0f}°)")
     total_voi = sum(d["w"] for d in info)
+    planned = {oid for L in chosen for oid in L["targets"]}
+    covered_voi = sum(d["w"] for d in info if d["t"].oid in planned)     # unrounded, like the total
     ranking = None
     if chosen:
         best = max(info, key=lambda d: d["w"])
@@ -226,6 +241,6 @@ def plan_resurvey(tracked: list[TrackedObject], track: dict[str, PingFix], boat_
                         f"would change little, so it does not drive the plan")
     return {"lines": chosen, "skipped": skipped, "boat_minutes_budget": boat_minutes, "boat_minutes_planned": round(spent, 1),
             "ranking": ranking, "info_unit": unit,
-            "voi_covered": round(sum(L["voi"] for L in chosen), 3), "voi_total": round(total_voi, 3),
+            "voi_covered": round(covered_voi, 3), "voi_total": round(total_voi, 3), "min_info_per_boat_min": floor,
             "targets_covered": sum(len(L["targets"]) for L in chosen), "targets_total": len(info),
             "assumptions": {"swath_m": swath_m, "mid_range_m": mid, "speed_kn": speed_kn, "turn_s": TURN_S}}

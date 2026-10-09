@@ -13,6 +13,10 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from src.detection.infer import DEFAULT_ONNX
+
+needs_model = pytest.mark.skipif(not DEFAULT_ONNX.exists(), reason="model weights absent (python -m src.detection.fetch_model)")
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from src.detection.infer import Detection
@@ -263,6 +267,7 @@ def test_incident_catalogue_and_unknown_drill(client):
     assert client.post(f"/api/analyze?sample={sid}&simulate=nope").status_code == 400
 
 
+@needs_model
 def test_analyze_drills(client):
     from src.dashboard import samples as samples_mod
     sid = samples_mod.list_samples()[0]["id"]
@@ -274,6 +279,7 @@ def test_analyze_drills(client):
     assert body["candidates"] == [] and body["incidents"][0]["code"] == "no_detection"
 
 
+@needs_model
 def test_survey_drills_log_and_replan(client):
     r = client.post("/api/survey?use_samples=1&gps=synthetic&budget_minutes=1&boat_minutes=60"
                     "&simulate=corrupt_frame,storage_failed,invalid_geometry")
@@ -305,8 +311,23 @@ def test_survey_drills_log_and_replan(client):
     assert any(e["kind"] == "brief" for e in client.get(f"/api/survey/{sid}/log").json()["entries"])
 
 
+@needs_model
 def test_missing_gps_drill_on_the_api(client):
     d = client.post("/api/survey?use_samples=1&gps=synthetic&simulate=missing_gps").json()
     assert not d["mission"]["gps_available"]
     inc = next(i for i in d["mission"]["incidents"] if i["code"] == "missing_gps")
     assert inc["simulated"] is True
+
+
+@needs_model
+def test_an_empty_upload_is_an_incident_not_a_crash(client):
+    """Judge audit 2026-10-08: OpenCV 5's imdecode raises on a 0-byte buffer -> HTTP 500, and one empty
+    file killed a whole survey. Now: 422 corrupt_frame for one frame; the survey skips it and runs."""
+    r = client.post("/api/analyze", files={"file": ("empty.jpg", b"", "image/jpeg")})
+    assert r.status_code == 422 and r.json()["detail"]["incident"]["code"] == "corrupt_frame"
+    from src.dashboard import samples as samples_mod
+    good = samples_mod.sample_path(samples_mod.list_samples()[0]["id"]).read_bytes()
+    r = client.post("/api/survey?gps=synthetic", files=[("files", ("empty.jpg", b"", "image/jpeg")),
+                                                        ("files", ("good.jpg", good, "image/jpeg"))])
+    assert r.status_code == 200, r.text
+    assert any(i["code"] == "corrupt_frame" and i["frame_id"] == "empty" for i in r.json()["mission"]["incidents"])

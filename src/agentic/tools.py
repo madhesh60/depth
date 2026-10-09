@@ -102,7 +102,7 @@ class Toolbox:
         if proof.height_m is not None:
             why = (f"height from shadow geometry ~{proof.height_m:.2f} m "
                    f"({100 * proof.height_rel:.0f}% of the measured sonar altitude)")
-        elif proof.run_px > 0:
+        elif proof.height_rel > 0:
             why = (f"relative height ~{100 * proof.height_rel:.0f}% of sonar altitude "
                    f"(metres need a measured altitude - not assumed)")
         else:

@@ -90,7 +90,9 @@ def test_height_scales_with_shadow_length():
         img[ey + 8:ey + 8 + run_len, cx - 4:cx + 5] = 18
         return prover.prove(img, (cx - 8, ey - 8, cx + 8, ey + 8)).height_rel
 
-    assert height_for(40) > height_for(15) > 0
+    # (both lengths pass the shadow test; a run that fails it carries no height at all - see
+    # test_no_height_without_a_shadow)
+    assert height_for(40) > height_for(25) > 0
 
 
 def test_metres_only_with_measured_altitude():
@@ -129,3 +131,14 @@ def _run_all():
 
 if __name__ == "__main__":
     _run_all()
+
+
+def test_no_height_without_a_shadow():
+    """A streak that fails the shadow test carries no height (judge audit 2026-10-08: the card showed
+    'Shadow: none' next to 'h 1% alt')."""
+    rng = np.random.default_rng(1)
+    img = (90 + rng.normal(0, 4, (200, 200))).clip(40, 140).astype(np.uint8)
+    img[60:64, 100:104] = 70                                       # a faint dark speck below the box
+    proof = ShadowProver(ShadowConfig(nadir="top")).prove(img, (96, 50, 112, 58), altitude_m=5.0)
+    assert proof.quality is ShadowQuality.NONE
+    assert proof.height_rel == 0.0 and proof.height_m is None

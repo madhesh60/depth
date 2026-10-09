@@ -12,6 +12,10 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from src.detection.infer import DEFAULT_ONNX
+
+needs_model = pytest.mark.skipif(not DEFAULT_ONNX.exists(), reason="model weights absent (python -m src.detection.fetch_model)")
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from src.agentic import active
@@ -223,6 +227,7 @@ def client():
     return TestClient(app)
 
 
+@needs_model
 def test_api_default_off_and_experimental_on(client):
     from src.dashboard import samples as samples_mod
     sid = samples_mod.list_samples()[0]["id"]
@@ -236,6 +241,7 @@ def test_api_default_off_and_experimental_on(client):
     assert [c["verdict"] for c in on["candidates"]] == [c["verdict"] for c in off["candidates"]]   # tiers unchanged
 
 
+@needs_model
 def test_api_declined_pass_replans(client):
     d = client.post("/api/survey?use_samples=1&gps=synthetic&boat_minutes=60&active=1").json()
     if not (d["mission"]["resurvey_plan"].get("lines")):
