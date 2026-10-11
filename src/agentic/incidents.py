@@ -54,7 +54,9 @@ CATALOGUE: dict[str, tuple[str, str, str, str, str]] = {
     "model_unavailable": (
         "error", "see", "Detector unavailable",
         "no detection was run and nothing was decided; earlier results are untouched",
-        "fetch the weights (python -m src.detection.fetch_model) or restart the server"),
+        "put the detector weights at models/<MODEL>/best.onnx - `python -m src.detection.fetch_model` downloads the "
+        "published, hash-checked release (if it says the release is not published, copy the file from the "
+        "owner's S3 / mirror with --url and --sha256) - then restart the server"),
     "tool_failed": (
         "warning", "prove", "An evidence tool failed",
         "the agent fell back to the detector's own confidence; affected finds go to a person, never auto-confirmed",

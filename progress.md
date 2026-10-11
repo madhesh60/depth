@@ -75,6 +75,18 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ## 4. Session log
 
+### 2026-10-11 (sweep 57) — Judge audit, cont.: a fresh clone gets a clear path to the detector
+
+- CI collection fix: `tests/conftest.py` puts the repo root on `sys.path` (the bare `pytest` entry
+  point does not; a test module importing `src` failed to collect → exit 2 on CI run 40).
+- `fetch_model`: a missing release (the `exp003-v1` asset still returns HTTP 404) or no network is a
+  `SystemExit` naming the destination path, the published SHA-256 and the `--url/--sha256` mirror route
+  (no traceback, no `.part` left behind). `infer.py` names `models/<MODEL>/best.onnx` (where
+  `fetch_model` installs) when the weights are absent; the `model_unavailable` incident says the same.
+- Hash test now covers EXP-003's local weights too; CI actions bumped (checkout v5, setup-python v6).
+- Tests: full suite 201 passed (also collected through the bare `pytest` entry point, as CI runs it).
+- **Open:** publish the `exp003-v1` GitHub release asset so `fetch_model` works on a fresh clone.
+
 ### 2026-10-09 (sweep 56) — The agent re-measures: OpenCV seabed vs depth sounder (STUDY-16) + audit fixes
 
 - `sensor_check.py`: per chunk of a raw recording the agent cross-checks OpenCV's bottom track against

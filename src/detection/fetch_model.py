@@ -16,6 +16,7 @@ import argparse
 import hashlib
 import os
 import sys
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -40,6 +41,21 @@ def sha256_of(p: Path) -> str:
     return h.hexdigest()
 
 
+def _unavailable(model: str, url: str, dest: Path, e: Exception) -> str:
+    """What a person can do when the download fails - never a bare traceback."""
+    why = (f"HTTP {e.code}: the {model} weights are not published at this address yet"
+           if isinstance(e, urllib.error.HTTPError) and e.code == 404 else f"{type(e).__name__}: {e}")
+    want = RELEASES.get(model, {}).get("sha256", "<hex>")
+    return (f"could not download the {model} detector weights from {url}\n  {why}\n"
+            f"Nothing that needs the detector can run until {dest.relative_to(REPO) if dest.is_relative_to(REPO) else dest} "
+            f"exists. Either:\n"
+            f"  - copy a best.onnx you already have to that path (published SHA-256 {want}; every result's "
+            f"provenance stamp records the hash of the file actually used), or\n"
+            f"  - fetch a mirror: python -m src.detection.fetch_model --url <url> --sha256 {want}\n"
+            f"Everything that does not need the detector (the test suite skips those tests, the docs, the raw-recording "
+            f"reader) works without it.")
+
+
 def fetch(model: str = SHIPPED_MODEL, url: str | None = None, sha256: str | None = None,
           dest: Path | None = None, quiet: bool = False) -> Path:
     rel = RELEASES.get(model, {})
@@ -54,12 +70,16 @@ def fetch(model: str = SHIPPED_MODEL, url: str | None = None, sha256: str | None
     dest.parent.mkdir(parents=True, exist_ok=True)
     tmp = dest.with_suffix(".part")
     h, n = hashlib.sha256(), 0
-    with urllib.request.urlopen(url, timeout=60) as r, tmp.open("wb") as f:
-        total = int(r.headers.get("Content-Length") or 0)
-        for b in iter(lambda: r.read(1 << 20), b""):
-            f.write(b); h.update(b); n += len(b)
-            if not quiet and total:
-                print(f"\r  {n / 1e6:5.1f} / {total / 1e6:.1f} MB", end="", flush=True)
+    try:
+        with urllib.request.urlopen(url, timeout=60) as r, tmp.open("wb") as f:
+            total = int(r.headers.get("Content-Length") or 0)
+            for b in iter(lambda: r.read(1 << 20), b""):
+                f.write(b); h.update(b); n += len(b)
+                if not quiet and total:
+                    print(f"\r  {n / 1e6:5.1f} / {total / 1e6:.1f} MB", end="", flush=True)
+    except (urllib.error.URLError, OSError) as e:            # HTTPError is a URLError: a missing release, no network
+        tmp.unlink(missing_ok=True)
+        raise SystemExit(_unavailable(model, url, dest, e)) from None
     if not quiet:
         print()
     if h.hexdigest() != want:

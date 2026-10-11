@@ -30,8 +30,20 @@ def test_mismatch_is_not_installed(tmp_path):
     assert not dest.exists() and not dest.with_suffix(".part").exists()
 
 
-def test_release_hash_matches_the_deployed_model():
-    local = Path(__file__).resolve().parents[1] / "runs" / "EXP-001" / "weights" / "best.onnx"
-    if not local.exists():
+def test_missing_release_is_a_clear_message_not_a_traceback(tmp_path):
+    """An unpublished release (HTTP 404) or no network: a SystemExit that says what to do, no partial file."""
+    dest = tmp_path / "models" / "X" / "best.onnx"
+    with pytest.raises(SystemExit) as e:
+        fetch("X", (tmp_path / "not-published.onnx").as_uri(), "0" * 64, dest, quiet=True)
+    msg = str(e.value)
+    assert "could not download the X detector weights" in msg and "--url" in msg and "--sha256" in msg
+    assert not dest.exists() and not dest.with_suffix(".part").exists()
+
+
+@pytest.mark.parametrize("model,local", [("EXP-001", ("runs", "EXP-001", "weights", "best.onnx")),
+                                         ("EXP-003", ("models", "EXP-003", "best.onnx"))])
+def test_release_hash_matches_the_local_model(model, local):
+    p = Path(__file__).resolve().parents[1].joinpath(*local)
+    if not p.exists():
         pytest.skip("model absent")
-    assert sha256_of(local) == RELEASES["EXP-001"]["sha256"] and local.stat().st_size == RELEASES["EXP-001"]["bytes"]
+    assert sha256_of(p) == RELEASES[model]["sha256"] and p.stat().st_size == RELEASES[model]["bytes"]

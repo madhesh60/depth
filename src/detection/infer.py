@@ -36,7 +36,7 @@ def _default_onnx() -> Path:
     for p in (REPO / "models" / model / "best.onnx", REPO / "runs" / model / "weights" / "best.onnx"):
         if p.exists():
             return p
-    return REPO / "runs" / model / "weights" / "best.onnx"
+    return REPO / "models" / model / "best.onnx"          # absent: where fetch_model installs it (named in the error)
 
 
 DEFAULT_ONNX = _default_onnx()
@@ -112,7 +112,8 @@ class YoloOnnxDetector:
         if not onnx_path.exists():
             raise FileNotFoundError(
                 f"ONNX weights not found: {onnx_path}\n"
-                f"Export them first: python src/detection/export_onnx.py"
+                f"Get them: python -m src.detection.fetch_model (the published, hash-checked release), "
+                f"or export a training run: python -m src.detection.export_onnx"
             )
         self.net = _read_net(onnx_path)
         self._onnx_path = str(onnx_path)
