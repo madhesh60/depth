@@ -1566,7 +1566,7 @@ function renderHazards(d) {
   const rank = Object.fromEntries((d.mission.review_queue || []).map((id, i) => [id, i]));
   rows.sort((a, b) => (VERDICTS.indexOf(a.verdict) - VERDICTS.indexOf(b.verdict)) || ((rank[a.oid] ?? 1e9) - (rank[b.oid] ?? 1e9)));
   const imp = d.mission.impact || {};
-  $("#hazCount").textContent = `${rows.length} hazards · review ordered by P(pot)` + (imp.decisions
+  $("#hazCount").textContent = `${rows.length} hazards · review ordered by P(real) × severity` + (imp.decisions
     ? ` · people: ${imp.person_confirmed} confirmed, ${imp.person_rejected} rejected, ${imp.person_recovered} recovered` + (imp.reviewed_precision != null
       ? ` · reviewed precision ${Math.round(imp.reviewed_precision * 100)}% (95% CI ${Math.round(imp.reviewed_precision_ci95[0] * 100)}–${Math.round(imp.reviewed_precision_ci95[1] * 100)}%)` : "")
     : " · low risk kept for audit");
@@ -1577,7 +1577,7 @@ function renderHazards(d) {
       : t.position_withheld ? `<span class="chip-weak" title="${escapeHtml(t.position_withheld)}">withheld</span>` : `<span class="muted">no GPS</span>`;
     tr.innerHTML = `<td>${t.oid}${t.sightings > 1 ? ` <span class="muted" title="seen on ${t.sightings} frames/passes">×${t.sightings}</span>` : ""}</td><td>${human(t.cls_name)}</td>
       <td><span class="v-tag" style="color:${VCOLOR[t.verdict]};background:${VCOLOR[t.verdict]}22">${VLABEL[t.verdict] || t.verdict}</span></td>
-      <td>${t.conf}</td><td>${t.evidence_score}</td><td>${t.p_pot != null ? Math.round(t.p_pot * 100) + "%" : "—"}</td><td>${heightText(t.height_m, t.height_rel, t.height_rel ? 1 : 0)}</td>
+      <td>${t.conf}</td><td>${t.evidence_score}</td><td>${t.p_pot != null ? Math.round(t.p_pot * 100) + "%" : "—"}${t.severity > 1 ? ` <span class="chip-weak" title="severity ×${t.severity}: ${escapeHtml((t.severity_why || []).join("; "))} (operator policy)">×${t.severity}</span>` : ""}</td><td>${heightText(t.height_m, t.height_rel, t.height_rel ? 1 : 0)}</td>
       <td class="${t.shadow_quality === "clear" ? "chip-clear" : t.shadow_quality === "weak" ? "chip-weak" : "chip-none"}">${t.shadow_quality}</td>
       <td>${coords}</td><td>${t.geo_error_m != null ? "±" + t.geo_error_m + " m" : "—"}</td><td>${reviewCell(t)}</td>`;
     body.appendChild(tr);

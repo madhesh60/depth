@@ -77,3 +77,17 @@ def _run_all():
 
 if __name__ == "__main__":
     _run_all()
+
+
+def test_severity_reorders_the_queue_only_on_measured_risk():
+    from src.agentic.mission import review_queue, hazard_severity
+    from src.agentic.types import TrackedObject, Verdict
+    pol = {"class_weight": {}, "suspended_weight": 2.0, "relief_weight": 1.5, "relief_m": 0.5, "source": "test"}
+    mk = lambda oid, p, **kw: TrackedObject(oid=oid, cls_name="ghost_gear", verdict=Verdict.REVIEW, conf=p,
+                                            evidence_score=p, frame_id="f", bbox=(0, 0, 1, 1), p_pot=p, **kw)
+    a, b, c = mk("H1", 0.6), mk("H2", 0.4, in_water_column=True), mk("H3", 0.35, height_m=0.8)
+    assert [t.oid for t in review_queue([a, b, c], pol)] == ["H2", "H1", "H3"]      # 0.8, 0.6, 0.525
+    assert b.severity == 2.0 and "suspended" in b.severity_why[0]
+    assert hazard_severity(mk("H4", 0.5, height_m=None), pol) == (1.0, [])          # no measured height: no factor
+    neutral = {**pol, "suspended_weight": 1.0, "relief_weight": 1.0}
+    assert [t.oid for t in review_queue([a, b, c], neutral)] == ["H1", "H2", "H3"]   # P(real) order

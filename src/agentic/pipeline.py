@@ -205,6 +205,7 @@ def _to_tracked(oid: str, frame_id: str, c: Candidate) -> TrackedObject:
         action0=ev.action0 if ev else None, conflict=ev.conflict if ev else None,
         request_resurvey=bool(ev.request_resurvey) if ev else False,
         info_bits=(ev.resurvey_gain or {}).get("info_bits") if ev else None,
+        in_water_column=getattr(c, "in_water_column", None),
     )
 
 

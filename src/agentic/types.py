@@ -252,6 +252,9 @@ class TrackedObject:
     request_resurvey: bool = False
     info_bits: Optional[float] = None                   # expected information from an opposite-side pass
     fallback: Optional[str] = None                      # "inspect": a person declined its pass -> inspect it instead
+    in_water_column: Optional[bool] = None              # Stage 1: box above the tracked seabed (suspended)
+    severity: float = 1.0                               # how bad IF real (operator policy, mission.hazard_severity)
+    severity_why: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         return _json(asdict(self))

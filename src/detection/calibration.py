@@ -148,6 +148,19 @@ class Calibration:
         return dict(self.data["tiers"].get("guarantees") or {})
 
     @property
+    def severity(self) -> dict:
+        """How bad a hazard is IF it is real — an OPERATOR POLICY, not fitted from data. Keys:
+        ``class_weight`` (per class, default 1), ``suspended_weight`` (box above the tracked seabed:
+        entanglement risk), ``relief_weight`` + ``relief_m`` (measured height above the seabed in
+        metres: snag / navigation risk). Absent → every weight 1, i.e. the queue is P(real) order."""
+        s = dict(self.data.get("severity") or {})
+        return {"class_weight": {k: float(v) for k, v in (s.get("class_weight") or {}).items()},
+                "suspended_weight": float(s.get("suspended_weight", 1.0)),
+                "relief_weight": float(s.get("relief_weight", 1.0)),
+                "relief_m": float(s.get("relief_m", 0.5)),
+                "source": s.get("source", "defaults (all weights 1)")}
+
+    @property
     def is_fitted(self) -> bool:
         return self.tau_review is not None or self.tau_confirm is not None
 

@@ -93,5 +93,15 @@
     "pots": 186,
     "verified_on": "`DATASET/03_yolo_ready_dataset_v2b/test` *wcp_ss_*.jpg \u2014 199 unique frames, recordings ['Rec14', 'Rec8', 'Rec9']",
     "note": "fitted by `python -m src.agentic.calibrate` (calibration split only; test scored once)"
+  },
+  "severity": {
+    "source": "operator policy, not fitted from data - edit to match the agency's priorities",
+    "class_weight": {
+      "ghost_gear": 1.0,
+      "wreck_debris": 1.0
+    },
+    "suspended_weight": 2.0,
+    "relief_weight": 1.5,
+    "relief_m": 0.5
   }
 }

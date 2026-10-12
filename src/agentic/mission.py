@@ -98,15 +98,47 @@ def build_mission(tracked: list[TrackedObject], gps_available: bool,
     )
 
 
-def review_queue(tracked: list[TrackedObject]) -> list[TrackedObject]:
-    """Undecided REVIEW cards, most-likely-real first: calibrated P(pot), then evidence score, then
-    confidence. Cards a person already decided leave the queue."""
+def severity_policy() -> dict:
+    from src.detection.calibration import load_calibration
+    try:
+        return load_calibration().severity
+    except Exception:                                         # no calibration -> neutral (P(real) order)
+        return {"class_weight": {}, "suspended_weight": 1.0, "relief_weight": 1.0, "relief_m": 0.5,
+                "source": "defaults (all weights 1)"}
+
+
+def hazard_severity(t: TrackedObject, policy: dict) -> tuple[float, list[str]]:
+    """How bad the hazard is IF it is real, from what was MEASURED (operator policy weights; never a
+    guess: no measured height -> no relief factor). Returns (multiplier, reasons)."""
+    s, why = policy["class_weight"].get(t.cls_name, 1.0), []
+    if s != 1.0:
+        why.append(f"{t.cls_name} x{s:g}")
+    if t.in_water_column and policy["suspended_weight"] != 1.0:
+        s *= policy["suspended_weight"]
+        why.append(f"suspended above the seabed (entanglement) x{policy['suspended_weight']:g}")
+    if t.height_m is not None and t.height_m >= policy["relief_m"] and policy["relief_weight"] != 1.0:
+        s *= policy["relief_weight"]
+        why.append(f"{t.height_m:.2f} m above the seabed >= {policy['relief_m']:g} m (snag / navigation) "
+                   f"x{policy['relief_weight']:g}")
+    return round(s, 3), why
+
+
+def _p_real(t: TrackedObject) -> float:
+    return t.p_evidence if t.p_evidence is not None else (t.p_pot if t.p_pot is not None else -1.0)
+
+
+def review_queue(tracked: list[TrackedObject], policy: Optional[dict] = None) -> list[TrackedObject]:
+    """Undecided REVIEW cards, worst expected harm first: calibrated P(real) × severity (how bad it is if
+    real — measured suspension / relief, operator weights), then evidence score, then confidence. With
+    no measured risk factor severity is 1 and this is P(real) order. Cards a person decided leave."""
+    policy = policy or severity_policy()
     rev = [t for t in tracked if undecided_review(t)]
+    for t in rev:
+        t.severity, t.severity_why = hazard_severity(t, policy)
     return sorted(rev, key=lambda t: (_PRIORITY_RANK.get(t.human_priority, 1),        # a person's override first
                                       0 if t.fallback == "inspect" else 1,           # a declined pass -> look here
                                       _ACTION_RANK.get(t.action, 1),                  # the agent's evidence action
-                                      -(t.p_evidence if t.p_evidence is not None else
-                                        (t.p_pot if t.p_pot is not None else -1.0)),
+                                      -(_p_real(t) * t.severity if _p_real(t) >= 0 else -1.0),
                                       -t.evidence_score, -t.conf, t.oid))
 
 
@@ -247,6 +279,13 @@ def planner_log(tracked: list[TrackedObject], m: MissionPlan, queue: list[Tracke
                                  f"opposite-side sonar pass (boat time)") if queue else
                    "no open REVIEW cards - nothing left that another observation could change",
                    status="done", open_uncertainty=unc, cards=len(queue)))
+    if queue:
+        raised = [t for t in queue if t.severity > 1.0]
+        L.append(_step("rank", ("queue ordered by expected harm = P(real) x severity (how bad if real; operator policy, "
+                                "not fitted); " + (f"{len(raised)} card(s) raised by a measured risk factor: " + "; ".join(
+                                    f"{t.oid} x{t.severity:g} ({', '.join(t.severity_why)})" for t in raised[:4])
+                                    if raised else "no measured risk factor on any card -> P(real) order")),
+                       raised=[t.oid for t in raised]))
     b = m.budget or {}
     if b:
         k, n = b["cards_affordable"], b["cards_total"]

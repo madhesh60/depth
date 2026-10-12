@@ -97,6 +97,10 @@ def merge_repeat_sightings(tracked: list[TrackedObject], min_gate_m: float = 3.0
             if m is not keep:
                 keep.also_in.append(m.frame_id)
                 keep.sightings += m.sightings
+                if m.in_water_column:                         # any sighting suspended -> the hazard is
+                    keep.in_water_column = True
+                if m.height_m is not None and (keep.height_m is None or m.height_m > keep.height_m):
+                    keep.height_m = m.height_m                # the tallest measured relief
         out.append(keep)
     order = {t.oid: i for i, t in enumerate(tracked)}
     return sorted(out, key=lambda t: order[t.oid]), merges
