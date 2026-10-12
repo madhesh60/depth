@@ -164,6 +164,23 @@ def canonical_view(gray: np.ndarray, nadir: Optional[str]) -> Optional[np.ndarra
     return np.ascontiguousarray(np.rot90(gray, k)) if k else gray
 
 
+def _box1d(v: np.ndarray, k: int, axis_len_first: bool = True) -> np.ndarray:
+    """Moving average of a 1-D signal with edge replication (``cv2.blur``, BORDER_REPLICATE) — the same
+    numbers as ``np.convolve(np.pad(v, k // 2, mode="edge"), ones(k) / k, "valid")`` for odd ``k``."""
+    v = np.asarray(v, np.float64)                                    # float64: same ties as np.convolve
+    if k <= 1 or v.size == 0:
+        return v.copy()
+    col = v.reshape(-1, 1) if axis_len_first else v.reshape(1, -1)
+    ks = (1, k) if axis_len_first else (k, 1)
+    return cv2.blur(col, ks, borderType=cv2.BORDER_REPLICATE).ravel()
+
+
+def _dy(sm: np.ndarray) -> np.ndarray:
+    """Centred vertical difference ``sm[y+1] - sm[y-1]`` (``cv2.Sobel`` dy=1, ksize=1 → kernel [-1, 0, 1]).
+    BORDER_REFLECT_101 makes the first and last rows exactly 0."""
+    return cv2.Sobel(sm, cv2.CV_32F, 0, 1, ksize=1, borderType=cv2.BORDER_REFLECT_101)
+
+
 def bottom_track(gc: np.ndarray) -> tuple[Optional[np.ndarray], Optional[float], float, float]:
     """Track the first seabed return in a CANONICAL view (nadir at top).
 
@@ -177,8 +194,8 @@ def bottom_track(gc: np.ndarray) -> tuple[Optional[np.ndarray], Optional[float],
     # water-column dip (dark) → first seabed return (sharp rise). The seabed further out can be
     # darker than the water column, so the dip is the FIRST local minimum that is followed by a
     # rise of ≥ MIN_STEP within RISE_ROWS — not the global minimum.
-    prof = np.median(sm[:band], axis=1)
-    prof = np.convolve(np.pad(prof, 1, mode="edge"), np.ones(3) / 3, mode="valid")
+    prof = np.median(sm[:band], axis=1)                              # NumPy on purpose: the local-minimum
+    prof = np.convolve(np.pad(prof, 1, mode="edge"), np.ones(3) / 3, mode="valid")   # search compares exact ties
     d0 = b0 = None
     step = 0.0
     for i in range(2, band - RISE_ROWS - 1):                         # rows 0-1: image edge
@@ -195,7 +212,7 @@ def bottom_track(gc: np.ndarray) -> tuple[Optional[np.ndarray], Optional[float],
 
     # per ping: strongest dark→bright step in a window around the frame-level bottom
     lo, hi = max(1, d0, b0 - TRACK_WIN), min(band - 1, b0 + TRACK_WIN)   # never above the dip (ring-down)
-    grad = sm[lo + 1:hi + 1] - sm[lo - 1:hi - 1]                     # centred vertical difference
+    grad = _dy(sm[:band])[lo:hi]                                     # centred vertical difference (cv2.Sobel)
     rows = lo + np.argmax(grad, axis=0).astype(np.float32) + 0.5    # centred diff peaks 1 row early
     strength = grad.max(axis=0)
     ok = strength >= 0.25 * step                                     # a real step, not flat speckle
@@ -209,7 +226,7 @@ def bottom_track(gc: np.ndarray) -> tuple[Optional[np.ndarray], Optional[float],
     k = min(ALONG_MEDIAN, W if W % 2 else W - 1)
     if k >= 5:                                                       # median (spikes) then mean (jitter)
         line = cv2.medianBlur(line.reshape(1, -1).astype(np.float32), 5).ravel()
-        line = np.convolve(np.pad(line, k // 2, mode="edge"), np.ones(k) / k, mode="valid")[:W]
+        line = _box1d(line, k, axis_len_first=False)
     return line, float(np.median(line)), track_conf, step
 
 
@@ -233,7 +250,7 @@ def smooth_line(rows: np.ndarray) -> Optional[np.ndarray]:
     k = min(ALONG_MEDIAN, W if W % 2 else W - 1)
     if k >= 5:
         line = cv2.medianBlur(line.reshape(1, -1), 5).ravel()
-        line = np.convolve(np.pad(line, k // 2, mode="edge"), np.ones(k) / k, mode="valid")[:W]
+        line = _box1d(line, k, axis_len_first=False)
     return line
 
 
@@ -245,8 +262,7 @@ def edge_picks(gc: np.ndarray, lo_rows: np.ndarray, hi_rows: np.ndarray) -> tupl
     (p90 of |vertical gradient| over the far half of the range axis)."""
     H, W = gc.shape
     sm = cv2.blur(gc, (PING_SMOOTH, 3)).astype(np.float32)
-    grad = np.zeros_like(sm)
-    grad[1:-1] = sm[2:] - sm[:-2]
+    grad = _dy(sm)                                                   # rows 0 and H-1 are 0
     noise = float(np.percentile(np.abs(grad[H // 2:]), 90)) + 1e-6
     rows, strength = np.full(W, np.nan, np.float32), np.zeros(W, np.float32)
     lo = np.clip(np.nan_to_num(lo_rows, nan=-1), 1, H - 2).astype(int)
