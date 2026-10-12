@@ -75,6 +75,32 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ## 4. Session log
 
+### 2026-10-12 (sweep 58) — Judge audit: the code-side gaps closed
+
+- **Evaluation:** `evaluate.py` defaults to the deployed model (weights, names, input size, thresholds
+  from `calibration.json`; dataset v2b) and adds **mAP@0.5:0.95**, a class-agnostic **confusion matrix**
+  and a **PR curve** image. EXP-003 reports regenerated: mAP@0.5 unchanged (0.319 test · 0.391
+  official398 · 0.341 xsonar); mAP@0.5:0.95 0.106 · 0.135 · 0.115; ghost gear AP@0.5:0.95 0.165.
+- **Tool deadlines:** every evidence tool runs under `$DEPTH_TOOL_TIMEOUT_S` (20 s). An overrun →
+  `ToolTimeout` → detector score, card to a person, `tool_timeout` incident; the `cv2.dnn` net is not
+  re-entered while a timed-out call holds it. New drill "Evidence tool hangs".
+- **Approvals:** approving issues a logged **work order** and the studio says the plan stands until the
+  crew reports back. The studio now sends the **approver PIN** (it never did — setting one would have
+  locked people out); the deploy script generates one (`/etc/depth/approver.env`).
+- **Counterfactual renamed:** "detector only vs + Stage 1 + OpenCV evidence" (both arms share `cv2.dnn`).
+- **Benchmarks committed** under `benchmarks/` (laptop x86, EXP-003: product 252 ms p50, 3.3 fps;
+  OpenCV-only stages 40 fps).
+- **Stage 1 on OpenCV:** seabed gradients via `cv2.Sobel`, line smoothing via `cv2.blur`; identical
+  output (≤ 2e-13 px on 258 frames × 2 orientations). Tie-sensitive 1-D steps stay NumPy.
+- **Queue by expected harm:** P(real) × severity (measured suspension / relief; weights are an
+  operator policy in `calibration.json`, labelled not fitted; neutral → old order).
+- **STUDY-12 re-run on EXP-003** (v2b test; the v1-only frame pattern matched 0 frames — fixed): 151 of
+  222 pins leave their own error circle without Stage 1; the shadow changes nothing.
+- **Docs truth pass:** model card and technical report rewritten for EXP-003; README / architecture /
+  agentic_vision / video script numbers updated.
+- Tests: full suite 205 passed.
+- **Open (people / AWS):** publish the `exp003-v1` release; timed study + blinded audit; AWS day.
+
 ### 2026-10-11 (sweep 57) — Judge audit, cont.: a fresh clone gets a clear path to the detector
 
 - CI collection fix: `tests/conftest.py` puts the repo root on `sys.path` (the bare `pytest` entry
