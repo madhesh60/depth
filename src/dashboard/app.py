@@ -73,7 +73,7 @@ from src.agentic import effort as effort_mod
 from src.detection import fp_audit
 from src.agentic.twin import frame_twin, survey_twin
 from src.agentic import brief as brief_mod
-from src.agentic.approvals import ApprovalStore, ApprovalError
+from src.agentic.approvals import ApprovalStore, ApprovalError, pin_ok, pin_required
 from src.agentic.incidents import DRILLS, catalogue as incident_catalogue, incident, parse_simulate
 from src.agentic.pipeline import validate_frame
 from .mcp_server import ENDPOINT as MCP_ENDPOINT
@@ -572,6 +572,7 @@ def health():
         "samples": len(samples_mod.list_samples()), "calibration": summary, "jobs": _JOBS.counts(),
         "limits": {"max_upload_mb": MAX_UPLOAD_MB, "max_frames": MAX_FRAMES, "max_sync_frames": MAX_SYNC_FRAMES},
         "recording": {"available": RECORDING_DAT.exists(), "name": RECORDING_DAT.stem},
+        "approver_pin_required": pin_required(),
     }
 
 
@@ -929,8 +930,7 @@ def survey_decide(survey_id: str, body: dict = Body(...)):
     """confirm / reject a card, mark a route stop recovered / not_found, or undo. Made by a named
     person in the studio (``DEPTH_APPROVER_PIN`` when set). The agent's own verdict is never
     overwritten; the plan is rebuilt around the decision and every decision is logged."""
-    want = os.environ.get("DEPTH_APPROVER_PIN")
-    if want and body.get("pin") != want:
+    if not pin_ok(body.get("pin")):
         raise HTTPException(403, "approver PIN required - decisions are made by a person in the DEPTH studio")
     s = _SURVEYS.get(survey_id)
     if s is None:
@@ -1075,8 +1075,33 @@ def approval_decide(rid: str, body: dict = Body(...)):
             d = s.to_dict()
             d.pop("frames", None)
             r = {**r, "replan": entry, "tracked": d["tracked"], "mission": d["mission"]}
+        elif r["status"] == "approved":
+            r = {**r, "work_order": _work_order_issued(s, r)}
         r = {**r, "dispatch": _dispatch(s)}
     return r
+
+
+def _work_order_issued(s: SurveyResult, r: dict) -> dict:
+    """An approval is a signed-off WORK ORDER, not a re-plan: DEPTH never drives the boat. The plan
+    stands as approved; it changes when the crew reports back (recovered / not found on the route
+    stops) or when the pass's sonar data is surveyed. Logged so the timeline says exactly that."""
+    by = (r.get("decision") or {}).get("by") or "?"
+    next_step = {"resurvey": "upload the pass's sonar recording as a new survey; the agent then re-scores these targets",
+                 "inspect": "mark each stop confirmed / rejected in Hazards; the agent re-plans after each",
+                 "recover": "mark each stop recovered / not found; the agent re-plans after each"}.get(
+        r["action"], "report the outcome in the studio; the agent re-plans from it")
+    wo = {"request": r["id"], "action": r["action"], "targets": len(r["targets"]), "approved_by": by,
+          "sent_to": "webhook approval.decided" + (" + OGC work_orders" if r["action"] != "share_public" else ""),
+          "plan_changed": False, "next": next_step}
+    s.mission.agent_log.append({"tool": "work_order", "status": "done",
+                                "rationale": f"{by} approved '{r['action']}' ({r['id']}, {len(r['targets'])} target(s)) "
+                                             f"-> work order issued; the plan stands as approved. Next: {next_step}",
+                                "detail": wo})
+    s.plan_args.setdefault("events", []).append(
+        {"t": time.time(), "actor": "person", "kind": "work_order", "by": by,
+         "title": f"{r['action']} approved - work order issued",
+         "text": f"DEPTH does not dispatch the boat; consoles receive the signed work order. Next: {next_step}"})
+    return wo
 
 
 # ---- integrations: signed webhooks + the Connect page's overview -----------------------------------

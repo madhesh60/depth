@@ -15,6 +15,7 @@ API or MCP token still cannot approve its own request.
 """
 from __future__ import annotations
 
+import hmac
 import json
 import os
 import threading
@@ -31,6 +32,16 @@ REPO = Path(__file__).resolve().parents[2]
 
 class ApprovalError(ValueError):
     pass
+
+
+def pin_required() -> bool:
+    return bool(os.environ.get("DEPTH_APPROVER_PIN"))
+
+
+def pin_ok(pin: Optional[str]) -> bool:
+    """True when no PIN is configured, or ``pin`` matches it (constant-time compare)."""
+    want = os.environ.get("DEPTH_APPROVER_PIN")
+    return not want or hmac.compare_digest(str(pin or "").encode(), want.encode())
 
 
 class ApprovalStore:
@@ -60,8 +71,7 @@ class ApprovalStore:
         return self.get(ev["id"])
 
     def decide(self, rid: str, decision: str, by: str, note: str = "", pin: Optional[str] = None) -> dict:
-        want = os.environ.get("DEPTH_APPROVER_PIN")
-        if want and pin != want:
+        if not pin_ok(pin):
             raise PermissionError("approver PIN required - approvals are made by a person in the DEPTH studio")
         if decision not in DECISIONS:
             raise ApprovalError(f"decision must be one of {list(DECISIONS)}")

@@ -614,6 +614,7 @@ input[type=range]:focus-visible::-webkit-slider-thumb { box-shadow: var(--ring);
 .writer-tag.llm { border-color: rgba(205, 185, 245, .5); color: #e8dcff; }
 .appr-who { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; font: 500 12px var(--sans); color: var(--txt-3); }
 .appr-name { flex: 1; min-width: 0; padding: 7px 10px; }
+.appr-pin { flex: 0 0 130px; }
 .appr-list { display: flex; flex-direction: column; gap: 8px; }
 .appr { border: 1px solid var(--line); border-radius: var(--radius); padding: 11px 12px; background: rgba(255, 255, 255, .025); }
 .appr-top { display: flex; align-items: center; gap: 8px; font: var(--t-12); color: var(--txt-2); }

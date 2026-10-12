@@ -308,6 +308,7 @@ async function loadHealth() {
     const h = await fetch(`${API}/api/health`).then(r => r.json());
     const cv = $("#pillCv"), md = $("#pillModel");
     if (h.recording && h.recording.available && $("#gpsRecording")) $("#gpsRecording").hidden = false;
+    if ($("#apprPin")) { $("#apprPin").hidden = !h.approver_pin_required; $("#apprOpen").hidden = !!h.approver_pin_required; }
     cv.textContent = `OpenCV ${h.opencv}`;
     cv.className = "pill " + (String(h.opencv).startsWith("5") ? "pill-ok" : "pill");
     md.textContent = h.model_loaded ? "Ready" : h.model_error ? "Error" : "Warming up";
@@ -1190,7 +1191,7 @@ function recoCards(d) {
       <div class="reco-r"><span>Reason</span>${escapeHtml(L.reason || "uncertain visual evidence")}</div>
       <div class="reco-m">${L.targets.length} target${L.targets.length === 1 ? "" : "s"} (${escapeHtml(L.targets.slice(0, 5).join(", "))}${L.targets.length > 5 ? "…" : ""}) · ${L.boat_min} boat-min${L.synthetic ? " · synthetic GPS" : ""}</div>
       ${st === "pending" && r.id ? `<div class="appr-btns"><button class="ok" data-d="approved">Approve</button><button class="no" data-d="declined">Reject</button></div>`
-        : `<div class="reco-s st ${st}">${st}${r.by ? " · " + escapeHtml(r.by) : ""}</div>`}
+        : `<div class="reco-s st ${st}">${st}${r.by ? " · " + escapeHtml(r.by) : ""}${st === "approved" ? " · work order issued; plan unchanged until the pass data is surveyed" : ""}</div>`}
     </div>`;
   }).join("")}</div>`;
 }
@@ -1517,7 +1518,7 @@ const Appr = {
       $("#apprList").innerHTML = list.slice(0, 30).map(q => `<div class="appr" data-id="${escapeHtml(q.id)}">
         <div class="appr-top"><span class="act">${escapeHtml(q.action)}</span><span>${escapeHtml(q.targets.slice(0, 6).join(", "))}${q.targets.length > 6 ? " …" : ""}</span><span class="st ${q.status}">${q.status}</span></div>
         <div class="appr-why">${escapeHtml(q.rationale)}</div>
-        <div class="appr-meta">${escapeHtml(q.id)} · asked by ${escapeHtml(q.requested_by)} via ${escapeHtml(q.channel)} · ${new Date(q.t * 1000).toLocaleString()}${q.decision ? ` · ${q.status} by <b>${escapeHtml(q.decision.by)}</b>` : ""}</div>
+        <div class="appr-meta">${escapeHtml(q.id)} · asked by ${escapeHtml(q.requested_by)} via ${escapeHtml(q.channel)} · ${new Date(q.t * 1000).toLocaleString()}${q.decision ? ` · ${q.status} by <b>${escapeHtml(q.decision.by)}</b>` : ""}${q.status === "approved" ? " · signed work order sent to consoles (DEPTH never dispatches)" : ""}</div>
         ${q.status === "pending" ? `<div class="appr-btns"><button class="ok" data-d="approved">Approve</button><button class="no" data-d="declined">Decline</button></div>` : ""}
       </div>`).join("");
       $$("#apprList .appr-btns button").forEach(b => b.onclick = () => this.decide(b.closest(".appr").dataset.id, b.dataset.d));
@@ -1527,7 +1528,8 @@ const Appr = {
     const by = ($("#apprName").value || "").trim();
     if (!by) { $("#apprName").focus(); $("#apprName").placeholder = "name required to decide"; return; }
     localStorage.setItem("depth.approver", by);
-    const r = await fetch(`${API}/api/approvals/${encodeURIComponent(id)}/decide`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ decision, by }) });
+    const r = await fetch(`${API}/api/approvals/${encodeURIComponent(id)}/decide`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ decision, by, pin: approverPin() }) });
+    if (r.status === 403) { $("#apprPin").hidden = false; $("#apprPin").focus(); }
     const body = await r.json().catch(() => ({}));
     Log.push([{ tool: "human_gate", msg: r.ok ? `${id} ${decision} by ${by}` : `${id}: ${body.detail || r.status}`, t: "" }]);
     if (r.ok && body.dispatch && state.survey && body.survey_id === state.survey.survey_id) {
@@ -1536,7 +1538,10 @@ const Appr = {
         state.survey.tracked = body.tracked; state.survey.mission = body.mission;
         if (body.replan) { toast(chainText({ rationale: body.replan.rationale })); setTimeout(toastHide, 4200); }
         renderSurvey(state.survey, { keepView: true });
-      } else { renderAgentPanel(state.survey); loadAudit(state.survey.survey_id); }
+      } else {
+        if (body.work_order) { toast(`Approved: work order ${body.work_order.request} issued. The plan stands — next: ${body.work_order.next}.`); setTimeout(toastHide, 5200); }
+        renderAgentPanel(state.survey); loadAudit(state.survey.survey_id);
+      }
     }
     this.load();
   },
@@ -1593,13 +1598,16 @@ function reviewCell(t) {
     : `<button data-d="prioritize" title="override the agent: inspect this first">↑</button><button data-d="deprioritize" title="override the agent: end of the queue">↓</button>`;
   return `<span class="rev-btns"><button class="ok" data-d="confirm" title="a real pot - put it on the recovery route">✓</button><button class="no" data-d="reject" title="not a pot - take it off the queue">✕</button><span class="rev-sep"></span>${pri}</span>`;
 }
+/* the approver PIN (when the server sets one) lives only in this tab's input - never stored */
+function approverPin() { const p = $("#apprPin"); return p && !p.hidden ? p.value : undefined; }
 /* a PERSON's decision -> the agent re-plans (recovery route, queue, budget, passes); also a training label */
 async function decideHazard(d, t, decision) {
   const by = ($("#apprName").value || "").trim();
   if (!by) { $("#apprName").focus(); $("#apprName").placeholder = "your name — required to decide"; toast("enter your name in Approvals first"); setTimeout(toastHide, 1800); return; }
   localStorage.setItem("depth.approver", by);
   const r = await fetch(`${API}/api/survey/${encodeURIComponent(d.survey_id)}/decide`, { method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ hazard_id: t.oid, decision, by }) });
+    body: JSON.stringify({ hazard_id: t.oid, decision, by, pin: approverPin() }) });
+  if (r.status === 403) { $("#apprPin").hidden = false; $("#apprPin").focus(); }
   const b = await r.json().catch(() => ({}));
   if (!r.ok) { toast(typeof b.detail === "string" ? b.detail : `not saved (${r.status})`); setTimeout(toastHide, 2200); return; }
   state.survey.tracked = b.tracked; state.survey.mission = b.mission; state.survey.dispatch = b.dispatch;

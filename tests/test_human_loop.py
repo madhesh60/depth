@@ -108,6 +108,8 @@ def test_api_decide_pin_and_replan(monkeypatch):
     assert s["mission"]["recovery_route"] == []
     monkeypatch.setenv("DEPTH_APPROVER_PIN", "2468")
     assert c.post(f"/api/survey/{sid}/decide", json={"hazard_id": q[0], "decision": "confirm", "by": "A"}).status_code == 403
+    assert c.post(f"/api/survey/{sid}/decide", json={"hazard_id": q[0], "decision": "confirm", "by": "A", "pin": "1111"}).status_code == 403
+    assert c.get("/api/health").json()["approver_pin_required"] is True
     r = c.post(f"/api/survey/{sid}/decide", json={"hazard_id": q[0], "decision": "confirm", "by": "A", "pin": "2468"})
     assert r.status_code == 200 and r.json()["mission"]["recovery_route"] == [q[0]]
     assert c.post(f"/api/survey/{sid}/decide", json={"hazard_id": q[0], "decision": "confirm", "by": "A", "pin": "2468"}).status_code == 409

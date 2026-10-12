@@ -257,3 +257,18 @@ def test_api_declined_pass_replans(client):
     left = {t for L in j["mission"]["resurvey_plan"]["lines"] for t in L["targets"]}
     assert not (declined & left)
     assert set(j["mission"]["review_queue"][:len(declined)]) == declined
+
+
+@needs_model
+def test_api_approved_pass_issues_a_work_order_and_says_the_plan_stands(client):
+    d = client.post("/api/survey?use_samples=1&gps=synthetic&boat_minutes=60&active=1").json()
+    keys = [k for k in d["dispatch"] if k.startswith("resurvey:")]
+    if not keys:
+        pytest.skip("no pass planned on the samples")
+    rid = d["dispatch"][keys[0]]["id"]
+    j = client.post(f"/api/approvals/{rid}/decide", json={"decision": "approved", "by": "Test Person"}).json()
+    wo = j["work_order"]
+    assert wo["request"] == rid and wo["approved_by"] == "Test Person" and wo["plan_changed"] is False
+    assert "sonar recording" in wo["next"]
+    log = client.get(f"/api/survey/{d['survey_id']}/log").json()["entries"]
+    assert any(e.get("kind") == "work_order" for e in log)

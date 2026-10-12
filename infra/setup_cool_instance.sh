@@ -67,9 +67,14 @@ if [ ! -s /etc/depth/mcp.env ]; then
   ( umask 077; printf 'DEPTH_MCP_TOKEN=%s\n' "$(head -c 24 /dev/urandom | od -An -tx1 | tr -d ' \n')" > /etc/depth/mcp.env )
 fi
 chmod 600 /etc/depth/mcp.env
-# Admin token for webhook management on the public server (same handling). The public judge demo
-# leaves DEPTH_APPROVER_PIN unset so judges can try the human loop; a production deployment adds
-# DEPTH_APPROVER_PIN=<pin> to this file so only people holding the PIN can decide.
+# Approver PIN: only people holding it can approve / decline / confirm (agents and API-token holders
+# can only ASK). Generated once, root-only; hand it to the judges privately with the submission.
+# DEPTH_APPROVALS_OPEN=1 skips it (the studio then says approvals are open to anyone).
+if [ "${DEPTH_APPROVALS_OPEN:-0}" != "1" ] && [ ! -s /etc/depth/approver.env ]; then
+  ( umask 077; printf 'DEPTH_APPROVER_PIN=%s\n' "$(od -An -N4 -tu4 /dev/urandom | tr -d ' \n' | tail -c 6)" > /etc/depth/approver.env )
+fi
+[ -f /etc/depth/approver.env ] && chmod 600 /etc/depth/approver.env
+# Admin token for webhook management on the public server (same handling).
 if [ ! -s /etc/depth/admin.env ]; then
   ( umask 077; printf 'DEPTH_ADMIN_TOKEN=%s\n' "$(head -c 24 /dev/urandom | od -An -tx1 | tr -d ' \n')" > /etc/depth/admin.env )
 fi
@@ -91,6 +96,7 @@ for i in $(seq 1 60); do
   if printf '%s' "$H" | grep -q '"model_loaded":true'; then
     printf '%s' "$H" | grep -q '"is_cool_path":true' && echo "COOL provenance: cv2 loaded from /opt/cool ✓" \
       || echo "WARNING: cv2 is NOT loaded from /opt/cool"
+    [ -s /etc/depth/approver.env ] && echo "approver PIN: sudo cat /etc/depth/approver.env (share it privately)"
     echo "DEPTH is up on :$PORT"; exit 0
   fi
   sleep 2
