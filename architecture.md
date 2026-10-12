@@ -287,7 +287,7 @@ auto-recover + email; JSON frame logs), **Budgets** alarm first. `deploy_aws.sh`
 default. The **3-way benchmark** (x86 stock · Graviton stock · Graviton COOL) times the product
 workload per stage with pinned threads and reports $/1k frames and $ + real-time factor per
 survey-hour; a run is labelled COOL only if `cv2` loads from `/opt/cool`. Local x86 reference:
-238 ms/frame p50; one survey-hour in 43 s (RTF 0.012).
+252 ms/frame p50 (EXP-003); one survey-hour in 51 s (RTF 0.014); results in `benchmarks/`.
 
 Scaling (described, not built): survey jobs → SQS → an Auto Scaling group of the same COOL AMI
 workers (Spot) → S3.

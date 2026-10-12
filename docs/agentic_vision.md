@@ -116,29 +116,31 @@ P(pot), reports how many cards fit and the expected number of real pots they con
 (`mission.plan_budget`), and routes an **inspection route** through them. Seconds-per-card is
 *assumed* (8 s) until the timed user study measures it.
 
-**What the measurements decided (EXP-001).** The calibration compared seven policies — plain detector
-confidence and six re-look variants — at the same recall promise. **None beat plain confidence
-significantly on the calibration split**, and on the verification split confidence ranked best (AUC
-0.764 vs 0.65–0.71 for every re-look variant). So, for this model, the agent's value-of-information
-rule spends **no re-look inference on tiering: 1 inference per frame** (the old ladder spent 4–7).
-The re-look stays as a display-only "agent's eye" view on each card. The same machinery re-decides
-automatically for the next model (EXP-003; EXP-002 was rejected as underfit).
+**What the measurements decided (EXP-001, then again for EXP-003).** The calibration compares seven
+policies — plain detector confidence and six re-look variants — at the same recall promise. **None
+beat plain confidence significantly on the calibration split**, for either model (EXP-003: AUC 0.803 for
+confidence vs 0.70–0.81 for the re-look variants, no significant gain; EXP-001: confidence also ranked
+best on its verification split, 0.764 vs 0.65–0.71). So the agent's value-of-information rule spends
+**no re-look inference on tiering: 1 inference per frame** (the old ladder spent 4–7). The re-look
+stays as a display-only "agent's eye" view on each card. The same machinery re-decides automatically
+for every new model.
 
 ---
 
 ## 4. Guaranteed tiers — calibrated on validation, verified once on test
 
-Full, regenerable report: [`calibration_exp001.md`](calibration_exp001.md). EXP-001's only unseen
-crab-pot sonograms are v1 val (**66 unique frames**, calibration) and v1 test (**92 unique frames**,
-verification); Roboflow copies are removed.
+Full, regenerable report: [`calibration_exp003.md`](calibration_exp003.md). EXP-003 is fit on the held-out
+validation recordings Rec10 / 12 / 16 (**163 unique frames**, 186 pots) and verified once on test Rec8 / 9 /
+14 (**199 unique frames**, 264 pots); Roboflow copies are removed. EXP-001's report:
+[`calibration_exp001.md`](calibration_exp001.md).
 
 | Promise (95% confidence) | Requested | What EXP-003 (deployed) can support | Verified on test |
 |---|---|---|---|
 | **Recall** — pots that reach a human (CONFIRMED+REVIEW) | ≥ 90% | **≥ 79%** — 90% is impossible: the detector's recall ceiling on the calibration recordings is 0.85 (EXP-001: ≥ 65%) | **held** — 81.1% (the test's own lower bound 76.7%) |
-| **Precision** — CONFIRMED finds that are real | ≥ 85% | **none** — the best any threshold supports is ~62–66% | — (nothing auto-confirmed) |
+| **Precision** — CONFIRMED finds that are real | ≥ 85% | **none** — the best any threshold supports is 56.5% | — (nothing auto-confirmed) |
 
-So with EXP-001 **every find goes to a human**, in P(pot) order. That is the honest consequence of the
-guarantee machinery, and it is the quantitative case for a better detector (EXP-003): raising the proposal ceiling is the
+So with EXP-003 **every find goes to a human**, in P(pot) order. That is the honest consequence of the
+guarantee machinery, and it is the quantitative case for a better detector: raising the proposal ceiling is the
 only lever that can raise the recall promise, and a better-separated score is the only way to earn an
 auto-confirm tier.
 
@@ -181,7 +183,7 @@ distance is the Stage-1 ground range × a range scale **measured** from the sona
 Stage-1 altitude. So on real data Stage 1 decides *where* and *how far* in metres
 ([`raw_recording.md`](raw_recording.md)).
 
-**Person-confirmed loop (perception → decision → person → re-plan → action).** EXP-001 supports no
+**Person-confirmed loop (perception → decision → person → re-plan → action).** EXP-003 supports no
 precision promise, so the agent auto-confirms nothing; the recovery route is built from what a named
 person confirms. Every ✓ / ✕ on a card, and every *recovered* / *not found* from a crew, makes the
 agent re-plan the recovery route, the review queue, the analyst budget and the re-survey passes
@@ -228,8 +230,8 @@ precision in that confidence band, with the auditors' own reliability measured.
 
 **Required evidence — "a trace showing OpenCV 5 output changing a later decision/action":**
 [`docs/causal_trace.md`](causal_trace.md) (STUDY-12) runs the same survey with each OpenCV output
-withheld and diffs every downstream decision. Without Stage 1's bottom track, 193 of 264 pins land
-outside their own error circle and 13 of 63 re-survey passes regroup (tiers unchanged — it is not a
+withheld and diffs every downstream decision. Without Stage 1's bottom track, 151 of 222 pins land
+outside their own error circle and 4 of 40 re-survey passes regroup (EXP-003, v2b test) (tiers unchanged — it is not a
 gate); without the shadow nothing changes (evidence only). It also prints one hazard's full chain,
 and every survey exports its decision log (`mission.trace.jsonl`).
 

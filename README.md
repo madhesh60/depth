@@ -36,7 +36,7 @@ wraps one in **promises you can check** and **measurements instead of assumption
 | **Humans teach it** | ✓ / ✕ / **＋ missed pot** on any frame → fine-tune set + hard negatives | `python -m src.agentic.feedback export` |
 | **The agent re-measures its own geometry** | on a raw recording it cross-checks OpenCV's seabed track against the **depth sounder** per chunk; on a conflict it **re-runs the OpenCV tracker** where the sounder points, trusts the image where the sounder lost lock, withholds what neither supports, then re-fits the range scale until it converges. Fresh 1-h recording: 280 of 280 chunks resolved, all 3 gross tracker failures corrected; one registered criterion failed and is reported | [`docs/sensor_check.md`](docs/sensor_check.md) |
 | **Real sonar recordings, real GPS** | reads a **raw Humminbird recording** (`.DAT` + `.SON`/`.IDX`) directly — per-ping GPS, heading, speed and depth, checked against physics (GPS speed vs speed field r = 0.95, course vs heading 2.4° median) — and **measures the range scale** (sonar depth ÷ Stage-1 altitude: 2.19 cm/sample ± 14.5%), so pins and heights are in real metres | [`docs/raw_recording.md`](docs/raw_recording.md) |
-| **OpenCV output drives actions — shown by counterfactual** | the same survey re-run with each OpenCV output withheld: without Stage 1, **193 of 264** pins fall outside their own error circle and 13 of 63 re-survey passes regroup; without the shadow, nothing changes (evidence only). Live in the product: **"⊘ without Stage 1"** on the survey map draws the ghost pins | [`docs/causal_trace.md`](docs/causal_trace.md) |
+| **OpenCV output drives actions — shown by counterfactual** | the same survey re-run with each OpenCV output withheld: without Stage 1, **151 of 222** pins fall outside their own error circle and 4 of 40 re-survey passes regroup (EXP-003, v2b test); without the shadow, nothing changes (evidence only). Live in the product: **"⊘ without Stage 1"** on the survey map draws the ghost pins | [`docs/causal_trace.md`](docs/causal_trace.md) |
 | **Plugs into any console** | **OGC API – Features** (QGIS / ArcGIS read hazards, passes, routes and approved work orders), **signed webhooks** to mission-control / dispatch systems, and a drop-in `<depth-hazards>` web component — the Connect tab has live URLs and snippets | [`docs/integrations.md`](docs/integrations.md) |
 | **Plugs into any agent (MCP)** | DEPTH is an MCP server — stdio for Claude Desktop / Code, Streamable HTTP at `/mcp` for remote agents (bearer token). 13 tools run the loop and read the evidence; the only write is **asking** a person, who approves in the studio | [`docs/mcp.md`](docs/mcp.md) |
 | **An LLM that writes, never decides** | a one-page **mission brief** for the crew; optional Claude on Amazon Bedrock rewrites it, but its text is shown only if **every number and ID traces back to the survey** and the safety caveats are present — otherwise the deterministic template is served | Survey tab · `GET /api/brief` |
@@ -152,9 +152,10 @@ recordings ([`docs/exp005_diagnosis.md`](docs/exp005_diagnosis.md)).
 supportable); 1 inference/frame (re-look did not beat confidence on unseen data; the old
 test-tuned "CONFIRMED 0.737" is 0.58 unseen — retired).
 
-**Runtime (laptop x86, stock OpenCV 5, full product path):** 238 ms/frame p50 (Stage 1 ≈ 5 ms,
-network ≈ 86%); one survey-hour of sonar (~169 frames) processed in **43 s** (real-time factor
-0.012). Graviton/COOL numbers: `infra/bench_cool.sh` on EC2 (pending).
+**Runtime (laptop x86, stock OpenCV 5, full product path, EXP-003):** 252 ms/frame p50 (network ≈ 92%;
+the OpenCV-only stages run at 40 fps); one survey-hour of sonar (~169 frames) processed in **51 s**
+(real-time factor 0.014). Results are committed in [`benchmarks/`](benchmarks). Graviton/COOL numbers:
+`infra/bench_cool.sh` on EC2 (pending).
 
 **Real recording** (raw Humminbird, Colorado River, 150.6 s, real per-ping GPS —
 [`docs/raw_recording.md`](docs/raw_recording.md)): 3,453 pings per channel parsed with 0 malformed;

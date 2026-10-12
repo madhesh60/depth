@@ -242,7 +242,7 @@ def main():
          "", f"_OpenCV {lat['opencv']} · {lat['threads']} threads · {FRAMES_PER_SURVEY_HOUR:.0f} frames per survey-hour. "
          "Re-measure on the deployment instance before switching (COOL benchmark)._", "",
          "## Evaluation reports", ""]
-    L += [f"- `{s}` → [{p.relative_to(REPO).as_posix()}]({p.relative_to(REPO).as_posix()})" for s, p in evals.items()] or ["- (skipped)"]
+    L += [f"- `{s}` → [{p.relative_to(REPO).as_posix()}]({p.name})" for s, p in evals.items()] or ["- (skipped)"]
     L += ["", "## Switch the product to this model", "",
           "```bash", f"DEPTH_MODEL={name} python -m uvicorn src.dashboard.app:app --port 8000   # local", "```",
           f"COOL server: `aws s3 cp models/{name}/best.onnx s3://<bucket>/models/{name}/best.onnx`, then set "

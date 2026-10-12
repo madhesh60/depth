@@ -30,9 +30,9 @@ _OpenCV 5.0.0 · 8 threads · 169 frames per survey-hour. Re-measure on the depl
 
 ## Evaluation reports
 
-- `test` → [docs/eval_exp003_test.md](docs/eval_exp003_test.md)
-- `test_official398` → [docs/eval_exp003_test_official398.md](docs/eval_exp003_test_official398.md)
-- `test_xsonar` → [docs/eval_exp003_test_xsonar.md](docs/eval_exp003_test_xsonar.md)
+- `test` → [docs/eval_exp003_test.md](eval_exp003_test.md)
+- `test_official398` → [docs/eval_exp003_test_official398.md](eval_exp003_test_official398.md)
+- `test_xsonar` → [docs/eval_exp003_test_xsonar.md](eval_exp003_test_xsonar.md)
 
 ## Switch the product to this model
 
