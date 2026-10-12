@@ -245,6 +245,7 @@ const DRILLS = [
   { code: "model_unavailable", label: "Detector offline", where: "analyze" },
   { code: "corrupt_frame", label: "Corrupt frame", where: "analyze" },
   { code: "tool_failed", label: "Evidence tool fails", where: "analyze" },
+  { code: "tool_timeout", label: "Evidence tool hangs", where: "analyze" },
   { code: "no_detection", label: "Empty frame", where: "analyze" },
   { code: "missing_gps", label: "No GPS", where: "survey" },
   { code: "invalid_geometry", label: "Bad GPS fix", where: "survey" },

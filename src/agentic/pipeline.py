@@ -133,7 +133,7 @@ class AgenticPipeline:
                     progress_cb("frame_done", {"frame_id": frame_id, "counts": {}})
                 continue
             fix = track.get(frame_id) if track else None
-            fr_faults = faults if k == 0 else faults - {"tool_failed", "invalid_geometry", "no_detection"}
+            fr_faults = faults if k == 0 else faults - {"tool_failed", "tool_timeout", "invalid_geometry", "no_detection"}
             try:
                 with (frame_lock or nullcontext()):
                     fr = self.run_frame(image, frame_id=frame_id, fix=fix, nadir=nadir, faults=fr_faults)

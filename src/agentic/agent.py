@@ -282,6 +282,8 @@ class ReLookAgent:
             try:
                 if "tool_failed" in self._faults and i == 0:
                     raise RuntimeError("simulated shadow-tool failure (failure drill)")
+                if "tool_timeout" in self._faults and i == 0:
+                    self.tools.simulate_hang("shadow_check")
                 proof, s = self.tools.shadow_check(gray, det.bbox, nadir, altitude_px=_altitude_for(cf, det.bbox),
                                                    altitude_m=altitude_m)
                 trace.append(s)
@@ -391,6 +393,8 @@ class ReLookAgent:
             try:
                 if "tool_failed" in self._faults and i == 0:
                     raise RuntimeError(f"simulated {tool} failure (failure drill)")
+                if "tool_timeout" in self._faults and i == 0:
+                    self.tools.simulate_hang(tool)
                 if tool == "shadow_check":
                     proof, s = self.tools.shadow_check(gray, det.bbox, cf.orientation.nadir,
                                                        altitude_px=_altitude_for(cf, det.bbox), altitude_m=altitude_m)
@@ -679,7 +683,12 @@ def _frame_incidents(frame_id: str, cands: list[Candidate], cf: CanonicalFrame, 
     if not cf.orientation.nadir:
         out.append(incident("orientation_unknown", f"{frame_id}: orientation not known - no ground range / shadow",
                             frame_id=frame_id))
-    nf = sum(any(s.status == "failed" for s in c.trace) for c in cands)
+    nt = sum(any(s.status == "failed" and str((s.detail or {}).get("error", "")).startswith("ToolTimeout")
+                 for s in c.trace) for c in cands)
+    if nt:
+        out.append(incident("tool_timeout", f"{frame_id}: an evidence tool overran its deadline on {nt} find(s)",
+                            frame_id=frame_id, affected=nt, simulated="tool_timeout" in faults))
+    nf = sum(any(s.status == "failed" for s in c.trace) for c in cands) - nt
     if nf:
         out.append(incident("tool_failed", f"{frame_id}: an evidence tool failed on {nf} find(s)",
                             frame_id=frame_id, affected=nf, simulated="tool_failed" in faults))

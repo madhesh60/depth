@@ -124,6 +124,48 @@ def test_tool_failure_drill_and_no_detection_incident():
     assert empty.incidents[0]["code"] == "no_detection"
 
 
+class _Hang(_Stub):
+    """A re-look backend that never answers (until released)."""
+    def __init__(self, dets):
+        super().__init__(dets)
+        import threading
+        self.release = threading.Event()
+
+    def relook_batch(self, frame, items, enhance=False):
+        self.release.wait(5)
+        return []
+
+
+def test_a_hung_tool_times_out_falls_back_and_the_detector_fails_fast():
+    import time
+    from src.agentic.tools import ToolTimeout
+    dets = [_det(0.30, (60, 60, 80, 80))]
+    stub = _Hang(dets)
+    agent = _agent(stub)
+    agent.tools.timeout_s = 0.2
+    t0 = time.perf_counter()
+    r = agent.run_frame(_frame(), frame_id="f1")
+    assert time.perf_counter() - t0 < 3                                      # did not wait for the hang
+    c = r.candidates[0]
+    failed = [s for s in c.trace if s.status == "failed"]
+    assert failed and failed[0].detail["error"].startswith("ToolTimeout")
+    assert c.verdict is Verdict.REVIEW                                      # a person decides
+    assert "tool_timeout" in [i["code"] for i in r.incidents]
+    with pytest.raises(ToolTimeout, match="still busy"):                     # net not re-entered
+        agent.tools.detect(_frame())
+    stub.release.set()
+    agent.tools._hung[0].join(2)
+    assert agent.tools.detect(_frame())[0] == dets                           # recovers once it returns
+
+
+def test_tool_timeout_drill():
+    dets = [_det(0.30, (60, 60, 80, 80))]
+    r = _agent(_Stub(dets, {0.30: 0.9})).run_frame(_frame(), faults={"tool_timeout"})
+    inc = [i for i in r.incidents if i["code"] == "tool_timeout"]
+    assert inc and inc[0]["simulated"] and inc[0]["fallback"]
+    assert r.candidates[0].verdict is not Verdict.CONFIRMED
+
+
 def test_validate_frame_catches_corrupt_blank_and_tiny():
     assert validate_frame(None) == "corrupt_frame"
     assert validate_frame(np.zeros((100, 100, 3), np.uint8)) == "invalid_frame"
@@ -259,7 +301,7 @@ def test_incident_catalogue_and_unknown_drill(client):
     j = client.get("/api/incidents").json()
     codes = {c["code"] for c in j["catalogue"]}
     for c in ("no_detection", "corrupt_frame", "missing_gps", "invalid_geometry", "model_unavailable",
-              "tool_failed", "storage_failed", "llm_failed"):
+              "tool_failed", "tool_timeout", "storage_failed", "llm_failed"):
         assert c in codes
     assert all(c["fallback"] and c["human_action"] for c in j["catalogue"])
     from src.dashboard import samples as samples_mod

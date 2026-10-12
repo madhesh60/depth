@@ -61,6 +61,11 @@ CATALOGUE: dict[str, tuple[str, str, str, str, str]] = {
         "warning", "prove", "An evidence tool failed",
         "the agent fell back to the detector's own confidence; affected finds go to a person, never auto-confirmed",
         "review the affected cards by eye; the trace marks the failed call"),
+    "tool_timeout": (
+        "warning", "prove", "An evidence tool timed out",
+        "the agent stopped waiting, fell back to the detector's own confidence and sent the affected finds to a "
+        "person; the survey kept going",
+        "review the affected cards by eye; if it repeats, check the server load ($DEPTH_TOOL_TIMEOUT_S sets the deadline)"),
     "storage_failed": (
         "warning", "act", "Cloud storage upload failed (S3)",
         "results are kept on the server's local disk and all downloads still work",
@@ -76,7 +81,7 @@ CATALOGUE: dict[str, tuple[str, str, str, str, str]] = {
 }
 
 # failures the studio can trigger on demand to show the fallback (?simulate=<code>)
-DRILLS = ("corrupt_frame", "missing_gps", "invalid_geometry", "tool_failed", "model_unavailable",
+DRILLS = ("corrupt_frame", "missing_gps", "invalid_geometry", "tool_failed", "tool_timeout", "model_unavailable",
           "storage_failed", "llm_failed", "no_detection")
 
 

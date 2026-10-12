@@ -6,11 +6,19 @@ the payload the agent reasons over, plus a timed, human-readable :class:`AgentSt
 Keeping the tools thin and uniform is what makes the agent's decisions auditable (Agentic-Vision:
 "the picture results must change the agent's next step") — every step the agent takes is one tool
 call recorded here.
+
+Every tool that does real work runs under a **deadline** (``$DEPTH_TOOL_TIMEOUT_S``, default 20 s;
+``0`` = off). A call that overruns raises :class:`ToolTimeout`, which the agent handles like any
+failed tool: the find falls back to the detector's score and goes to a person. Python cannot kill
+a thread, so a hung call is left to finish on its own; until it does, the tools that share the
+detector **fail fast** instead of queueing behind it (``cv2.dnn`` nets are not re-entrant).
 """
 from __future__ import annotations
 
+import os
+import threading
 import time
-from typing import Optional
+from typing import Callable, Optional, TypeVar
 
 import numpy as np
 
@@ -19,18 +27,70 @@ from .perception import Perceptor
 from .shadow import ShadowProver
 from .types import AgentStep, RelookResult, ShadowProof
 
+T = TypeVar("T")
+_NET_TOOLS = {"detect", "zoom_relook", "relook_band"}      # share the one cv2.dnn net
+
+
+def default_timeout_s() -> float:
+    try:
+        return max(0.0, float(os.environ.get("DEPTH_TOOL_TIMEOUT_S", "20")))
+    except ValueError:
+        return 20.0
+
+
+class ToolTimeout(RuntimeError):
+    """A tool overran its deadline (or the detector is still busy with one that did)."""
+
 
 class Toolbox:
     """Timed, trace-emitting wrappers around the See/Prove primitives."""
 
-    def __init__(self, perceptor: Perceptor, shadow_prover: Optional[ShadowProver] = None):
+    def __init__(self, perceptor: Perceptor, shadow_prover: Optional[ShadowProver] = None,
+                 timeout_s: Optional[float] = None):
         self.perceptor = perceptor
         self.shadow = shadow_prover or ShadowProver()
+        self.timeout_s = default_timeout_s() if timeout_s is None else float(timeout_s)
+        self._hung: list[threading.Thread] = []             # timed-out calls still running
+
+    # -- deadline guard ----------------------------------------------------------------------
+    def _guard(self, tool: str, fn: Callable[[], T], timeout_s: Optional[float] = None) -> T:
+        """Run ``fn`` with a deadline; raise :class:`ToolTimeout` if it overruns."""
+        limit = self.timeout_s if timeout_s is None else timeout_s
+        self._hung = [t for t in self._hung if t.is_alive()]
+        if tool in _NET_TOOLS and any(t.name.split(":", 1)[1] in _NET_TOOLS for t in self._hung):
+            raise ToolTimeout(f"{tool} not started: the detector is still busy with a call that timed out")
+        if not limit:
+            return fn()
+        box: dict = {}
+
+        def work():
+            try:
+                box["v"] = fn()
+            except BaseException as e:                       # re-raised in the caller's thread
+                box["e"] = e
+
+        th = threading.Thread(target=work, name=f"depth-tool:{tool}", daemon=True)
+        th.start()
+        th.join(limit)
+        if th.is_alive():
+            self._hung.append(th)
+            raise ToolTimeout(f"{tool} did not answer within {limit:g} s")
+        if "e" in box:
+            raise box["e"]
+        return box["v"]
+
+    def simulate_hang(self, tool: str, timeout_s: float = 0.3) -> None:
+        """Failure drill: a tool that never answers, under a short deadline -> :class:`ToolTimeout`."""
+        stop = threading.Event()
+        try:
+            self._guard(f"drill_{tool}", lambda: stop.wait(timeout_s * 10), timeout_s=timeout_s)
+        finally:
+            stop.set()                                         # release the drill thread at once
 
     # -- See -------------------------------------------------------------------------------
     def detect(self, frame: np.ndarray) -> tuple[list[Detection], AgentStep]:
         t0 = time.perf_counter()
-        dets = self.perceptor.perceive(frame)
+        dets = self._guard("detect", lambda: self.perceptor.perceive(frame))
         ms = (time.perf_counter() - t0) * 1000
         g = getattr(self.perceptor, "guaranteed_class", "fishing_gear")
         n_fg = sum(d.cls_name == g for d in dets)
@@ -58,7 +118,8 @@ class Toolbox:
                      altitude_px: Optional[float] = None,
                      altitude_m: Optional[float] = None) -> tuple[ShadowProof, AgentStep]:
         t0 = time.perf_counter()
-        proof = self.shadow.prove(gray, bbox, nadir=nadir, altitude_px=altitude_px, altitude_m=altitude_m)
+        proof = self._guard("shadow_check", lambda: self.shadow.prove(
+            gray, bbox, nadir=nadir, altitude_px=altitude_px, altitude_m=altitude_m))
         ms = (time.perf_counter() - t0) * 1000
         if not proof.orientation_known:
             why = "frame orientation unknown -> shadow not measured (never guessed)"
@@ -78,7 +139,7 @@ class Toolbox:
     def zoom_relook(self, frame, bbox, cls_name: str, conf_before: float,
                     enhance: bool = False) -> tuple[RelookResult, AgentStep]:
         t0 = time.perf_counter()
-        rl = self.perceptor.zoom_relook(frame, bbox, cls_name, enhance=enhance)
+        rl = self._guard("zoom_relook", lambda: self.perceptor.zoom_relook(frame, bbox, cls_name, enhance=enhance))
         rl.gain = round(rl.conf - conf_before, 4)
         ms = (time.perf_counter() - t0) * 1000
         label = "enhanced re-look (CLAHE)" if enhance else "re-look"
@@ -124,10 +185,11 @@ class Toolbox:
         items = [(d.bbox, d.cls_name) for d in dets]
         batch = getattr(self.perceptor, "relook_batch", None)
         if mode == "mosaic" and batch is not None:
-            results = batch(frame, items, enhance=enhance)
+            results = self._guard("relook_band", lambda: batch(frame, items, enhance=enhance))
             n_inf = -(-len(items) // 4)
         else:
-            results = [self.perceptor.zoom_relook(frame, b, c, enhance=enhance) for b, c in items]
+            results = self._guard("relook_band", lambda: [
+                self.perceptor.zoom_relook(frame, b, c, enhance=enhance) for b, c in items])
             n_inf = len(items)
         ms = (time.perf_counter() - t0) * 1000
         label = ("enhanced " if enhance else "") + ("mosaic re-look" if mode == "mosaic" else "re-look")
