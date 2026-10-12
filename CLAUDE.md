@@ -112,7 +112,7 @@ python -m src.cv_pipeline.humminbird fetch [--large]|validate|report  # raw reco
 python -m src.agentic.study_sensor                         # STUDY-16 sensor cross-check (design + fresh recording)
 python -m src.detection.study_scale_tta                     # STUDY-13 (input size + flip TTA)
 python -m src.agentic.evidence_model                        # STUDY-15 active-vision evidence (val -> test -> fresh)
-python -m src.agentic.counterfactual                        # same survey WITH vs WITHOUT OpenCV
+python -m src.agentic.counterfactual                        # same survey: detector only vs + Stage 1 + evidence
 ```
 
 ## Environment

@@ -449,7 +449,7 @@ def _run_survey(frames, gps: str, budget_minutes: Optional[float], nadir: Option
         log.exception("stage-1 counterfactual failed")
         d["stage1_counterfactual"] = {"available": False, "reason": f"error: {type(e).__name__}"}
         _add_incident(result, d, incident("view_failed", f"Stage-1 counterfactual: {type(e).__name__}"))
-    try:                                                    # the same survey WITH vs WITHOUT OpenCV evidence
+    try:                                                    # detector only vs + Stage 1 + OpenCV evidence
         from src.agentic.counterfactual import without_opencv
         d["opencv_counterfactual"] = without_opencv(result, d.get("stage1_counterfactual"))
     except Exception as e:

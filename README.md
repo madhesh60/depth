@@ -68,10 +68,10 @@ Sonar frame ─► OpenCV 5: Stage 1 (bottom track, geometry) + YOLO11 via cv2.d
 | **Agent Trace** | DETECT → evidence → decision → OpenCV tool → new evidence → decision changed → approval → survey plan, on every evidence card | Analyze |
 | **Sensor cross-check (on by default)** | OpenCV seabed track vs depth sounder → conflict → OpenCV re-track with a new search window → accept / trust the image / withhold → re-fit the range scale → re-check. It changes where pins go and heights in metres (0.36 m → 0.11 m on a chunk where the sounder lost lock) | Survey → Agent · Seabed cross-check · STUDY-16 |
 
-**Does OpenCV matter? The same survey with vs without it** — the 8 shipped frames, 27 hazards
+**Does OpenCV's measurement matter? The same survey, detector only vs + Stage 1 + OpenCV evidence** (both arms run the same `cv2.dnn` detections) — the 8 shipped frames, 27 hazards
 (`python -m src.agentic.counterfactual` → [`docs/opencv_counterfactual.md`](docs/opencv_counterfactual.md)):
 
-| downstream | WITHOUT OpenCV | WITH OpenCV — default | WITH OpenCV — active vision (experimental) |
+| downstream | Detector only | + Stage 1 + evidence — default | + Stage 1 + evidence — active vision (experimental) |
 |---|---|---|---|
 | decision (agent action) | detector only (8 accept) | unchanged | **3 accept; 7 of 27 hazards change action** |
 | geolocation | slant range, frame-centre ping | **median pin moves 6.5 m; 17 of 27 leave their own error circle** | same |
@@ -190,7 +190,7 @@ python -m src.detection.diagnose --zip EXP-003_complete.zip        # why a new m
 python -m src.detection.onboard_model --zip EXP-003_complete.zip   # plug in a new model (+ speed gate)
 python -m src.agentic.study_causal --frames <v1>/test/images --limit 80   # STUDY-12 counterfactual
 python -m src.agentic.evidence_model                  # STUDY-15: evidence LRs (val) -> test -> fresh split
-python -m src.agentic.counterfactual                  # the same survey WITH vs WITHOUT OpenCV
+python -m src.agentic.counterfactual                  # the same survey: detector only vs + Stage 1 + OpenCV evidence
 python -m src.detection.study_scale_tta               # STUDY-13 input size + flip TTA
 python -m src.cv_pipeline.humminbird report           # STUDY-14 raw recording, real GPS
 ```

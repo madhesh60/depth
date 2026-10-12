@@ -55,7 +55,7 @@ dashed violet = optional. Text version:_
  SURVEY  frames ─► chunk stitching ─► repeat-sighting merge ─► recovery route · inspection route
                    · analyst budget · boat budget ─► opposite-side re-survey passes (ranked by information
                    per boat-minute; one approval per pass; a declined pass re-plans) ─► GeoJSON/GPX/KML/CSV/JSON
-                   · WITH vs WITHOUT OpenCV counterfactual, live per survey   src/agentic/counterfactual.py
+                   · detector-only vs + Stage 1 + evidence counterfactual, live per survey   src/agentic/counterfactual.py
                                                             src/agentic/{pipeline,stitch,resurvey,mission}.py
  HUMAN LOOP  labels (✓ / ✕ / ＋missed) ─► fine-tune set     src/agentic/feedback.py
              timed study (manual vs cards) ─► effort curve  src/agentic/{study,effort}.py
@@ -188,7 +188,7 @@ disables it). Report: [`docs/evidence_model_exp003.md`](docs/evidence_model_exp0
   the bearing its shadow must flip to. Each pass is its own approval request ("Agent recommends:
   Perform opposite-side resurvey · Reason: …"). **Declined** → never proposed again, the boat time is
   re-ranked over the remaining passes and its targets move to the front of the inspection queue.
-* **WITH vs WITHOUT OpenCV** (`counterfactual.py`) — every survey re-plans itself with the OpenCV
+* **Detector only vs + Stage 1 + OpenCV evidence** (`counterfactual.py`; both arms share the `cv2.dnn` detections) — every survey re-plans itself with the OpenCV
   outputs removed (detector action, slant-range pins) and diffs decision, priority, geolocation,
   re-survey route and approvals; shown in the Agent tab ([`docs/opencv_counterfactual.md`](docs/opencv_counterfactual.md)).
 * **exports** — GeoJSON / GPX / KML / CSV / JSON, synthetic GPS always labelled; every format but CSV

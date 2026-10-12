@@ -1198,8 +1198,8 @@ function recoCards(d) {
 /* the same survey WITH vs WITHOUT the OpenCV evidence - what changes downstream */
 function cfTable(cf) {
   if (!cf || !cf.available) return "";
-  return `<div class="cfx"><div class="gate-h">Does OpenCV change the plan?<span>at planning time · ${cf.active ? "active vision (experimental)" : "active vision off"}</span></div>
-    <table><thead><tr><th></th><th>Without OpenCV</th><th>With OpenCV</th></tr></thead><tbody>${cf.rows.map(r =>
+  return `<div class="cfx"><div class="gate-h">Does OpenCV's measurement change the plan?<span>at planning time · ${cf.active ? "active vision (experimental)" : "active vision off"}</span></div>
+    <table><thead><tr><th></th><th title="the same cv2.dnn detections, nothing OpenCV measured afterwards">Detector only</th><th>+ Stage 1 + OpenCV evidence</th></tr></thead><tbody>${cf.rows.map(r =>
       `<tr class="${r.changed ? "chg" : ""}"><th>${escapeHtml(r.what)}</th><td>${escapeHtml(r.without)}</td><td>${escapeHtml(r.with)}<div class="cfx-d">${escapeHtml(r.detail)}</div></td></tr>`).join("")}</tbody></table>
     ${cf.example ? `<p class="gate-note"><b>${escapeHtml(cf.example.id)}</b>: ${escapeHtml(cf.example.conflict || "")} — ${ACT[cf.example.without]} → ${ACT[cf.example.with]}${cf.example.resurvey ? ", opposite-side pass requested" : ""}.</p>` : ""}
     <p class="gate-note">${escapeHtml(cf.note)}</p></div>`;
