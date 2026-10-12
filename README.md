@@ -16,6 +16,41 @@ Madhesh) · **Targets:** Agentic Vision · Best Use of COOL · **License:** AGPL
 
 ![DEPTH architecture: OpenCV 5 agent (Stage 1 → See → Prove → Decide → Act) on EC2 Graviton + COOL, with the human loop, exports and AWS services](docs/img/architecture.svg)
 
+### At a glance
+
+| | number | measured on |
+|---|--:|---|
+| **Recall promise** — pots that reach a person (95% confidence) | **≥ 79%**, held at **81.1%** | fit on held-out recordings, verified once on 199 unseen frames / 264 pots |
+| Crab-pot detector, AP@0.5 · AP@0.5:0.95 | **0.482** (95% CI 0.43–0.55) · 0.165 | v2b test, 214 unique frames |
+| OpenCV's seabed measurement moves the boat | **151 of 222** pins leave their own error circle without it | STUDY-12, v2b test |
+| Stage-1 altitude, port vs starboard (no labels needed) | agree to **1.6 px** (random pairs 5.3 px) | STUDY-08 |
+| Full product path on a laptop CPU | **252 ms/frame** p50 · one survey-hour in **51 s** | `benchmarks/`, x86, stock OpenCV 5 |
+| Raw sonar recording, real GPS | range scale **2.03 cm/sample ± 10.2%**, measured | Colorado River, Humminbird |
+| Tests | **205** passing, CI on every push | `pytest -q` |
+
+**Not yet measured, and said so:** Graviton + COOL timings (scripted, AWS day), analyst minutes saved
+(the timed study needs people), audited false-alarm precision (the blinded audit needs people). The
+detector misses the proposal's 0.70 mAP target; §4 says by how much and why.
+
+**For judges — five minutes from a clean clone:**
+
+```bash
+git clone https://github.com/madhesh60/depth.git && cd depth
+pip install -r requirements.txt && python -m src.detection.fetch_model   # 38 MB, SHA-256 checked
+python -m uvicorn src.dashboard.app:app --port 8000                      # http://localhost:8000 → ▶ 60-s demo
+```
+
+### How the evidence maps to the judging criteria
+
+| criterion | where DEPTH shows it |
+|---|---|
+| **Technical execution** — OpenCV 5 doing real work | Stage 1 (bottom track with `cv2.Sobel` / `cv2.blur`, slant→ground `cv2.remap`), YOLO11 through `cv2.dnn`, shadow + re-look evidence; deploy-faithful evaluation with CIs, mAP@0.5:0.95, confusion matrix, PR curves ([`eval_exp003_test.md`](docs/eval_exp003_test.md)); 205 tests; deadlines + fallbacks on every tool |
+| **Agentic Vision** — perception changes the next action | value-of-information tool choice, evidence conflicts → another observation, opposite-side re-survey passes, a person's decision → re-plan (§2); proven by counterfactual ([`causal_trace.md`](docs/causal_trace.md)) |
+| **Innovation** | statistical promises on an imperfect detector ([`calibration_exp003.md`](docs/calibration_exp003.md)); the agent cross-checks its own seabed track against the depth sounder ([`sensor_check.md`](docs/sensor_check.md)); shadow-flip prediction for second looks |
+| **Real-world impact** | raw Humminbird recordings with real GPS, routes, budgets, GPX/KML/GeoJSON, OGC API, webhooks, MCP; queue ordered by expected harm |
+| **UX** | zero-build studio: guided demo, evidence cards with the full agent trace, 3D twin, approvals inbox, failure drills (`?drills`) |
+| **Responsible cloud delivery** | Graviton + COOL deploy, dry-run by default, budgets first, provenance on every result ([`infra/README.md`](infra/README.md)); approver PIN; protected wrecks generalised in public exports ([`responsible_use.md`](docs/responsible_use.md)) |
+
 ---
 
 ## 1. Why this is different
@@ -130,10 +165,20 @@ PINGMapper's sample data (MIT code, Zenodo 10.5281/zenodo.6604666), fetched hash
 
 | | value | split |
 |---|--:|---|
-| crab pots (ghost gear) on sonar: AP@0.5 (95% CI) | **0.482** (0.43–0.55) | v2b test, 285 pots |
-| wreck debris: AP@0.5 | 0.156 (weak) | v2b test, 70 boxes |
-| GhostVision head-to-head: F1 | 0.41 (GhostVision reports 0.71–0.73) | official 398-frame split |
-| cross-sonar: ghost gear AP@0.5 | 0.34 | `test_xsonar` |
+| crab pots (ghost gear) on sonar: AP@0.5 (95% CI) · AP@0.5:0.95 | **0.482** (0.43–0.55) · 0.165 | v2b test, 285 pots |
+| crab pots: P / R / F1 at the validation-tuned threshold | 0.50 / 0.47 / 0.49 | v2b test |
+| wreck debris: AP@0.5 · AP@0.5:0.95 | 0.156 · 0.047 (weak) | v2b test, 70 boxes |
+| **mAP@0.5 · mAP@0.5:0.95** (both classes) | **0.319** · 0.106 — the proposal's 0.70 is **not met** | v2b test |
+| GhostVision head-to-head: F1 · AP@0.5 | 0.41 · 0.39 (GhostVision reports F1 0.71–0.73) | official 398-frame split |
+| cross-sonar: ghost gear AP@0.5 | 0.34; the val threshold does not transfer (recall 0.11) | `test_xsonar` |
+
+Full reports, each with a confusion matrix and a PR curve: [test](docs/eval_exp003_test.md) ·
+[official 398](docs/eval_exp003_test_official398.md) · [cross-sonar](docs/eval_exp003_test_xsonar.md).
+Why the gap: most training "wrecks" are fish-finder screenshots and the wreck boxes are loose — a data
+problem, not the recipe ([`docs/exp003_diagnosis.md`](docs/exp003_diagnosis.md)). The recall promise is
+what makes this detector safe to use: every pot it covers reaches a person.
+
+<img src="docs/img/pr_exp003_test.png" width="430" alt="EXP-003 precision-recall curves on v2b test, with the validation-tuned operating points">
 
 Five training runs after it (EXP-003f, 004, 004g, 005, 005a) did not beat it on the held-out
 recordings ([`docs/exp005_diagnosis.md`](docs/exp005_diagnosis.md)).
@@ -164,9 +209,10 @@ cross-check (STUDY-16); the full agent in ~4 s (~40× faster than the recording)
 2 review cards = **48 cards per hour of sonar** on water with no known pots — the false-alarm load
 this model would put on an analyst there.
 
-**Pending:** the timed study and the blinded audit with people, the EC2 / COOL benchmark, and
-publishing the weights as a GitHub Release. (EXP-003 is deployed; EXP-002/004/005 were trained and did
-not beat it — [`docs/exp005_diagnosis.md`](docs/exp005_diagnosis.md).)
+**Pending:** the timed study and the blinded audit with people, and the EC2 / COOL benchmark. The
+weights are published (GitHub Release `exp003-v1`, SHA-256 checked by `fetch_model`). EXP-003 is
+deployed; EXP-002/004/005 were trained and did not beat it
+([`docs/exp005_diagnosis.md`](docs/exp005_diagnosis.md)).
 
 ## 5. How it works
 
@@ -177,6 +223,7 @@ survey ─► stitch · merge repeat sightings ─► routes · budgets · oppos
 human ─► labels · timed study · blinded audit          offline ─► v2b ─► train ─► onboard (one command)
 ```
 Full design: [`architecture.md`](architecture.md). Agentic writeup: [`docs/agentic_vision.md`](docs/agentic_vision.md).
+Every document, grouped by what it proves: [`docs/README.md`](docs/README.md).
 
 ## 6. Reproduce
 
@@ -189,7 +236,7 @@ python -m src.agentic.effort                           # analyst-effort curve
 python -m src.bench.product_bench --label my_host      # benchmark this machine (product workload)
 python -m src.detection.diagnose --zip EXP-003_complete.zip        # why a new model is (not) good: val + fit check
 python -m src.detection.onboard_model --zip EXP-003_complete.zip   # plug in a new model (+ speed gate)
-python -m src.agentic.study_causal --frames <v1>/test/images --limit 80   # STUDY-12 counterfactual
+python -m src.agentic.study_causal --frames DATASET/03_yolo_ready_dataset_v2b/test/images --limit 80   # STUDY-12
 python -m src.agentic.evidence_model                  # STUDY-15: evidence LRs (val) -> test -> fresh split
 python -m src.agentic.counterfactual                  # the same survey: detector only vs + Stage 1 + OpenCV evidence
 python -m src.detection.study_scale_tta               # STUDY-13 input size + flip TTA
@@ -215,7 +262,7 @@ models/<MODEL>/   calibration.json + effort/audit data (weights: GitHub Release,
 docs/             technical report, cards, calibration, evaluation, studies, MCP, integrations, …
 .github/          CI: the test suite on every push
 ```
-Logs: [`experiments.md`](experiments.md) (every study, including negative results) ·
+Documentation map: [`docs/README.md`](docs/README.md). Logs: [`experiments.md`](experiments.md) (every study, including negative results) ·
 [`progress.md`](progress.md) · [`TODO.md`](TODO.md).
 
 ## 8. Responsible use & license

@@ -238,6 +238,34 @@ Promote each into the log below with full results as it runs.
   recordings shared a fix and 11 spurious repeat-sighting merges appeared without Stage 1. Fixed in
   the study (parallel lines 500 m apart) before reading any number; the product's demo track is
   single-recording.
+- **Re-run on EXP-003 (2026-10-12)**, v2b test, 80 unique crab-pot frames, 223 hazards. The default
+  frame pattern assumed v1's `crabpot_` prefix and matched 0 v2b frames; it is now `*wcp_ss_*.jpg`.
+
+| downstream decision (EXP-003, v2b test) | no_stage1 | no_shadow |
+|---|---|---|
+| tier flips · queue order (Kendall τ) · budget picks changed | 0 · 1.0 · 0 | 0 · 1.0 · 0 |
+| geotag shift, median / p90 / max | **9.1 / 15.0 / 15.7 m** | 0 |
+| pins pushed outside their own stated error circle | **151 of 222** | 0 of 223 |
+| re-survey passes with identical targets | 36 of 40 | 40 of 40 |
+| inspection stops moved (route length) | 4 (2747.0 → 2746.6 m) | 0 |
+
+  Same reading as EXP-001: Stage 1 decides where the boat goes; the shadow changes no decision.
+
+### EVAL — EXP-003 deploy-faithful evaluation, extended (2026-10-12)
+
+- `python -m src.detection.evaluate` now defaults to the deployed model and adds COCO-style
+  AP@0.5:0.95, a class-agnostic confusion matrix at the val-tuned thresholds, and PR curves. Same
+  cached `cv2.dnn` detections; AP@0.5 unchanged.
+
+| split | mAP@0.5 | mAP@0.5:0.95 | ghost gear AP@0.5 · AP@0.5:0.95 |
+|---|--:|--:|---|
+| v2b test | 0.319 | 0.106 | 0.482 · 0.165 |
+| official 398 | 0.391 | 0.135 | 0.391 · 0.135 |
+| `test_xsonar` | 0.341 | 0.115 | 0.341 · 0.115 |
+
+  Confusion (v2b test): 134 of 285 pots found, 151 missed, 133 false alarms; wreck 8 of 70; no
+  ghost↔wreck label confusion. The low AP@0.5:0.95 says the boxes are loose as well as missed —
+  consistent with the loose labels in `exp003_diagnosis.md` §3.
 
 ### STUDY-11b — Seam inference across chunk boundaries (NEGATIVE — not shipped)
 

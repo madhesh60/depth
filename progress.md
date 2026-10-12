@@ -75,6 +75,20 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ## 4. Session log
 
+### 2026-10-12 (sweep 59) — Weights published; documentation brought to one truth
+
+- **Release `exp003-v1` published** by the owner. Fresh clone of `main`: `fetch_model` installed 37.9 MB
+  with a matching SHA-256; the suite ran there: 202 passed, 3 skipped (optional raw recording, the
+  unpublished EXP-001 weights). The reproducibility blocker is closed.
+- **README:** an "At a glance" table (every headline number with its split), a five-minute judge path
+  from a clean clone, a criteria → evidence map, the full detector table (AP@0.5:0.95, P/R/F1, the
+  missed 0.70 target stated) with the PR curve, and the stale "publish the weights" pending removed.
+- **`docs/README.md`:** a documentation map grouped by what each document proves (evidence, negative
+  results, run / connect / deploy). 0 broken relative links across the repo's Markdown.
+- Technical report: final status header, reproduce section checked on the fresh clone. `experiments.md`:
+  STUDY-12 re-run on EXP-003 and the extended evaluation logged.
+- **Open (people / AWS):** timed study + blinded audit; AWS day (deploy + 3-way COOL benchmark).
+
 ### 2026-10-12 (sweep 58) — Judge audit: the code-side gaps closed
 
 - **Evaluation:** `evaluate.py` defaults to the deployed model (weights, names, input size, thresholds

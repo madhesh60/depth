@@ -1,4 +1,4 @@
-# Release `exp003-v1` — EXP-003 detector weights (prepared, not published)
+# Release `exp003-v1` — EXP-003 detector weights (published 2026-10-12)
 
 **What it is:** DEPTH's default detector since 2026-10-06.
 
@@ -57,3 +57,7 @@ gh release create exp003-v1 models/EXP-003/best.onnx --repo madhesh60/depth --ti
 ```
 
 Then check: `python -m src.detection.fetch_model` on a fresh clone installs it and the hash matches.
+
+**Checked 2026-10-12:** a fresh clone of `main` fetched the asset (37.9 MB) and its SHA-256 matched
+`71339e99ad2b4b29f8d516967ce02e1fb5895434bf6f483cb517efe6750ba2f2`; the test suite then ran on that clone: 202 passed, 3 skipped
+(the optional raw recording, and the unpublished EXP-001 weights).

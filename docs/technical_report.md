@@ -1,10 +1,10 @@
-# DEPTH — Technical Report (draft)
+# DEPTH — Technical Report
 
 **Side-scan sonar → a human-approved cleanup plan for ghost fishing gear and wreck debris**
 OpenCV AI Competition 2026 · Team Syndicate (solo — Madhesh) · Tracks: **Agentic Vision**, **Best Use
 of COOL** · Code: <https://github.com/madhesh60/depth> (AGPL-3.0)
 
-> Draft of 2026-09-26. Every number names its split and links the script-generated report it comes
+> Status of 2026-10-12, deployed detector EXP-003. Every number names its split and links the script-generated report it comes
 > from. Items marked **⏳ pending** are measurements that have not been taken yet; they are left
 > empty rather than estimated.
 
@@ -312,13 +312,18 @@ Log: [`experiments.md`](../experiments.md).
 ## 9. Reproduce
 
 ```bash
-pip install -r requirements-dev.txt && pytest -q             # 204 tests (CI: .github/workflows/tests.yml)
-python -m src.detection.fetch_model                          # the detector, SHA-256 checked
+pip install -r requirements-dev.txt
+python -m src.detection.fetch_model                          # the detector (Release exp003-v1), SHA-256 checked
+pytest -q                                                    # 205 tests (CI: .github/workflows/tests.yml)
 python -m uvicorn src.dashboard.app:app --port 8000          # studio → "▶ 60-s demo"
 python -m src.agentic.calibrate                              # fit + verify the guarantees
-python -m src.detection.evaluate                             # deploy-faithful detector eval
-python -m src.agentic.study_causal --frames <v1>/test/images --limit 80   # STUDY-12
+python -m src.detection.evaluate                             # deploy-faithful detector eval (+ mAP@0.5:0.95, confusion, PR)
+python -m src.agentic.study_causal --frames DATASET/03_yolo_ready_dataset_v2b/test/images --limit 80   # STUDY-12
 python -m src.detection.study_scale_tta                      # STUDY-13
 python -m src.cv_pipeline.humminbird fetch && python -m src.cv_pipeline.humminbird report   # STUDY-14
 python -m src.bench.product_bench --label <host>             # benchmark this machine
 ```
+
+Checked on a fresh clone (2026-10-12): `fetch_model` installed the published weights with a matching
+hash, and the suite passed (202 passed, 3 skipped: the optional raw recording and the unpublished
+EXP-001 weights). The datasets are git-ignored; their builders are in `DATASET/scripts/`.

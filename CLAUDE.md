@@ -138,7 +138,9 @@ src/dashboard/    app (FastAPI) · jobs · metrics · samples · mcp_server · o
 webui/            zero-build studio · twin3d.js · embed/depth-embed.js · samples/ (8 CC-BY-SA frames) ·
                   audit/ crops · vendor/leaflet · vendor/three
 infra/            deploy_aws.sh · setup_cool_instance.sh · depth.service · bench_cool.sh
-models/<MODEL>/   calibration.json · effort_curve.json · fp_audit_val.json (weights: fetch_model)
+models/<MODEL>/   calibration.json · effort_curve.json · fp_audit_val.json (weights: Release exp003-v1 via fetch_model)
+benchmarks/       product_bench JSON results (tracked; EC2 / COOL runs land here too)
+docs/README.md    the documentation map (start here)
 tests/            pytest suite (CI: .github/workflows/tests.yml)
 ```
 

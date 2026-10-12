@@ -77,8 +77,8 @@ Legend: `[x]` done · `[ ]` open · **(YOU)** needs a person / an account / a GP
       there and understate every model's score. Needs 1–2 people.
 - [x] EXP-003 is the default model (`calibration.SHIPPED_MODEL`). The demo frames are now held-out v2b
       test frames.
-- [ ] **(YOU) Publish the EXP-003 weights.** Decide the licence wording first, then run the one command
-      in [`docs/release_exp003.md`](docs/release_exp003.md).
+- [x] **(YOU) Publish the EXP-003 weights.** Done 2026-10-12 (`exp003-v1`); a fresh clone fetches it and
+      the hash matches.
 - [ ] After the label audit: re-score EXP-001/003/004/005 on the corrected validation labels (v2c, val
       only, never test).
 - [ ] Optional GPU run: EXP-003's exact recipe with a second seed, to report its run-to-run spread. No
