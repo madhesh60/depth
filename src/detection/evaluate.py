@@ -8,14 +8,15 @@ Runs the **exact artifact that ships** (``best.onnx`` via ``cv2.dnn`` / ``YoloOn
 * **VAL-tuned per-class confidence thresholds** — the test split is scored ONCE   (#10)
 * **per-source and per-sensor tables** — the aggregate mAP hides the truth        (#11)
 * **bootstrap 95% CIs** on the headline metrics                                   (#13)
-* **GhostVision head-to-head** scaffold on the official crab-pot split            (#24)
+* **GhostVision head-to-head** on the official crab-pot split                     (#24)
   — *gated on a leakage-free model*. EXP-001 trained on v1, which mixed the official
   crab-pot test frames into training, so the head-to-head is **SKIPPED** for it (printing a
-  leaked number would be dishonest). Re-run with ``--official-split ... --leakage-free`` once
-  EXP-002 (trained on v2, which respects the split) exists.
+  leaked number would be dishonest). v2b models (EXP-002+) respect the split.
+* **COCO-style mAP@0.5:0.95**, a **confusion matrix** at the val-tuned thresholds and a
+  **PR curve** image (``docs/img/pr_<model>_<split>.png``).
 
 Design notes (why this is trustworthy):
-  * Same ``cv2.dnn`` decode/NMS path as ``infra/lambda_handler.py`` and the dashboard, so the
+  * Same ``cv2.dnn`` decode/NMS path as the studio and the MCP server, so the
     numbers describe the deployed system — not a torch re-run that never ships.
   * Detections are collected once at a low floor (conf 0.001) and cached; every threshold,
     table and bootstrap replicate is computed from that cache (fast, deterministic).
@@ -23,14 +24,18 @@ Design notes (why this is trustworthy):
     may differ by a hair from ultralytics' 101-point interpolation — the purpose here is
     val-tuned thresholds, per-domain tables and CIs, not to reproduce a single headline number.
 
-Usage (defaults target EXP-001 + dataset v1, so a bare call runs the real thing):
-    python -m src.detection.evaluate
-    python -m src.detection.evaluate --bootstrap 2000 --out docs/eval_exp001.md
+Usage (defaults target the DEPLOYED model — ``$DEPTH_MODEL``, else ``calibration.SHIPPED_MODEL``
+— its weights under ``models/<MODEL>/`` (``python -m src.detection.fetch_model``), its class names,
+input size and thresholds from ``models/<MODEL>/calibration.json``, and the dataset it was scored on):
+    python -m src.detection.evaluate                                # EXP-003 on v2b test
+    python -m src.detection.evaluate --test-split test_official398 --official-split         DATASET/03_yolo_ready_dataset_v2b/official_crabpot_test.txt --leakage-free
+    python -m src.detection.evaluate --model EXP-001                # the earlier 4-class baseline
 """
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import time
 from pathlib import Path
 from typing import Optional
@@ -38,12 +43,28 @@ from typing import Optional
 import cv2
 import numpy as np
 
-from src.detection.infer import YoloOnnxDetector, PER_CLASS_CONF, _iou
+from src.detection.calibration import DEFAULT_MODEL, load_calibration
+from src.detection.infer import YoloOnnxDetector, _iou
 
 REPO = Path(__file__).resolve().parents[2]
-DEFAULT_ONNX = REPO / "runs" / "EXP-001" / "weights" / "best.onnx"
-DEFAULT_ROOT = REPO / "DATASET" / "03_yolo_ready_dataset_v1"
-DEFAULT_NAMES = ["fishing_gear", "pipe_cylinder", "structural_fragment", "natural_formation"]
+DATASET_V1 = REPO / "DATASET" / "03_yolo_ready_dataset_v1"
+DATASET_V2B = REPO / "DATASET" / "03_yolo_ready_dataset_v2b"
+LEAKED_ON_OFFICIAL = {"EXP-001"}        # trained on v1, which mixed the official crab-pot test in
+IOU_COCO = np.round(np.arange(0.50, 0.95 + 1e-9, 0.05), 2)
+CACHE_VERSION = 2                       # v2 caches keep raw dets + GT (mAP@0.5:0.95, confusion)
+
+
+def default_weights(model: str) -> Path:
+    """``models/<MODEL>/best.onnx`` (where ``fetch_model`` installs it), else the training run."""
+    for p in (REPO / "models" / model / "best.onnx", REPO / "runs" / model / "weights" / "best.onnx"):
+        if p.exists():
+            return p
+    return REPO / "models" / model / "best.onnx"
+
+
+def default_root(model: str) -> Path:
+    """The dataset a model is scored on: EXP-001 → v1 (its 4 classes), every later model → v2b."""
+    return DATASET_V1 if model == "EXP-001" else DATASET_V2B
 
 # Source is the filename prefix (crabpot_..., uatd_..., icra_...). Sensor follows from source.
 SONAR_SOURCES = {"crabpot", "mpulse", "seabed", "shipwreck", "uatd"}
@@ -135,7 +156,8 @@ def collect_split(detector: YoloOnnxDetector, split_dir: Path, names, cache: Pat
     imgs = sorted(p for p in img_dir.iterdir() if p.suffix.lower() in IMG_EXTS)
     if limit:
         imgs = imgs[:limit]
-    key = f"{detector_net_id(detector)}|{len(imgs)}|iou{iou_thr}|floor{detector.conf_floor}"
+    key = (f"v{CACHE_VERSION}|{detector_net_id(detector)}|{len(imgs)}|iou{iou_thr}"
+           f"|floor{detector.conf_floor}|imgsz{detector.imgsz}")
     if cache.exists():
         blob = json.loads(cache.read_text())
         if blob.get("key") == key:
@@ -161,7 +183,9 @@ def collect_split(detector: YoloOnnxDetector, split_dir: Path, names, cache: Pat
                 "n_gt": len(g_c),
             }
         records.append({"name": ip.name, "source": src, "sensor": sensor_of(src),
-                        "per_class": per_class})
+                        "per_class": per_class,
+                        "dets": [[d.cls_id, round(float(d.conf), 5), *map(int, d.bbox)] for d in dets],
+                        "gts": [[c, *b] for c, b in gts]})
         if (k + 1) % 200 == 0:
             print(f"  {split_dir.name}: {k + 1}/{len(imgs)}  ({time.time() - t0:.0f}s)")
     cache.parent.mkdir(parents=True, exist_ok=True)
@@ -259,6 +283,93 @@ def bootstrap_ci(records, cid: int, b: int, seed: int = 0):
     return float(lo), float(med), float(hi)
 
 
+def ap_at_iou(records, cid: int, iou_thr: float) -> float:
+    """AP for class `cid` re-matched at `iou_thr` from the cached raw detections + GT."""
+    pts, n_gt = [], 0
+    for r in records:
+        d_c = [(d[1], tuple(d[2:6])) for d in r["dets"] if d[0] == cid]
+        g_c = [tuple(g[1:5]) for g in r["gts"] if g[0] == cid]
+        pts.extend(_match_image(d_c, g_c, iou_thr))
+        n_gt += len(g_c)
+    return voc_ap(pts, n_gt)
+
+
+def ap_coco(records, cid: int) -> float:
+    """COCO-style AP@0.5:0.95 — the mean of AP over IoU 0.50, 0.55, …, 0.95 (VOC all-points each)."""
+    aps = [ap_at_iou(records, cid, float(t)) for t in IOU_COCO]
+    return float("nan") if any(np.isnan(a) for a in aps) else float(np.mean(aps))
+
+
+def confusion_matrix(records, names, tuned, iou_thr: float = 0.5) -> np.ndarray:
+    """(C+1)×(C+1) counts, rows = predicted, cols = true; index C = background.
+
+    Detections kept at each class's VAL-tuned threshold; class-agnostic greedy matching (highest
+    confidence first, best-IoU unused GT ≥ `iou_thr`) so a box on the right object with the wrong
+    label shows as confusion, not as one FP plus one FN.
+    """
+    C = len(names)
+    cm = np.zeros((C + 1, C + 1), int)
+    for r in records:
+        dets = sorted((d for d in r["dets"] if d[0] < C and d[1] >= tuned[names[d[0]]]),
+                      key=lambda d: -d[1])
+        gts = [g for g in r["gts"] if g[0] < C]
+        used = [False] * len(gts)
+        for d in dets:
+            best, bj = 0.0, -1
+            for j, g in enumerate(gts):
+                if not used[j]:
+                    i = _iou(tuple(d[2:6]), tuple(g[1:5]))
+                    if i > best:
+                        best, bj = i, j
+            if bj >= 0 and best >= iou_thr:
+                used[bj] = True
+                cm[d[0], gts[bj][0]] += 1
+            else:
+                cm[d[0], C] += 1                 # false alarm on background
+        for j, g in enumerate(gts):
+            if not used[j]:
+                cm[C, g[0]] += 1                 # missed object
+    return cm
+
+
+def pr_curve(pts, n_gt: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """(recall, precision, confidence) along the ranked detections."""
+    if not pts or not n_gt:
+        return np.zeros(0), np.zeros(0), np.zeros(0)
+    pts = sorted(pts, key=lambda x: -x[0])
+    tp = np.array([q[1] for q in pts], float)
+    ctp, cfp = np.cumsum(tp), np.cumsum(1.0 - tp)
+    return ctp / n_gt, ctp / np.maximum(ctp + cfp, 1e-12), np.array([q[0] for q in pts])
+
+
+def plot_pr(test_records, names, tuned, title: str, out_png: Path) -> Optional[Path]:
+    """PR curve per class with the val-tuned operating point marked. Matplotlib is a dev-only
+    dependency; without it the image is skipped and the report says so."""
+    try:
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+    except ImportError:
+        return None
+    fig, ax = plt.subplots(figsize=(6, 4.5), dpi=120)
+    for cid, nm in enumerate(names):
+        pts, n_gt = _gather(test_records, cid)
+        if n_gt == 0:
+            continue
+        rec, prec, _ = pr_curve(pts, n_gt)
+        ln, = ax.plot(rec, prec, lw=1.6, label=f"{nm}  AP@0.5 {voc_ap(pts, n_gt):.3f}")
+        p, r, *_ = prf_at(pts, n_gt, tuned[nm])
+        ax.plot([r], [p], "o", color=ln.get_color(), ms=6)
+        ax.annotate(f"val-t {tuned[nm]:.2f}", (r, p), textcoords="offset points", xytext=(6, 6),
+                    fontsize=8, color=ln.get_color())
+    ax.set_xlim(0, 1); ax.set_ylim(0, 1.02)
+    ax.set_xlabel("recall"); ax.set_ylabel("precision"); ax.set_title(title, fontsize=10)
+    ax.grid(alpha=0.3); ax.legend(loc="upper right", fontsize=8)
+    out_png.parent.mkdir(parents=True, exist_ok=True)
+    fig.tight_layout(); fig.savefig(out_png); plt.close(fig)
+    return out_png
+
+
 # ----------------------------------------------------------------------------- report
 def _fmt(x, nd=3):
     return "—" if (isinstance(x, float) and np.isnan(x)) else f"{x:.{nd}f}"
@@ -272,35 +383,63 @@ def build_report(names, tuned, shipped, test_records, val_records, args) -> tupl
     except ValueError:
         wp = Path(args.weights).name
 
-    A("# EXP-001 evaluation — deploy-faithful (cv2.dnn ONNX), honest per-domain\n")
-    A(f"_Model_: `{wp}` · _Data_: `{Path(args.root).name}` · "
-      f"_AP_: VOC all-points @IoU 0.5 · _NMS IoU_: {args.iou_nms} · "
-      f"_bootstrap_: {args.bootstrap} resamples\n")
-    A("> Evaluated on the **exact ONNX artifact the dashboard/Lambda serve** (torch-free "
-      "`cv2.dnn`). Thresholds are tuned on **val**; the **test** split below is scored once.\n")
+    split = args.test_split
+    A(f"# {args.model} evaluation — `{split}` split — deploy-faithful (cv2.dnn ONNX), honest per-domain\n")
+    A(f"_Model_: `{wp}` · _Data_: `{Path(args.root).name}/{split}` ({len(test_records)} images) · "
+      f"_AP_: VOC all-points @IoU 0.5 and COCO-style @0.5:0.95 · _NMS IoU_: {args.iou_nms} · "
+      f"_input_: {args.imgsz} px · _bootstrap_: {args.bootstrap} resamples\n")
+    A("> Evaluated on the **exact ONNX artifact the studio and the MCP server run** (torch-free "
+      f"`cv2.dnn`). Thresholds are tuned on **{args.val_split}**; the **{split}** split below is "
+      "scored once.\n")
 
     # 1. Per-class on TEST, at val-tuned thresholds (with bootstrap CI on AP)
-    A("\n## 1. Per-class (TEST, all sonar+optical)\n")
-    A("| class | n_gt | AP@0.5 | AP 95% CI | P@val-t | R@val-t | F1@val-t | val-t | shipped-t |")
-    A("|---|--:|--:|:--:|--:|--:|--:|--:|--:|")
-    ap_list = []
+    A(f"\n## 1. Per-class ({split})\n")
+    A("| class | n_gt | AP@0.5 | AP 95% CI | AP@0.5:0.95 | P@val-t | R@val-t | F1@val-t | val-t | shipped-t |")
+    A("|---|--:|--:|:--:|--:|--:|--:|--:|--:|--:|")
+    ap_list, coco_list = [], []
     js["per_class"] = {}
     for cid, nm in enumerate(names):
         pts, n_gt = _gather(test_records, cid)
         ap = voc_ap(pts, n_gt)
         lo, med, hi = bootstrap_ci(test_records, cid, args.bootstrap, args.seed)
         p, r, f1, tp, fp, fn = prf_at(pts, n_gt, tuned[nm])
+        apc = ap_coco(test_records, cid)
         if not np.isnan(ap):
             ap_list.append(ap)
-        A(f"| {nm} | {n_gt} | {_fmt(ap)} | {_fmt(lo,2)}–{_fmt(hi,2)} | {_fmt(p)} | "
+        if not np.isnan(apc):
+            coco_list.append(apc)
+        A(f"| {nm} | {n_gt} | {_fmt(ap)} | {_fmt(lo,2)}–{_fmt(hi,2)} | {_fmt(apc)} | {_fmt(p)} | "
           f"{_fmt(r)} | {_fmt(f1)} | {tuned[nm]:.2f} | {shipped.get(nm,0.25):.2f} |")
-        js["per_class"][nm] = {"n_gt": n_gt, "ap50": ap, "ap_ci": [lo, hi],
+        js["per_class"][nm] = {"n_gt": n_gt, "ap50": ap, "ap_ci": [lo, hi], "ap50_95": apc,
                                "P": p, "R": r, "F1": f1, "TP": tp, "FP": fp, "FN": fn,
                                "val_t": tuned[nm], "shipped_t": shipped.get(nm, 0.25)}
     m = float(np.mean(ap_list)) if ap_list else float("nan")
-    A(f"\n**mAP@0.5 (mean over classes present): {_fmt(m)}**  "
-      f"— *inflated by domain segregation; read the per-sensor split below.*")
-    js["mAP50"] = m
+    mc = float(np.mean(coco_list)) if coco_list else float("nan")
+    A(f"\n**mAP@0.5 (mean over classes present): {_fmt(m)}** · **mAP@0.5:0.95: {_fmt(mc)}**  "
+      f"— *read the per-class rows: the mean hides the mission class.*")
+    js["mAP50"], js["mAP50_95"] = m, mc
+
+    # 1b. Confusion matrix + PR curve
+    A(f"\n### Confusion matrix ({split}, val-tuned thresholds, IoU ≥ 0.5)\n")
+    A("Rows = predicted, columns = true. The `background` row counts missed objects; the "
+      "`background` column counts false alarms. Matching is class-agnostic, so a right box with the "
+      "wrong label shows as confusion.\n")
+    cm = confusion_matrix(test_records, names, tuned)
+    labels = list(names) + ["background"]
+    A("| predicted \\ true | " + " | ".join(labels) + " |")
+    A("|---|" + "--:|" * len(labels))
+    for i, nm in enumerate(labels):
+        A(f"| **{nm}** | " + " | ".join(str(int(v)) for v in cm[i]) + " |")
+    js["confusion"] = {"labels": labels, "rows_pred_cols_true": cm.tolist()}
+    tag = args.model.lower().replace("-", "")
+    png = plot_pr(test_records, names, tuned, f"{args.model} · {split} · PR (dot = val-tuned threshold)",
+                  REPO / "docs" / "img" / f"pr_{tag}_{split}.png")
+    if png is not None:
+        rel = Path(os.path.relpath(png, Path(args.out).resolve().parent)).as_posix()
+        A(f"\n![PR curve]({rel})\n")
+        js["pr_curve_png"] = png.relative_to(REPO).as_posix()
+    else:
+        A("\n_PR curve skipped: matplotlib is not installed (dev-only dependency)._\n")
 
     # 2. Per-sensor
     A("\n## 2. Per-sensor (the product is SONAR)\n")
@@ -340,17 +479,22 @@ def build_report(names, tuned, shipped, test_records, val_records, args) -> tupl
 
     # 4. GhostVision head-to-head (gated)
     A("\n## 4. GhostVision head-to-head (official crab-pot split)\n")
-    if args.official_split and args.leakage_free:
+    if args.official_split and args.leakage_free and args.model not in LEAKED_ON_OFFICIAL:
         res = eval_official_split(names, test_records, val_records, tuned, args)  # noqa
         A(res)
         js["ghostvision"] = {"status": "computed"}
+    elif args.model not in LEAKED_ON_OFFICIAL:
+        A(f"Not run on `{split}`. {args.model} is leakage-free for the official split; its head-to-head "
+          f"is the `test_official398` report ([`eval_{tag}_test_official398.md`]"
+          f"(eval_{tag}_test_official398.md)). GhostVision (JMSE 2026) reports F1 ≈ 0.71–0.73 there.")
+        js["ghostvision"] = {"status": "see test_official398"}
     else:
         A("**SKIPPED — EXP-001 is not leakage-free for this split.** EXP-001 trained on dataset "
           "**v1**, which mixed the official crab-pot test frames into training; scoring them here "
           "would report a leaked (optimistic) number. Dataset **v2** locks the official 398-frame "
-          "split (`official_crabpot_test.txt`). Re-run once EXP-002 (v2) exists:\n\n"
-          "```\npython -m src.detection.evaluate --weights runs/EXP-002/weights/best.onnx \\\n"
-          "    --official-split DATASET/03_yolo_ready_dataset_v2/official_crabpot_test.txt "
+          "split (`official_crabpot_test.txt`); EXP-003 is scored on it:\n\n"
+          "```\npython -m src.detection.evaluate --test-split test_official398 \\\n"
+          "    --official-split DATASET/03_yolo_ready_dataset_v2b/official_crabpot_test.txt "
           "--leakage-free\n```\n\n"
           "GhostVision (JMSE 2026) reports F1 ≈ 0.71–0.73 on this split — the target to match.")
         js["ghostvision"] = {"status": "skipped", "reason": "EXP-001 leaked on v1"}
@@ -381,10 +525,15 @@ def eval_official_split(names, test_records, val_records, tuned, args) -> str:
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--weights", default=str(DEFAULT_ONNX))
-    ap.add_argument("--root", default=str(DEFAULT_ROOT), help="dataset root with val/ and test/")
-    ap.add_argument("--names", default=",".join(DEFAULT_NAMES))
-    ap.add_argument("--iou-nms", type=float, default=0.45, help="NMS IoU (matches deploy)")
+    ap.add_argument("--model", default=DEFAULT_MODEL,
+                    help="model name: weights, names, input size, thresholds from models/<MODEL>/; "
+                         "caches go to runs/<MODEL>/eval")
+    ap.add_argument("--weights", default=None, help="default models/<MODEL>/best.onnx")
+    ap.add_argument("--root", default=None, help="dataset root with val/ and test/ (default: v1 for "
+                                                  "EXP-001, else v2b)")
+    ap.add_argument("--names", default=None, help="default: the model's calibration.json")
+    ap.add_argument("--imgsz", type=int, default=None, help="default: the model's calibration.json")
+    ap.add_argument("--iou-nms", type=float, default=None, help="NMS IoU (default: the model's calibration)")
     ap.add_argument("--iou-match", type=float, default=0.50, help="TP IoU threshold")
     ap.add_argument("--conf-floor", type=float, default=0.001, help="collection floor for the PR curve")
     ap.add_argument("--bootstrap", type=int, default=1000)
@@ -393,18 +542,27 @@ def main():
     ap.add_argument("--official-split", default=None)
     ap.add_argument("--leakage-free", action="store_true",
                     help="assert the model did NOT train on the official split (enables §4)")
-    ap.add_argument("--out", default=str(REPO / "docs" / "eval_exp001.md"))
-    ap.add_argument("--model", default="EXP-001", help="run name: caches go to runs/<model>/eval")
+    ap.add_argument("--out", default=None, help="default docs/eval_<model>_<test-split>.md")
     ap.add_argument("--val-split", default="val", help="split dir used to tune thresholds")
     ap.add_argument("--test-split", default="test",
                     help="split dir scored once (e.g. test | test_official398 | test_xsonar)")
     args = ap.parse_args()
 
-    names = args.names.split(",")
+    cal = load_calibration(args.model)
+    args.weights = args.weights or str(default_weights(args.model))
+    args.root = args.root or str(default_root(args.model))
+    args.imgsz = args.imgsz or cal.imgsz
+    args.iou_nms = args.iou_nms if args.iou_nms is not None else cal.iou_nms
+    args.out = args.out or str(REPO / "docs" / f"eval_{args.model.lower().replace('-', '')}_{args.test_split}.md")
+    names = args.names.split(",") if args.names else cal.names
     root = Path(args.root)
+    if not (root / args.test_split / "images").exists():
+        raise SystemExit(f"no images under {root / args.test_split} - DATASET/ is git-ignored; build it "
+                         f"with DATASET/scripts/ (see docs/dataset_card.md) or pass --root")
     # Collect at a low floor for ALL classes so we recover the full PR curve, then threshold ourselves.
-    det = YoloOnnxDetector(args.weights, names=names,
-                           conf_thres=args.conf_floor, iou_thres=args.iou_nms)
+    det = YoloOnnxDetector(args.weights, names=names, imgsz=args.imgsz,
+                           conf_thres=args.conf_floor, iou_thres=args.iou_nms,
+                           class_aware_nms=cal.class_aware_nms)
     det._onnx_path = args.weights
     eval_dir = REPO / "runs" / args.model / "eval"
 
@@ -418,7 +576,7 @@ def main():
     tuned = tune_thresholds(val_records, names)
     print(f"\nVal-tuned thresholds: {tuned}")
 
-    report, js = build_report(names, tuned, PER_CLASS_CONF, test_records, val_records, args)
+    report, js = build_report(names, tuned, cal.conf, test_records, val_records, args)
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(report, encoding="utf-8")
