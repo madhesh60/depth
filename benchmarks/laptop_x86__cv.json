@@ -1,0 +1,81 @@
+{
+  "label": "laptop_x86",
+  "workload": "cv",
+  "created": "2026-10-12T19:07:45",
+  "fingerprint": {
+    "opencv": {
+      "version": "5.0.0",
+      "cv2_file": "C:\\Users\\RAJ\\AppData\\Local\\Programs\\Python\\Python310\\lib\\site-packages\\cv2\\__init__.py",
+      "is_cool_path": false,
+      "threads": 8,
+      "build_flags": {
+        "KleidiCV": false,
+        "NEON": false,
+        "IPP": true,
+        "TBB": false,
+        "OpenMP": false
+      }
+    },
+    "host": {
+      "machine": "AMD64",
+      "system": "Windows",
+      "python": "3.10.11",
+      "vcpus": 8,
+      "cpu_model": "Intel64 Family 6 Model 140 Stepping 1, GenuineIntel"
+    },
+    "ec2": {},
+    "git_commit": "a53d62d",
+    "model_sha256": "71339e99ad2b4b29f8d516967ce02e1fb5895434bf6f483cb517efe6750ba2f2",
+    "calibration_sha256": "f14338a327383232f7e68acbdd4d71f7891863d1b9d49b3810e024aed09a5d74"
+  },
+  "runtime": {
+    "threads": 8,
+    "engine": "auto"
+  },
+  "config": {
+    "n": 120,
+    "warmup": 5,
+    "threads_requested": 0,
+    "frames_dir": "webui/samples",
+    "unique_frames": 8,
+    "input_manifest_sha256": "25376f6e21f70bb04798ac04da927e48544d3889f2672f8e0ce6045e141f8264"
+  },
+  "stages_ms": {
+    "decode": {
+      "p50": 2.67,
+      "p95": 3.86,
+      "mean": 2.86
+    },
+    "stage1": {
+      "p50": 16.87,
+      "p95": 20.78,
+      "mean": 17.43
+    },
+    "render": {
+      "p50": 3.66,
+      "p95": 4.46,
+      "mean": 3.8
+    },
+    "total": {
+      "p50": 23.66,
+      "p95": 28.61,
+      "mean": 24.09
+    }
+  },
+  "throughput_fps": 40.17,
+  "cost": {
+    "price_hour_usd": 0.0,
+    "usd_per_1k_frames": null,
+    "survey_hour": {
+      "frames": 168.8,
+      "compute_s": 4.07,
+      "real_time_factor": 0.00113,
+      "usd": null
+    },
+    "assumptions": {
+      "ping_rate_hz": 15.0,
+      "pings_per_frame": 640,
+      "channels": 2
+    }
+  }
+}

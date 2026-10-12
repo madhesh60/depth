@@ -104,6 +104,14 @@ class Workload:
         return t
 
 
+def _rel(path: str) -> str:
+    """Repo-relative when inside the repo (results are committed; no local user paths)."""
+    try:
+        return Path(path).resolve().relative_to(REPO).as_posix()
+    except ValueError:
+        return Path(path).name
+
+
 def survey_hour(mean_ms: float, price_hour: float, ping_rate_hz: float, pings_per_frame: int,
                 channels: int) -> dict:
     frames = ping_rate_hz * 3600.0 / pings_per_frame * channels
@@ -126,7 +134,7 @@ def main():
     ap.add_argument("--ping-rate-hz", type=float, default=15.0, help="sonar ping rate (survey setting)")
     ap.add_argument("--pings-per-frame", type=int, default=640)
     ap.add_argument("--channels", type=int, default=2, help="port + starboard")
-    ap.add_argument("--out", default=str(REPO / "runs" / "bench"))
+    ap.add_argument("--out", default=str(REPO / "benchmarks"))
     a = ap.parse_args()
 
     from src.detection.infer import configure_runtime, DEFAULT_ONNX
@@ -153,7 +161,7 @@ def main():
         "label": a.label, "workload": a.workload, "created": time.strftime("%Y-%m-%dT%H:%M:%S"),
         "fingerprint": fingerprint(DEFAULT_ONNX, calibration_path()),
         "runtime": runtime,
-        "config": {"n": a.n, "warmup": a.warmup, "threads_requested": a.threads, "frames_dir": a.frames,
+        "config": {"n": a.n, "warmup": a.warmup, "threads_requested": a.threads, "frames_dir": _rel(a.frames),
                    "unique_frames": len(frames), "input_manifest_sha256": manifest},
         "stages_ms": stages,
         "throughput_fps": round(a.n / wall, 2),

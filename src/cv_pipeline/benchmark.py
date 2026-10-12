@@ -16,7 +16,7 @@ the pipeline is pure CPU OpenCV, the same code and config run unchanged in all t
 Usage
 -----
     python -m src.cv_pipeline.benchmark --images DATASET/03_yolo_ready_dataset_v1/test/images \
-        --limit 500 --repeats 3 --label graviton_cool --out runs/bench
+        --limit 500 --repeats 3 --label graviton_cool --out benchmarks
 """
 from __future__ import annotations
 
@@ -150,7 +150,7 @@ def parse_args():
     p.add_argument("--warmup", type=int, default=10, help="untimed warmup frames")
     p.add_argument("--label", default="run", help="config label, e.g. graviton_cool")
     p.add_argument("--preset", choices=["default", "quality"], default="default")
-    p.add_argument("--out", default="runs/bench", help="output dir for the JSON")
+    p.add_argument("--out", default="benchmarks", help="output dir for the JSON")
     return p.parse_args()
 
 

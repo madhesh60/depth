@@ -73,11 +73,11 @@ for T in $THREADS; do
   L="$LABEL"; [ "$T" != "0" ] && L="${LABEL}_t${T}"
   for WL in $WORKLOADS; do
     "$PY" -m src.bench.product_bench --label "$L" --workload "$WL" --threads "$T" --n "$N" \
-      --frames "$FRAMES" --price-hour "$PRICE_HOUR" --out runs/bench
+      --frames "$FRAMES" --price-hour "$PRICE_HOUR" --out benchmarks
   done
 done
 
 if [ -n "$S3_BUCKET" ]; then
-  aws s3 cp runs/bench/ "s3://$S3_BUCKET/benchmarks/" --recursive --exclude "*" --include "${LABEL}*.json"
+  aws s3 cp benchmarks/ "s3://$S3_BUCKET/benchmarks/" --recursive --exclude "*" --include "${LABEL}*.json"
 fi
-echo "== done [$LABEL] — collect runs/bench/*.json from all three machines, then: python -m src.bench.compare =="
+echo "== done [$LABEL] — collect benchmarks/*.json from all three machines, then: python -m src.bench.compare =="

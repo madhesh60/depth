@@ -74,7 +74,7 @@ FLAVOR=stock LABEL=baseline_x86   PRICE_HOUR=0.1785 ./infra/bench_cool.sh
 FLAVOR=stock LABEL=graviton_stock PRICE_HOUR=0.1595 ./infra/bench_cool.sh
 # (C) Graviton + COOL — the SAME c8g.xlarge on the COOL AMI (+ $0.01/h COOL fee)
 FLAVOR=cool  LABEL=graviton_cool  PRICE_HOUR=0.1695 ./infra/bench_cool.sh
-# then, with all runs/bench/*.json in one place:
+# then, with all benchmarks/*.json in one place:
 python -m src.bench.compare        # → docs/cool_benchmark.md + docs/img/cool_benchmark.png
 ```
 _(Prices: us-east-1 on-demand Linux as remembered on 2026-09-24 — confirm on the pricing page on the day.)_

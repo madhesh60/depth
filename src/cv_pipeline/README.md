@@ -54,11 +54,11 @@ Run the identical pipeline/config in three configs and diff the JSON:
 
 ```bash
 # A) x86 + stock OpenCV
-python -m src.cv_pipeline.benchmark --images <frames> --label baseline_x86      --out runs/bench
+python -m src.cv_pipeline.benchmark --images <frames> --label baseline_x86      --out benchmarks
 # B) Graviton + stock OpenCV
-python -m src.cv_pipeline.benchmark --images <frames> --label graviton_stock    --out runs/bench
+python -m src.cv_pipeline.benchmark --images <frames> --label graviton_stock    --out benchmarks
 # C) Graviton + COOL
-python -m src.cv_pipeline.benchmark --images <frames> --label graviton_cool     --out runs/bench
+python -m src.cv_pipeline.benchmark --images <frames> --label graviton_cool     --out benchmarks
 ```
 
 - **(B) → (C)** on identical hardware **isolates COOL's contribution** → the 30% "verified
