@@ -46,9 +46,9 @@ python -m uvicorn src.dashboard.app:app --port 8000                      # http:
 | criterion | where DEPTH shows it |
 |---|---|
 | **Technical execution** — OpenCV 5 doing real work | Stage 1 (bottom track with `cv2.Sobel` / `cv2.blur`, slant→ground `cv2.remap`), YOLO11 through `cv2.dnn`, shadow + re-look evidence; deploy-faithful evaluation with CIs, mAP@0.5:0.95, confusion matrix, PR curves ([`eval_exp003_test.md`](docs/eval_exp003_test.md)); 205 tests; deadlines + fallbacks on every tool |
-| **Agentic Vision** — perception changes the next action | value-of-information tool choice, evidence conflicts → another observation, opposite-side re-survey passes, a person's decision → re-plan (§2); proven by counterfactual ([`causal_trace.md`](docs/causal_trace.md)) |
+| **Agentic Vision** — perception changes the next action | on by default and measured: OpenCV's seabed measurement decides where the pins go (without it 151 of 222 leave their own error circle and 4 of 40 re-survey passes regroup — [`causal_trace.md`](docs/causal_trace.md)); the agent cross-checks that seabed against the depth sounder and re-tracks on a conflict ([`sensor_check.md`](docs/sensor_check.md)); opposite-side passes ranked by information per boat-minute; a person's decline re-plans, an approval issues a work order (§2). Per-frame active vision is built and tested but failed its own validation, so it is off by default ([`evidence_model_exp003.md`](docs/evidence_model_exp003.md)) |
 | **Innovation** | statistical promises on an imperfect detector ([`calibration_exp003.md`](docs/calibration_exp003.md)); the agent cross-checks its own seabed track against the depth sounder ([`sensor_check.md`](docs/sensor_check.md)); shadow-flip prediction for second looks |
-| **Real-world impact** | raw Humminbird recordings with real GPS, routes, budgets, GPX/KML/GeoJSON, OGC API, webhooks, MCP; queue ordered by expected harm |
+| **Real-world impact** | raw Humminbird recordings with real GPS, routes, budgets, GPX/KML/GeoJSON, OGC API, webhooks, MCP; a severity hook for the review queue (suspended or tall finds weighted up; an operator policy, not yet exercised: no find in the demo data has a measured risk factor) |
 | **UX** | zero-build studio: guided demo, evidence cards with the full agent trace, 3D twin, approvals inbox, failure drills (`?drills`) |
 | **Responsible cloud delivery** | Graviton + COOL deploy, dry-run by default, budgets first, provenance on every result ([`infra/README.md`](infra/README.md)); approver PIN; protected wrecks generalised in public exports ([`responsible_use.md`](docs/responsible_use.md)) |
 
@@ -63,7 +63,7 @@ wraps one in **promises you can check** and **measurements instead of assumption
 |---|---|---|
 | **Guaranteed tiers** | "≥ 79% of pots reach a human (95% confidence)" — fit on held-out recordings, verified once on unseen test (**held: 81.1%**; the test's own lower bound is 76.7%). It also says what it *cannot* promise (90% recall; any auto-confirm precision). | [`docs/calibration_exp003.md`](docs/calibration_exp003.md) |
 | **Stage 1 measures the sonar** | bottom tracking gives the sonar's altitude per ping → relative object height, slant→ground geotags. Validated with no labels: port vs starboard on the same pings agree to **1.6 px** (random pairs: 5.3 px). | [`docs/stage1_canonical.md`](docs/stage1_canonical.md) |
-| **Value-of-information agent** | spends compute only where it can change an outcome; orders the human queue by calibrated P(pot); **analyst budget** ("what do 10 minutes buy?") and **boat budget** | trace on every card |
+| **Value-of-information agent** | spends compute only where it can change an outcome (with EXP-003, calibration found a second look cannot change a tier: re-looks did not beat plain confidence, STUDY-07, so it runs one inference per frame and logs each skipped look); orders the human queue by calibrated P(pot); **analyst budget** ("what do 10 minutes buy?") and **boat budget** | trace on every card |
 | **Active vision** (experimental) | the agent picks its next OpenCV tool by whether the result could change its decision; evidence conflicts trigger another observation — §2. Validation failed, so it is **off by default** and labelled | [`docs/evidence_model_exp003.md`](docs/evidence_model_exp003.md) |
 | **A physical second look** | plans re-survey passes on the **opposite side** at mid-swath, ranked by **information per boat-minute**; each is approved or rejected on its own, and a rejection makes the agent re-plan; each target predicts the bearing its **shadow must flip to** | map + GPX/GeoJSON |
 | **Minutes saved — to be measured** | a timed, counterbalanced user study built into the app (not yet run with people). Under today's *assumed* timings the DEPTH queue costs **more** than manual review at the recall promise (65.5 vs 56.3 min); break-even card time **6.88 s**. We report that instead of an invented "4 h → 10 min" | Study tab · [`docs/effort_curve.md`](docs/effort_curve.md) |
@@ -85,24 +85,33 @@ seam inference across chunk boundaries (STUDY-11b), and a larger input + flipped
 
 ## 2. The agentic loop — OpenCV result → decision → next action → new evidence → changed plan
 
+**On by default, with evidence:** the seabed cross-check (STUDY-16), the survey planner (Stage-1
+geometry moves pins and passes, STUDY-12) and the human approvals (a decline re-plans, an approval
+issues a work order; both in the test suite). **Per-frame active vision** (below the dashed line) is built and tested, but it failed its own
+validation, so it is off by default and labelled experimental. In default mode the agent still asks of
+every find whether another look could change the decision. With EXP-003 the answer is always no (a
+re-look did not beat plain confidence, STUDY-07), so it runs one inference per frame.
+
 ```
 Sonar frame ─► OpenCV 5: Stage 1 (bottom track, geometry) + YOLO11 via cv2.dnn
-           ─► evidence: confidence · geometry (water column, 0 ms) · shadow (~1 ms) · height · zoom re-look (~0.4 s)
-           ─► agent belief P(pot) ─► action: ACCEPT / REVIEW / WATCH
-           ─► next OpenCV tool = the cheapest one whose result could CHANGE that action (else stop)
-           ─► new evidence ─► belief + action updated ─► conflict? ─► another observation
-           ─► person approves ─► inspection route · opposite-side re-survey pass (rejected ─► the agent re-plans)
+            ─► evidence: water column · shadow · height ─► calibrated tier + P(pot) ─► a person's review queue
+Raw recording ─► OpenCV seabed track vs depth sounder ─► conflict? ─► OpenCV re-tracks ─► range scale re-fit ─► re-check
+Survey ─► pins from the measured geometry ─► opposite-side passes ranked by information per boat-minute
+Person ─► ✓ / ✕ a card or decline a pass ─► the agent re-plans route, queue, budget and passes · approve ─► work order
+- - - - - - - - - - - - - - - - experimental, off by default - - - - - - - - - - - - - - - - -
+Per find ─► next OpenCV tool = the cheapest one whose result could CHANGE the action (ACCEPT / REVIEW / WATCH), else stop
+         ─► new evidence ─► belief + action updated ─► conflict? ─► another observation
 ```
 
 | feature | what the agent does | where |
 |---|---|---|
-| **Adaptive tool use** | not the same tools every time: a confident, consistent find is accepted after one ~1 ms check with **no re-look**; a borderline one gets the shadow check and, if that could still flip it, a zoom re-look; a find no result could move gets **no tool at all** — every skip is logged with why | `active.next_tool` |
-| **Evidence conflict** | the detector says ACCEPT but the shadow says no (or the box sits in the water column) → *"Evidence conflict detected → another observation"*: the next informative tool, else an opposite-side pass | trace step `conflict` |
-| **Active second look** | the re-look / shadow result changes the action (e.g. ACCEPT → REVIEW) and that changes the queue and the plan | `update_belief` (before → after) |
-| **Smart survey planning** | passes ranked by expected **information per boat-minute**, not confidence: the most likely target is often worth ~0 bits and does not drive the plan | Agent tab · `resurvey_rank` |
-| **Human control** | *Agent recommends: Perform opposite-side resurvey RS1 · Reason: evidence conflict on H001 · [Approve] [Reject]* — reject and the pass is dropped for good, the boat time re-ranked, its targets moved to the front of the inspection queue | Agent tab · `/api/approvals/{id}/decide` |
-| **Agent Trace** | DETECT → evidence → decision → OpenCV tool → new evidence → decision changed → approval → survey plan, on every evidence card | Analyze |
-| **Sensor cross-check (on by default)** | OpenCV seabed track vs depth sounder → conflict → OpenCV re-track with a new search window → accept / trust the image / withhold → re-fit the range scale → re-check. It changes where pins go and heights in metres (0.36 m → 0.11 m on a chunk where the sounder lost lock) | Survey → Agent · Seabed cross-check · STUDY-16 |
+| **Sensor cross-check** | OpenCV seabed track vs depth sounder → conflict → OpenCV re-track with a new search window → accept / trust the image / withhold → re-fit the range scale → re-check. It changes where pins go and heights in metres (0.36 m → 0.11 m on a chunk where the sounder lost lock) | Survey → Agent · Seabed cross-check · STUDY-16 |
+| **Smart survey planning** | passes ranked by expected **information per boat-minute**, not confidence: the most likely target is worth little and does not drive the plan | Agent tab · `resurvey_rank` |
+| **Human control** | *Agent recommends: Perform opposite-side resurvey RS1 · Reason: uncertain visual evidence · [Approve] [Reject]* — reject and the pass is dropped for good, the boat time re-ranked, its targets moved to the front of the inspection queue | Agent tab · `/api/approvals/{id}/decide` |
+| **Agent Trace** | on every evidence card: can another look change the decision? → evidence → P(pot) → tier → who acts next; with active vision also the tool it chose, the new evidence and any changed decision | Analyze |
+| **Adaptive tool use** · experimental, off | not the same tools every time: a confident, consistent find is accepted after one ~1 ms check with **no re-look**; a borderline one gets the shadow check and, if that could still flip it, a zoom re-look; a find no result could move gets **no tool at all** — every skip is logged with why | `active.next_tool` |
+| **Evidence conflict** · experimental, off | the detector says ACCEPT but the shadow says no (or the box sits in the water column) → *"Evidence conflict detected → another observation"*: the next informative tool, else an opposite-side pass | trace step `conflict` |
+| **Active second look** · experimental, off | the re-look / shadow result changes the action (e.g. ACCEPT → REVIEW) and that changes the queue and the plan | `update_belief` (before → after) |
 
 **Does OpenCV's measurement matter? The same survey, detector only vs + Stage 1 + OpenCV evidence** (both arms run the same `cv2.dnn` detections) — the 8 shipped frames, 27 hazards
 (`python -m src.agentic.counterfactual` → [`docs/opencv_counterfactual.md`](docs/opencv_counterfactual.md)):
