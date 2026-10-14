@@ -2,13 +2,15 @@
 fetch_model.py — get the trained detector a fresh clone needs (weights are not in git: 38 MB).
 
     python -m src.detection.fetch_model                  # the deployed model ($DEPTH_MODEL, default EXP-003)
-    python -m src.detection.fetch_model --model EXP-001  # the earlier 4-class model
     python -m src.detection.fetch_model --url <url> --sha256 <hex>   # a mirror (S3, Zenodo, …)
 
 Downloads to ``models/<MODEL>/best.onnx`` (the first place the runtime looks, see
 ``infer._default_onnx``), streaming to a temporary file, and keeps it **only if its SHA-256 matches**
 the published hash — the same hash every provenance stamp carries, so a result can be traced to the
 exact weights. An existing file with the right hash is left alone.
+
+Only EXP-003 is published (GitHub Release ``exp003-v1``). The earlier 4-class EXP-001 is not: its entry
+has no download address, only the hash that checks a local copy or a mirror.
 """
 from __future__ import annotations
 
@@ -24,7 +26,7 @@ from src.detection.calibration import SHIPPED_MODEL
 
 REPO = Path(__file__).resolve().parents[2]
 RELEASES = {
-    "EXP-001": {"url": "https://github.com/madhesh60/depth/releases/download/exp001-v1/best.onnx",
+    "EXP-001": {"url": None,                          # not published: there is no exp001-v1 release
                 "sha256": "55f827db9bd5cbf89a87d50c767ecbf17594b9c8c654a428a80118ab3537c19e",
                 "bytes": 37932951, "license": "AGPL-3.0 (Ultralytics YOLO11s, trained on dataset v1)"},
     "EXP-003": {"url": "https://github.com/madhesh60/depth/releases/download/exp003-v1/best.onnx",

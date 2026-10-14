@@ -84,7 +84,8 @@ Legend: `[x]` done · `[ ]` open · **(YOU)** needs a person / an account / a GP
 - [ ] Optional GPU run: EXP-003's exact recipe with a second seed, to report its run-to-run spread. No
       more augmentation or cleanup runs.
 - [ ] **(YOU) Publish the EXP-001 weights.** GitHub → Releases → tag `exp001-v1`, attach
-      `runs/EXP-001/weights/best.onnx` (37,932,951 bytes, SHA-256 `55f827db…`).
+      `runs/EXP-001/weights/best.onnx` (37,932,951 bytes, SHA-256 `55f827db…`), then put the download
+      URL back in `fetch_model.RELEASES["EXP-001"]` (it is `None` until the release exists).
 - [ ] Fine-tune seed from human labels (`python -m src.agentic.feedback export`): a small
       before/after if labels accumulate.
 
