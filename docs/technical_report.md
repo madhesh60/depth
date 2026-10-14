@@ -26,7 +26,7 @@ Graviton + COOL**.
 | OpenCV output changes the agent's actions: without Stage 1, **151 of 222** pins leave their own error circle and 4 of 40 re-survey passes regroup (EXP-003, v2b test); the shadow changes no decision (evidence only) | [`causal_trace.md`](causal_trace.md) |
 | Break-even analyst time: DEPTH meets the promise faster than manual review if a card takes **< 6.88 s** (timings assumed until the study runs) | [`effort_curve.md`](effort_curve.md) |
 | Full product path **252 ms/frame p50** on a laptop CPU; one survey-hour of sonar in **51 s** | [`cool_benchmark.md`](cool_benchmark.md) |
-| A **raw sonar recording with real GPS** is read directly and checked against physics (GPS speed vs the speed field r = 0.95; course vs heading 2.4°), with a **measured range scale** (2.19 cm/sample ± 14.5%) → pins and heights in real metres | [`raw_recording.md`](raw_recording.md) |
+| A **raw sonar recording with real GPS** is read directly and checked against physics (GPS speed vs the speed field r = 0.95; course vs heading 2.4°), with a **measured range scale** (2.03 cm/sample ± 10.2% after the agent cross-checks its seabed track against the depth sounder) → pins and heights in real metres | [`raw_recording.md`](raw_recording.md) |
 | A person's decision makes the agent **re-plan** the recovery route, queue, budget and passes; an impact ledger measures the reviewed precision | [`agentic_vision.md`](agentic_vision.md) |
 
 ---
@@ -192,15 +192,18 @@ The effort curve ([`effort_curve.md`](effort_curve.md)) compares three review mo
 - **a confidence-sorted list**;
 - **DEPTH's cards.**
 
-It reports the **break-even card time: 7.95 s**. DEPTH beats manual review at the recall promise
-whenever a card takes less than this.
+It reports the **break-even card time: 6.88 s** (EXP-003, verification split, 20 s per frame assumed
+for manual review). DEPTH beats manual review at the recall promise whenever a card takes less than
+this. At the assumed 8 s per card it does not: the DEPTH queue takes 65.5 analyst minutes for the 199
+frames, manual review 56.3.
 
 - **⏳ pending:** the timed, counterbalanced study built into the app (Study tab, [`user_study.md`](user_study.md)) will replace the assumed 8 s/card with a measurement.
 - **⏳ pending:** the blinded false-alarm audit (Audit tab) will measure how many "false alarms" are unlabelled real objects. Catch trials check the auditors themselves.
 
 ### 4.5 Failure cases (measured, not assumed)
 
-On the verification split, 19 of 138 pots (14%) never reach a human
+The failure gallery was measured on the earlier EXP-001 (its verification split, v1 test, 92 unique
+frames) and has not been re-run for EXP-003. There, 19 of 138 pots (14%) never reached a human
 ([`failure_gallery.md`](failure_gallery.md), with contact sheets):
 
 - **32% of missed pots touch the frame edge**, against 11% of found pots;
@@ -217,9 +220,9 @@ Not shipped.
 raw Humminbird recording with real per-ping GPS: the Colorado River at Horseshoe Bend, 150.6 s, with no
 known crab pots.
 
-- It produced **8 review cards**, which is **191 cards per hour of sonar** at the detector floor.
+- With EXP-003 it produced **2 review cards**, which is **48 cards per hour of sonar** at the detector floor.
 - Every card is a false alarm or an unknown object, so this is the review load the model would put on an analyst there.
-- All pins were placed from their own ping's GPS with a 3.0–6.7 m error radius.
+- All pins were placed from their own ping's GPS with a 7.9–8.0 m error radius.
 
 ### 4.6 Runtime and COOL
 
@@ -279,7 +282,7 @@ on Spot → S3.
 - **Calibration.** Calibration uses three recordings whose frames are correlated. That is why the promise is verified on a separate split.
 - **Labels.** Labels are incomplete, so precision is a lower estimate (the audit will quantify this).
 - **GPS.** The public crab-pot frames carry no GPS, so their demo track is synthetic and labelled as such everywhere, including the counterfactual's metres. The raw-recording path has **real** per-ping GPS and a measured range scale, but that recording is a river with no known pots: it measures false alarms, not recall.
-- **Heights.** On crab-pot frames heights are relative (h/H). On raw recordings they are in metres from the sonar's measured depth. The range scale there is measured, but 5 of 11 chunks were bottom-track false picks (reported), and its uncertainty (± 14.5%) is carried into every error radius.
+- **Heights.** On crab-pot frames heights are relative (h/H). On raw recordings they are in metres from the sonar's measured depth. The range scale there is measured: the tracker alone made 5 false picks among the 11 first-estimate chunks, the agent's cross-check against the depth sounder resolves them (STUDY-16, [`sensor_check.md`](sensor_check.md)), and the remaining uncertainty (± 10.2%) is carried into every error radius.
 - **Effort.** Analyst seconds per card are assumed until the study measures them.
 
 ## 7. Responsible use

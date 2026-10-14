@@ -26,7 +26,7 @@ Madhesh) · **Targets:** Agentic Vision · Best Use of COOL · **License:** AGPL
 | Stage-1 altitude, port vs starboard (no labels needed) | agree to **1.6 px** (random pairs 5.3 px) | STUDY-08 |
 | Full product path on a laptop CPU | **252 ms/frame** p50 · one survey-hour in **51 s** | `benchmarks/`, x86, stock OpenCV 5 |
 | Raw sonar recording, real GPS | range scale **2.03 cm/sample ± 10.2%**, measured | Colorado River, Humminbird |
-| Tests | **205** passing, CI on every push | `pytest -q` |
+| Tests | **205**, CI on every push; 3 need optional data and skip without it (the raw recording, the unpublished EXP-001 weights) | `pytest -q` |
 
 **Not yet measured, and said so:** Graviton + COOL timings (scripted, AWS day), analyst minutes saved
 (the timed study needs people), audited false-alarm precision (the blinded audit needs people). The
@@ -37,6 +37,7 @@ detector misses the proposal's 0.70 mAP target; §4 says by how much and why.
 ```bash
 git clone https://github.com/madhesh60/depth.git && cd depth
 pip install -r requirements.txt && python -m src.detection.fetch_model   # 38 MB, SHA-256 checked
+python -m src.cv_pipeline.humminbird fetch                               # raw recording with real GPS (11 MB)
 python -m uvicorn src.dashboard.app:app --port 8000                      # http://localhost:8000 → ▶ 60-s demo
 ```
 
@@ -110,8 +111,8 @@ Sonar frame ─► OpenCV 5: Stage 1 (bottom track, geometry) + YOLO11 via cv2.d
 |---|---|---|---|
 | decision (agent action) | detector only (8 accept) | unchanged | **3 accept; 7 of 27 hazards change action** |
 | geolocation | slant range, frame-centre ping | **median pin moves 6.5 m; 17 of 27 leave their own error circle** | same |
-| re-survey route | 6 passes, 15.5 boat-min | 6 passes, 15.4 boat-min (2 regrouped) | **3 passes, 6.9 boat-min, 0 identical** |
-| human approval | 6 pass requests, 0 conflicts | same | **3 pass requests, 7 conflicts flagged** |
+| re-survey route | 6 passes, 15.5 boat-min | 6 passes, 15.4 boat-min (2 regrouped) | **1 pass, 3.3 boat-min, 0 identical** |
+| human approval | 6 pass requests, 0 conflicts | same | **1 pass request, 7 conflicts flagged** |
 | OpenCV tool calls | — | shadow on all 31 | shadow on 23 / 31, zoom re-look on **2** / 31 |
 
 **Is it better? Measured, and the honest answer is "not proven".** Likelihood ratios fit on the

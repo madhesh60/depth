@@ -109,10 +109,14 @@ checks) and the census in [`exp002_diagnosis.md`](exp002_diagnosis.md).
 | rotation artifacts | 351 training frames are still black-bordered rotated copies (manifest). Some confident detections sit on those borders | border edges look like objects; the copies teach a geometry that real sonar never has |
 | validation power | 3 recordings, **186 ghost boxes, 20 wreck boxes**. Per-recording ghost AP for one model spans 0.23–0.57 | the wreck val metric is noise-level (1 box = 5% recall); judge the ghost class by recording |
 
-**Next data fixes, in order:**
+**Next data fixes, in order** (updated after EXP-004 / 005, [`exp005_diagnosis.md`](exp005_diagnosis.md)):
 
 1. Run the blinded audit on val, then add the confirmed missing pots as **v2c** labels. Never edit test.
 2. ~~Report AP at IoU 0.3 beside 0.5.~~ Done: `python -m src.detection.diagnose` reports both.
-3. Drop or crop the black-bordered rotated copies.
-4. EXP-004 hypothesis: luminance-normalised training (one palette), because the target recordings are
-   grayscale.
+3. ~~Drop the black-bordered rotated copies.~~ Tried in EXP-004 (`build_tiles.py --drop-rotated`, with
+   the 412 fish-finder screenshots also left out): no gain for pots (ΔAP@0.5 −0.03 [−0.11, +0.05] vs
+   EXP-003), and dropping the screenshots took away the rock negatives (false pots on natural-formation
+   frames 2 → 16). EXP-003, which keeps them, stays the best.
+4. Needs new data: more held-out recordings (validation has 3, hence ±0.07 AP of noise), tighter and
+   more side-scan wreck boxes, and the fish-finder screenshots kept as rock negatives only (no wreck
+   boxes). Luminance-normalised training (one palette) was proposed for EXP-004 but never run.

@@ -209,8 +209,8 @@ disables it). Report: [`docs/evidence_model_exp003.md`](docs/evidence_model_exp0
 | **person-confirmed loop** | a named person's ✓ / ✕ on a card, then the crew's *recovered* / *not found* → the agent **re-plans** (recovery route, queue, budget, re-survey passes); the agent's verdict is never overwritten; every decision logged; **impact ledger** with the reviewed precision (Clopper–Pearson 95%) | `mission.apply_human / plan_mission`, `POST /api/survey/{id}/decide`, Survey table |
 | labels | ✓ real / ✕ not a pot / **＋ missed pot** → append-only log → YOLO fine-tune set + hard negatives; reviewer agreement vs GT | `feedback.py`, Analyze + Survey |
 | timed study | counterbalanced 2×2 Latin square, manual review vs DEPTH cards, scored vs labels → s/frame, s/card, recall both ways | `study.py`, Study tab |
-| effort curve | recall vs analyst minutes: manual / detector list / DEPTH queue; promise point; **break-even card time** (7.95 s at 20 s/frame); forecast vs actual (84.5 vs 90) | `effort.py`, Study tab |
-| false-alarm audit | blinded, with catch trials; exact audited precision in the conf ≥ 0.176 band; taxonomy; κ | `fp_audit.py`, Audit tab |
+| effort curve | recall vs analyst minutes: manual / detector list / DEPTH queue; promise point; **break-even card time** (6.88 s at 20 s/frame, EXP-003); forecast vs actual (162.5 vs 209 real pots) | `effort.py`, Study tab |
+| false-alarm audit | blinded, with catch trials; exact audited precision in the conf ≥ 0.2465 band (EXP-003); taxonomy; κ | `fp_audit.py`, Audit tab |
 
 ## 9. Serving (`src/dashboard/`, `webui/`)
 
@@ -312,7 +312,7 @@ recordings.
 |---|---|
 | PINGMapper sample `Test-Small-DS` (R01224, Humminbird 9xx, Colorado River, 150.6 s) | the raw-recording path with real GPS (STUDY-14). Fetched and hash-pinned, never redistributed. |
 
-Weights: `python -m src.detection.fetch_model` (GitHub Release `exp001-v1`, SHA-256 checked).
+Weights: `python -m src.detection.fetch_model` (GitHub Release `exp003-v1`, SHA-256 checked).
 
 ## 12. Code map
 
