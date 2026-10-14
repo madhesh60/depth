@@ -75,6 +75,39 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ## 4. Session log
 
+### 2026-10-14 (sweep 60) — Judge re-audit (13 Oct): each finding checked, then fixed
+
+Every finding was re-measured before anything changed; all held.
+- **Doc slips (all confirmed):**
+  - Technical report: break-even 7.95 s → EXP-003's 6.88 s, now also saying DEPTH loses at the assumed 8 s/card
+    (65.5 vs 56.3 min). The real-recording block 8 cards / 191 per hour / 3.0–6.7 m → EXP-003's 2 / 48 / 7.9–8.0 m.
+  - Found while checking: the failure gallery is EXP-001's (now labelled), and the range scale is now the
+    post-cross-check 2.03 cm/sample ± 10.2% (was the first estimate, ± 14.5%).
+  - `architecture.md` had the same EXP-001 values: break-even, forecast vs actual, audit band, and the
+    `exp001-v1` release.
+  - Dataset card "next data fixes" updated with EXP-004/005.
+  - README tests row: 205 tests, 3 skip without optional data. Measured today: 205 passed locally. A fresh
+    clone of this commit with the weights gives 202 passed and 3 skipped (the EXP-001 weights and the 2 raw-recording
+    tests); after the new judge-path `humminbird fetch`, the recording tests pass too.
+- **`fetch_model`:** the `exp001-v1` URL answers HTTP 404 (only `exp003-v1` exists, per the GitHub API). EXP-001
+  now has no URL, only its hash, and the docstring no longer offers it.
+- **Judge path:** added `python -m src.cv_pipeline.humminbird fetch`. Without it the Survey tab hides the
+  real-GPS source, and the guided demo skips the seabed cross-check (`webui/app.js`). On the fresh clone it
+  downloaded and hash-verified all 5 files (10.8 MB).
+- **Agentic story:**
+  - Confirmed: in default mode every find's `voi_check` answers "no", because EXP-003 has
+    `relook_mode: null`; the counterfactual shows zoom re-looks run on 0 of 31 finds.
+  - README §2 and the criteria map now lead with what runs by default and has evidence: the seabed
+    cross-check, the survey planner and the approvals. The active-vision rows are labelled experimental, off.
+  - The video script now shows the seabed cross-check and lists active vision among the negative results.
+  - The regenerated counterfactual is byte-identical to the committed report, so two README cells were
+    stale: active vision gives 1 pass, 3.3 boat-min and 1 request (README said 3 / 6.9 / 3).
+- **Expected harm:** 0 of 27 demo hazards and 0 of 2 recording hazards have a measured risk factor (no
+  suspended box; the tallest is 0.11 m against the 0.5 m threshold), so the order equals P(real). The README
+  now calls it a policy hook that is not yet exercised, instead of a real-world-impact claim.
+- **Still needs people:** the timed study (DEPTH wins only if a card takes < 6.88 s; report it even if manual
+  wins) and the blinded false-alarm audit.
+
 ### 2026-10-12 (sweep 59) — Weights published; documentation brought to one truth
 
 - **Release `exp003-v1` published** by the owner. Fresh clone of `main`: `fetch_model` installed 37.9 MB
