@@ -132,7 +132,8 @@ def pkcs7_signature_ok(document: str, rsa2048_b64: str, region: str) -> tuple[bo
         return None, "skipped (" + ("no openssl on PATH" if not exe else f"no RSA-2048 certificate for {region}") + ")"
     with tempfile.TemporaryDirectory() as d:
         sig, cert = Path(d) / "rsa2048.p7", Path(d) / "cert.pem"
-        body = "\n".join(rsa2048_b64[i:i + 64] for i in range(0, len(rsa2048_b64), 64))
+        b64 = "".join(rsa2048_b64.split())          # IMDS serves it in 76-column lines; PEM wants 64
+        body = "\n".join(b64[i:i + 64] for i in range(0, len(b64), 64))
         sig.write_text(f"-----BEGIN PKCS7-----\n{body}\n-----END PKCS7-----\n")
         cert.write_text(pem)
         # -nointern: the signer must be AWS's certificate given here, never one embedded in the signature
