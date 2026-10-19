@@ -24,7 +24,7 @@ Metadata:
       - Label: {default: COOL server}
         Parameters: [CoolAmiId, InstanceType, RootDeviceName, RootVolumeGiB, GitRef]
       - Label: {default: Network}
-        Parameters: [VpcId, SubnetId, CloudFrontPrefixListId, OriginSecretParam]
+        Parameters: [VpcId, SubnetId, CloudFrontPrefixListId, OriginSecretParam, EnableCdn]
       - Label: {default: Operations}
         Parameters: [AlertEmail, StopAt, Rehearsal]
 
@@ -84,9 +84,18 @@ Parameters:
     Description: >-
       true = dress rehearsal on stock Ubuntu 24.04 arm64 + stock OpenCV 5 (pip) before the COOL AMI is
       available; labelled NOT COOL everywhere (the receipt does not verify). Switch back = stack update.
+  EnableCdn:
+    Type: String
+    Default: "true"
+    AllowedValues: ["false", "true"]
+    Description: >-
+      false while the account awaits CloudFront verification (new accounts must be verified by AWS Support
+      before creating distributions): everything else deploys; the origin stays closed to the internet.
 
 Conditions:
   IsUsEast1: !Equals [!Ref "AWS::Region", us-east-1]
+  CdnOn: !Equals [!Ref EnableCdn, "true"]
+  EdgeAlarmOn: !And [!Condition IsUsEast1, !Condition CdnOn]
 
 Resources:
   # ---------------------------------------------------------------- storage
@@ -299,6 +308,7 @@ Resources:
   # ---------------------------------------------------------------- edge
   Distribution:
     Type: AWS::CloudFront::Distribution
+    Condition: CdnOn
     Metadata:
       com.aws.cloudformation.Context:
         why: Free HTTPS and edge caching for the static UI; the API passes through uncached.
@@ -449,7 +459,8 @@ Resources:
           SECRET=$(aws ssm get-parameter --region ${AWS::Region} --name '${OriginSecretParam}' --query Parameter.Value --output text)
           [ -n "$SECRET" ] && [ "$SECRET" != None ]
           ( umask 077; printf 'DEPTH_ORIGIN_SECRET=%s\n' "$SECRET" > /etc/depth/origin.env )
-          ( umask 022; printf 'DEPTH_PUBLIC_URL=https://%s\n' '${Distribution.DomainName}' > /etc/depth/public.env )
+          # the public https address (/etc/depth/public.env) is written by infra/deploy.sh over SSM once the
+          # distribution exists - so the instance never waits for CloudFront
           command -v git >/dev/null || { apt-get -o DPkg::Lock::Timeout=300 update -y && apt-get -o DPkg::Lock::Timeout=300 install -y git; }
           [ -d /opt/depth/.git ] || git clone -q https://github.com/madhesh60/depth.git /opt/depth
           if [ "${Rehearsal}" = "true" ]; then
@@ -536,7 +547,7 @@ Resources:
 
   Edge5xxAlarm:
     Type: AWS::CloudWatch::Alarm
-    Condition: IsUsEast1
+    Condition: EdgeAlarmOn
     Properties:
       AlarmDescription: More than 5 percent of requests return 5xx at the edge for 10 minutes - email.
       Namespace: AWS/CloudFront
@@ -600,7 +611,7 @@ Resources:
         - |
           {"widgets": [
             {"type": "text", "x": 0, "y": 0, "width": 24, "height": 2, "properties": {"markdown":
-              "## DEPTH on Graviton4 + COOL - live\nhttps://${Domain} · COOL receipt: [/api/cool](https://${Domain}/api/cool) · per-stage latency from the server's JSON frame log (metric filters)"}},
+              "## DEPTH on Graviton4 + COOL - live\n${Address} · per-stage latency from the server's JSON frame log (metric filters)"}},
             {"type": "metric", "x": 0, "y": 2, "width": 12, "height": 6, "properties": {"title": "Per-stage latency p50 (ms)",
               "region": "${AWS::Region}", "stat": "p50", "period": 300, "view": "timeSeries",
               "metrics": [["DEPTH", "see_ms"], ["DEPTH", "stage1_ms"], ["DEPTH", "prove_decide_ms"], ["DEPTH", "analyze_wall_ms"]]}},
@@ -613,13 +624,17 @@ Resources:
               "region": "${AWS::Region}", "period": 300, "metrics": [["AWS/EC2", "CPUUtilization", "InstanceId", "${Instance}"],
               ["CWAgent", "mem_used_percent", "InstanceId", "${Instance}"]]}},
             {"type": "metric", "x": 16, "y": 8, "width": 8, "height": 6, "properties": {"title": "CloudFront requests / 5xx %",
-              "region": "us-east-1", "period": 300, "metrics": [["AWS/CloudFront", "Requests", "Region", "Global", "DistributionId", "${Distribution}", {"stat": "Sum"}],
-              ["AWS/CloudFront", "5xxErrorRate", "Region", "Global", "DistributionId", "${Distribution}", {"stat": "Average", "yAxis": "right"}]]}},
+              "region": "us-east-1", "period": 300, "metrics": [["AWS/CloudFront", "Requests", "Region", "Global", "DistributionId", "${DistributionId}", {"stat": "Sum"}],
+              ["AWS/CloudFront", "5xxErrorRate", "Region", "Global", "DistributionId", "${DistributionId}", {"stat": "Average", "yAxis": "right"}]]}},
             {"type": "log", "x": 0, "y": 14, "width": 24, "height": 6, "properties": {"title": "Latest analysed frames",
               "region": "${AWS::Region}", "view": "table",
               "query": "SOURCE '${AppLogGroup}' | filter evt = 'frame' | fields @timestamp, kind, frame, ms.stage1, ms.see, ms.prove_decide, ms.wall | sort @timestamp desc | limit 20"}}
           ]}
-        - Domain: !GetAtt Distribution.DomainName
+        - Address: !If
+            - CdnOn
+            - !Sub "https://${Distribution.DomainName} · COOL receipt: [/api/cool](https://${Distribution.DomainName}/api/cool)"
+            - "CloudFront off (EnableCdn=false) - the origin is closed to the internet; checks run on the box over SSM"
+          DistributionId: !If [CdnOn, !Ref Distribution, none]
 
   StopScheduleRole:
     Type: AWS::IAM::Role
@@ -662,12 +677,15 @@ Resources:
 
 Outputs:
   Url:
+    Condition: CdnOn
     Description: The live demo (HTTPS)
     Value: !Sub https://${Distribution.DomainName}
   ReceiptUrl:
+    Condition: CdnOn
     Description: COOL execution receipt - verify with python -m src.bench.verify_cool <Url>
     Value: !Sub https://${Distribution.DomainName}/api/cool
   DistributionId:
+    Condition: CdnOn
     Description: CloudFront distribution
     Value: !Ref Distribution
   InstanceId:

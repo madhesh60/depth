@@ -1,6 +1,10 @@
 # lib.sh — shared helpers for the infra scripts (sourced, not run). Works in Linux / AWS CloudShell and in
 # Git Bash on Windows (where the AWS CLI is a Windows .exe that prints CRLF line ends).
 
+# Git Bash rewrites arguments that start with "/" into Windows paths before calling a Windows program, so the
+# SSM name /aws/service/... reached aws.exe as C:/Program Files/Git/aws/service/... - never rewrite anything
+export MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*'
+
 # credentials: the named profile when it exists (laptop), else whatever the environment provides (CloudShell)
 if [ -z "${AWS_PROFILE:-}" ] && grep -qs '^\[profile hackathon\]' "$HOME/.aws/config"; then
   export AWS_PROFILE=hackathon
@@ -53,4 +57,26 @@ stack_output() {   # stack_output <stack> <OutputKey>
 }
 stack_param() {    # stack_param <stack> <ParameterKey>
   awsq cloudformation describe-stacks --stack-name "$1" --query "Stacks[0].Parameters[?ParameterKey=='$2'].ParameterValue" --output text
+}
+stack_resource() { # stack_resource <stack> <LogicalId> - physical id; works when a failed stack has no outputs
+  awsq cloudformation describe-stack-resource --stack-name "$1" --logical-resource-id "$2" \
+    --query StackResourceDetail.PhysicalResourceId --output text 2>/dev/null || true
+}
+
+# ssm_run <instance-id> <shell command>: run it as root over SSM Run Command (no SSH), wait for the end, print
+# its stdout; non-zero (stderr tail on stderr) unless it succeeded. SSM_COMMENT labels it in the console.
+ssm_run() {
+  local iid="$1" cmd="$2" cid st=Pending i
+  python -I -c 'import json, sys; json.dump({"commands": [sys.argv[1]]}, open(sys.argv[2], "w"))' "$cmd" "$WORK/ssm-cmd.json"
+  cid=$(awsq ssm send-command --instance-ids "$iid" --document-name AWS-RunShellScript --comment "${SSM_COMMENT:-DEPTH}" \
+          --parameters "file://$WORK/ssm-cmd.json" --query Command.CommandId --output text) || return 1
+  for i in $(seq 1 90); do
+    st=$(awsq ssm get-command-invocation --command-id "$cid" --instance-id "$iid" --query Status --output text 2>/dev/null || echo Pending)
+    case "$st" in Pending|InProgress|Delayed) sleep 10 ;; *) break ;; esac
+  done
+  awsq ssm get-command-invocation --command-id "$cid" --instance-id "$iid" --query StandardOutputContent --output text
+  [ "$st" = Success ] && return 0
+  echo "SSM command $st: $(awsq ssm get-command-invocation --command-id "$cid" --instance-id "$iid" \
+        --query StandardErrorContent --output text | tail -5)" >&2
+  return 1
 }

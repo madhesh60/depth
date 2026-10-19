@@ -25,7 +25,7 @@ if [ -n "$BENCH" ]; then run ec2 terminate-instances --instance-ids $BENCH >/dev
 say "2/5 stack"
 BUCKET=""
 if awsq cloudformation describe-stacks --stack-name "$STACK" >/dev/null 2>&1; then
-  BUCKET=$(stack_output "$STACK" BucketName)
+  BUCKET=$(stack_resource "$STACK" DataBucket)
   awsq cloudformation list-stack-resources --stack-name "$STACK" \
     --query 'StackResourceSummaries[].[ResourceType,PhysicalResourceId]' --output text | sed 's/^/   /'
   run cloudformation delete-stack --stack-name "$STACK"

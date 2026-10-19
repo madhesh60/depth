@@ -13,6 +13,10 @@
 #   REHEARSAL=0 APPLY=1 ./infra/deploy.sh                             # rehearsal -> COOL (replaces the instance;
 #                                                                     #   the Elastic IP and CloudFront stay)
 #   APPLY=1 INSTANCE_TYPE=c8g.xlarge ./infra/deploy.sh                # resize (stop/start, same address)
+#   ENABLE_CDN=0 APPLY=1 ./infra/deploy.sh                            # no CloudFront (a new account waits for AWS
+#                                                                     #   Support to verify it): the origin stays
+#                                                                     #   closed; the checks run on the box over SSM
+#   ENABLE_CDN=1 APPLY=1 ./infra/deploy.sh                            # add CloudFront later (same server)
 # Code updates on the running server: ./infra/update_server.sh (SSM, no SSH, no replacement).
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -22,6 +26,7 @@ STACK="${STACK:-depth}"
 SECRET_PARAM="${SECRET_PARAM:-/depth/$STACK/origin-secret}"
 COOL_CODE="${COOL_PRODUCT_CODE:-aajkmdd4qo3r7yhqg61a7aah9}"     # Cloud Optimized OpenCV for AWS Graviton4
 TEMPLATE=infra/cfn/depth.yaml
+case "${ENABLE_CDN:-}" in 0) CDN=false ;; 1|"") CDN=true ;; *) die "ENABLE_CDN must be 0 or 1" ;; esac
 
 # resolve_ami: sets AMI REH ROOTDEV ROOT_GIB (+ checks arm64, the COOL product code and the subscription)
 resolve_ami() {
@@ -109,7 +114,7 @@ if [ "$STATUS" = NONE ] || [ "$STATUS" = REVIEW_IN_PROGRESS ]; then
 
   PARAMS=(CoolAmiId="$AMI" Rehearsal="$REH" InstanceType="$INSTANCE_TYPE" RootDeviceName="$ROOTDEV"
           RootVolumeGiB="$ROOT_GIB" GitRef="$GIT_REF" VpcId="$VPC" SubnetId="$SUBNET" CloudFrontPrefixListId="$PL"
-          OriginSecretParam="$SECRET_PARAM" AlertEmail="$ALERT_EMAIL" StopAt="$STOP_AT")
+          OriginSecretParam="$SECRET_PARAM" AlertEmail="$ALERT_EMAIL" StopAt="$STOP_AT" EnableCdn="$CDN")
 else
   # update: only what you set changes; every other parameter keeps its value (no accidental replacement)
   if [ -n "${REHEARSAL:-}" ] || [ -n "${COOL_AMI_ID:-}" ]; then
@@ -124,6 +129,7 @@ else
   [ -n "${INSTANCE_TYPE:-}" ] && PARAMS+=(InstanceType="$INSTANCE_TYPE")
   [ -n "${STOP_AT:-}" ] && PARAMS+=(StopAt="$STOP_AT")
   [ -n "${ALERT_EMAIL:-}" ] && PARAMS+=(AlertEmail="$ALERT_EMAIL")
+  [ -n "${ENABLE_CDN:-}" ] && PARAMS+=(EnableCdn="$CDN")
 fi
 
 say "template"
@@ -149,20 +155,34 @@ fi
 
 say "deploying (the instance signals only once DEPTH serves; ~15-25 min)"
 "$AWS_CLI" "${DEPLOY[@]}" --disable-rollback | tr -d '\r'
-URL=$(stack_output "$STACK" Url)
+URL=$(stack_output "$STACK" Url)                  # empty while CloudFront is off
 IID=$(stack_output "$STACK" InstanceId)
-echo "live: $URL · instance $IID · dashboard: $(stack_output "$STACK" DashboardUrl)"
+echo "instance $IID · dashboard: $(stack_output "$STACK" DashboardUrl)"
 
-say "live check through CloudFront"
-for i in $(seq 1 60); do
-  H=$(curl -fsS "$URL/api/health" 2>/dev/null || true)
-  if printf '%s' "$H" | grep -q '"model_loaded":true'; then
-    printf '%s' "$H" | grep -q '"is_cool_path":true' && echo "$URL/api/health: serving on COOL" \
-      || echo "$URL/api/health: serving (NOT on COOL - rehearsal?)"
-    break
-  fi
-  sleep 10
-done
-python -m src.bench.verify_cool "$URL" || echo "(the COOL receipt did not verify - expected only in a rehearsal)"
+if [ -n "$URL" ] && [ "$URL" != None ]; then
+  say "public address -> the server (/etc/depth/public.env: links in webhooks and briefs)"
+  SSM_COMMENT="DEPTH public address" ssm_run "$IID" "want='DEPTH_PUBLIC_URL=$URL'
+[ \"\$(cat /etc/depth/public.env 2>/dev/null)\" = \"\$want\" ] && echo unchanged && exit 0
+( umask 022; printf '%s\n' \"\$want\" > /etc/depth/public.env ); systemctl restart depth; echo 'set; DEPTH restarted'"
+
+  say "live check through CloudFront: $URL"
+  for i in $(seq 1 60); do
+    H=$(curl -fsS "$URL/api/health" 2>/dev/null || true)
+    if printf '%s' "$H" | grep -q '"model_loaded":true'; then
+      printf '%s' "$H" | grep -q '"is_cool_path":true' && echo "$URL/api/health: serving on COOL" \
+        || echo "$URL/api/health: serving (NOT on COOL - rehearsal?)"
+      break
+    fi
+    sleep 10
+  done
+  python -m src.bench.verify_cool "$URL" || echo "(the COOL receipt did not verify - expected only in a rehearsal)"
+else
+  say "on-box check over SSM (no CloudFront: the origin is closed to the internet)"
+  SSM_COMMENT="DEPTH health" ssm_run "$IID" "curl -fsS http://127.0.0.1:8000/api/health" | cut -c1-400
+  SSM_COMMENT="DEPTH COOL receipt" ssm_run "$IID" "curl -fsS http://127.0.0.1:8000/api/cool" > "$WORK/receipt.json"
+  python -m src.bench.verify_cool "$WORK/receipt.json" \
+    || echo "(the COOL receipt did not verify - expected only in a rehearsal)"
+  echo "receipt saved: $WORK/receipt.json · add CloudFront once AWS verifies the account: ENABLE_CDN=1 APPLY=1 ./infra/deploy.sh"
+fi
 echo "shell (no SSH): aws ssm start-session --target $IID"
 echo "SNS: confirm the subscription email sent to the alert address"

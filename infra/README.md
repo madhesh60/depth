@@ -37,14 +37,14 @@ Scaling story (described, not built): survey jobs → SQS → an Auto Scaling gr
 | File | Role |
 |---|---|
 | [`cfn/depth.yaml`](cfn/depth.yaml) | The whole demo as one stack (design reasons recorded per resource in `Metadata`). |
-| [`deploy.sh`](deploy.sh) | Resolves the COOL AMI (checks arm64 + Marketplace product code), an AZ that offers every type, the CloudFront prefix list; validates; prints the change set. `APPLY=1` deploys and verifies the live receipt. |
+| [`deploy.sh`](deploy.sh) | Resolves the COOL AMI (checks arm64 + Marketplace product code + the subscription), an AZ that offers every type, the CloudFront prefix list; validates; prints the change set. `APPLY=1` deploys and verifies the live receipt. `REHEARSAL=1` / `ENABLE_CDN=0`: see the checklist. |
 | [`setup_cool_instance.sh`](setup_cool_instance.sh) | On the instance: exact commit, SHA-256-checked model, web deps into `/opt/depth/pydeps` (**the COOL venv is never modified**), CloudWatch agent, systemd. Fails unless `/api/health` shows the model warm **and** `cv2` from `/opt/cool` — so the CloudFormation signal means "serving on COOL". |
 | [`depth.service`](depth.service) | systemd unit: COOL interpreter, threads = vCPUs, restart on failure, log file for the agent. |
 | [`update_server.sh`](update_server.sh) | New commit on the live server through SSM Run Command (no SSH, no replacement). |
 | [`bench_fleet.sh`](bench_fleet.sh) + [`bench_userdata.sh`](bench_userdata.sh) | The whole COOL benchmark as one command (see below). |
 | [`bench_cool.sh`](bench_cool.sh) | The benchmark on one machine (the fleet runs it; it also runs by hand). |
 | [`teardown.sh`](teardown.sh) | Removes everything (stack, retained bucket with every version, parameter) and lists leftovers. |
-| [`lib.sh`](lib.sh) | Shared helpers: AWS CLI detection (Linux, CloudShell, Git Bash on Windows), Price List API lookup. |
+| [`lib.sh`](lib.sh) | Shared helpers: AWS CLI detection (Linux, CloudShell, Git Bash on Windows), Price List API lookup, `ssm_run` (a root command on the server over SSM). |
 
 ## Verified COOL — anyone can check it
 
@@ -132,3 +132,16 @@ to back + 1 survey, health p95 ≤ 1 s): `python -m src.bench.load_test https://
 4. `APPLY=1 ./infra/bench_fleet.sh` → `python -m src.bench.compare`; the load test; commit `benchmarks/`.
 5. After judging: the instance stops itself on 2026-11-10; then `APPLY=1 ./infra/teardown.sh` and cancel the
    COOL subscription.
+
+Two waits a new account can hit, and how the stack keeps moving through them:
+
+* **COOL subscription pending** → `REHEARSAL=1` runs the whole stack on stock Ubuntu 24.04 arm64 + stock
+  OpenCV 5 (pip). `/api/health` and the receipt say *rehearsal* and the verifier fails it, so a rehearsal can
+  never pass for COOL. `REHEARSAL=0 APPLY=1 ./infra/deploy.sh` then swaps in the COOL AMI. Only the instance
+  is replaced; the Elastic IP, CloudFront, bucket and alarms stay.
+* **CloudFront not yet allowed** → AWS answers *"Your account must be verified before you can add new
+  CloudFront resources"* until AWS Support verifies the account (a support case, Account and billing).
+  Until then, `ENABLE_CDN=0` deploys everything else. The origin stays closed to the internet, and `deploy.sh`
+  checks the server on the box over SSM. It saves the receipt to `runs/infra/receipt.json` and verifies it
+  from the file. `ENABLE_CDN=1 APPLY=1 ./infra/deploy.sh` adds CloudFront later to the same server, and writes
+  the public address to it.
