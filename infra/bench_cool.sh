@@ -1,43 +1,41 @@
 #!/usr/bin/env bash
-# bench_cool.sh — the 3-way "Best Use of COOL" benchmark of the DEPTH PRODUCT workload (review M-5).
+# bench_cool.sh — the "Best Use of COOL" benchmark of the DEPTH PRODUCT workload on THIS machine.
+# infra/bench_fleet.sh runs it on equal-size machines automatically; it also runs by hand:
 #
-# Same code, same frames (sha256-pinned), same model, three configurations:
-#   (A) x86      + stock OpenCV 5   LABEL=baseline_x86    on c7i.xlarge
-#   (B) Graviton + stock OpenCV 5   LABEL=graviton_stock  on c8g.xlarge
-#   (C) Graviton + COOL (AMI)       LABEL=graviton_cool   on the SAME c8g.xlarge (COOL AMI)
-# (B)->(C) isolates COOL on identical hardware; (A)->(C) is the Arm-vs-x86 latency + cost story.
+#   FLAVOR=stock LABEL=baseline_x86   PRICE_HOUR=0.1785 ./infra/bench_cool.sh   # c8i.xlarge, Ubuntu 24.04
+#   FLAVOR=stock LABEL=graviton_stock PRICE_HOUR=0.1595 ./infra/bench_cool.sh   # c8g.xlarge, Ubuntu 24.04
+#   FLAVOR=cool  LABEL=graviton_cool  PRICE_HOUR=0.1695 ./infra/bench_cool.sh   # c8g.xlarge, COOL AMI (+ $0.01/h)
+# (B) → (C) isolates COOL on identical hardware; (A) → (C) is the x86 → Graviton + COOL latency and cost story.
 #
-#   FLAVOR=stock LABEL=baseline_x86   PRICE_HOUR=0.1785 ./infra/bench_cool.sh
-#   FLAVOR=stock LABEL=graviton_stock PRICE_HOUR=0.1595 ./infra/bench_cool.sh
-#   FLAVOR=cool  LABEL=graviton_cool  PRICE_HOUR=0.1695 ./infra/bench_cool.sh   # + $0.01/h COOL fee
-# (prices: us-east-1 on-demand Linux — verify on the day with the AWS pricing page / CLI)
-#
-# Fixes vs the old benchmark_graviton.sh (review §3.7):
-#   * times the PRODUCT (decode → Stage 1 → cv2.dnn → evidence → render), not the retired Stage-1 ROIs;
-#   * Ubuntu 24.04 (PEP 668): stock runs use a private venv, never the system Python;
-#   * COOL runs use the COOL interpreter AS-IS — nothing is ever installed into /opt/cool/venvs/*
-#     (installing numpy there could replace the build COOL was compiled against);
-#   * threads pinned and recorded (THREADS="0 1": all vCPUs, then 1 thread = per-core comparison —
-#     an Intel vCPU is a hyper-thread, a Graviton vCPU is a physical core);
-#   * provenance: a run is labelled COOL only if cv2 loads from /opt/cool (the script refuses otherwise);
-#   * cost: $/1k frames and $ + real-time factor per survey-hour, from PRICE_HOUR.
+# What a run records:
+#   * all vCPUs: product + cv + survey (a real 1-h sonar recording end to end), 3 interleaved repeats,
+#     the parity record (every detection per frame), CPU use, peak memory;
+#   * 1 thread: product + cv (per-core comparison - an Intel vCPU is a hyper-thread, a Graviton vCPU a core);
+#   * provenance: COOL only if cv2 loads from /opt/cool (refuses to mislabel); on EC2 the machine's
+#     AWS-signed identity (instance type, AMI, Marketplace product code) is saved as <label>__receipt.json.
+# Stock runs use a private venv (Ubuntu 24.04 / PEP 668); COOL runs use COOL's interpreter as-is - nothing
+# is ever installed into /opt/cool/venvs/* (that could replace the numpy COOL was built against).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 FLAVOR="${FLAVOR:?FLAVOR=stock|cool}"
 LABEL="${LABEL:?LABEL=baseline_x86|graviton_stock|graviton_cool}"
 PRICE_HOUR="${PRICE_HOUR:-0}"
-N="${N:-300}"
+PRICE_SOURCE="${PRICE_SOURCE:-}"
+N="${N:-120}"; N1="${N1:-48}"
+REPEATS="${REPEATS:-3}"
 THREADS="${THREADS:-0 1}"
-WORKLOADS="${WORKLOADS:-product cv}"
-FRAMES="${FRAMES:-webui/samples}"            # or a synced set: aws s3 sync s3://$S3_BUCKET/bench/frames bench_frames
-S3_BUCKET="${S3_BUCKET:-}"
+WORKLOADS="${WORKLOADS:-product,cv,survey}"
+WORKLOADS_1T="${WORKLOADS_1T:-product,cv}"
+FRAMES="${FRAMES:-webui/samples}"
 OPENCV_PIN="${OPENCV_PIN:-5.0.0.93}"
 NUMPY_PIN="${NUMPY_PIN:-2.2.6}"
 
 echo "== DEPTH COOL benchmark [$LABEL] flavor=$FLAVOR arch=$(uname -m) vcpus=$(nproc) =="
 
-if [ "$FLAVOR" = "stock" ]; then
+if [ -n "${BENCH_PY:-}" ]; then
+  PY="$BENCH_PY"
+elif [ "$FLAVOR" = "stock" ]; then
   VENV="${VENV:-$HOME/.depth-bench-stock}"
   if [ ! -x "$VENV/bin/python" ]; then
     python3 -m venv "$VENV"
@@ -67,17 +65,12 @@ PY
 
 M="${DEPTH_MODEL:-EXP-003}"
 [ -f "${DEPTH_ONNX:-models/$M/best.onnx}" ] || [ -f "runs/$M/weights/best.onnx" ] \
-  || { echo "ERROR: model missing (set DEPTH_ONNX or run infra/setup_cool_instance.sh)" >&2; exit 2; }
+  || { echo "ERROR: model missing (python -m src.detection.fetch_model)" >&2; exit 2; }
 
 for T in $THREADS; do
-  L="$LABEL"; [ "$T" != "0" ] && L="${LABEL}_t${T}"
-  for WL in $WORKLOADS; do
-    "$PY" -m src.bench.product_bench --label "$L" --workload "$WL" --threads "$T" --n "$N" \
-      --frames "$FRAMES" --price-hour "$PRICE_HOUR" --out benchmarks
-  done
+  if [ "$T" = "0" ]; then L="$LABEL"; W="$WORKLOADS"; NN="$N"; EXTRA=(--parity)
+  else L="${LABEL}_t${T}"; W="$WORKLOADS_1T"; NN="$N1"; EXTRA=(); fi
+  "$PY" -m src.bench.product_bench --label "$L" --workloads "$W" --threads "$T" --n "$NN" --repeats "$REPEATS" \
+    --frames "$FRAMES" --price-hour "$PRICE_HOUR" --price-source "$PRICE_SOURCE" --out benchmarks "${EXTRA[@]}"
 done
-
-if [ -n "$S3_BUCKET" ]; then
-  aws s3 cp benchmarks/ "s3://$S3_BUCKET/benchmarks/" --recursive --exclude "*" --include "${LABEL}*.json"
-fi
-echo "== done [$LABEL] — collect benchmarks/*.json from all three machines, then: python -m src.bench.compare =="
+echo "== done [$LABEL] — gather benchmarks/*.json from every machine, then: python -m src.bench.compare =="

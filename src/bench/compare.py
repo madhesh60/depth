@@ -251,7 +251,8 @@ def report(runs: list[dict], par: dict[str, dict] | None = None, d: Path | None 
               "", "| run | instance type | arch | AMI | Marketplace product code | AWS-signed receipt | COOL build (read from the machine) |",
               "|---|---|---|---|---|---|---|"] + mrows
 
-    cool_prod = [r for r in runs if r["workload"] == "product" and r["fingerprint"]["opencv"]["is_cool_path"]]
+    cool_prod = [r for r in runs if r["workload"] == "product" and r["fingerprint"]["opencv"]["is_cool_path"]
+                 and not (r.get("config") or {}).get("threads_requested")]          # sizes, not the 1-thread runs
     meets = [r for r in cool_prod if r["stages_ms"]["total"]["p95"] < TARGET_P95_MS and r["throughput_fps"] >= TARGET_FPS]
     if cool_prod:
         priced = sorted(meets, key=lambda r: r["cost"].get("price_hour_usd") or 1e9)
