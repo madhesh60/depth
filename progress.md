@@ -44,7 +44,7 @@ what moved, what's blocked, what's next. Newest entries at the top of §4.
 | Evaluation + ablation | ✅ Done (EXP-001) | `evaluate.py` (deploy-faithful cv2.dnn): val-tuned thresholds/test-once, per-sensor & per-source tables, bootstrap CIs → `docs/eval_exp001.md` (STUDY-05). Aggregate 0.827 reproduces 0.822; honest sonar `fishing_gear` AP 0.473. GhostVision head-to-head pending EXP-002. |
 | Reporting engine | ✅ Done | `src/agentic/{geo,mission}.py`: honest geotag + GeoJSON/GPX/KML/CSV/JSON exports. |
 | Dashboard | ✅ Done | Zero-build static web app (`webui/`), served by FastAPI; hardened (job queue, per-frame model lock, upload limits, shipped samples, vendored Leaflet). See→Prove→Decide→Act stepper, evidence cards (conf→relook), agent trace, Leaflet hazard map + recovery route, downloads, honesty banners. Verified under uvicorn. |
-| AWS deployment | 🟡 Scripted, not run | `infra/deploy_aws.sh` (dry-run default) + `setup_cool_instance.sh` + `depth.service`; EC2 c8g COOL AMI + CloudFront + S3 + alarms. Scheduled for the AWS day. |
+| AWS deployment | 🟡 Partly run | One stack, `infra/cfn/depth.yaml` via `infra/deploy.sh` (dry run by default): c8g COOL AMI + CloudFront + S3 + alarms. 2026-10-19: everything except CloudFront created (the account needs AWS Support verification first, so `EnableCdn=false` for now). The COOL subscription is still pending, so a rehearsal runs on stock Ubuntu. |
 | **COOL benchmark (Arm vs x86)** | 🟡 Tooling done, EC2 runs pending | Product-workload benchmark (`src/bench/`, `infra/bench_cool.sh`): per stage, threads pinned, $/survey-hour, COOL provenance. Local x86 reference: 238 ms/frame p50, RTF 0.012. |
 | Agentic loop (See→Prove→Decide→Act) | ✅ Done | **Primary Agentic-Vision entry.** All 4 stages + an **adaptive escalation controller** (STUDY-04) + live dashboard. Two calibrated CONFIRMED paths (re-look ⋃ high-confidence → precision **0.737 @ 30% recall**), cross-pass corroboration, 6-tool toolbox, full audit trace, human-gated. `src/agentic/` + `webui/`; 30/30 tests. Remaining is *deployment* (AWS/COOL), not the brain. |
 | Submission package (report + video) | ⬜ Not started | Due 2026-10-26. |
@@ -74,6 +74,41 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 ---
 
 ## 4. Session log
+
+### 2026-10-19 (sweep 62) — First AWS contact: COOL found by its product code; CloudFront needs account verification
+
+- **COOL located from the CLI.** `describe-images --owners aws-marketplace` gives the Graviton4 listing's
+  product code `aajkmdd4qo3r7yhqg61a7aah9`, now pinned in `verify_cool.COOL_PRODUCT_CODES`. Its newest image is
+  `ami-033e481a24f94c8cb` (COOL 3.1 on OpenCV 5.0, 60 GiB root). The seller named it `Graviton5-COOL-v3`, but
+  it carries the Graviton4 listing's code; the listing's suffix `k6u24vxijyzvg` is the same as in its v2
+  image. `deploy.sh` and `bench_fleet.sh` pick the AMI by this code. They test the subscription with a
+  dry-run launch, which still answers `OptInRequired` (the owner has not subscribed yet).
+- **STUDY-17 registered before any AWS number** (`experiments.md`). `compare` only says "faster" when the
+  per-repeat values do not overlap.
+- **Rehearsal mode** (`REHEARSAL=1`): stock Ubuntu 24.04 arm64 + stock OpenCV 5 while the subscription is
+  pending. It is labelled *rehearsal* everywhere, and the verifier fails it.
+- **First apply (10:44 UTC, rehearsal).** Every resource was created except CloudFront. AWS answered with a
+  403: *"Your account must be verified before you can add new CloudFront resources"*. The fix is a new
+  `EnableCdn` parameter (`ENABLE_CDN=0`):
+  - the distribution, its 5xx alarm, the URL outputs and the dashboard links are conditional;
+  - the instance no longer waits for CloudFront (`deploy.sh` writes the public address over SSM once a
+    distribution exists);
+  - with CloudFront off, `deploy.sh` checks health and the receipt on the box over SSM. This uses the new
+    `ssm_run` helper, which `update_server.sh` now shares.
+
+  Two more fixes found on the way:
+  - `teardown.sh` now finds the bucket from the stack resource, because a failed stack has no outputs;
+  - Git Bash turned `/aws/service/…` into a Windows path, so `lib.sh` now sets `MSYS_NO_PATHCONV=1`.
+
+  Checks: cfn-lint 0 findings. A change set on the failed stack adds the instance, alarms, dashboard
+  and stop schedule, and replaces nothing. The second apply (`EnableCdn=false`, rehearsal) was started; its
+  result is checked next. The vCPU quota is now 16 (approved).
+- **Next (needs the owner):**
+  - subscribe to COOL;
+  - open an AWS Support case (Account and billing) to unlock CloudFront;
+  - confirm the SNS email.
+
+  Then: rehearsal → `REHEARSAL=0` (COOL) → verify → fleet → load test.
 
 ### 2026-10-19 (sweep 61) — AWS + COOL, laptop side: receipt, stack, fleet, load test (runs pending login)
 

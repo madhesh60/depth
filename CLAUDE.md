@@ -55,7 +55,7 @@ pipe_cylinder, structural_fragment, natural_formation`. EXP-002 was rejected on 
 pass an explicit optimizer. The runtime is
 model-agnostic.
 
-## Cloud (scripted, not yet run — AWS work is scheduled for a dedicated day)
+## Cloud (first apply 2026-10-19: all but CloudFront, which awaits AWS account verification → `ENABLE_CDN=0`; COOL subscription pending → `REHEARSAL=1`)
 
 One CloudFormation stack (`infra/cfn/depth.yaml`): EC2 **c8g.large** from the **COOL AMI** (OpenCV 5
 under `/opt/cool`) + Elastic IP + systemd + CloudFront (HTTPS; origin = CloudFront prefix list + secret
