@@ -75,6 +75,48 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ## 4. Session log
 
+### 2026-10-19 (sweep 61) — AWS + COOL, laptop side: receipt, stack, fleet, load test (runs pending login)
+
+Everything the one-shot AWS day needs is built and tested locally; nothing has run on AWS yet (the CLI
+session had expired). Rubric aimed at: Verified COOL 30 · architecture 25 · measured value 20 ·
+innovation 15 · reproducibility 10, plus the main prize's responsible-delivery 10.
+- **Verified COOL — `GET /api/cool`** (`src/bench/cool_attest.py`): the AWS-signed instance identity document
+  exactly as IMDSv2 serves it (AMI, Marketplace product code, arm64, instance type), every OpenCV object
+  mapped into the server process (`/proc/self/maps`: all under `/opt/cool`?), and the COOL build read from
+  the machine. `python -m src.bench.verify_cool <url|file>` checks the RSA-SHA256 signature against AWS's
+  us-east-1 certificate (copied from the EC2 docs page; self-signature checked in tests) and the PKCS7 one
+  with `openssl -nointern` — found while testing: AWS's documented `smime -verify -noverify` also trusts a
+  certificate embedded in the signature, so a forged receipt carrying its own cert would pass without it.
+  Provenance stamps now carry the signed document's SHA-256; benchmarks save the machine's receipt.
+- **Security fix (confirmed):** behind CloudFront the rate limiter keyed on the FIRST `X-Forwarded-For`
+  hop, which the visitor controls (CloudFront appends the real address at the end) — rotating a fake first
+  hop escaped every limit. Now the last hop; a test proves a rotating fake hop is still limited.
+  **Origin guard:** with `DEPTH_ORIGIN_SECRET`, only requests carrying CloudFront's `X-Origin-Verify` reach the app.
+- **Benchmark v3** (`product_bench.py`, `compare.py`): the product frame split per op — on the laptop x86 the
+  `cv2.dnn` forward is **88 %** of the frame (497 of 566 ms mean), so COOL's effect on the product hinges on
+  its DNN speed; interleaved repeats, CPU use, peak RSS; parity (class, IoU ≥ 0.9, |Δscore| ≤ 0.01, same
+  tier); a `survey` workload that runs a raw recording end to end. Laptop reference: the **1-h Solix
+  recording (3,607 s of sonar) → 280 frames → full plan in 246 s, real-time factor 0.068, peak 714 MB**; the
+  150-s sample: RTF 0.055. The `cv` workload lost the twin-only `remap` (not on the analyze path).
+- **Infra = one CloudFormation stack** (`infra/cfn/depth.yaml`, cfn-lint 1.57.2: 0 findings; replaces
+  `deploy_aws.sh`): c8g.large COOL AMI (IMDSv2, encrypted gp3, launch template), Elastic IP, CloudFront (all
+  edges, static UI cached, security headers, `/mcp` uncompressed), SG = CloudFront prefix list on 8000, no
+  SSH; versioned TLS-only S3; least-privilege roles; CloudWatch log group + per-stage metric filters +
+  dashboard + 4 alarms → SNS; Scheduler stop 2026-11-10. The instance signals only when serving on COOL.
+  `deploy.sh` (dry run = change set), `update_server.sh` (SSM), `teardown.sh`. S3 result mirroring now works
+  on the server (boto3 added to the pinned `pydeps`; it was silently off).
+- **Fleet + load test:** `bench_fleet.sh` = 4 self-terminating machines (c8i.xlarge x86 stock · c8g.xlarge
+  stock · c8g.xlarge COOL · c8g.large COOL), Price List API prices; `load_test.py` with the pass mark fixed
+  before any run (0 errors, analyze p95 ≤ 3 s with 4 clients back to back + 1 survey, health p95 ≤ 1 s) —
+  local smoke: 40/40 ok, health p95 43 ms.
+- **Not done, by choice:** cfn-guard not run — the only pip binding (`guardpycfn`) has no verifiable
+  publisher; the template was reviewed against the Guard rules by hand and each deliberate exception (no WAF,
+  no customer KMS keys, no CloudFront access logs) is recorded with its reason in the template.
+- Tests: 205 → 222 passed locally (17 new: receipt, verifier, origin guard, rate-limit hop, parity, report). Stale doc fixed: `src/cv_pipeline/README.md` no longer calls the retired
+  contour pipeline the COOL workload.
+- **Next (needs the owner):** `aws login --profile hackathon`, subscribe to COOL; then deploy → verify →
+  fleet → load test → report.
+
 ### 2026-10-14 (sweep 60) — Judge re-audit (13 Oct): each finding checked, then fixed
 
 Every finding was re-measured before anything changed; all held.
