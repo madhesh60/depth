@@ -111,6 +111,32 @@ Promote each into the log below with full results as it runs.
 
 ## Experiment log
 
+### STUDY-17 — COOL on Graviton4 vs stock OpenCV vs x86: the product workload (REGISTERED 2026-10-19, not yet run)
+
+- **Why.** The Best-Use-of-COOL award asks for COOL executing the core workload on Graviton, with
+  reproducible measurements against a baseline. Registered before any AWS number exists, so the claims
+  below cannot be shaped by the results.
+- **Design** (`infra/bench_fleet.sh`, one run, self-terminating machines, same commit / frames / model /
+  recordings, all SHA-256 pinned): A `baseline_x86` c8i.xlarge + stock OpenCV 5.0.0.93 · B `graviton_stock`
+  c8g.xlarge + stock OpenCV 5.0.0.93 · C `graviton_cool` c8g.xlarge COOL AMI · D `graviton_cool_large` c8g.large
+  COOL AMI. Workloads `product` (per stage + per op), `cv`, `survey` (Test-Large-DS, 1 h of sonar, end to end);
+  3 interleaved repeats; all vCPUs and 1 thread; prices from the AWS Price List API at launch (+ COOL's $0.01/h).
+- **Criteria (fixed now):**
+  - **V1 Verified COOL** — C's and D's receipts verify (`verify_cool`): AWS signature valid, `arm64`, the
+    Marketplace product code `describe-images` reports for the COOL AMI, every mapped OpenCV object under
+    `/opt/cool`. Fail ⇒ that run is not reported as COOL.
+  - **P1 Same answers** — C vs B and B vs A: every detection matches (class, IoU ≥ 0.9, |Δscore| ≤ 0.01, same
+    tier); every difference is listed.
+  - **M1 COOL's own effect** = B → C ratio of product p50 and of the survey real-time factor; **M2** = A → C
+    latency and $-per-survey-hour ratios. Reported whatever their sign; "faster/cheaper" is claimed only if
+    the per-repeat values do not overlap (`compare.separation`), else "within noise".
+  - **S1 Size** — D meets the product target (< 300 ms p95 per frame, ≥ 5 fps); if not, the report names
+    the cheapest measured size that does.
+  - **L1 Load** — the live demo passes `load_test.PASS` (0 errors, analyze p95 ≤ 3 s with 4 clients back to
+    back + 1 survey, health p95 ≤ 1 s); fail ⇒ tune threads and re-test before any upsizing.
+- **Laptop reference (x86, stock OpenCV 5.0.0, not a criterion):** product frame 566 ms mean, of which
+  `cv2.dnn` forward 497 ms (88%); 1-h recording → plan in 246 s (real-time factor 0.068, peak 714 MB).
+
 ### STUDY-16 — The agent cross-checks OpenCV's seabed track against the depth sounder (ON by default for recordings)
 
 - **Why.** On a raw recording every metre (ground range, heights, the range scale) hangs on the sonar

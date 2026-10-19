@@ -102,6 +102,28 @@ def _ratio(a: dict, b: dict, key: str = "p50") -> str:
     return f"{x / y:.2f}×" if y else "—"
 
 
+def _rep_values(r: dict) -> list[float]:
+    """Per-repeat headline value: frame p50 (ms) for frame workloads, real-time factor for the survey."""
+    reps = r.get("repeats") or []
+    if r["workload"] == "survey":
+        return [x["real_time_factor"] for x in reps if "real_time_factor" in x]
+    return [x["total_ms"]["p50"] for x in reps if "total_ms" in x]
+
+
+def separation(slow: dict, fast: dict) -> str:
+    """The registered claim rule (STUDY-17): a speed-up is claimed only when the repeat ranges do not
+    overlap (the fast run's worst repeat beats the slow run's best); otherwise the ratio is reported
+    as within noise."""
+    a, b = _rep_values(slow), _rep_values(fast)
+    if len(a) < 2 or len(b) < 2:
+        return "single repeat - no claim"
+    if max(b) < min(a):
+        return "repeat ranges separate"
+    if max(a) < min(b):
+        return "repeat ranges separate (slower)"
+    return "repeat ranges overlap - within noise, no claim"
+
+
 def _iou(a, b) -> float:
     ix = max(0, min(a[2], b[2]) - max(a[0], b[0]))
     iy = max(0, min(a[3], b[3]) - max(a[1], b[1]))
@@ -217,21 +239,26 @@ def report(runs: list[dict], par: dict[str, dict] | None = None, d: Path | None 
         if wl == "survey":
             if b and c:
                 x, y = b["survey"]["real_time_factor_median"], c["survey"]["real_time_factor_median"]
-                cmp.append(f"| survey | **COOL on identical Graviton** (B → C) | {x / y:.2f}× faster per survey-hour |")
+                cmp.append(f"| survey | **COOL on identical Graviton** (B → C) | {x / y:.2f}× faster per survey-hour "
+                           f"| {separation(b, c)} |")
             if a and c:
                 x, y = a["survey"]["real_time_factor_median"], c["survey"]["real_time_factor_median"]
                 ua, uc = a["survey"].get("usd_per_survey_hour"), c["survey"].get("usd_per_survey_hour")
                 cost = f" · {ua / uc:.2f}× cheaper per survey-hour" if ua and uc else ""
-                cmp.append(f"| survey | **x86 → Graviton + COOL** (A → C) | {x / y:.2f}× faster{cost} |")
+                cmp.append(f"| survey | **x86 → Graviton + COOL** (A → C) | {x / y:.2f}× faster{cost} | {separation(a, c)} |")
             continue
         if b and c:
-            cmp.append(f"| {wl} | **COOL on identical Graviton** (B → C) | {_ratio(b, c)} faster p50 · {_ratio(b, c, 'p95')} p95 |")
+            cmp.append(f"| {wl} | **COOL on identical Graviton** (B → C) | {_ratio(b, c)} faster p50 · {_ratio(b, c, 'p95')} p95 "
+                       f"| {separation(b, c)} |")
         if a and c:
             ca, cc = (a["cost"].get("survey_hour") or {}).get("usd"), (c["cost"].get("survey_hour") or {}).get("usd")
             cost = f" · {ca / cc:.2f}× cheaper per survey-hour" if ca and cc else ""
-            cmp.append(f"| {wl} | **x86 → Graviton + COOL** (A → C) | {_ratio(a, c)} faster p50{cost} |")
+            cmp.append(f"| {wl} | **x86 → Graviton + COOL** (A → C) | {_ratio(a, c)} faster p50{cost} | {separation(a, c)} |")
     if cmp:
-        L += ["", "## Comparisons", "", "| workload | comparison | result |", "|---|---|---|"] + cmp
+        L += ["", "## Comparisons", "",
+              "A ratio > 1 means the second machine is faster. Registered claim rule (STUDY-17): a speed-up is "
+              "claimed only when the per-repeat values do not overlap.", "",
+              "| workload | comparison | result | claim rule |", "|---|---|---|---|"] + cmp
     else:
         L += ["", "_A/B/C comparison appears once the EC2 runs (`infra/bench_fleet.sh`) are in `benchmarks/`._"]
 

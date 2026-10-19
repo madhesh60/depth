@@ -98,6 +98,17 @@ def test_report_sections_survey_ops_parity_and_receipts(tmp_path):
     assert "Machines" in md and "graviton_cool__receipt.json" in md
 
 
+def test_claim_rule_needs_separate_repeat_ranges():
+    def runs(vals):
+        return {"workload": "product", "repeats": [{"total_ms": {"p50": v}} for v in vals]}
+    assert compare.separation(runs([200, 205, 210]), runs([150, 152, 155])) == "repeat ranges separate"
+    assert "overlap" in compare.separation(runs([200, 205, 210]), runs([190, 202, 208]))
+    assert "slower" in compare.separation(runs([150, 151, 152]), runs([200, 201, 202]))
+    assert compare.separation(runs([200]), runs([150])) == "single repeat - no claim"
+    surv = lambda v: {"workload": "survey", "repeats": [{"real_time_factor": x} for x in v]}
+    assert compare.separation(surv([0.07, 0.071]), surv([0.05, 0.051])) == "repeat ranges separate"
+
+
 def _run_all():
     import tempfile
     for name, fn in sorted(globals().items()):
