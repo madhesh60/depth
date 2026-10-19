@@ -189,6 +189,11 @@ def cool_build(cool_root: str = COOL_ROOT) -> dict:
 
 
 # ---- the receipt -------------------------------------------------------------------------------
+def rehearsal() -> bool:
+    """A stock-Ubuntu dress rehearsal of the stack (``infra/cfn/depth.yaml`` Rehearsal=true): NOT COOL."""
+    return os.environ.get("DEPTH_REHEARSAL") == "1"
+
+
 def receipt() -> dict:
     ident = signed_identity()
     doc = ident.get("document")
@@ -196,6 +201,7 @@ def receipt() -> dict:
     return {
         "what": "COOL execution receipt - check it: python -m src.bench.verify_cool <this server's URL>",
         "created_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "rehearsal": rehearsal(),
         "on_ec2": bool(doc),
         "aws_signed_identity": ({"document": doc, "signature": ident["signature"], "rsa2048": ident["rsa2048"],
                                  "document_sha256": document_sha256(doc),
@@ -216,7 +222,7 @@ def summary() -> dict:
     doc = ident.get("document")
     c = claims(doc) if doc else {}
     maps = mapped_libraries()
-    return {"on_ec2": bool(doc), "aws_signed": bool(doc),
+    return {"rehearsal": rehearsal(), "on_ec2": bool(doc), "aws_signed": bool(doc),
             "architecture": c.get("architecture"), "instance_type": c.get("instance_type"),
             "image_id": c.get("image_id"), "marketplace_product_codes": c.get("marketplace_product_codes"),
             "opencv_all_from_cool": maps.get("all_opencv_from_cool") if maps.get("available") else None,

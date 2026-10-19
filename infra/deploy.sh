@@ -1,15 +1,18 @@
 #!/usr/bin/env bash
 # deploy.sh — create or update the DEPTH demo stack (infra/cfn/depth.yaml) on Graviton4 + COOL.
 #
-# DRY RUN by default: resolves every input (COOL AMI + its Marketplace product code, an AZ that offers the
-# instance types, the CloudFront prefix list), validates the template with CloudFormation, creates an inert
-# CHANGE SET and prints it. Nothing that costs money is created. APPLY=1 executes the change set, waits until
-# the server signals "serving on COOL", then checks the live URL and verifies the COOL receipt.
+# DRY RUN by default: resolves every input (the COOL AMI by its Marketplace product code, an AZ that offers
+# the instance types, the CloudFront prefix list), checks the COOL subscription with a dry-run launch,
+# validates the template with CloudFormation, creates an inert CHANGE SET and prints it. Nothing that costs
+# money is created. APPLY=1 executes the change set, waits until the server signals that it is serving,
+# then checks the live URL and the COOL receipt.
 #
 #   ALERT_EMAIL=you@example.com ./infra/deploy.sh                     # plan
 #   APPLY=1 ALERT_EMAIL=you@example.com ./infra/deploy.sh             # deploy (~15-25 min)
+#   REHEARSAL=1 APPLY=1 ALERT_EMAIL=… ./infra/deploy.sh               # dress rehearsal: stock Ubuntu, NOT COOL
+#   REHEARSAL=0 APPLY=1 ./infra/deploy.sh                             # rehearsal -> COOL (replaces the instance;
+#                                                                     #   the Elastic IP and CloudFront stay)
 #   APPLY=1 INSTANCE_TYPE=c8g.xlarge ./infra/deploy.sh                # resize (stop/start, same address)
-#   COOL_AMI_ID=ami-... ./infra/deploy.sh                             # pin the AMI if the lookup is ambiguous
 # Code updates on the running server: ./infra/update_server.sh (SSM, no SSH, no replacement).
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -17,7 +20,47 @@ cd "$(dirname "$0")/.."
 
 STACK="${STACK:-depth}"
 SECRET_PARAM="${SECRET_PARAM:-/depth/$STACK/origin-secret}"
+COOL_CODE="${COOL_PRODUCT_CODE:-aajkmdd4qo3r7yhqg61a7aah9}"     # Cloud Optimized OpenCV for AWS Graviton4
 TEMPLATE=infra/cfn/depth.yaml
+
+# resolve_ami: sets AMI REH ROOTDEV ROOT_GIB (+ checks arm64, the COOL product code and the subscription)
+resolve_ami() {
+  say "server image"
+  if [ "${REHEARSAL:-0}" = "1" ]; then
+    REH=true
+    AMI=$(awsq ssm get-parameter --name /aws/service/canonical/ubuntu/server/24.04/stable/current/arm64/hvm/ebs-gp3/ami-id \
+          --query Parameter.Value --output text)
+    echo "REHEARSAL: stock Ubuntu 24.04 arm64 $AMI + stock OpenCV 5 (pip) - NOT COOL"
+  else
+    REH=false
+    AMI="${COOL_AMI_ID:-}"
+    if [ -z "$AMI" ]; then
+      AMI=$(awsq ec2 describe-images --owners aws-marketplace --filters "Name=product-code,Values=$COOL_CODE" \
+            --query 'reverse(sort_by(Images,&CreationDate))[0].ImageId' --output text)
+      [ -n "$AMI" ] && [ "$AMI" != None ] || die "no Marketplace AMI carries the COOL product code $COOL_CODE"
+      echo "COOL AMI = newest image with product code $COOL_CODE"
+    fi
+  fi
+  local arch codes snap name
+  read -r arch ROOTDEV codes < <(awsq ec2 describe-images --image-ids "$AMI" \
+    --query 'Images[0].[Architecture,RootDeviceName,join(`","`,ProductCodes[].ProductCodeId || `[]`)]' --output text)
+  name=$(awsq ec2 describe-images --image-ids "$AMI" --query 'Images[0].Name' --output text)
+  snap=$(awsq ec2 describe-images --image-ids "$AMI" \
+    --query "Images[0].BlockDeviceMappings[?DeviceName=='$ROOTDEV'].Ebs.VolumeSize | [0]" --output text)
+  echo "$AMI ($name) · $arch · root $ROOTDEV ${snap} GiB · product code(s): ${codes:-none}"
+  [ "$arch" = arm64 ] || die "$AMI is $arch, not arm64 (Graviton)"
+  if [ "$REH" = false ]; then
+    case ",$codes," in *",$COOL_CODE,"*) ;; *) die "$AMI does not carry the COOL product code $COOL_CODE";; esac
+    local probe
+    probe=$("$AWS_CLI" ec2 run-instances --dry-run --image-id "$AMI" --instance-type "${INSTANCE_TYPE:-c8g.large}" 2>&1 | tr -d '\r' || true)
+    case "$probe" in
+      *DryRunOperation*) echo "COOL subscription: OK (a dry-run launch is allowed)" ;;
+      *OptInRequired*)   die "not subscribed to COOL yet - AWS Marketplace -> 'Cloud Optimized OpenCV for AWS Graviton4' -> Subscribe, then re-run" ;;
+      *)                 echo "WARNING: dry-run launch answered: ${probe:0:200}" ;;
+    esac
+  fi
+  ROOT_GIB=$(( snap > 20 ? snap : 20 ))
+}
 
 say "identity"
 ACCOUNT=$(awsq sts get-caller-identity --query Account --output text) || die "no AWS credentials (aws login --profile hackathon)"
@@ -36,35 +79,17 @@ if [ "$STATUS" = NONE ] || [ "$STATUS" = REVIEW_IN_PROGRESS ]; then
   GIT_REF="${GIT_REF:-$(git rev-parse HEAD)}"
   git fetch -q origin 2>/dev/null || true
   git branch -r --contains "$GIT_REF" 2>/dev/null | grep -q . || die "commit $GIT_REF is not on GitHub yet - push it first (the server clones it)"
-
-  say "COOL AMI"
-  AMI="${COOL_AMI_ID:-}"
-  if [ -z "$AMI" ]; then
-    awsq ec2 describe-images --owners aws-marketplace --filters "Name=architecture,Values=arm64" \
-      "Name=name,Values=*COOL*,*cool*,*Cloud*Optimized*OpenCV*" \
-      --query 'reverse(sort_by(Images,&CreationDate))[].[ImageId,CreationDate,Name]' --output text > "$WORK/cool-amis.txt"
-    cat "$WORK/cool-amis.txt"
-    AMI=$(head -1 "$WORK/cool-amis.txt" | cut -f1)
-    [ -n "$AMI" ] || die "no COOL AMI visible - subscribe to the COOL Graviton4 listing first, or set COOL_AMI_ID"
-    echo "picked the newest: $AMI (set COOL_AMI_ID to override)"
-  fi
-  read -r ARCH ROOTDEV CODES < <(awsq ec2 describe-images --image-ids "$AMI" \
-    --query 'Images[0].[Architecture,RootDeviceName,join(`","`,ProductCodes[].ProductCodeId || `[]`)]' --output text)
-  SNAP_GIB=$(awsq ec2 describe-images --image-ids "$AMI" \
-    --query "Images[0].BlockDeviceMappings[?DeviceName=='$ROOTDEV'].Ebs.VolumeSize | [0]" --output text)
-  echo "AMI $AMI · $ARCH · root $ROOTDEV ${SNAP_GIB} GiB · Marketplace product code(s): ${CODES:-none}"
-  [ "$ARCH" = arm64 ] || die "$AMI is $ARCH, not arm64 (Graviton)"
-  [ -n "$CODES" ] && [ "$CODES" != None ] || die "$AMI carries no Marketplace product code - not the COOL listing"
-  ROOT_GIB=$(( SNAP_GIB > 20 ? SNAP_GIB : 20 ))
+  resolve_ami
 
   say "network"
   VPC=$(awsq ec2 describe-vpcs --filters Name=isDefault,Values=true --query 'Vpcs[0].VpcId' --output text)
   [ "$VPC" != None ] || die "no default VPC in $AWS_REGION"
   # one AZ that offers the demo type AND the benchmark fleet's types (the fleet launches in the same subnet)
+  NEED=$(printf '%s\n' "$INSTANCE_TYPE" c8g.large c8g.xlarge c8i.xlarge | sort -u | wc -l | tr -d ' ')
   AZ=$(awsq ec2 describe-instance-type-offerings --location-type availability-zone \
         --filters "Name=instance-type,Values=$INSTANCE_TYPE,c8g.large,c8g.xlarge,c8i.xlarge" \
         --query 'InstanceTypeOfferings[].[Location,InstanceType]' --output text \
-      | sort -u | cut -f1 | sort | uniq -c | awk -v n="$(printf '%s\n' "$INSTANCE_TYPE" c8g.large c8g.xlarge c8i.xlarge | sort -u | wc -l)" '$1==n {print $2}' | head -1)
+      | sort -u | cut -f1 | sort | uniq -c | awk -v n="$NEED" '$1==n {print $2}' | head -1)
   [ -n "$AZ" ] || die "no AZ in $AWS_REGION offers $INSTANCE_TYPE + c8g.large + c8g.xlarge + c8i.xlarge"
   SUBNET=$(awsq ec2 describe-subnets --filters "Name=vpc-id,Values=$VPC" "Name=availability-zone,Values=$AZ" \
             Name=default-for-az,Values=true --query 'Subnets[0].SubnetId' --output text)
@@ -82,15 +107,23 @@ if [ "$STATUS" = NONE ] || [ "$STATUS" = REVIEW_IN_PROGRESS ]; then
     echo "created"
   fi
 
-  PARAMS=(CoolAmiId="$AMI" InstanceType="$INSTANCE_TYPE" RootDeviceName="$ROOTDEV" RootVolumeGiB="$ROOT_GIB"
-          GitRef="$GIT_REF" VpcId="$VPC" SubnetId="$SUBNET" CloudFrontPrefixListId="$PL"
+  PARAMS=(CoolAmiId="$AMI" Rehearsal="$REH" InstanceType="$INSTANCE_TYPE" RootDeviceName="$ROOTDEV"
+          RootVolumeGiB="$ROOT_GIB" GitRef="$GIT_REF" VpcId="$VPC" SubnetId="$SUBNET" CloudFrontPrefixListId="$PL"
           OriginSecretParam="$SECRET_PARAM" AlertEmail="$ALERT_EMAIL" StopAt="$STOP_AT")
 else
   # update: only what you set changes; every other parameter keeps its value (no accidental replacement)
+  if [ -n "${REHEARSAL:-}" ] || [ -n "${COOL_AMI_ID:-}" ]; then
+    resolve_ami
+    echo "NOTE: a new server image REPLACES the instance: the new one must signal before the old one goes;"
+    echo "      the Elastic IP, CloudFront, bucket and alarms stay"
+    GIT_REF="${GIT_REF:-$(git rev-parse HEAD)}"
+    git fetch -q origin 2>/dev/null || true
+    git branch -r --contains "$GIT_REF" 2>/dev/null | grep -q . || die "commit $GIT_REF is not on GitHub yet - push it first"
+    PARAMS+=(CoolAmiId="$AMI" Rehearsal="$REH" RootDeviceName="$ROOTDEV" RootVolumeGiB="$ROOT_GIB" GitRef="$GIT_REF")
+  fi
   [ -n "${INSTANCE_TYPE:-}" ] && PARAMS+=(InstanceType="$INSTANCE_TYPE")
   [ -n "${STOP_AT:-}" ] && PARAMS+=(StopAt="$STOP_AT")
   [ -n "${ALERT_EMAIL:-}" ] && PARAMS+=(AlertEmail="$ALERT_EMAIL")
-  [ -n "${COOL_AMI_ID:-}" ] && { echo "WARNING: a new AMI REPLACES the instance"; PARAMS+=(CoolAmiId="$COOL_AMI_ID"); }
 fi
 
 say "template"
@@ -102,7 +135,7 @@ DEPLOY=(cloudformation deploy --stack-name "$STACK" --template-file "$TEMPLATE" 
 
 if [ "$APPLY" != "1" ]; then
   say "change set (dry run - nothing is executed)"
-  OUT=$("$AWS_CLI" "${DEPLOY[@]}" --no-execute-changeset | tr -d '\r') || die "change set failed: $OUT"
+  OUT=$("$AWS_CLI" "${DEPLOY[@]}" --no-execute-changeset 2>&1 | tr -d '\r') || die "change set failed: $OUT"
   CS=$(printf '%s\n' "$OUT" | grep -oE 'arn:aws[a-z-]*:cloudformation:[^ ]+changeSet/[^ ]+' | head -1 || true)
   if [ -n "$CS" ]; then
     awsq cloudformation describe-change-set --change-set-name "$CS" \
@@ -114,7 +147,7 @@ if [ "$APPLY" != "1" ]; then
   exit 0
 fi
 
-say "deploying (the instance signals only once DEPTH serves on COOL; ~15-25 min)"
+say "deploying (the instance signals only once DEPTH serves; ~15-25 min)"
 "$AWS_CLI" "${DEPLOY[@]}" --disable-rollback | tr -d '\r'
 URL=$(stack_output "$STACK" Url)
 IID=$(stack_output "$STACK" InstanceId)
@@ -123,9 +156,13 @@ echo "live: $URL · instance $IID · dashboard: $(stack_output "$STACK" Dashboar
 say "live check through CloudFront"
 for i in $(seq 1 60); do
   H=$(curl -fsS "$URL/api/health" 2>/dev/null || true)
-  if printf '%s' "$H" | grep -q '"is_cool_path":true'; then echo "$URL/api/health: serving on COOL"; break; fi
+  if printf '%s' "$H" | grep -q '"model_loaded":true'; then
+    printf '%s' "$H" | grep -q '"is_cool_path":true' && echo "$URL/api/health: serving on COOL" \
+      || echo "$URL/api/health: serving (NOT on COOL - rehearsal?)"
+    break
+  fi
   sleep 10
 done
-python -m src.bench.verify_cool "$URL" || echo "WARNING: the COOL receipt did not verify - see above"
+python -m src.bench.verify_cool "$URL" || echo "(the COOL receipt did not verify - expected only in a rehearsal)"
 echo "shell (no SSH): aws ssm start-session --target $IID"
 echo "SNS: confirm the subscription email sent to the alert address"

@@ -44,7 +44,10 @@ def _self_signed():
     return key, cert
 
 
-def _document(arch="arm64", itype="c8g.large", codes=("cool123code",)):
+G4 = "aajkmdd4qo3r7yhqg61a7aah9"          # the COOL Graviton4 listing (describe-images, 2026-10-19)
+
+
+def _document(arch="arm64", itype="c8g.large", codes=(G4,)):
     return json.dumps({"accountId": "000000000000", "architecture": arch, "availabilityZone": "us-east-1a",
                        "imageId": "ami-0abc", "instanceId": "i-0abc", "instanceType": itype,
                        "marketplaceProductCodes": list(codes), "pendingTime": "2026-10-20T00:00:00Z",
@@ -113,11 +116,14 @@ def test_verifier_rejects(fake_aws, why):
     assert failed, res["checks"]
 
 
-def test_pinned_cool_product_code_is_enforced(fake_aws, monkeypatch):
+def test_pinned_cool_product_code_is_enforced(fake_aws):
     key, cert = fake_aws
-    monkeypatch.setattr(verify_cool, "COOL_PRODUCT_CODES", {"cool123code": "COOL Graviton4"})
+    assert G4 in verify_cool.COOL_PRODUCT_CODES                        # pinned from describe-images
     assert verify_cool.verify(_receipt(key, cert, _document()))["passed"]
-    assert not verify_cool.verify(_receipt(key, cert, _document(codes=("someotheramicode",))))["passed"]
+    # a different Marketplace AMI (any other product) on Graviton with a stand-in /opt/cool: NOT COOL
+    res = verify_cool.verify(_receipt(key, cert, _document(codes=("someotheramicode",))))
+    assert not res["passed"]
+    assert [c for c in res["checks"] if not c["ok"] and c["required"]][0]["check"].startswith("launched from the COOL")
 
 
 @pytest.mark.skipif(not shutil.which("openssl"), reason="openssl not on PATH")

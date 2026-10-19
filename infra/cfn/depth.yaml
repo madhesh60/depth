@@ -26,12 +26,14 @@ Metadata:
       - Label: {default: Network}
         Parameters: [VpcId, SubnetId, CloudFrontPrefixListId, OriginSecretParam]
       - Label: {default: Operations}
-        Parameters: [AlertEmail, StopAt]
+        Parameters: [AlertEmail, StopAt, Rehearsal]
 
 Parameters:
   CoolAmiId:
     Type: AWS::EC2::Image::Id
-    Description: COOL for Graviton4 AMI in this region (AWS Marketplace listing prodview-fdvbfiewzuehs).
+    Description: >-
+      COOL for Graviton4 AMI in this region (AWS Marketplace prodview-fdvbfiewzuehs, product code
+      aajkmdd4qo3r7yhqg61a7aah9) - or stock Ubuntu 24.04 arm64 when Rehearsal=true.
   InstanceType:
     Type: String
     Default: c8g.large
@@ -75,6 +77,13 @@ Parameters:
     Default: "2026-11-10T06:30:00"
     AllowedPattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$
     Description: UTC time the instance is stopped automatically (after the 9 Nov judging date).
+  Rehearsal:
+    Type: String
+    Default: "false"
+    AllowedValues: ["false", "true"]
+    Description: >-
+      true = dress rehearsal on stock Ubuntu 24.04 arm64 + stock OpenCV 5 (pip) before the COOL AMI is
+      available; labelled NOT COOL everywhere (the receipt does not verify). Switch back = stack update.
 
 Conditions:
   IsUsEast1: !Equals [!Ref "AWS::Region", us-east-1]
@@ -443,6 +452,15 @@ Resources:
           ( umask 022; printf 'DEPTH_PUBLIC_URL=https://%s\n' '${Distribution.DomainName}' > /etc/depth/public.env )
           command -v git >/dev/null || { apt-get -o DPkg::Lock::Timeout=300 update -y && apt-get -o DPkg::Lock::Timeout=300 install -y git; }
           [ -d /opt/depth/.git ] || git clone -q https://github.com/madhesh60/depth.git /opt/depth
+          if [ "${Rehearsal}" = "true" ]; then
+            # REHEARSAL: stock OpenCV 5 from pip in a private venv exercises the whole stack before the COOL AMI
+            # is available. NOT COOL: /api/health says rehearsal, is_cool_path is false, the receipt fails.
+            apt-get -o DPkg::Lock::Timeout=300 update -y && apt-get -o DPkg::Lock::Timeout=300 install -y python3-venv
+            python3 -m venv /opt/stock-opencv
+            /opt/stock-opencv/bin/python -m pip install -q numpy==2.2.6 opencv-python-headless==5.0.0.93
+            export COOL_PY=/opt/stock-opencv/bin/python DEPTH_REQUIRE_COOL=0
+            ( umask 022; echo DEPTH_REHEARSAL=1 > /etc/depth/rehearsal.env )
+          fi
           export DEPTH_GIT_REF=${GitRef} DEPTH_S3_BUCKET=${DataBucket} DEPTH_LOG_GROUP=${AppLogGroup}
           bash /opt/depth/infra/setup_cool_instance.sh
           signal SUCCESS

@@ -91,9 +91,16 @@ NWIsDEcp3GUB4proOR+C7PNkY+VGODitBOw09qBGosCBstwyEqY=
     },
 }
 
-# AWS Marketplace product code(s) of the COOL listing(s), read from `aws ec2 describe-images` for the AMI
-# the demo was launched from (filled in on deploy day; until then the check reports the code it sees).
-COOL_PRODUCT_CODES: dict[str, str] = {}
+# AWS Marketplace product codes of the COOL listings, read on 2026-10-19 with
+#   aws ec2 describe-images --owners aws-marketplace --filters Name=name,Values=*COOL* (us-east-1)
+# — every one owned by 679593333241 (aws-marketplace). DEPTH runs the Graviton4 listing.
+COOL_PRODUCT_CODES: dict[str, str] = {
+    "aajkmdd4qo3r7yhqg61a7aah9": "Cloud Optimized OpenCV for AWS Graviton4 (prodview-fdvbfiewzuehs; COOL 3.1 on "
+                                 "OpenCV 5.0; ami-033e481a24f94c8cb in us-east-1)",
+    "216fpdsdup19yw3vwuiwx254l": "COOL for AWS Graviton5",
+    "9u1i10i9fbqhc92kgsb6ni7k9": "COOL for AWS Graviton3",
+    "4eb70u7a6gb5bj1ijix5jlokv": "COOL for AWS Graviton (Graviton2 / earlier listing)",
+}
 
 GRAVITON_TYPE = re.compile(r"^(a1|[a-z]+\d+g[a-z]*)\.", re.I)        # c8g, m7gd, t4g, x2gd, im4gn, hpc7g …
 
@@ -173,11 +180,14 @@ def verify(receipt: dict, analyze: dict | None = None) -> dict:
     if COOL_PRODUCT_CODES:
         hit = [x for x in codes if x in COOL_PRODUCT_CODES]
         add("launched from the COOL Marketplace AMI (product code)", bool(hit),
-            f"marketplaceProductCodes = {codes}; COOL = {sorted(COOL_PRODUCT_CODES)}")
+            f"marketplaceProductCodes = {codes} -> " + ("; ".join(COOL_PRODUCT_CODES[x] for x in hit) if hit else
+                                                        "no COOL listing's code"))
     else:
         add("launched from an AWS Marketplace AMI (product code present)", bool(codes),
             f"marketplaceProductCodes = {codes} - compare with: aws ec2 describe-images --image-ids "
             f"{c.get('imageId')} --query Images[0].ProductCodes")
+    if receipt.get("rehearsal"):
+        add("not a stock-Ubuntu dress rehearsal", False, "the server says rehearsal=true (stock OpenCV, NOT COOL)")
     p = receipt.get("process") or {}
     add("cv2 is imported from /opt/cool", bool(p.get("cv2_from_cool")), f"cv2.__file__ = {p.get('cv2_file')}")
     if p.get("available"):

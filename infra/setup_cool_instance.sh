@@ -149,9 +149,10 @@ for i in $(seq 1 90); do
   if printf '%s' "$H" | grep -q '"model_loaded":true'; then
     if printf '%s' "$H" | grep -q '"is_cool_path":true'; then
       echo "COOL provenance: cv2 loaded from /opt/cool ✓"
+    elif [ "$REQUIRE_COOL" = "1" ]; then
+      echo "ERROR: the server runs, but cv2 is NOT loaded from /opt/cool" >&2; exit 3
     else
-      echo "ERROR: the server runs, but cv2 is NOT loaded from /opt/cool" >&2
-      [ "$REQUIRE_COOL" = "1" ] && exit 3
+      echo "note: cv2 is not from /opt/cool (DEPTH_REQUIRE_COOL=0 - a rehearsal, NOT COOL)"
     fi
     [ -s /etc/depth/approver.env ] && echo "approver PIN: sudo cat /etc/depth/approver.env (share it privately)"
     echo "DEPTH is up on :$PORT"; exit 0

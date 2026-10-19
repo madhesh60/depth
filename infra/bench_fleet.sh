@@ -30,8 +30,13 @@ git branch -r --contains "$GIT_REF" 2>/dev/null | grep -q . || die "commit $GIT_
 say "stack outputs"
 B=$(stack_output "$STACK" BucketName); PROFILE=$(stack_output "$STACK" BenchInstanceProfile)
 SG=$(stack_output "$STACK" BenchSecurityGroup); SUBNET=$(stack_output "$STACK" SubnetId)
-COOL_AMI="${COOL_AMI_ID:-$(stack_param "$STACK" CoolAmiId)}"
 [ -n "$B" ] && [ "$B" != None ] || die "stack $STACK not found - run infra/deploy.sh first"
+COOL_CODE="${COOL_PRODUCT_CODE:-aajkmdd4qo3r7yhqg61a7aah9}"     # Cloud Optimized OpenCV for AWS Graviton4
+COOL_AMI="${COOL_AMI_ID:-$(awsq ec2 describe-images --owners aws-marketplace --filters "Name=product-code,Values=$COOL_CODE" \
+            --query 'reverse(sort_by(Images,&CreationDate))[0].ImageId' --output text)}"
+cool_ok() {   # subscribed? a dry-run launch of the COOL AMI is the cheapest exact test
+  "$AWS_CLI" ec2 run-instances --dry-run --image-id "$COOL_AMI" --instance-type "$1" 2>&1 | tr -d '\r' | grep -q DryRunOperation
+}
 U_ARM=$(awsq ssm get-parameter --name /aws/service/canonical/ubuntu/server/24.04/stable/current/arm64/hvm/ebs-gp3/ami-id --query Parameter.Value --output text)
 U_X86=$(awsq ssm get-parameter --name /aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id --query Parameter.Value --output text)
 echo "bucket $B · subnet $SUBNET · sg $SG · profile $PROFILE · run $RUN_ID · commit ${GIT_REF:0:12}"
@@ -46,7 +51,12 @@ LAUNCHED=()
 
 say "launch"
 for t in $TARGETS; do
-  it=${TYPE[$t]}; base=$(price_of "$it")
+  it=${TYPE[$t]}
+  if [ "${FLAVOR[$t]}" = cool ] && ! cool_ok "$it"; then
+    echo "$t ${LABEL[$t]}: SKIPPED - not subscribed to COOL yet (AWS Marketplace -> Subscribe), or $COOL_AMI unavailable"
+    continue
+  fi
+  base=$(price_of "$it")
   if [ "${FLAVOR[$t]}" = cool ]; then
     price=$(python -I -c "print(round($base + $COOL_FEE, 5))"); src="AWS Price List API $TODAY ($it on-demand Linux $AWS_REGION \$$base/h) + COOL software fee \$$COOL_FEE/h"
   else
