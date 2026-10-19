@@ -4,6 +4,8 @@ app.py — FastAPI service exposing the See → Prove → Decide → Act loop to
 Endpoints
     GET  /api/health                 — liveness, OpenCV version + WHERE cv2 was loaded from (COOL
                                        provenance), runtime, model state, calibration promises, jobs
+    GET  /api/cool                   — the COOL execution receipt: AWS-signed instance identity + the
+                                       OpenCV libraries this process mapped (src/bench/cool_attest.py)
     GET  /api/samples                — shipped sample frames (webui/samples, CC-BY-SA, attributed)
     POST /api/analyze?sample=ID      — See→Prove→Decide on a sample or ONE uploaded frame → evidence
          (multipart file=…)            cards + traces   [?nadir=top|bottom|left|right overrides]
@@ -37,6 +39,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import hmac
 import json
 import logging
 import os
@@ -79,6 +82,8 @@ from src.agentic.pipeline import validate_frame
 from .mcp_server import ENDPOINT as MCP_ENDPOINT
 from .integrations import Webhooks, WebhookError, EVENTS as WEBHOOK_EVENTS
 from .ratelimit import RateLimitMiddleware
+from .origin_guard import OriginGuardMiddleware
+from src.bench import cool_attest
 
 log = logging.getLogger("depth.api")
 REPO = Path(__file__).resolve().parents[2]
@@ -188,6 +193,7 @@ app.add_middleware(RateLimitMiddleware)                # per-client limits on th
 _cors = [o.strip() for o in os.environ.get("DEPTH_CORS_ORIGINS", "").split(",") if o.strip()]
 if _cors:
     app.add_middleware(CORSMiddleware, allow_origins=_cors, allow_methods=["GET", "POST"], allow_headers=["*"])
+app.add_middleware(OriginGuardMiddleware)              # behind CloudFront: only our distribution gets in
 
 
 @app.middleware("http")
@@ -573,7 +579,16 @@ def health():
         "limits": {"max_upload_mb": MAX_UPLOAD_MB, "max_frames": MAX_FRAMES, "max_sync_frames": MAX_SYNC_FRAMES},
         "recording": {"available": RECORDING_DAT.exists(), "name": RECORDING_DAT.stem},
         "approver_pin_required": pin_required(),
+        "cool": cool_attest.summary(),
     }
+
+
+@app.get("/api/cool")
+def cool_receipt():
+    """The COOL execution receipt (src/bench/cool_attest.py): the AWS-signed instance identity document
+    (AMI, Marketplace product code, arm64, instance type) exactly as IMDS serves it, the OpenCV objects this
+    process mapped, and the COOL build read from the machine. Verify: python -m src.bench.verify_cool <url>"""
+    return cool_attest.receipt()
 
 
 @app.post("/api/feedback")
@@ -1108,7 +1123,7 @@ def _work_order_issued(s: SurveyResult, r: dict) -> dict:
 def _admin(request: Request) -> None:
     """Webhook management needs ``X-DEPTH-Admin: $DEPTH_ADMIN_TOKEN`` when that token is set."""
     want = os.environ.get("DEPTH_ADMIN_TOKEN")
-    if want and request.headers.get("x-depth-admin") != want:
+    if want and not hmac.compare_digest(request.headers.get("x-depth-admin", ""), want):
         raise HTTPException(403, "admin token required (X-DEPTH-Admin)")
 
 

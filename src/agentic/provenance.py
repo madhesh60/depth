@@ -4,7 +4,9 @@ provenance.py — every result says exactly what produced it (observability, rev
 
 ``stamp()`` returns: model name + ONNX sha256, calibration sha256 (the promises in force), OpenCV
 version + where ``cv2`` was loaded from (``/opt/cool`` ⇒ COOL), code commit, host architecture / EC2
-type, UTC time. It is attached to ``/api/analyze`` responses and to every exported report, and heads
+type, UTC time — and, on EC2, the SHA-256 of the AWS-signed instance identity document with the claims
+it signs (AMI, Marketplace product code, arm64, instance type; ``src/bench/cool_attest.py``), so a result
+names the attested machine that computed it (``GET /api/cool`` serves the document to check against). It is attached to ``/api/analyze`` responses and to every exported report, and heads
 the agent decision log (``trace`` export) — so any hazard in a GeoJSON can be traced back to the model,
 thresholds, OpenCV build and code that produced it.
 
@@ -42,8 +44,22 @@ def stamp() -> dict:
     s = dict(_static(str(DEFAULT_ONNX), str(calibration_path())))
     s["model"] = cal.data.get("model")
     s["guarantees"] = {k: (cal.guarantees or {}).get(k) for k in ("recall_promise", "precision_promise")}
+    s["attestation"] = _attestation()
     s["created_utc"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     return s
+
+
+def _attestation():
+    """The signed machine identity behind this result (None off EC2 or with DEPTH_PROVENANCE_EC2=0)."""
+    if os.environ.get("DEPTH_PROVENANCE_EC2", "1") != "1":
+        return None
+    from src.bench.cool_attest import signed_identity, claims, document_sha256
+    doc = signed_identity().get("document")
+    if not doc:
+        return None
+    c = claims(doc)
+    return {"document_sha256": document_sha256(doc), "receipt": "/api/cool",
+            **{k: c[k] for k in ("image_id", "marketplace_product_codes", "architecture", "instance_type")}}
 
 
 def short(s: dict) -> str:
