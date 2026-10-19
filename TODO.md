@@ -45,11 +45,11 @@ Legend: `[x]` done · `[ ]` open · **(YOU)** needs a person / an account / a GP
 
 - [ ] **(YOU)** Budget alarm first, then `aws login` (profile `hackathon`, us-east-1).
 - [ ] **(YOU)** Subscribe to the COOL Graviton listing (note the AMI id). Accepting the terms is yours to do.
-- [ ] Upload `best.onnx` to S3. Run `infra/deploy_aws.sh` as a dry run, then `APPLY=1` only after an
-      explicit yes.
+- [ ] `ALERT_EMAIL=… ./infra/deploy.sh` (dry run: change set), then `APPLY=1` (the model comes from the
+      SHA-256-pinned release; no S3 upload step).
 - [ ] Check that `/api/health` shows `is_cool_path: true`, and that the CloudFront HTTPS link works.
 - [ ] Optional: enable the Bedrock mission-brief writer (`infra/README.md`).
-- [ ] Run the 3-way benchmark (section 2), then terminate the extra instances.
+- [ ] `APPLY=1 ./infra/bench_fleet.sh` (machines terminate themselves) → `python -m src.bench.compare`; load test.
 - [ ] 24 h soak test of the live link; CloudWatch alarm to email; daily check during judging.
 
 ## 4) Best training numbers

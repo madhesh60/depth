@@ -48,7 +48,7 @@ EXP-005 analyses). Records:
 
   Publishing weights trained on "research use" data is a licence call for the owner, not a technical
   step. If in doubt, state "research use" in the release text, or keep the release private and use
-  the S3 copy (`infra/deploy_aws.sh`).
+  an S3 copy (`setup_cool_instance.sh` takes `DEPTH_MODEL_S3` + `DEPTH_MODEL_SHA256`).
 
 ## Publish (owner only)
 

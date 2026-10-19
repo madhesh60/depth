@@ -279,14 +279,21 @@ UI: a zero-build studio with five modes (Analyze · Survey · Study · Audit · 
 
 ## 10. Cloud + COOL (`infra/`)
 
-EC2 **c8g.xlarge** from the **COOL AMI** (OpenCV 5 under `/opt/cool`), `systemd` unit running the
-app with the COOL interpreter (web deps via `pip --target`; the COOL venv is never modified), behind
-**CloudFront** (HTTPS; security group open only to CloudFront's origin-facing prefix list; no SSH —
-SSM), **S3** (models, uploads with 7-day expiry, results, benchmarks), **CloudWatch** (status-check
-auto-recover + email; JSON frame logs), **Budgets** alarm first. `deploy_aws.sh` is dry-run by
-default. The **3-way benchmark** (x86 stock · Graviton stock · Graviton COOL) times the product
-workload per stage with pinned threads and reports $/1k frames and $ + real-time factor per
-survey-hour; a run is labelled COOL only if `cv2` loads from `/opt/cool`. Local x86 reference:
+One CloudFormation stack (`infra/cfn/depth.yaml`, deployed by `infra/deploy.sh`, dry-run by default):
+EC2 **c8g.large** (Graviton4) from the **COOL Marketplace AMI** (OpenCV 5 under `/opt/cool`), `systemd`
+unit running the app with the COOL interpreter (web deps via `pip --target`; the COOL venv is never
+modified), an Elastic IP, behind **CloudFront** (HTTPS, static UI cached at the edge; the origin accepts
+only CloudFront's origin-facing prefix list **and** our secret `X-Origin-Verify` header; no SSH — SSM),
+**S3** (versioned, TLS-only: results 30 d, uploads 7 d, benchmarks), **CloudWatch** (per-stage latency from
+the JSON frame log, CPU/memory, a dashboard, 4 alarms → SNS email, auto-recover/reboot), an **EventBridge
+Scheduler** stop after judging, and the account **Budget**. `GET /api/cool` serves the **COOL execution
+receipt** — the AWS-signed instance identity (AMI, Marketplace product code, arm64) plus the OpenCV
+libraries the process mapped — and `python -m src.bench.verify_cool <url>` checks it from anywhere.
+`infra/bench_fleet.sh` runs the **equal-size benchmark** (c8i.xlarge x86 stock · c8g.xlarge stock ·
+c8g.xlarge COOL · c8g.large COOL) on self-terminating machines: product per stage and per op, a real
+1-h recording end to end (measured real-time factor and $ per survey-hour), 3 interleaved repeats, CPU
+and memory, output parity, prices from the AWS Price List API; a run is labelled COOL only if `cv2`
+loads from `/opt/cool`. Local x86 reference:
 252 ms/frame p50 (EXP-003); one survey-hour in 51 s (RTF 0.014); results in `benchmarks/`.
 
 Scaling (described, not built): survey jobs → SQS → an Auto Scaling group of the same COOL AMI
@@ -328,10 +335,11 @@ src/agentic/      agent.py · perception.py · shadow.py · tools.py · evidence
                   provenance.py · brief.py (mission brief) · study_causal.py (STUDY-12) · types.py
 src/bench/        product_bench.py · fingerprint.py · compare.py (COOL benchmark)
 src/dashboard/    app.py · jobs.py · metrics.py · samples.py · mcp_server.py · ogc.py · integrations.py ·
-                  ratelimit.py
+                  ratelimit.py · origin_guard.py
 webui/            index.html · app.js · twin3d.js (three.js twin) · styles.css · embed/depth-embed.js ·
                   samples/ (8 CC-BY-SA frames) · audit/ · vendor/leaflet · vendor/three
-infra/            deploy_aws.sh · setup_cool_instance.sh · depth.service · bench_cool.sh
+infra/            cfn/depth.yaml · deploy.sh · setup_cool_instance.sh · depth.service · update_server.sh ·
+                  bench_fleet.sh · bench_userdata.sh · bench_cool.sh · teardown.sh · lib.sh
 models/<MODEL>/   calibration.json · effort_curve.json · fp_audit_val.json (weights: fetch_model)
 DATASET/scripts/  audit_dataset · build_dataset_v1/v2/v2b · build_tiles · visualize_labels
 .github/          workflows/tests.yml (CI)

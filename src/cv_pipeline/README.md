@@ -1,4 +1,4 @@
-# Stage 1 — Classical OpenCV (the COOL CPU workload)
+# Stage 1 — sonar canonicalisation (classical OpenCV)
 
 > **Current role (2026-09-24, `experiments.md` STUDY-08).** Stage 1 in the product path is
 > **`canonical.py` — sonar canonicalisation**: palette → luminance, orientation by source rule,
@@ -11,19 +11,25 @@
 > as the documented STUDY-01 negative result and a benchmark op-mix.
 
 
+> **Where COOL is measured (2026-10-19).** Not here. COOL is benchmarked on the **product** workload —
+> exactly what `/api/analyze` runs (Stage 1 canonicalisation → YOLO11 via `cv2.dnn` → evidence → render),
+> split per op, plus a real 1-h recording end to end — by `src/bench/product_bench.py` on equal-size
+> machines (`infra/bench_fleet.sh`; report `docs/cool_benchmark.md`). Everything below describes the
+> retired contour pipeline (`pipeline.py`, the STUDY-01 negative result): its op table is history (stock
+> OpenCV 4.12 on the x86 laptop) and **no Graviton-vs-x86 or COOL speed-up is claimed for it**.
+
 CPU-only classical CV over a side-scan sonar frame (denoise → resize → adaptive threshold →
-morphology → contours → geometry). This is the **workload we run on AWS Graviton via COOL**
-and benchmark against x86 — the primary "Best Use of COOL" deliverable.
+morphology → contours → geometry) — the retired ROI pipeline.
 
 > **Role note (2026-09-22, see `experiments.md` STUDY-01).** This pipeline is **not** a
 > Stage-2 ROI gate — classical CV has no discriminative power on this sonar (GT coverage caps
 > ~72% at 141 ROIs/frame; it fires more on empty seafloor than on debris), so ROI-gating was
-> retired. It stays as the **sonar-preprocessing / benchmark workload**: its ops are the COOL
-> sweet-spot, so it gives a real, attributable Graviton-vs-x86 speedup. YOLO
+> retired. It is kept only to reproduce that result (and as an op-mix reference); it is not in the
+> product path and was never measured on Graviton. YOLO
 > (`src/detection/infer.py`) does the detection, full-frame. The `candidates` it emits are
 > still useful for the transparency/demo view and as a benchmarkable tiling/region pass.
 
-## Why this is the COOL workload
+## History: why this was once meant as the COOL workload
 
 The COOL / KleidiCV build accelerates a specific set of ops on Arm/Graviton. Stage 1 is
 deliberately composed of those ops, and every op is timed so we can prove where the compute
@@ -45,12 +51,11 @@ contours). That concentration is what makes COOL's speedup attributable — not 
 heavy non-accelerated op. (This is why `fastNlMeansDenoising` is OFF by default: it is slow
 and *not* KleidiCV-accelerated; it lives in `QUALITY_PRESET` for the ablation only.)
 
-Budget check: 29 ms/frame ≪ 300 ms target, 30.5 FPS ≫ 5 FPS target — with 10× headroom for
-Graviton.
+Budget check: 29 ms/frame ≪ 300 ms target, 30.5 FPS ≫ 5 FPS target (x86 laptop).
 
-## The three-way benchmark (earns 30% + 20% of the COOL score)
+## The legacy three-way harness (superseded by `src/bench/product_bench.py`)
 
-Run the identical pipeline/config in three configs and diff the JSON:
+Kept for the record; the COOL evidence comes from the product benchmark instead:
 
 ```bash
 # A) x86 + stock OpenCV

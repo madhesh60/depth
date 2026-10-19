@@ -57,11 +57,15 @@ model-agnostic.
 
 ## Cloud (scripted, not yet run — AWS work is scheduled for a dedicated day)
 
-EC2 c8g.xlarge from the **COOL AMI** (OpenCV 5 under `/opt/cool`) + systemd + CloudFront (HTTPS) +
-S3 + CloudWatch + Budgets + SSM. `infra/deploy_aws.sh` is **dry-run by default** (`APPLY=1` to
-execute). The COOL venv is never modified (web deps via `pip --target`). The 3-way COOL benchmark
-(`infra/bench_cool.sh`, `src/bench/`) times the **product workload** per stage; a run is COOL only if
-`cv2.__file__` is under `/opt/cool`. Lambda / DynamoDB / Amplify / SageMaker are **retired**.
+One CloudFormation stack (`infra/cfn/depth.yaml`): EC2 **c8g.large** from the **COOL AMI** (OpenCV 5
+under `/opt/cool`) + Elastic IP + systemd + CloudFront (HTTPS; origin = CloudFront prefix list + secret
+`X-Origin-Verify` header) + S3 + CloudWatch (logs, metric filters, dashboard, alarms → SNS) + SSM +
+EventBridge Scheduler stop (2026-11-10). `infra/deploy.sh` is **dry-run by default** (`APPLY=1` to
+execute); `infra/teardown.sh` removes everything. The COOL venv is never modified (web deps via
+`pip --target`). `GET /api/cool` = the COOL receipt (AWS-signed identity + mapped OpenCV libs),
+checked by `python -m src.bench.verify_cool <url>`. `infra/bench_fleet.sh` = the equal-size benchmark on
+self-terminating machines (`src/bench/`; product per stage/op, a real 1-h survey, parity, repeats); a run
+is COOL only if `cv2.__file__` is under `/opt/cool`. Lambda / DynamoDB / Amplify / SageMaker are **retired**.
 Details: [infra/README.md](infra/README.md).
 
 ## Dataset state
@@ -133,11 +137,12 @@ src/detection/    infer · calibration · evaluate · export_onnx · train · on
 src/agentic/      agent · perception · shadow · tools · policy · guarantees · calibrate · geo · stitch ·
                   resurvey · mission (plan_mission / apply_human) · pipeline · approvals · brief · twin ·
                   provenance · feedback · study · effort · study_causal (12) · types
-src/bench/        product_bench · fingerprint · compare (COOL benchmark)
-src/dashboard/    app (FastAPI) · jobs · metrics · samples · mcp_server · ogc · integrations · ratelimit
+src/bench/        product_bench · fingerprint · compare · cool_attest · verify_cool · load_test (COOL)
+src/dashboard/    app (FastAPI) · jobs · metrics · samples · mcp_server · ogc · integrations · ratelimit · origin_guard
 webui/            zero-build studio · twin3d.js · embed/depth-embed.js · samples/ (8 CC-BY-SA frames) ·
                   audit/ crops · vendor/leaflet · vendor/three
-infra/            deploy_aws.sh · setup_cool_instance.sh · depth.service · bench_cool.sh
+infra/            cfn/depth.yaml · deploy.sh · teardown.sh · update_server.sh · setup_cool_instance.sh ·
+                  depth.service · bench_fleet.sh · bench_userdata.sh · bench_cool.sh · lib.sh
 models/<MODEL>/   calibration.json · effort_curve.json · fp_audit_val.json (weights: Release exp003-v1 via fetch_model)
 benchmarks/       product_bench JSON results (tracked; EC2 / COOL runs land here too)
 docs/README.md    the documentation map (start here)

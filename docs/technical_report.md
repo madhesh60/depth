@@ -253,15 +253,21 @@ CV-only workload that isolates where COOL acts.
 
 The deployment is scripted, dry-run checked, and executed on the AWS day:
 
-- **EC2 c8g** (Graviton4) launched from the **COOL AMI**, running `depth.service` under systemd with the COOL interpreter.
-- Web dependencies are installed with `pip --target`; **the COOL venv is never modified**.
-- **CloudFront** provides HTTPS, with the origin restricted to CloudFront's IP ranges.
-- **S3** holds the model (sha256-checked), uploads (7-day lifecycle) and results.
-- **CloudWatch** status alarms trigger auto-recovery plus email, and collects JSON frame logs.
-- **Budgets** alert at 50% and 90% of spend.
-- Access goes through **SSM** only (no SSH port), under an **IAM** role scoped to the bucket.
+One CloudFormation stack (`infra/cfn/depth.yaml`):
 
-`infra/deploy_aws.sh` is a dry run by default. It sets the budget alarm before creating anything.
+- **EC2 c8g.large** (Graviton4) launched from the **COOL Marketplace AMI**, running `depth.service` under systemd
+  with the COOL interpreter; web dependencies via `pip --target` — **the COOL venv is never modified**.
+- **CloudFront** provides HTTPS and caches the static UI; the origin accepts only CloudFront's origin-facing
+  prefix list and our secret `X-Origin-Verify` header.
+- **S3** (versioned, TLS-only) holds survey results (30-day lifecycle), uploads (7-day) and benchmark results.
+- **CloudWatch**: per-stage latency from the server's JSON frame log, CPU/memory, a dashboard, and alarms
+  (recover, reboot, CPU, edge 5xx) that email through SNS.
+- Access goes through **SSM** only (no SSH port, no key pair), IMDSv2, least-privilege **IAM** roles.
+- An **EventBridge Scheduler** stops the instance after judging; the account **Budget** alerts at 25/50/100% + forecast.
+- **Verified COOL:** `GET /api/cool` serves the AWS-signed instance identity (AMI, Marketplace product code,
+  arm64) and the OpenCV libraries mapped into the server process; `python -m src.bench.verify_cool <url>` checks it.
+
+`infra/deploy.sh` is a dry run by default (it prints the change set); `infra/teardown.sh` removes everything.
 
 **Optional:** Amazon Bedrock (Claude) rewrites the mission brief. It writes, never decides: its text is
 shown only if every number and ID traces back to the survey, otherwise the template is served
