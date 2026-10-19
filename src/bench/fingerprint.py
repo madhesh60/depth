@@ -87,8 +87,24 @@ def host() -> dict:
             "vcpus": os.cpu_count(), "cpu_model": _cpu_model()}
 
 
+def cool_info() -> dict:
+    """The COOL build as read from THIS machine (``cool_attest.cool_build``) — only where ``/opt/cool``
+    exists — plus the AWS-signed identity's hash and claims when on EC2 (the full signed document is
+    saved beside the benchmark as ``<label>__receipt.json``)."""
+    from . import cool_attest
+    out: dict = {}
+    if Path(cool_attest.COOL_ROOT).is_dir():
+        b = cool_attest.cool_build()
+        out["build"] = {k: b.get(k) for k in ("version_files", "dpkg", "python_dists", "cool_venvs", "cv2_build_lines")}
+    doc = cool_attest.signed_identity().get("document")
+    if doc:
+        out["attestation"] = {"document_sha256": cool_attest.document_sha256(doc), **cool_attest.claims(doc)}
+    return out
+
+
 def fingerprint(model: Optional[Path] = None, calibration: Optional[Path] = None, ec2: bool = True) -> dict:
     return {"opencv": opencv_provenance(), "host": host(), "ec2": ec2_identity() if ec2 else {},
+            "cool": cool_info() if ec2 else {},
             "git_commit": git_commit(),
             "model_sha256": sha256_file(model) if model else None,
             "calibration_sha256": sha256_file(calibration) if calibration else None}

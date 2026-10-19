@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Sequence
@@ -131,6 +132,9 @@ class YoloOnnxDetector:
             self.conf_by_class = np.full(len(self.names), float(conf_thres))
         self.conf_floor = float(self.conf_by_class.min())
         self.conf_thres = self.conf_floor  # back-compat alias
+        # running op-level timings (ms): letterbox+blob, cv2.dnn forward, decode+NMS. One dict shared
+        # with every with_conf() view, so re-looks add to it; the benchmark resets it per frame.
+        self.prof = {"pre_ms": 0.0, "forward_ms": 0.0, "post_ms": 0.0, "forwards": 0}
 
     def with_conf(self, conf_thres: "float | dict[str, float]") -> "YoloOnnxDetector":
         """A view of this detector with different confidence thresholds that SHARES the loaded
@@ -159,12 +163,18 @@ class YoloOnnxDetector:
 
     def forward_raw(self, img: np.ndarray) -> tuple[np.ndarray, float, int, int]:
         """Letterbox + forward only. Returns (preds (N, 4+nc), scale, padx, pady)."""
+        t0 = time.perf_counter()
         if img.ndim == 2:
             img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
         canvas, scale, padx, pady = _letterbox(img, self.imgsz)
         blob = cv2.dnn.blobFromImage(canvas, 1 / 255.0, (self.imgsz, self.imgsz), swapRB=True)
+        t1 = time.perf_counter()
         self.net.setInput(blob)
         out = self.net.forward()                      # (1, 4+nc, N)
+        p = self.prof
+        p["pre_ms"] += (t1 - t0) * 1000
+        p["forward_ms"] += (time.perf_counter() - t1) * 1000
+        p["forwards"] += 1
         return out[0].T, scale, padx, pady
 
     # -- core detector ------------------------------------------------------------------
@@ -176,6 +186,14 @@ class YoloOnnxDetector:
     def decode(self, preds: np.ndarray, scale: float, padx: int, pady: int,
                hw: tuple[int, int]) -> list[Detection]:
         """Decode raw (N, 4+nc) predictions → per-class-NMS'd detections in original pixels."""
+        t0 = time.perf_counter()
+        try:
+            return self._decode(preds, scale, padx, pady, hw)
+        finally:
+            self.prof["post_ms"] += (time.perf_counter() - t0) * 1000
+
+    def _decode(self, preds: np.ndarray, scale: float, padx: int, pady: int,
+                hw: tuple[int, int]) -> list[Detection]:
         cxcywh = preds[:, :4]
         scores = preds[:, 4:]
         cls_ids = np.argmax(scores, axis=1)

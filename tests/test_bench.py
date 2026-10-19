@@ -57,6 +57,47 @@ def test_compare_report_has_both_comparisons(tmp_path):
     assert "(A → C)" in md and "1.50× faster p50" in md and "cheaper per survey-hour" in md
 
 
+def _parity_doc(dets: dict, manifest="m1") -> dict:
+    return {"workload": "parity", "input_manifest_sha256": manifest, "frames": dets}
+
+
+def test_parity_tolerates_float_noise_but_catches_real_differences():
+    a = {"f1": [{"cls": "ghost_gear", "bbox": [10, 10, 50, 50], "conf": 0.61, "tier": "review"}],
+         "f2": [{"cls": "wreck_debris", "bbox": [100, 100, 200, 180], "conf": 0.33, "tier": "review"}]}
+    noisy = {"f1": [{"cls": "ghost_gear", "bbox": [10, 11, 50, 50], "conf": 0.6131, "tier": "review"}],
+             "f2": [{"cls": "wreck_debris", "bbox": [100, 100, 200, 180], "conf": 0.3302, "tier": "review"}]}
+    p = compare.parity(_parity_doc(a), _parity_doc(noisy))
+    assert p["match"] == p["detections"] == 2 and p["extra"] == 0 and p["same_frames"]
+    tier_flip = json.loads(json.dumps(noisy)); tier_flip["f2"][0]["tier"] = "low_risk"
+    assert compare.parity(_parity_doc(a), _parity_doc(tier_flip))["match"] == 1
+    moved = json.loads(json.dumps(noisy)); moved["f1"][0]["bbox"] = [30, 30, 70, 70]
+    p2 = compare.parity(_parity_doc(a), _parity_doc(moved))
+    assert p2["missing"] == 1 and p2["extra"] == 1 and p2["first_problem"]
+    assert not compare.parity(_parity_doc(a), _parity_doc(noisy, "m2"))["same_frames"]
+
+
+def test_report_sections_survey_ops_parity_and_receipts(tmp_path):
+    r = _run("graviton_cool", 200, True, 0.0015)
+    r["ops_ms"] = {k: {"p50": v, "p95": v, "mean": v} for k, v in
+                   (("decode", 3), ("stage1", 5), ("dnn_pre", 4), ("dnn_forward", 170), ("dnn_post", 1),
+                    ("evidence", 12), ("render", 5))}
+    s = {**_run("graviton_cool", 200, True, 0.0015), "workload": "survey",
+         "config": {"recording": "DATASET/external/pingmapper_large/Test-Large-DS.DAT"},
+         "survey": {"sonar_duration_s": 3606.9, "frames": 280, "real_time_factor_median": 0.04,
+                    "real_time_factor_range": [0.039, 0.041], "compute_s_per_survey_hour": 144.0,
+                    "usd_per_survey_hour": 0.0068}}
+    for x, name in ((r, "graviton_cool__product.json"), (s, "graviton_cool__survey.json")):
+        (tmp_path / name).write_text(json.dumps(x))
+    (tmp_path / "graviton_cool__parity.json").write_text(json.dumps(_parity_doc({})))
+    (tmp_path / "graviton_cool__receipt.json").write_text("{}")
+    runs = compare.load(tmp_path)
+    assert [x["workload"] for x in runs] == ["product", "survey"]       # parity/receipt files are not runs
+    md = compare.report(runs, compare.load_parity(tmp_path), tmp_path)
+    assert "Where the time goes" in md and "85%" in md                  # 170 of 200 ms is the network
+    assert "A real survey, measured" in md and "Test-Large-DS.DAT" in md and "$0.00680" in md
+    assert "Machines" in md and "graviton_cool__receipt.json" in md
+
+
 def _run_all():
     import tempfile
     for name, fn in sorted(globals().items()):
