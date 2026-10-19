@@ -101,8 +101,20 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
   - Git Bash turned `/aws/service/…` into a Windows path, so `lib.sh` now sets `MSYS_NO_PATHCONV=1`.
 
   Checks: cfn-lint 0 findings. A change set on the failed stack adds the instance, alarms, dashboard
-  and stop schedule, and replaces nothing. The second apply (`EnableCdn=false`, rehearsal) was started; its
-  result is checked next. The vCPU quota is now 16 (approved).
+  and stop schedule, and replaces nothing. The vCPU quota is now 16 (approved).
+- **The rehearsal runs** (second apply, 14:20 UTC; c8g.large, stock Ubuntu 24.04 + stock OpenCV 5.0.0,
+  Python 3.12). The stack reached `UPDATE_COMPLETE`, and the instance signalled only once it was serving.
+  The 3 alarms are OK and the logs reach CloudWatch.
+  - On the box over SSM, **8/8 demo frames** were analysed in **386–415 ms** wall time per frame. The detector
+    (`cv2.dnn`) took ≈ 375 ms, Stage 1 ≈ 3 ms, Prove + Decide 1–7 ms. These are rehearsal numbers: not COOL,
+    and not the registered benchmark.
+  - The raw recording was fetched.
+  - The verifier says **NOT VERIFIED**, as designed: no product code, the rehearsal flag, and cv2 outside
+    `/opt/cool`.
+- **Bug found by the rehearsal:** the PKCS7 check failed on AWS's real signature. IMDS serves it in
+  76-column lines, and the verifier re-wrapped it at 64 without removing them, so openssl reported "bad end
+  line". Fixed. The real receipt now passes both AWS signatures. The test fixture now wraps like IMDS, and it
+  fails on the old code.
 - **Next (needs the owner):**
   - subscribe to COOL;
   - open an AWS Support case (Account and billing) to unlock CloudFront;
