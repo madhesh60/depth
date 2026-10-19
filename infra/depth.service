@@ -25,11 +25,18 @@ Environment=DEPTH_MCP_ALLOWED_HOSTS=*
 EnvironmentFile=-/etc/depth/mcp.env
 EnvironmentFile=-/etc/depth/admin.env
 EnvironmentFile=-/etc/depth/approver.env
-# behind CloudFront: the viewer's address is the first X-Forwarded-For hop (per-client rate limits)
+# CloudFront's X-Origin-Verify secret (only our distribution gets in) and the public https address
+EnvironmentFile=-/etc/depth/origin.env
+EnvironmentFile=-/etc/depth/public.env
+# behind CloudFront: the viewer's address is the LAST X-Forwarded-For hop, the one CloudFront appends
+# (per-client rate limits; the first hop is whatever the visitor sent)
 Environment=DEPTH_TRUST_PROXY=1
 ExecStart=@COOL_PY@ -m uvicorn src.dashboard.app:app --host 0.0.0.0 --port @PORT@ --workers 1 --timeout-keep-alive 30
 Restart=always
 RestartSec=3
+# the journal also goes to a file the CloudWatch agent ships (logrotate: /etc/logrotate.d/depth)
+StandardOutput=append:/var/log/depth/depth.log
+StandardError=inherit
 # light hardening
 NoNewPrivileges=true
 ProtectSystem=full

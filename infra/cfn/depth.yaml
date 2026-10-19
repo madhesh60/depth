@@ -1,0 +1,678 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  DEPTH live demo on AWS Graviton4 + COOL (OpenCV AI Competition 2026). One c8g instance launched from the
+  COOL Marketplace AMI runs the whole See-Prove-Decide-Act agent (OpenCV 5 from /opt/cool) behind CloudFront
+  HTTPS. Origin locked to our distribution (CloudFront prefix list + secret header), SSM-only access (no SSH),
+  encrypted storage, least-privilege IAM, CloudWatch logs/metrics/dashboard/alarms with email, a scheduled stop
+  after judging, and an equal-size benchmark fleet profile. Deploy: infra/deploy.sh. Remove: infra/teardown.sh.
+
+Metadata:
+  AWSToolsMetrics:
+    AWSAgentToolkit: aws-cloudformation@3
+  com.aws.cloudformation.Context:
+    why: >-
+      The competition's Best Use of COOL award requires COOL to execute the claimed core workload on
+      Graviton; the cheapest COOL-capable size (c8g.large) serves the demo, CloudFront gives free HTTPS,
+      and everything else is free-tier or cents. Budget guard: the account budget (depth-monthly, outside
+      this stack) plus the scheduled stop.
+    must:
+      - The instance MUST boot the COOL Marketplace AMI; the receipt at /api/cool proves it (AWS-signed).
+      - The origin MUST stay reachable only through this distribution (prefix list + X-Origin-Verify).
+      - No inbound SSH; administration is SSM Session Manager only.
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label: {default: COOL server}
+        Parameters: [CoolAmiId, InstanceType, RootDeviceName, RootVolumeGiB, GitRef]
+      - Label: {default: Network}
+        Parameters: [VpcId, SubnetId, CloudFrontPrefixListId, OriginSecretParam]
+      - Label: {default: Operations}
+        Parameters: [AlertEmail, StopAt]
+
+Parameters:
+  CoolAmiId:
+    Type: AWS::EC2::Image::Id
+    Description: COOL for Graviton4 AMI in this region (AWS Marketplace listing prodview-fdvbfiewzuehs).
+  InstanceType:
+    Type: String
+    Default: c8g.large
+    AllowedValues: [c8g.large, c8g.xlarge, c8g.2xlarge]
+    Description: COOL's Graviton4 listing supports c8g/m8g/r8g; c8g.large is the smallest. Resize = stack update (stop/start, same IP).
+  RootDeviceName:
+    Type: String
+    Default: /dev/sda1
+    AllowedPattern: ^/dev/[a-z0-9]+$
+    Description: The AMI's root device (deploy.sh reads it from the AMI).
+  RootVolumeGiB:
+    Type: Number
+    Default: 20
+    MinValue: 8
+    MaxValue: 100
+    Description: Encrypted gp3 root size; never smaller than the AMI snapshot (deploy.sh checks).
+  GitRef:
+    Type: String
+    AllowedPattern: ^[0-9a-f]{40}$
+    Description: The exact commit the server runs (reproducibility; deploy.sh passes the pushed HEAD).
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+  SubnetId:
+    Type: AWS::EC2::Subnet::Id
+    Description: A public subnet in an AZ that offers the instance type (deploy.sh picks one).
+  CloudFrontPrefixListId:
+    Type: String
+    AllowedPattern: ^pl-[0-9a-f]+$
+    Description: Managed prefix list com.amazonaws.global.cloudfront.origin-facing (deploy.sh looks it up).
+  OriginSecretParam:
+    Type: String
+    Default: /depth/origin-secret
+    AllowedPattern: ^/[A-Za-z0-9/_.-]+$
+    Description: Name of the SSM parameter holding the X-Origin-Verify value (deploy.sh creates it; never in the template).
+  AlertEmail:
+    Type: String
+    AllowedPattern: ^[^@\s]+@[^@\s]+\.[^@\s]+$
+    Description: Receives alarm emails (confirm the SNS subscription mail once).
+  StopAt:
+    Type: String
+    Default: "2026-11-10T06:30:00"
+    AllowedPattern: ^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$
+    Description: UTC time the instance is stopped automatically (after the 9 Nov judging date).
+
+Conditions:
+  IsUsEast1: !Equals [!Ref "AWS::Region", us-east-1]
+
+Resources:
+  # ---------------------------------------------------------------- storage
+  DataBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: Survey results mirrored by the server (results/), benchmark JSONs from the fleet (bench/), uploads (uploads/).
+        must:
+          - Never public; TLS only.
+          - Retained on stack delete; infra/teardown.sh empties and deletes it deliberately.
+      guard:
+        SuppressedRules:
+          - S3_BUCKET_LOGGING_ENABLED     # single-operator demo bucket, no public access; access logs need a 2nd bucket
+          - S3_BUCKET_REPLICATION_ENABLED # demo data, every result is reproducible from the repo
+          - S3_BUCKET_DEFAULT_LOCK_ENABLED
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault: {SSEAlgorithm: AES256}
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      OwnershipControls:
+        Rules: [{ObjectOwnership: BucketOwnerEnforced}]
+      VersioningConfiguration: {Status: Enabled}
+      LifecycleConfiguration:
+        Rules:
+          - Id: uploads-7d
+            Status: Enabled
+            Prefix: uploads/
+            ExpirationInDays: 7
+          - Id: results-30d
+            Status: Enabled
+            Prefix: results/
+            ExpirationInDays: 30
+          - Id: old-versions-7d
+            Status: Enabled
+            NoncurrentVersionExpiration: {NoncurrentDays: 7}
+          - Id: abort-multipart-1d
+            Status: Enabled
+            AbortIncompleteMultipartUpload: {DaysAfterInitiation: 1}
+      Tags:
+        - {Key: project, Value: depth}
+
+  DataBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref DataBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: "*"
+            Action: "s3:*"
+            Resource: [!GetAtt DataBucket.Arn, !Sub "${DataBucket.Arn}/*"]
+            Condition:
+              Bool: {aws:SecureTransport: "false"}
+
+  AppLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: The server's journal (uvicorn + one JSON line per analysed frame), shipped by the CloudWatch agent.
+      guard:
+        SuppressedRules:
+          - CLOUDWATCH_LOG_GROUP_ENCRYPTED   # encrypted at rest by CloudWatch Logs; a customer KMS key would cost $1/month
+    Properties:
+      LogGroupName: !Sub /depth/${AWS::StackName}/app
+      RetentionInDays: 14
+
+  # ---------------------------------------------------------------- identity
+  InstanceRole:
+    Type: AWS::IAM::Role
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: The COOL server's only credentials (IMDSv2, no keys on disk).
+        must:
+          - Least privilege - this bucket, this log group, this stack's signal, this one parameter.
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: {Service: ec2.amazonaws.com}
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub arn:${AWS::Partition}:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Policies:
+        - PolicyName: depth-server
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: BucketObjects
+                Effect: Allow
+                Action: [s3:GetObject, s3:PutObject]
+                Resource: !Sub "${DataBucket.Arn}/*"
+              - Sid: BucketList
+                Effect: Allow
+                Action: s3:ListBucket
+                Resource: !GetAtt DataBucket.Arn
+              - Sid: AppLogs
+                Effect: Allow
+                Action: [logs:CreateLogStream, logs:PutLogEvents, logs:DescribeLogStreams]
+                Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${AppLogGroup}:*
+              - Sid: AgentMetrics
+                Effect: Allow
+                Action: cloudwatch:PutMetricData
+                Resource: "*"
+                Condition:
+                  StringEquals: {cloudwatch:namespace: CWAgent}
+              - Sid: SignalReady
+                Effect: Allow
+                Action: cloudformation:SignalResource
+                Resource: !Ref AWS::StackId
+              - Sid: OriginSecret
+                Effect: Allow
+                Action: ssm:GetParameter
+                Resource: !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter${OriginSecretParam}
+      Tags:
+        - {Key: project, Value: depth}
+
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles: [!Ref InstanceRole]
+
+  BenchRole:
+    Type: AWS::IAM::Role
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: The self-terminating benchmark fleet (infra/bench_fleet.sh) - may only write results under bench/.
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: {Service: ec2.amazonaws.com}
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub arn:${AWS::Partition}:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Policies:
+        - PolicyName: depth-bench
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: WriteResults
+                Effect: Allow
+                Action: s3:PutObject
+                Resource: !Sub "${DataBucket.Arn}/bench/*"
+      Tags:
+        - {Key: project, Value: depth}
+
+  BenchInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles: [!Ref BenchRole]
+
+  # ---------------------------------------------------------------- network
+  WebSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: The origin accepts CloudFront's origin-facing ranges on 8000 and nothing else; egress is HTTPS/HTTP only.
+        must:
+          - Never add 0.0.0.0/0 ingress or port 22.
+    Properties:
+      GroupDescription: DEPTH origin - tcp 8000 from CloudFront origin-facing ranges only, no SSH
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 8000
+          ToPort: 8000
+          SourcePrefixListId: !Ref CloudFrontPrefixListId
+          Description: CloudFront origin-facing (com.amazonaws.global.cloudfront.origin-facing)
+      SecurityGroupEgress:
+        - {IpProtocol: tcp, FromPort: 443, ToPort: 443, CidrIp: 0.0.0.0/0, Description: "HTTPS out (GitHub, PyPI, S3, SSM, CloudWatch)"}
+        - {IpProtocol: tcp, FromPort: 80, ToPort: 80, CidrIp: 0.0.0.0/0, Description: "HTTP out (Ubuntu apt mirrors)"}
+      Tags:
+        - {Key: project, Value: depth}
+
+  BenchSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: DEPTH benchmark fleet - no inbound at all, HTTPS/HTTP out
+      VpcId: !Ref VpcId
+      SecurityGroupEgress:
+        - {IpProtocol: tcp, FromPort: 443, ToPort: 443, CidrIp: 0.0.0.0/0, Description: "HTTPS out"}
+        - {IpProtocol: tcp, FromPort: 80, ToPort: 80, CidrIp: 0.0.0.0/0, Description: "HTTP out (apt)"}
+      Tags:
+        - {Key: project, Value: depth}
+
+  ElasticIp:
+    Type: AWS::EC2::EIP
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: A fixed origin address, so a stop/start or a resize never breaks CloudFront's origin name. Costs the same as an auto-assigned public IPv4.
+    Properties:
+      Domain: vpc
+      Tags:
+        - {Key: project, Value: depth}
+
+  # ---------------------------------------------------------------- edge
+  Distribution:
+    Type: AWS::CloudFront::Distribution
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: Free HTTPS and edge caching for the static UI; the API passes through uncached.
+        must:
+          - Keep X-Origin-Verify; the server refuses requests without it (src/dashboard/origin_guard.py).
+          - /mcp must not be compressed (Streamable HTTP / SSE).
+      guard:
+        SuppressedRules:
+          - CLOUDFRONT_ACCESSLOGS_ENABLED    # metrics + the origin's JSON logs cover the demo; S3 access logs would need ACLs
+          - CLOUDFRONT_ORIGIN_FAILOVER_ENABLED
+          - CLOUDFRONT_ASSOCIATED_WITH_WAF   # WAF is $5+/month; the app enforces per-client rate limits
+          - CLOUDFRONT_CUSTOM_SSL_CERTIFICATE
+          - CLOUDFRONT_SNI_ENABLED
+          - CLOUDFRONT_ORIGIN_ACCESS_IDENTITY_ENABLED   # custom (EC2) origin, not S3
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Comment: !Sub DEPTH live demo - Graviton4 + COOL (${AWS::StackName})
+        HttpVersion: http2and3
+        IPV6Enabled: true
+        PriceClass: PriceClass_All        # the free tier covers every edge: judges in India/Asia get a near one
+        Origins:
+          - Id: cool-origin
+            DomainName: !Join
+              - ""
+              - - ec2-
+                - !Join ["-", !Split [".", !Ref ElasticIp]]
+                - !If [IsUsEast1, .compute-1.amazonaws.com, !Sub ".${AWS::Region}.compute.amazonaws.com"]
+            CustomOriginConfig:
+              HTTPPort: 8000
+              OriginProtocolPolicy: http-only
+              OriginReadTimeout: 60
+              OriginKeepaliveTimeout: 5
+            OriginCustomHeaders:
+              - HeaderName: X-Origin-Verify
+                HeaderValue: !Sub "{{resolve:ssm:${OriginSecretParam}}}"
+        DefaultCacheBehavior:
+          TargetOriginId: cool-origin
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods: [GET, HEAD, OPTIONS, PUT, POST, PATCH, DELETE]
+          CachedMethods: [GET, HEAD]
+          CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad          # Managed-CachingDisabled
+          OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac  # Managed-AllViewerExceptHostHeader
+          ResponseHeadersPolicyId: 67f7725c-6f97-4210-82d7-5512b31e9d03 # Managed-SecurityHeadersPolicy
+          Compress: true
+        CacheBehaviors:
+          - PathPattern: /mcp*
+            TargetOriginId: cool-origin
+            ViewerProtocolPolicy: https-only
+            AllowedMethods: [GET, HEAD, OPTIONS, PUT, POST, PATCH, DELETE]
+            CachedMethods: [GET, HEAD]
+            CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad
+            OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac
+            Compress: false
+          - PathPattern: /vendor/*
+            TargetOriginId: cool-origin
+            ViewerProtocolPolicy: redirect-to-https
+            AllowedMethods: [GET, HEAD]
+            CachedMethods: [GET, HEAD]
+            CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6          # Managed-CachingOptimized
+            ResponseHeadersPolicyId: 67f7725c-6f97-4210-82d7-5512b31e9d03
+            Compress: true
+          - PathPattern: /img/*
+            TargetOriginId: cool-origin
+            ViewerProtocolPolicy: redirect-to-https
+            AllowedMethods: [GET, HEAD]
+            CachedMethods: [GET, HEAD]
+            CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+            ResponseHeadersPolicyId: 67f7725c-6f97-4210-82d7-5512b31e9d03
+            Compress: true
+          - PathPattern: /samples/*
+            TargetOriginId: cool-origin
+            ViewerProtocolPolicy: redirect-to-https
+            AllowedMethods: [GET, HEAD]
+            CachedMethods: [GET, HEAD]
+            CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+            ResponseHeadersPolicyId: 67f7725c-6f97-4210-82d7-5512b31e9d03
+            Compress: true
+      Tags:
+        - {Key: project, Value: depth}
+
+  # ---------------------------------------------------------------- compute
+  LaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateData:
+        MetadataOptions:
+          HttpTokens: required            # IMDSv2 only
+          HttpEndpoint: enabled
+          HttpPutResponseHopLimit: 1
+        BlockDeviceMappings:
+          - DeviceName: !Ref RootDeviceName
+            Ebs:
+              VolumeSize: !Ref RootVolumeGiB
+              VolumeType: gp3
+              Encrypted: true
+              DeleteOnTermination: true
+        NetworkInterfaces:
+          - DeviceIndex: 0
+            SubnetId: !Ref SubnetId
+            Groups: [!Ref WebSecurityGroup]
+            AssociatePublicIpAddress: true   # egress for setup until the Elastic IP is attached
+            DeleteOnTermination: true
+        TagSpecifications:
+          - ResourceType: volume
+            Tags:
+              - {Key: project, Value: depth}
+              - {Key: Name, Value: !Sub "${AWS::StackName}-root"}
+
+  Instance:
+    Type: AWS::EC2::Instance
+    CreationPolicy:
+      ResourceSignal:
+        Count: 1
+        Timeout: PT40M
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: >-
+          The COOL server. It signals CloudFormation only after /api/health reports the model warm AND cv2 loaded
+          from /opt/cool, so CREATE_COMPLETE means the agent is serving on COOL.
+        must:
+          - ImageId must be the COOL Marketplace AMI (changing it replaces the instance).
+    Properties:
+      ImageId: !Ref CoolAmiId
+      InstanceType: !Ref InstanceType
+      IamInstanceProfile: !Ref InstanceProfile
+      LaunchTemplate:
+        LaunchTemplateId: !Ref LaunchTemplate
+        Version: !GetAtt LaunchTemplate.LatestVersionNumber
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          # DEPTH bootstrap (cloud-init, root): COOL server -> signal CloudFormation. Log: /var/log/depth-bootstrap.log
+          set -euo pipefail
+          exec > >(tee -a /var/log/depth-bootstrap.log) 2>&1
+          export HOME=/root DEBIAN_FRONTEND=noninteractive PATH="$PATH:/snap/bin"
+          TOKEN=$(curl -fsS -X PUT http://169.254.169.254/latest/api/token -H "X-aws-ec2-metadata-token-ttl-seconds: 600")
+          IID=$(curl -fsS -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/instance-id)
+          signal() { aws cloudformation signal-resource --region ${AWS::Region} --stack-name ${AWS::StackName} \
+                       --logical-resource-id Instance --unique-id "$IID" --status "$1" || true; }
+          trap 'signal FAILURE' ERR
+          snap wait system seed.loaded
+          command -v aws >/dev/null || snap install aws-cli --classic
+          # SSM Session Manager is the only way in: make sure the agent runs on this AMI
+          snap list amazon-ssm-agent >/dev/null 2>&1 || snap install amazon-ssm-agent --classic
+          systemctl enable --now snap.amazon-ssm-agent.amazon-ssm-agent.service || true
+          install -d -m 700 /etc/depth
+          SECRET=$(aws ssm get-parameter --region ${AWS::Region} --name '${OriginSecretParam}' --query Parameter.Value --output text)
+          [ -n "$SECRET" ] && [ "$SECRET" != None ]
+          ( umask 077; printf 'DEPTH_ORIGIN_SECRET=%s\n' "$SECRET" > /etc/depth/origin.env )
+          ( umask 022; printf 'DEPTH_PUBLIC_URL=https://%s\n' '${Distribution.DomainName}' > /etc/depth/public.env )
+          command -v git >/dev/null || { apt-get -o DPkg::Lock::Timeout=300 update -y && apt-get -o DPkg::Lock::Timeout=300 install -y git; }
+          [ -d /opt/depth/.git ] || git clone -q https://github.com/madhesh60/depth.git /opt/depth
+          export DEPTH_GIT_REF=${GitRef} DEPTH_S3_BUCKET=${DataBucket} DEPTH_LOG_GROUP=${AppLogGroup}
+          bash /opt/depth/infra/setup_cool_instance.sh
+          signal SUCCESS
+      Tags:
+        - {Key: Name, Value: !Sub "${AWS::StackName}-cool"}
+        - {Key: project, Value: depth}
+        - {Key: role, Value: demo}
+
+  EipAssociation:
+    Type: AWS::EC2::EIPAssociation
+    Properties:
+      AllocationId: !GetAtt ElasticIp.AllocationId
+      InstanceId: !Ref Instance
+
+  # ---------------------------------------------------------------- operations
+  AlertTopic:
+    Type: AWS::SNS::Topic
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: Email for the alarms below.
+      guard:
+        SuppressedRules:
+          - SNS_ENCRYPTED_KMS   # CloudWatch alarms cannot publish to a topic encrypted with aws/sns; alarm names only
+    Properties:
+      DisplayName: DEPTH alerts
+      Subscription:
+        - {Protocol: email, Endpoint: !Ref AlertEmail}
+      Tags:
+        - {Key: project, Value: depth}
+
+  SystemCheckAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: AWS hardware/host problem - recover the instance onto healthy hardware (same IP, same disk) and email.
+      Namespace: AWS/EC2
+      MetricName: StatusCheckFailed_System
+      Dimensions: [{Name: InstanceId, Value: !Ref Instance}]
+      Statistic: Maximum
+      Period: 60
+      EvaluationPeriods: 2
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      AlarmActions: [!Sub "arn:${AWS::Partition}:automate:${AWS::Region}:ec2:recover", !Ref AlertTopic]
+
+  InstanceCheckAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: The OS stopped answering - reboot the instance (systemd restarts DEPTH) and email.
+      Namespace: AWS/EC2
+      MetricName: StatusCheckFailed_Instance
+      Dimensions: [{Name: InstanceId, Value: !Ref Instance}]
+      Statistic: Maximum
+      Period: 60
+      EvaluationPeriods: 3
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      AlarmActions: [!Sub "arn:${AWS::Partition}:automate:${AWS::Region}:ec2:reboot", !Ref AlertTopic]
+
+  CpuHighAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Sustained CPU above 85 percent for 15 minutes - the demo size may be too small; email.
+      Namespace: AWS/EC2
+      MetricName: CPUUtilization
+      Dimensions: [{Name: InstanceId, Value: !Ref Instance}]
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 3
+      Threshold: 85
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlertTopic]
+
+  Edge5xxAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: IsUsEast1
+    Properties:
+      AlarmDescription: More than 5 percent of requests return 5xx at the edge for 10 minutes - email.
+      Namespace: AWS/CloudFront
+      MetricName: 5xxErrorRate
+      Dimensions:
+        - {Name: DistributionId, Value: !Ref Distribution}
+        - {Name: Region, Value: Global}
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 5
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlertTopic]
+
+  FramesMetric:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref AppLogGroup
+      FilterPattern: '{ $.evt = "frame" }'
+      MetricTransformations:
+        - {MetricNamespace: DEPTH, MetricName: frames, MetricValue: "1", Unit: Count}
+
+  Stage1Metric:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref AppLogGroup
+      FilterPattern: '{ $.evt = "frame" }'
+      MetricTransformations:
+        - {MetricNamespace: DEPTH, MetricName: stage1_ms, MetricValue: $.ms.stage1, Unit: Milliseconds}
+
+  SeeMetric:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref AppLogGroup
+      FilterPattern: '{ $.evt = "frame" }'
+      MetricTransformations:
+        - {MetricNamespace: DEPTH, MetricName: see_ms, MetricValue: $.ms.see, Unit: Milliseconds}
+
+  DecideMetric:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref AppLogGroup
+      FilterPattern: '{ $.evt = "frame" }'
+      MetricTransformations:
+        - {MetricNamespace: DEPTH, MetricName: prove_decide_ms, MetricValue: $.ms.prove_decide, Unit: Milliseconds}
+
+  WallMetric:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref AppLogGroup
+      FilterPattern: '{ $.evt = "frame" && $.kind = "analyze" }'
+      MetricTransformations:
+        - {MetricNamespace: DEPTH, MetricName: analyze_wall_ms, MetricValue: $.ms.wall, Unit: Milliseconds}
+
+  Dashboard:
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardName: !Sub ${AWS::StackName}-live
+      DashboardBody: !Sub
+        - |
+          {"widgets": [
+            {"type": "text", "x": 0, "y": 0, "width": 24, "height": 2, "properties": {"markdown":
+              "## DEPTH on Graviton4 + COOL - live\nhttps://${Domain} · COOL receipt: [/api/cool](https://${Domain}/api/cool) · per-stage latency from the server's JSON frame log (metric filters)"}},
+            {"type": "metric", "x": 0, "y": 2, "width": 12, "height": 6, "properties": {"title": "Per-stage latency p50 (ms)",
+              "region": "${AWS::Region}", "stat": "p50", "period": 300, "view": "timeSeries",
+              "metrics": [["DEPTH", "see_ms"], ["DEPTH", "stage1_ms"], ["DEPTH", "prove_decide_ms"], ["DEPTH", "analyze_wall_ms"]]}},
+            {"type": "metric", "x": 12, "y": 2, "width": 12, "height": 6, "properties": {"title": "Per-stage latency p95 (ms)",
+              "region": "${AWS::Region}", "stat": "p95", "period": 300, "view": "timeSeries",
+              "metrics": [["DEPTH", "see_ms"], ["DEPTH", "stage1_ms"], ["DEPTH", "prove_decide_ms"], ["DEPTH", "analyze_wall_ms"]]}},
+            {"type": "metric", "x": 0, "y": 8, "width": 8, "height": 6, "properties": {"title": "Frames analysed (per 5 min)",
+              "region": "${AWS::Region}", "stat": "Sum", "period": 300, "metrics": [["DEPTH", "frames"]]}},
+            {"type": "metric", "x": 8, "y": 8, "width": 8, "height": 6, "properties": {"title": "COOL server CPU % / memory %",
+              "region": "${AWS::Region}", "period": 300, "metrics": [["AWS/EC2", "CPUUtilization", "InstanceId", "${Instance}"],
+              ["CWAgent", "mem_used_percent", "InstanceId", "${Instance}"]]}},
+            {"type": "metric", "x": 16, "y": 8, "width": 8, "height": 6, "properties": {"title": "CloudFront requests / 5xx %",
+              "region": "us-east-1", "period": 300, "metrics": [["AWS/CloudFront", "Requests", "Region", "Global", "DistributionId", "${Distribution}", {"stat": "Sum"}],
+              ["AWS/CloudFront", "5xxErrorRate", "Region", "Global", "DistributionId", "${Distribution}", {"stat": "Average", "yAxis": "right"}]]}},
+            {"type": "log", "x": 0, "y": 14, "width": 24, "height": 6, "properties": {"title": "Latest analysed frames",
+              "region": "${AWS::Region}", "view": "table",
+              "query": "SOURCE '${AppLogGroup}' | filter evt = 'frame' | fields @timestamp, kind, frame, ms.stage1, ms.see, ms.prove_decide, ms.wall | sort @timestamp desc | limit 20"}}
+          ]}
+        - Domain: !GetAtt Distribution.DomainName
+
+  StopScheduleRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: {Service: scheduler.amazonaws.com}
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals: {aws:SourceAccount: !Ref AWS::AccountId}
+      Policies:
+        - PolicyName: stop-demo-instance
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: ec2:StopInstances
+                Resource: !Sub arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:instance/${Instance}
+      Tags:
+        - {Key: project, Value: depth}
+
+  StopSchedule:
+    Type: AWS::Scheduler::Schedule
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: Responsible cost control - the demo cannot keep billing after judging even if nobody remembers it.
+    Properties:
+      Description: Stop the DEPTH demo instance after judging (one-time)
+      ScheduleExpression: !Sub at(${StopAt})
+      ScheduleExpressionTimezone: UTC
+      FlexibleTimeWindow: {Mode: "OFF"}
+      State: ENABLED
+      Target:
+        Arn: arn:aws:scheduler:::aws-sdk:ec2:stopInstances
+        RoleArn: !GetAtt StopScheduleRole.Arn
+        Input: !Sub '{"InstanceIds": ["${Instance}"]}'
+        RetryPolicy: {MaximumRetryAttempts: 3}
+
+Outputs:
+  Url:
+    Description: The live demo (HTTPS)
+    Value: !Sub https://${Distribution.DomainName}
+  ReceiptUrl:
+    Description: COOL execution receipt - verify with python -m src.bench.verify_cool <Url>
+    Value: !Sub https://${Distribution.DomainName}/api/cool
+  DistributionId:
+    Description: CloudFront distribution
+    Value: !Ref Distribution
+  InstanceId:
+    Description: The COOL server (SSM - aws ssm start-session --target <id>)
+    Value: !Ref Instance
+  ElasticIp:
+    Description: Origin address (reachable only from CloudFront)
+    Value: !Ref ElasticIp
+  BucketName:
+    Description: Results / benchmarks bucket (retained on delete; teardown.sh removes it)
+    Value: !Ref DataBucket
+  LogGroup:
+    Description: Server log group
+    Value: !Ref AppLogGroup
+  DashboardUrl:
+    Description: CloudWatch dashboard
+    Value: !Sub https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards/dashboard/${AWS::StackName}-live
+  BenchInstanceProfile:
+    Description: Instance profile for infra/bench_fleet.sh
+    Value: !Ref BenchInstanceProfile
+  BenchSecurityGroup:
+    Description: No-ingress security group for infra/bench_fleet.sh
+    Value: !Ref BenchSecurityGroup
+  SubnetId:
+    Description: Subnet the stack uses (the fleet launches here too)
+    Value: !Ref SubnetId
