@@ -11,11 +11,15 @@ Sliding one-minute windows per (client, bucket). Buckets and default limits (req
     write    other POST / DELETE                           DEPTH_RATE_WRITE   (60)
 
 GET requests (pages, reports, OGC, health) are not limited. Over the limit → 429 with Retry-After.
-The client is the socket peer, or — only when ``DEPTH_TRUST_PROXY=1`` (behind CloudFront) — the first
-``X-Forwarded-For`` address. ``DEPTH_RATE_LIMITS=0`` switches limiting off (tests, local use).
+The client is the socket peer, or — only when ``DEPTH_TRUST_PROXY=1`` (behind CloudFront) — the LAST
+``X-Forwarded-For`` address: CloudFront appends the address it saw to whatever the viewer sent, so only
+the right-most entry cannot be forged (the first one is whatever a visitor chose to put there).
+``DEPTH_RATE_LIMITS=0`` switches limiting off (tests, local use); an operator request carrying
+``X-DEPTH-Admin: $DEPTH_ADMIN_TOKEN`` is not limited (the scripted load test, ``src/bench/load_test.py``).
 """
 from __future__ import annotations
 
+import hmac
 import os
 import threading
 import time
@@ -68,10 +72,18 @@ class RateLimiter:
 def client_of(scope: dict) -> str:
     if os.environ.get("DEPTH_TRUST_PROXY") == "1":
         xff = dict(scope.get("headers") or []).get(b"x-forwarded-for", b"").decode()
-        if xff:
-            return xff.split(",")[0].strip()
+        hops = [h.strip() for h in xff.split(",") if h.strip()]
+        if hops:
+            return hops[-1]                                  # the address the proxy itself appended
     peer = scope.get("client")
     return peer[0] if peer else "unknown"
+
+
+def is_operator(scope: dict) -> bool:
+    """``X-DEPTH-Admin`` equals ``$DEPTH_ADMIN_TOKEN`` (constant-time; False when no token is set)."""
+    want = os.environ.get("DEPTH_ADMIN_TOKEN", "")
+    got = dict(scope.get("headers") or []).get(b"x-depth-admin", b"").decode(errors="replace")
+    return bool(want) and hmac.compare_digest(got, want)
 
 
 class RateLimitMiddleware:
@@ -84,7 +96,7 @@ class RateLimitMiddleware:
         if scope["type"] != "http" or os.environ.get("DEPTH_RATE_LIMITS", "1") == "0":
             return await self.app(scope, receive, send)
         b = bucket_for(scope.get("method", "GET"), scope.get("path", ""))
-        if b is None:
+        if b is None or is_operator(scope):
             return await self.app(scope, receive, send)
         wait = self.limiter.check(client_of(scope), b)
         if wait:
