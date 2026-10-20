@@ -237,11 +237,11 @@ and every survey exports its decision log (`mission.trace.jsonl`).
 
 | Criterion | Weight | Where it's met |
 |---|---:|---|
-| OpenCV 5 + agent doing real work | 30% | Stage-1 bottom tracking / `cv2.remap` / luminance, `cv2.dnn` detect, re-look + CLAHE, thin-line shadow, `seamlessClone` copy-paste for training; the agent's tools *are* CV ops |
-| Orchestration & autonomy | 25% | stated objective; value-of-information tool use; analyst **and boat** budgets; stitching; repeat-sighting merge; routes; opposite-side re-survey planning (§3, §6) |
-| Task success | 20% | a recall promise that **held on unseen test** (≥ 79%, held at 81.1%); honest "no auto-confirm"; forecast held; effort study built, not yet run with people (§4, §6) |
-| Failure handling & human control | 15% | bounded LOW-RISK tier, budgeted REVIEW queue, human-approval gate, missed-pot labels, blinded audit (§5, §6) |
-| User experience | 10% | calm glass studio with five modes (Analyze · Survey · Study · Audit · Connect), purposeful type roles, and a guided 60-s demo: guarantee badges, evidence cards, seabed overlay, map + routes + re-survey passes, person-confirmed recovery route, 3D twin, live effort curve, downloads |
+| Substantive OpenCV 5 + agent | 30% | the agent's tools *are* OpenCV ops: Stage-1 bottom tracking, `cv2.remap` slant→ground, luminance; `cv2.dnn` detect; re-look + CLAHE; thin-line shadow; water-column check; sensor cross-check re-runs the OpenCV tracker on a conflict. **Proof OpenCV matters:** with Stage 1 removed, 151 of 222 pins leave their error circle (`docs/causal_trace.md`) |
+| Orchestration & autonomy | 25% | stated objective; value-of-information tool use; compute, analyst **and boat** budgets; **sensor cross-check** decides per chunk which sensor to trust, re-tracks and re-fits the range scale with no person (STUDY-16, on by default); stitching; repeat-sighting merge; routes; opposite-side re-survey planning (§3, §6) |
+| Task effectiveness | 20% | a recall promise that **held on unseen test** (≥ 79%, held at 81.1%); honest "no auto-confirm"; cross-check validated on a fresh 1-h recording (2 of 3 pre-registered checks passed; the failure is reported); effort study built, not yet run with people (§4, §6) |
+| Failure handling & human control | 15% | a failed tool never raises: the agent falls back to the detector score and sends the find to a person; failure drills you can run (`?simulate=tool_failed`, `tool_timeout`, `no_detection`); bounded LOW-RISK tier; budgeted REVIEW queue; **person-confirmed loop** re-plans routes from a named person's ✓ / ✕ / recovered; MCP agents can only *ask* (`approvals.py`); missed-pot labels; blinded audit (§5, §6) |
+| User experience | 10% | calm glass studio with five modes (Analyze · Survey · Study · Audit · Connect) and a guided 60-s demo: guarantee badges, evidence cards with the full trace, seabed overlay, map + routes + re-survey passes, person-confirmed recovery route, 3D twin, live effort curve, downloads |
 
 **Reproduce:** `python -m src.agentic.calibrate` (fit + verify + report + `calibration.json`) ·
 `python -m src.agentic.pipeline --survey <dir>` · `python -m src.agentic.effort` · `pytest -q`.

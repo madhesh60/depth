@@ -323,13 +323,29 @@ Weights: `python -m src.detection.fetch_model` (GitHub Release `exp003-v1`, SHA-
 
 ## 12. Code map
 
+**Read the code in this order** — it follows one frame from pixels to a person's decision:
+
+1. `src/cv_pipeline/canonical.py` — Stage 1: palette → luminance, orientation, bottom track, slant → ground.
+2. `src/agentic/agent.py` → `ReLookAgent.run_frame` — the agent. `_decide_calibrated` is the loop in four
+   named steps: `_voi_pass` (can more looking change the tier?) → `_budget` (the stop rule) →
+   `_relook_band` → `_physical_evidence` + `_decide_one` (belief → tier → handoff to a person).
+3. `src/agentic/tools.py` — the OpenCV tools the agent calls (`cv2.dnn` detect, re-look, CLAHE, shadow,
+   water column); each call returns a logged `AgentStep`.
+4. `src/agentic/policy.py` + `guarantees.py` — the calibrated tiers and the recall promise.
+5. `src/agentic/sensor_check.py` — the autonomous image-vs-sounder cross-check on raw recordings.
+6. `src/agentic/mission.py` → `plan_mission` / `apply_human` — stitching, routes, re-survey passes and the
+   person-confirmed re-plan.
+7. `src/agentic/incidents.py` — every failure the agent handles, and the drills (`?simulate=`).
+8. `src/dashboard/app.py` — the HTTP API the studio (`webui/app.js`) and the MCP / OGC channels use.
+
 ```
 src/cv_pipeline/  canonical.py (Stage 1) · humminbird.py (raw recordings, STUDY-14) · orientation.py ·
                   study_canonical.py (STUDY-08) · pipeline.py (retired ROI gate, STUDY-01 record)
 src/detection/    infer.py · calibration.py · evaluate.py · export_onnx.py · train.py ·
                   onboard_model.py · fetch_model.py · fp_audit.py · frames.py · error_analysis.py ·
                   tiled_infer.py · failure_gallery.py · seam.py · study_seam.py (11b) · study_scale_tta.py (13)
-src/agentic/      agent.py · perception.py · shadow.py · tools.py · evidence.py · policy.py ·
+src/agentic/      agent.py · perception.py · shadow.py · tools.py · evidence.py · policy.py · incidents.py ·
+                  sensor_check.py (STUDY-16) · active.py + evidence_model.py (STUDY-15) ·
                   guarantees.py · calibrate.py · geo.py · stitch.py · resurvey.py · mission.py ·
                   pipeline.py · approvals.py · feedback.py · study.py · effort.py · twin.py (3D twin) ·
                   provenance.py · brief.py (mission brief) · study_causal.py (STUDY-12) · types.py
