@@ -74,6 +74,21 @@ Current numbers, each with its split: README "At a glance" and
 
 ## 4. Session log
 
+### 2026-10-20 (sweep 67) — restructure: a minimal root, `docs/` and `docs/reports/`
+
+- **Root:** only README, LICENSE, CLAUDE.md, `pyproject.toml` and the three requirements files sit next to the
+  code folders. `AGENT.md` → `docs/proposal.md`; `architecture.md`, `experiments.md`, `progress.md` → `docs/`.
+- **Reports:** the 25 evaluation and study reports → `docs/reports/`, and every generator writes there (report
+  image links now `../img/`). Checked end to end: `study_scale_tta --report-only` rewrote its report at the
+  new path, byte-identical. The two calibration reports stay in `docs/`: their path is recorded in
+  `calibration.json`, whose SHA-256 is part of every provenance stamp, so that file was not touched.
+- **Removed** (git history keeps them, last at `9d37a68`): the working notes (`docs/notes/`), the v0 dataset
+  report, the EXP-001-era one-off scripts (`ablation_fp`, `error_analysis`, `fn_gallery`, `tiled_infer`,
+  `tune_coverage`, `cv_pipeline/benchmark`) and the retired contour pipeline's README.
+- Every link and path re-pointed (0 broken links, 0 missing paths); `ruff check .` clean; full suite: 225 passed.
+- **Not done:** sending the 9 model zips, the old local audit notes, `runs/` scratch and the 3.4 GB v1 tar to
+  the Recycle Bin was blocked by the session's permission mode; left for the owner to decide.
+
 ### 2026-10-20 (sweep 66) — repository cleanup: structure, commands, lint
 
 - **Structure:** the working notes moved to `docs/notes/` (the initial review, formerly `WINNING_REPORT.md`; the
