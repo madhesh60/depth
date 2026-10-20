@@ -1,0 +1,95 @@
+{
+  "what": "COOL execution receipt - check it: python -m src.bench.verify_cool <this server's URL>",
+  "created_utc": "2026-10-20T05:50:24Z",
+  "rehearsal": false,
+  "on_ec2": true,
+  "aws_signed_identity": {
+    "document": "{\n  \"accountId\" : \"202226602740\",\n  \"architecture\" : \"x86_64\",\n  \"availabilityZone\" : \"us-east-1a\",\n  \"billingProducts\" : null,\n  \"devpayProductCodes\" : null,\n  \"marketplaceProductCodes\" : null,\n  \"imageId\" : \"ami-02a9cdd4e98bc3c78\",\n  \"instanceId\" : \"i-0693946dcc3686b1b\",\n  \"instanceType\" : \"c8i.xlarge\",\n  \"kernelId\" : null,\n  \"pendingTime\" : \"2026-10-20T05:46:09Z\",\n  \"privateIp\" : \"172.31.0.100\",\n  \"ramdiskId\" : null,\n  \"region\" : \"us-east-1\",\n  \"version\" : \"2017-09-30\"\n}",
+    "signature": "PyY+TwqSDDKjjqLD2pnS9Sh7Bnpox2KDYUAKuxSXiFnsQ1zo293oFSLHMPswxX0vDEwBUHe3jCdj\n4uCt4n5EAxyn7Z5MQY6TDulQlDEwlQKX6ETgiZoAE6Qg24qD4hDiT6esZDY2sL988wFocIyTohNO\nk8yAv61iQvo6fIXhilA=",
+    "rsa2048": "MIAGCSqGSIb3DQEHAqCAMIACAQExDTALBglghkgBZQMEAgEwgAYJKoZIhvcNAQcBoIAkgASCAd57\nCiAgImFjY291bnRJZCIgOiAiMjAyMjI2NjAyNzQwIiwKICAiYXJjaGl0ZWN0dXJlIiA6ICJ4ODZf\nNjQiLAogICJhdmFpbGFiaWxpdHlab25lIiA6ICJ1cy1lYXN0LTFhIiwKICAiYmlsbGluZ1Byb2R1\nY3RzIiA6IG51bGwsCiAgImRldnBheVByb2R1Y3RDb2RlcyIgOiBudWxsLAogICJtYXJrZXRwbGFj\nZVByb2R1Y3RDb2RlcyIgOiBudWxsLAogICJpbWFnZUlkIiA6ICJhbWktMDJhOWNkZDRlOThiYzNj\nNzgiLAogICJpbnN0YW5jZUlkIiA6ICJpLTA2OTM5NDZkY2MzNjg2YjFiIiwKICAiaW5zdGFuY2VU\neXBlIiA6ICJjOGkueGxhcmdlIiwKICAia2VybmVsSWQiIDogbnVsbCwKICAicGVuZGluZ1RpbWUi\nIDogIjIwMjYtMTAtMjBUMDU6NDY6MDlaIiwKICAicHJpdmF0ZUlwIiA6ICIxNzIuMzEuMC4xMDAi\nLAogICJyYW1kaXNrSWQiIDogbnVsbCwKICAicmVnaW9uIiA6ICJ1cy1lYXN0LTEiLAogICJ2ZXJz\naW9uIiA6ICIyMDE3LTA5LTMwIgp9AAAAAAAAMYICKzCCAicCAQEwaTBcMQswCQYDVQQGEwJVUzEZ\nMBcGA1UECBMQV2FzaGluZ3RvbiBTdGF0ZTEQMA4GA1UEBxMHU2VhdHRsZTEgMB4GA1UEChMXQW1h\nem9uIFdlYiBTZXJ2aWNlcyBMTEMCCQCxacxAFVmkGTALBglghkgBZQMEAgGggZYwGAYJKoZIhvcN\nAQkDMQsGCSqGSIb3DQEHATAcBgkqhkiG9w0BCQUxDxcNMjYxMDIwMDU0NjEwWjArBgkqhkiG9w0B\nCTQxHjAcMAsGCWCGSAFlAwQCAaENBgkqhkiG9w0BAQsFADAvBgkqhkiG9w0BCQQxIgQgCUVLqb+u\nb/x80NUXe5xPJd3yST637y47jgo2Qy4dXoowDQYJKoZIhvcNAQELBQAEggEAdADwsXldqwf2pu4X\nrgmtG1BkRw7GR8OSq7WT88V42mVfw9pbTfQbGJQq3TuWxn0K1gpnOPvKujQ0sUvMJQskLut2fS/6\nUtxTgmQPFIXHro7FHYFIYDVc1fkA0/DpqOd1ag+qXjfoHkNGErSHZjNqAuFRxofjD/OdYx6BNJ4R\n/QHLiXY2+4WGt9EEfj3IqTQV8FqHuD5COqa9QSQ38As62jh/dLdWkI4QcKYwt5IV6X2d+qc0mcHv\nR+hYyJNiOyifxQqHQIzsQUz9EkCwt8bzRqISIBmG/J7uOy4h83McN0YW7I3dryCffF/vdFHJM8rs\nRkjwXlyVVrNSVoa3IPhPAwAAAAAAAA==",
+    "document_sha256": "09454ba9bfae6ffc7cd0d5177b9c4f25ddf2493eb7ef2e3b8e0a36432e1d5e8a",
+    "how_to_verify": "RSA-SHA256 'signature' or PKCS7 'rsa2048' against AWS's published certificate for the region (EC2 User Guide: verify-iid)"
+  },
+  "claims": {
+    "architecture": "x86_64",
+    "instance_type": "c8i.xlarge",
+    "image_id": "ami-02a9cdd4e98bc3c78",
+    "marketplace_product_codes": [],
+    "billing_products": null,
+    "region": "us-east-1",
+    "availability_zone": "us-east-1a",
+    "instance_id": "i-0693946dcc3686b1b",
+    "pending_time": "2026-10-20T05:46:09Z"
+  },
+  "process": {
+    "pid": 1857,
+    "python": "/opt/benchvenv/bin/python",
+    "cv2_file": "/opt/benchvenv/lib/python3.12/site-packages/cv2/__init__.py",
+    "cv2_from_cool": false,
+    "available": true,
+    "cool_root": "/opt/cool",
+    "opencv_libs": [
+      "/opt/benchvenv/lib/python3.12/site-packages/cv2/cv2.abi3.so",
+      "/opt/benchvenv/lib/python3.12/site-packages/opencv_python_headless.libs/libaom-a0d22147.so.3.14.1",
+      "/opt/benchvenv/lib/python3.12/site-packages/opencv_python_headless.libs/libavcodec-c4204469.so.62.28.101",
+      "/opt/benchvenv/lib/python3.12/site-packages/opencv_python_headless.libs/libavformat-4762a711.so.62.12.101",
+      "/opt/benchvenv/lib/python3.12/site-packages/opencv_python_headless.libs/libavif-43e630fc.so.16.4.2",
+      "/opt/benchvenv/lib/python3.12/site-packages/opencv_python_headless.libs/libavutil-befbbc48.so.60.26.101",
+      "/opt/benchvenv/lib/python3.12/site-packages/opencv_python_headless.libs/libcrypto-5409cd36.so.1.1.1k",
+      "/opt/benchvenv/lib/python3.12/site-packages/opencv_python_headless.libs/libdrm-b0291a67.so.2.4.0",
+      "/opt/benchvenv/lib/python3.12/site-packages/opencv_python_headless.libs/libgfortran-83c28eba.so.5.0.0",
+      "/opt/benchvenv/lib/python3.12/site-packages/opencv_python_headless.libs/libopenblasp-r0-59ffcd50.3.15.so",
+      "/opt/benchvenv/lib/python3.12/site-packages/opencv_python_headless.libs/libpng16-529cb57a.so.16.58.0",
+      "/opt/benchvenv/lib/python3.12/site-packages/opencv_python_headless.libs/libquadmath-2284e583.so.0.0.0",
+      "/opt/benchvenv/lib/python3.12/site-packages/opencv_python_headless.libs/libssl-81259c47.so.1.1.1k",
+      "/opt/benchvenv/lib/python3.12/site-packages/opencv_python_headless.libs/libswresample-2dfded3b.so.6.3.101",
+      "/opt/benchvenv/lib/python3.12/site-packages/opencv_python_headless.libs/libswscale-fe215b0b.so.9.5.101",
+      "/opt/benchvenv/lib/python3.12/site-packages/opencv_python_headless.libs/libvpx-4fb239ff.so.11.0.1"
+    ],
+    "opencv_outside_cool": [
+      "/opt/benchvenv/lib/python3.12/site-packages/cv2/cv2.abi3.so",
+      "/opt/benchvenv/lib/python3.12/site-packages/opencv_python_headless.libs/libaom-a0d22147.so.3.14.1",
+      "/opt/benchvenv/lib/python3.12/site-packages/opencv_python_headless.libs/libavcodec-c4204469.so.62.28.101",
+      "/opt/benchvenv/lib/python3.12/site-packages/opencv_python_headless.libs/libavformat-4762a711.so.62.12.101",
+      "/opt/benchvenv/lib/python3.12/site-packages/opencv_python_headless.libs/libavif-43e630fc.so.16.4.2",
+      "/opt/benchvenv/lib/python3.12/site-packages/opencv_python_headless.libs/libavutil-befbbc48.so.60.26.101",
+      "/opt/benchvenv/lib/python3.12/site-packages/opencv_python_headless.libs/libcrypto-5409cd36.so.1.1.1k",
+      "/opt/benchvenv/lib/python3.12/site-packages/opencv_python_headless.libs/libdrm-b0291a67.so.2.4.0",
+      "/opt/benchvenv/lib/python3.12/site-packages/opencv_python_headless.libs/libgfortran-83c28eba.so.5.0.0",
+      "/opt/benchvenv/lib/python3.12/site-packages/opencv_python_headless.libs/libopenblasp-r0-59ffcd50.3.15.so",
+      "/opt/benchvenv/lib/python3.12/site-packages/opencv_python_headless.libs/libpng16-529cb57a.so.16.58.0",
+      "/opt/benchvenv/lib/python3.12/site-packages/opencv_python_headless.libs/libquadmath-2284e583.so.0.0.0",
+      "/opt/benchvenv/lib/python3.12/site-packages/opencv_python_headless.libs/libssl-81259c47.so.1.1.1k",
+      "/opt/benchvenv/lib/python3.12/site-packages/opencv_python_headless.libs/libswresample-2dfded3b.so.6.3.101",
+      "/opt/benchvenv/lib/python3.12/site-packages/opencv_python_headless.libs/libswscale-fe215b0b.so.9.5.101",
+      "/opt/benchvenv/lib/python3.12/site-packages/opencv_python_headless.libs/libvpx-4fb239ff.so.11.0.1"
+    ],
+    "all_opencv_from_cool": false,
+    "cool_tree_libs": [],
+    "shared_objects_mapped": 43
+  },
+  "cool_build": {
+    "cool_root_exists": false,
+    "dpkg": [],
+    "python_dists": [
+      "numpy 2.2.6",
+      "opencv-python-headless 5.0.0.93"
+    ],
+    "cv2_version": "5.0.0",
+    "cv2_build_lines": [
+      "General configuration for OpenCV 5.0.0 =====================================",
+      "Version control:               5.0.0",
+      "Host:                        Linux 6.8.0-1059-azure x86_64",
+      "CPU/HW features:",
+      "Baseline:                    SSE SSE2 SSE3",
+      "Dispatched code generation:  SSE4_1 SSE4_2 AVX FP16 AVX2 AVX512_SKX",
+      "C++ Compiler:                /opt/rh/gcc-toolset-14/root/usr/bin/c++  (ver 14.2.1)",
+      "C Compiler:                  /opt/rh/gcc-toolset-14/root/usr/bin/cc",
+      "Extra dependencies:          avif /usr/local/lib/libpng.so /usr/lib64/libz.so /usr/lib64/libopenblasp.so dl m pthread rt",
+      "To be built:                 calib core dnn features flann geometry highgui imgcodecs imgproc objdetect photo ptcloud python3 stereo stitching video videoio",
+      "Parallel framework:            pthreads",
+      "Lapack:                      YES (OpenBLAS /usr/lib64/libopenblasp.so)",
+      "DNN MLAS:                    YES (SGEMM-only, vendored)"
+    ]
+  }
+}

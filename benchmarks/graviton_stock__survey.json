@@ -1,0 +1,138 @@
+{
+  "label": "graviton_stock",
+  "created": "2026-10-20T05:51:30",
+  "fingerprint": {
+    "opencv": {
+      "version": "5.0.0",
+      "cv2_file": "/opt/benchvenv/lib/python3.12/site-packages/cv2/__init__.py",
+      "is_cool_path": false,
+      "threads": 4,
+      "build_flags": {
+        "KleidiCV": true,
+        "NEON": true,
+        "IPP": false,
+        "TBB": false,
+        "OpenMP": false
+      }
+    },
+    "host": {
+      "machine": "aarch64",
+      "system": "Linux",
+      "python": "3.12.3",
+      "vcpus": 4,
+      "cpu_model": "0xd4f"
+    },
+    "ec2": {
+      "instance-type": "c8g.xlarge",
+      "ami-id": "ami-0d0f26d09ffd9af92",
+      "region": "us-east-1"
+    },
+    "cool": {
+      "attestation": {
+        "document_sha256": "42503f724795af56c2600482566d08264bc45cc296af2d2343a44e5534a6a731",
+        "architecture": "arm64",
+        "instance_type": "c8g.xlarge",
+        "image_id": "ami-0d0f26d09ffd9af92",
+        "marketplace_product_codes": [],
+        "billing_products": null,
+        "region": "us-east-1",
+        "availability_zone": "us-east-1a",
+        "instance_id": "i-01a77d58622610ecb",
+        "pending_time": "2026-10-20T05:46:21Z"
+      }
+    },
+    "git_commit": "9c190b3",
+    "model_sha256": "71339e99ad2b4b29f8d516967ce02e1fb5895434bf6f483cb517efe6750ba2f2",
+    "calibration_sha256": "84d4933eb9f6bfa9b6c9f9a30a29b6f889ca2c3d6f1304faf503fa3d800f4281"
+  },
+  "runtime": {
+    "threads": 4,
+    "engine": "auto"
+  },
+  "workload": "survey",
+  "config": {
+    "repeats": 3,
+    "recording": "DATASET/external/pingmapper_large/Test-Large-DS.DAT",
+    "recording_sha256": "7350f0dc3145d49ad9ced5325e7031dd17197c284b9ba9bd64fd77faaed9fe65",
+    "sonar_duration_s": 3606.9,
+    "threads_requested": 0
+  },
+  "stages_ms": {
+    "read": {
+      "p50": 1843.25,
+      "p95": 1862.28,
+      "mean": 1839.32
+    },
+    "sonogram_crosscheck": {
+      "p50": 5677.4,
+      "p95": 5739.98,
+      "mean": 5698.98
+    },
+    "agent_plan": {
+      "p50": 54171.18,
+      "p95": 54204.05,
+      "mean": 54177.67
+    },
+    "total": {
+      "p50": 61723.57,
+      "p95": 61776.61,
+      "mean": 61715.98
+    }
+  },
+  "repeats": [
+    {
+      "repeat": 1,
+      "wall_s": 61.82,
+      "cpu_util": 0.885,
+      "peak_rss_mb": 860.4,
+      "real_time_factor": 0.01713,
+      "read_ms": 1864.4,
+      "sonogram_crosscheck_ms": 5746.9,
+      "agent_plan_ms": 54171.2,
+      "total_ms": 61782.5,
+      "frames": 280,
+      "hazards": 64
+    },
+    {
+      "repeat": 2,
+      "wall_s": 61.68,
+      "cpu_util": 0.886,
+      "peak_rss_mb": 861.2,
+      "real_time_factor": 0.01709,
+      "read_ms": 1810.3,
+      "sonogram_crosscheck_ms": 5677.4,
+      "agent_plan_ms": 54154.1,
+      "total_ms": 61641.8,
+      "frames": 280,
+      "hazards": 64
+    },
+    {
+      "repeat": 3,
+      "wall_s": 61.76,
+      "cpu_util": 0.885,
+      "peak_rss_mb": 913.5,
+      "real_time_factor": 0.01711,
+      "read_ms": 1843.2,
+      "sonogram_crosscheck_ms": 5672.6,
+      "agent_plan_ms": 54207.7,
+      "total_ms": 61723.6,
+      "frames": 280,
+      "hazards": 64
+    }
+  ],
+  "survey": {
+    "sonar_duration_s": 3606.9,
+    "frames": 280,
+    "real_time_factor_median": 0.01711,
+    "real_time_factor_range": [
+      0.01709,
+      0.01713
+    ],
+    "compute_s_per_survey_hour": 61.6,
+    "usd_per_survey_hour": 0.002729
+  },
+  "cost": {
+    "price_hour_usd": 0.15952,
+    "price_source": "AWS Price List API 2026-10-20 (c8g.xlarge on-demand Linux us-east-1)"
+  }
+}

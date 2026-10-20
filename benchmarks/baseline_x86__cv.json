@@ -1,0 +1,152 @@
+{
+  "label": "baseline_x86",
+  "created": "2026-10-20T05:50:24",
+  "fingerprint": {
+    "opencv": {
+      "version": "5.0.0",
+      "cv2_file": "/opt/benchvenv/lib/python3.12/site-packages/cv2/__init__.py",
+      "is_cool_path": false,
+      "threads": 4,
+      "build_flags": {
+        "KleidiCV": false,
+        "NEON": false,
+        "IPP": true,
+        "TBB": false,
+        "OpenMP": false
+      }
+    },
+    "host": {
+      "machine": "x86_64",
+      "system": "Linux",
+      "python": "3.12.3",
+      "vcpus": 4,
+      "cpu_model": "Intel(R) Xeon(R) 6975P-C"
+    },
+    "ec2": {
+      "instance-type": "c8i.xlarge",
+      "ami-id": "ami-02a9cdd4e98bc3c78",
+      "region": "us-east-1"
+    },
+    "cool": {
+      "attestation": {
+        "document_sha256": "09454ba9bfae6ffc7cd0d5177b9c4f25ddf2493eb7ef2e3b8e0a36432e1d5e8a",
+        "architecture": "x86_64",
+        "instance_type": "c8i.xlarge",
+        "image_id": "ami-02a9cdd4e98bc3c78",
+        "marketplace_product_codes": [],
+        "billing_products": null,
+        "region": "us-east-1",
+        "availability_zone": "us-east-1a",
+        "instance_id": "i-0693946dcc3686b1b",
+        "pending_time": "2026-10-20T05:46:09Z"
+      }
+    },
+    "git_commit": "9c190b3",
+    "model_sha256": "71339e99ad2b4b29f8d516967ce02e1fb5895434bf6f483cb517efe6750ba2f2",
+    "calibration_sha256": "84d4933eb9f6bfa9b6c9f9a30a29b6f889ca2c3d6f1304faf503fa3d800f4281"
+  },
+  "runtime": {
+    "threads": 4,
+    "engine": "auto"
+  },
+  "workload": "cv",
+  "config": {
+    "n": 120,
+    "repeats": 3,
+    "warmup": 5,
+    "threads_requested": 0,
+    "frames_dir": "webui/samples",
+    "unique_frames": 8,
+    "input_manifest_sha256": "25376f6e21f70bb04798ac04da927e48544d3889f2672f8e0ce6045e141f8264"
+  },
+  "stages_ms": {
+    "decode": {
+      "p50": 1.71,
+      "p95": 1.75,
+      "mean": 1.71
+    },
+    "stage1": {
+      "p50": 4.79,
+      "p95": 4.95,
+      "mean": 4.74
+    },
+    "dnn_pre": {
+      "p50": 1.14,
+      "p95": 1.22,
+      "mean": 1.16
+    },
+    "render": {
+      "p50": 1.32,
+      "p95": 1.35,
+      "mean": 1.32
+    },
+    "total": {
+      "p50": 8.96,
+      "p95": 9.15,
+      "mean": 8.92
+    }
+  },
+  "ops_ms": null,
+  "forwards_per_frame": null,
+  "repeats": [
+    {
+      "repeat": 1,
+      "wall_s": 1.07,
+      "fps": 112.03,
+      "cpu_util": 0.298,
+      "peak_rss_mb": 406.3,
+      "total_ms": {
+        "p50": 8.93,
+        "p95": 9.14,
+        "mean": 8.91
+      }
+    },
+    {
+      "repeat": 2,
+      "wall_s": 1.07,
+      "fps": 112.14,
+      "cpu_util": 0.298,
+      "peak_rss_mb": 876.3,
+      "total_ms": {
+        "p50": 8.94,
+        "p95": 9.12,
+        "mean": 8.9
+      }
+    },
+    {
+      "repeat": 3,
+      "wall_s": 1.08,
+      "fps": 111.35,
+      "cpu_util": 0.297,
+      "peak_rss_mb": 877.5,
+      "total_ms": {
+        "p50": 9.0,
+        "p95": 9.17,
+        "mean": 8.96
+      }
+    }
+  ],
+  "throughput_fps": 112.03,
+  "throughput_fps_range": [
+    111.35,
+    112.14
+  ],
+  "cpu_util": 0.298,
+  "peak_rss_mb": 406.3,
+  "cost": {
+    "price_hour_usd": 0.18742,
+    "price_source": "AWS Price List API 2026-10-20 (c8i.xlarge on-demand Linux us-east-1)",
+    "usd_per_1k_frames": 0.000464,
+    "survey_hour": {
+      "frames": 168.8,
+      "compute_s": 1.51,
+      "real_time_factor": 0.00042,
+      "usd": 7.8e-05
+    },
+    "assumptions": {
+      "ping_rate_hz": 15.0,
+      "pings_per_frame": 640,
+      "channels": 2
+    }
+  }
+}

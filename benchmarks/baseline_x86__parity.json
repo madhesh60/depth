@@ -1,0 +1,444 @@
+{
+  "label": "baseline_x86",
+  "created": "2026-10-20T05:50:24",
+  "fingerprint": {
+    "opencv": {
+      "version": "5.0.0",
+      "cv2_file": "/opt/benchvenv/lib/python3.12/site-packages/cv2/__init__.py",
+      "is_cool_path": false,
+      "threads": 4,
+      "build_flags": {
+        "KleidiCV": false,
+        "NEON": false,
+        "IPP": true,
+        "TBB": false,
+        "OpenMP": false
+      }
+    },
+    "host": {
+      "machine": "x86_64",
+      "system": "Linux",
+      "python": "3.12.3",
+      "vcpus": 4,
+      "cpu_model": "Intel(R) Xeon(R) 6975P-C"
+    },
+    "ec2": {
+      "instance-type": "c8i.xlarge",
+      "ami-id": "ami-02a9cdd4e98bc3c78",
+      "region": "us-east-1"
+    },
+    "cool": {
+      "attestation": {
+        "document_sha256": "09454ba9bfae6ffc7cd0d5177b9c4f25ddf2493eb7ef2e3b8e0a36432e1d5e8a",
+        "architecture": "x86_64",
+        "instance_type": "c8i.xlarge",
+        "image_id": "ami-02a9cdd4e98bc3c78",
+        "marketplace_product_codes": [],
+        "billing_products": null,
+        "region": "us-east-1",
+        "availability_zone": "us-east-1a",
+        "instance_id": "i-0693946dcc3686b1b",
+        "pending_time": "2026-10-20T05:46:09Z"
+      }
+    },
+    "git_commit": "9c190b3",
+    "model_sha256": "71339e99ad2b4b29f8d516967ce02e1fb5895434bf6f483cb517efe6750ba2f2",
+    "calibration_sha256": "84d4933eb9f6bfa9b6c9f9a30a29b6f889ca2c3d6f1304faf503fa3d800f4281"
+  },
+  "runtime": {
+    "threads": 4,
+    "engine": "auto"
+  },
+  "workload": "parity",
+  "input_manifest_sha256": "25376f6e21f70bb04798ac04da927e48544d3889f2672f8e0ce6045e141f8264",
+  "frames": {
+    "Rec9_wcp_ss_port_00010": [
+      {
+        "cls": "ghost_gear",
+        "bbox": [
+          73,
+          219,
+          108,
+          244
+        ],
+        "conf": 0.56716,
+        "tier": "review",
+        "evidence_score": 0.5672
+      },
+      {
+        "cls": "ghost_gear",
+        "bbox": [
+          437,
+          514,
+          466,
+          540
+        ],
+        "conf": 0.13749,
+        "tier": "review",
+        "evidence_score": 0.1375
+      }
+    ],
+    "Rec9_wcp_ss_port_00011": [
+      {
+        "cls": "ghost_gear",
+        "bbox": [
+          279,
+          597,
+          317,
+          639
+        ],
+        "conf": 0.29653,
+        "tier": "review",
+        "evidence_score": 0.2965
+      },
+      {
+        "cls": "ghost_gear",
+        "bbox": [
+          184,
+          36,
+          245,
+          89
+        ],
+        "conf": 0.27314,
+        "tier": "review",
+        "evidence_score": 0.2731
+      },
+      {
+        "cls": "ghost_gear",
+        "bbox": [
+          435,
+          469,
+          464,
+          507
+        ],
+        "conf": 0.14755,
+        "tier": "review",
+        "evidence_score": 0.1475
+      },
+      {
+        "cls": "ghost_gear",
+        "bbox": [
+          1,
+          436,
+          52,
+          491
+        ],
+        "conf": 0.11433,
+        "tier": "review",
+        "evidence_score": 0.1143
+      },
+      {
+        "cls": "ghost_gear",
+        "bbox": [
+          420,
+          466,
+          475,
+          515
+        ],
+        "conf": 0.10747,
+        "tier": "review",
+        "evidence_score": 0.1075
+      },
+      {
+        "cls": "ghost_gear",
+        "bbox": [
+          207,
+          40,
+          222,
+          54
+        ],
+        "conf": 0.07323,
+        "tier": "review",
+        "evidence_score": 0.0732
+      },
+      {
+        "cls": "ghost_gear",
+        "bbox": [
+          199,
+          38,
+          232,
+          74
+        ],
+        "conf": 0.05847,
+        "tier": "low_risk",
+        "evidence_score": 0.0585
+      }
+    ],
+    "Rec9_wcp_ss_port_00012": [
+      {
+        "cls": "ghost_gear",
+        "bbox": [
+          497,
+          242,
+          524,
+          266
+        ],
+        "conf": 0.70809,
+        "tier": "review",
+        "evidence_score": 0.7081
+      },
+      {
+        "cls": "ghost_gear",
+        "bbox": [
+          394,
+          329,
+          418,
+          350
+        ],
+        "conf": 0.5772,
+        "tier": "review",
+        "evidence_score": 0.5772
+      },
+      {
+        "cls": "ghost_gear",
+        "bbox": [
+          374,
+          327,
+          425,
+          352
+        ],
+        "conf": 0.06952,
+        "tier": "review",
+        "evidence_score": 0.0695
+      },
+      {
+        "cls": "ghost_gear",
+        "bbox": [
+          230,
+          555,
+          250,
+          568
+        ],
+        "conf": 0.05627,
+        "tier": "low_risk",
+        "evidence_score": 0.0563
+      }
+    ],
+    "Rec9_wcp_ss_port_00013": [
+      {
+        "cls": "ghost_gear",
+        "bbox": [
+          604,
+          501,
+          634,
+          534
+        ],
+        "conf": 0.3207,
+        "tier": "review",
+        "evidence_score": 0.3207
+      },
+      {
+        "cls": "ghost_gear",
+        "bbox": [
+          584,
+          494,
+          639,
+          545
+        ],
+        "conf": 0.09598,
+        "tier": "review",
+        "evidence_score": 0.096
+      }
+    ],
+    "Rec9_wcp_ss_port_00014": [
+      {
+        "cls": "ghost_gear",
+        "bbox": [
+          513,
+          99,
+          535,
+          125
+        ],
+        "conf": 0.68509,
+        "tier": "review",
+        "evidence_score": 0.6851
+      },
+      {
+        "cls": "ghost_gear",
+        "bbox": [
+          108,
+          428,
+          130,
+          446
+        ],
+        "conf": 0.56613,
+        "tier": "review",
+        "evidence_score": 0.5661
+      },
+      {
+        "cls": "ghost_gear",
+        "bbox": [
+          0,
+          512,
+          15,
+          526
+        ],
+        "conf": 0.36981,
+        "tier": "review",
+        "evidence_score": 0.3698
+      },
+      {
+        "cls": "ghost_gear",
+        "bbox": [
+          460,
+          510,
+          477,
+          522
+        ],
+        "conf": 0.10946,
+        "tier": "review",
+        "evidence_score": 0.1095
+      },
+      {
+        "cls": "ghost_gear",
+        "bbox": [
+          50,
+          234,
+          61,
+          244
+        ],
+        "conf": 0.10381,
+        "tier": "review",
+        "evidence_score": 0.1038
+      },
+      {
+        "cls": "ghost_gear",
+        "bbox": [
+          493,
+          94,
+          560,
+          171
+        ],
+        "conf": 0.09525,
+        "tier": "review",
+        "evidence_score": 0.0953
+      },
+      {
+        "cls": "ghost_gear",
+        "bbox": [
+          490,
+          551,
+          513,
+          564
+        ],
+        "conf": 0.05472,
+        "tier": "low_risk",
+        "evidence_score": 0.0547
+      }
+    ],
+    "Rec9_wcp_ss_port_00015": [
+      {
+        "cls": "ghost_gear",
+        "bbox": [
+          174,
+          549,
+          214,
+          577
+        ],
+        "conf": 0.60771,
+        "tier": "review",
+        "evidence_score": 0.6077
+      }
+    ],
+    "Rec9_wcp_ss_star_00005": [
+      {
+        "cls": "ghost_gear",
+        "bbox": [
+          313,
+          595,
+          339,
+          625
+        ],
+        "conf": 0.38142,
+        "tier": "review",
+        "evidence_score": 0.3814
+      },
+      {
+        "cls": "ghost_gear",
+        "bbox": [
+          105,
+          438,
+          158,
+          479
+        ],
+        "conf": 0.25847,
+        "tier": "review",
+        "evidence_score": 0.2585
+      },
+      {
+        "cls": "ghost_gear",
+        "bbox": [
+          294,
+          590,
+          353,
+          633
+        ],
+        "conf": 0.08694,
+        "tier": "review",
+        "evidence_score": 0.0869
+      },
+      {
+        "cls": "ghost_gear",
+        "bbox": [
+          115,
+          444,
+          147,
+          471
+        ],
+        "conf": 0.07877,
+        "tier": "review",
+        "evidence_score": 0.0788
+      }
+    ],
+    "Rec9_wcp_ss_star_00006": [
+      {
+        "cls": "ghost_gear",
+        "bbox": [
+          288,
+          604,
+          306,
+          630
+        ],
+        "conf": 0.19905,
+        "tier": "review",
+        "evidence_score": 0.199
+      },
+      {
+        "cls": "ghost_gear",
+        "bbox": [
+          198,
+          415,
+          239,
+          461
+        ],
+        "conf": 0.15938,
+        "tier": "review",
+        "evidence_score": 0.1594
+      },
+      {
+        "cls": "ghost_gear",
+        "bbox": [
+          272,
+          599,
+          323,
+          638
+        ],
+        "conf": 0.13128,
+        "tier": "review",
+        "evidence_score": 0.1313
+      },
+      {
+        "cls": "ghost_gear",
+        "bbox": [
+          181,
+          414,
+          261,
+          471
+        ],
+        "conf": 0.07718,
+        "tier": "review",
+        "evidence_score": 0.0772
+      }
+    ]
+  }
+}

@@ -1,0 +1,100 @@
+{
+  "what": "COOL execution receipt - check it: python -m src.bench.verify_cool <this server's URL>",
+  "created_utc": "2026-10-20T05:53:02Z",
+  "rehearsal": false,
+  "on_ec2": true,
+  "aws_signed_identity": {
+    "document": "{\n  \"accountId\" : \"202226602740\",\n  \"architecture\" : \"arm64\",\n  \"availabilityZone\" : \"us-east-1a\",\n  \"billingProducts\" : null,\n  \"devpayProductCodes\" : null,\n  \"marketplaceProductCodes\" : null,\n  \"imageId\" : \"ami-0d0f26d09ffd9af92\",\n  \"instanceId\" : \"i-01a77d58622610ecb\",\n  \"instanceType\" : \"c8g.xlarge\",\n  \"kernelId\" : null,\n  \"pendingTime\" : \"2026-10-20T05:46:21Z\",\n  \"privateIp\" : \"172.31.0.45\",\n  \"ramdiskId\" : null,\n  \"region\" : \"us-east-1\",\n  \"version\" : \"2017-09-30\"\n}",
+    "signature": "DeAt085dH2jpH2eX+vzdINCuiNuM1s/XjtYOgLqfXT2ZkQhIB561P2iKJNtTm0qri15ao61u7gG8\nGiWnlN2IYaVpfnyQo560cXsfJMvx/CnkhYN5tMsAVxz4Ox2LkgE4AelU4cjaZxblp+EswFyA8sac\nqDbYSiX44T3SmTDEZKg=",
+    "rsa2048": "MIAGCSqGSIb3DQEHAqCAMIACAQExDTALBglghkgBZQMEAgEwgAYJKoZIhvcNAQcBoIAkgASCAdx7\nCiAgImFjY291bnRJZCIgOiAiMjAyMjI2NjAyNzQwIiwKICAiYXJjaGl0ZWN0dXJlIiA6ICJhcm02\nNCIsCiAgImF2YWlsYWJpbGl0eVpvbmUiIDogInVzLWVhc3QtMWEiLAogICJiaWxsaW5nUHJvZHVj\ndHMiIDogbnVsbCwKICAiZGV2cGF5UHJvZHVjdENvZGVzIiA6IG51bGwsCiAgIm1hcmtldHBsYWNl\nUHJvZHVjdENvZGVzIiA6IG51bGwsCiAgImltYWdlSWQiIDogImFtaS0wZDBmMjZkMDlmZmQ5YWY5\nMiIsCiAgImluc3RhbmNlSWQiIDogImktMDFhNzdkNTg2MjI2MTBlY2IiLAogICJpbnN0YW5jZVR5\ncGUiIDogImM4Zy54bGFyZ2UiLAogICJrZXJuZWxJZCIgOiBudWxsLAogICJwZW5kaW5nVGltZSIg\nOiAiMjAyNi0xMC0yMFQwNTo0NjoyMVoiLAogICJwcml2YXRlSXAiIDogIjE3Mi4zMS4wLjQ1IiwK\nICAicmFtZGlza0lkIiA6IG51bGwsCiAgInJlZ2lvbiIgOiAidXMtZWFzdC0xIiwKICAidmVyc2lv\nbiIgOiAiMjAxNy0wOS0zMCIKfQAAAAAAADGCAiswggInAgEBMGkwXDELMAkGA1UEBhMCVVMxGTAX\nBgNVBAgTEFdhc2hpbmd0b24gU3RhdGUxEDAOBgNVBAcTB1NlYXR0bGUxIDAeBgNVBAoTF0FtYXpv\nbiBXZWIgU2VydmljZXMgTExDAgkAsWnMQBVZpBkwCwYJYIZIAWUDBAIBoIGWMBgGCSqGSIb3DQEJ\nAzELBgkqhkiG9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTI2MTAyMDA1NDYyMlowKwYJKoZIhvcNAQk0\nMR4wHDALBglghkgBZQMEAgGhDQYJKoZIhvcNAQELBQAwLwYJKoZIhvcNAQkEMSIEIEJQP3JHla9W\nwmAEglZtCCZLxFzClq8tI0OkTlU0pqcxMA0GCSqGSIb3DQEBCwUABIIBAEbTqJvayS9WB2EYlKnC\nmtADFxsyMn4OI1NxwZP+d4Fn/cvVsYhs1oh8SMyAUVwI27e0CbDNBsrwbcV/VMh5Gf9hgFTJFGBO\nK/hOJ5ZKnLU4CzFj8wOFNqYLNUmP7fmqdjCRObHVMt0ngtBqzSzGKZ6T8XZtiv7Dzej2lQItzqzv\nh2Dc2jE6ncCVHpfP1L5fI8qHk4YsRJ7agxfj1FonDyZB1Hok+9604ZAt4sC8IyJlyIeQr82Q6UT7\nNCP1NOCJ/BDAcAMFBoCkVfFp9G9EOBn9UZxSxiZR8lN1Qhe2HI3MWx4h7yF1hkDFCTqdU3OBrm7g\nEtgaBkAtuRWSNkNI05kAAAAAAAA=",
+    "document_sha256": "42503f724795af56c2600482566d08264bc45cc296af2d2343a44e5534a6a731",
+    "how_to_verify": "RSA-SHA256 'signature' or PKCS7 'rsa2048' against AWS's published certificate for the region (EC2 User Guide: verify-iid)"
+  },
+  "claims": {
+    "architecture": "arm64",
+    "instance_type": "c8g.xlarge",
+    "image_id": "ami-0d0f26d09ffd9af92",
+    "marketplace_product_codes": [],
+    "billing_products": null,
+    "region": "us-east-1",
+    "availability_zone": "us-east-1a",
+    "instance_id": "i-01a77d58622610ecb",
+    "pending_time": "2026-10-20T05:46:21Z"
+  },
+  "process": {
+    "pid": 4758,
+    "python": "/opt/benchvenv/bin/python",
+    "cv2_file": "/opt/benchvenv/lib/python3.12/site-packages/cv2/__init__.py",
+    "cv2_from_cool": false,
+    "available": true,
+    "cool_root": "/opt/cool",
+    "opencv_libs": [
+      "/opt/benchvenv/lib/python3.12/site-packages/cv2/cv2.abi3.so",
+      "/opt/benchvenv/lib/python3.12/site-packages/opencv_python_headless.libs/libaom-f737b1d9.so.3.14.1",
+      "/opt/benchvenv/lib/python3.12/site-packages/opencv_python_headless.libs/libavcodec-72930352.so.62.28.101",
+      "/opt/benchvenv/lib/python3.12/site-packages/opencv_python_headless.libs/libavformat-3d8eec66.so.62.12.101",
+      "/opt/benchvenv/lib/python3.12/site-packages/opencv_python_headless.libs/libavif-96469e55.so.16.4.2",
+      "/opt/benchvenv/lib/python3.12/site-packages/opencv_python_headless.libs/libavutil-8f5e7298.so.60.26.101",
+      "/opt/benchvenv/lib/python3.12/site-packages/opencv_python_headless.libs/libcrypto-6aa7cfbd.so.1.1.1k",
+      "/opt/benchvenv/lib/python3.12/site-packages/opencv_python_headless.libs/libdrm-7ea97f77.so.2.4.0",
+      "/opt/benchvenv/lib/python3.12/site-packages/opencv_python_headless.libs/libgfortran-e1b7dfc8.so.5.0.0",
+      "/opt/benchvenv/lib/python3.12/site-packages/opencv_python_headless.libs/libopenblasp-r0-e3ea6fd1.3.15.so",
+      "/opt/benchvenv/lib/python3.12/site-packages/opencv_python_headless.libs/libpng16-5dd41f4d.so.16.58.0",
+      "/opt/benchvenv/lib/python3.12/site-packages/opencv_python_headless.libs/libssl-f4f30056.so.1.1.1k",
+      "/opt/benchvenv/lib/python3.12/site-packages/opencv_python_headless.libs/libswresample-4e764699.so.6.3.101",
+      "/opt/benchvenv/lib/python3.12/site-packages/opencv_python_headless.libs/libswscale-9061c2fd.so.9.5.101",
+      "/opt/benchvenv/lib/python3.12/site-packages/opencv_python_headless.libs/libvpx-ac54ea65.so.11.0.1"
+    ],
+    "opencv_outside_cool": [
+      "/opt/benchvenv/lib/python3.12/site-packages/cv2/cv2.abi3.so",
+      "/opt/benchvenv/lib/python3.12/site-packages/opencv_python_headless.libs/libaom-f737b1d9.so.3.14.1",
+      "/opt/benchvenv/lib/python3.12/site-packages/opencv_python_headless.libs/libavcodec-72930352.so.62.28.101",
+      "/opt/benchvenv/lib/python3.12/site-packages/opencv_python_headless.libs/libavformat-3d8eec66.so.62.12.101",
+      "/opt/benchvenv/lib/python3.12/site-packages/opencv_python_headless.libs/libavif-96469e55.so.16.4.2",
+      "/opt/benchvenv/lib/python3.12/site-packages/opencv_python_headless.libs/libavutil-8f5e7298.so.60.26.101",
+      "/opt/benchvenv/lib/python3.12/site-packages/opencv_python_headless.libs/libcrypto-6aa7cfbd.so.1.1.1k",
+      "/opt/benchvenv/lib/python3.12/site-packages/opencv_python_headless.libs/libdrm-7ea97f77.so.2.4.0",
+      "/opt/benchvenv/lib/python3.12/site-packages/opencv_python_headless.libs/libgfortran-e1b7dfc8.so.5.0.0",
+      "/opt/benchvenv/lib/python3.12/site-packages/opencv_python_headless.libs/libopenblasp-r0-e3ea6fd1.3.15.so",
+      "/opt/benchvenv/lib/python3.12/site-packages/opencv_python_headless.libs/libpng16-5dd41f4d.so.16.58.0",
+      "/opt/benchvenv/lib/python3.12/site-packages/opencv_python_headless.libs/libssl-f4f30056.so.1.1.1k",
+      "/opt/benchvenv/lib/python3.12/site-packages/opencv_python_headless.libs/libswresample-4e764699.so.6.3.101",
+      "/opt/benchvenv/lib/python3.12/site-packages/opencv_python_headless.libs/libswscale-9061c2fd.so.9.5.101",
+      "/opt/benchvenv/lib/python3.12/site-packages/opencv_python_headless.libs/libvpx-ac54ea65.so.11.0.1"
+    ],
+    "all_opencv_from_cool": false,
+    "cool_tree_libs": [],
+    "shared_objects_mapped": 41
+  },
+  "cool_build": {
+    "cool_root_exists": false,
+    "dpkg": [],
+    "python_dists": [
+      "numpy 2.2.6",
+      "opencv-python-headless 5.0.0.93"
+    ],
+    "cv2_version": "5.0.0",
+    "cv2_build_lines": [
+      "General configuration for OpenCV 5.0.0 =====================================",
+      "Version control:               5.0.0",
+      "Host:                        Linux 6.8.0-51-generic aarch64",
+      "CPU/HW features:",
+      "Baseline:                    NEON FP16",
+      "Dispatched code generation:  NEON_DOTPROD NEON_FP16 NEON_BF16",
+      "requested:                 NEON_FP16 NEON_BF16 NEON_DOTPROD",
+      "NEON_DOTPROD (3 files):    + NEON_DOTPROD",
+      "NEON_FP16 (6 files):       + NEON_FP16",
+      "NEON_BF16 (0 files):       + NEON_BF16",
+      "C++ Compiler:                /opt/rh/gcc-toolset-14/root/usr/bin/c++  (ver 14.2.1)",
+      "C Compiler:                  /opt/rh/gcc-toolset-14/root/usr/bin/cc",
+      "Extra dependencies:          avif /usr/local/lib/libpng.so /usr/lib64/libz.so /usr/lib64/libopenblasp.so dl m pthread rt",
+      "3rdparty dependencies:       ittnotify libprotobuf libjpeg-turbo libwebp libtiff libopenjp2 tegra_hal kleidicv_hal kleidicv kleidicv_thread",
+      "To be built:                 calib core dnn features flann geometry highgui imgcodecs imgproc objdetect photo ptcloud python3 stereo stitching video videoio",
+      "Parallel framework:            pthreads",
+      "Lapack:                      YES (OpenBLAS /usr/lib64/libopenblasp.so)",
+      "DNN MLAS:                    YES (SGEMM-only, vendored)",
+      "ASM kernels:               YES (ARM64: NEON SGEMM, NEON SGEMV)",
+      "Custom HAL:                  YES (carotene (ver 0.0.1) KleidiCV (ver 26.03))"
+    ]
+  }
+}

@@ -1,0 +1,213 @@
+{
+  "label": "graviton_stock",
+  "created": "2026-10-20T05:51:30",
+  "fingerprint": {
+    "opencv": {
+      "version": "5.0.0",
+      "cv2_file": "/opt/benchvenv/lib/python3.12/site-packages/cv2/__init__.py",
+      "is_cool_path": false,
+      "threads": 4,
+      "build_flags": {
+        "KleidiCV": true,
+        "NEON": true,
+        "IPP": false,
+        "TBB": false,
+        "OpenMP": false
+      }
+    },
+    "host": {
+      "machine": "aarch64",
+      "system": "Linux",
+      "python": "3.12.3",
+      "vcpus": 4,
+      "cpu_model": "0xd4f"
+    },
+    "ec2": {
+      "instance-type": "c8g.xlarge",
+      "ami-id": "ami-0d0f26d09ffd9af92",
+      "region": "us-east-1"
+    },
+    "cool": {
+      "attestation": {
+        "document_sha256": "42503f724795af56c2600482566d08264bc45cc296af2d2343a44e5534a6a731",
+        "architecture": "arm64",
+        "instance_type": "c8g.xlarge",
+        "image_id": "ami-0d0f26d09ffd9af92",
+        "marketplace_product_codes": [],
+        "billing_products": null,
+        "region": "us-east-1",
+        "availability_zone": "us-east-1a",
+        "instance_id": "i-01a77d58622610ecb",
+        "pending_time": "2026-10-20T05:46:21Z"
+      }
+    },
+    "git_commit": "9c190b3",
+    "model_sha256": "71339e99ad2b4b29f8d516967ce02e1fb5895434bf6f483cb517efe6750ba2f2",
+    "calibration_sha256": "84d4933eb9f6bfa9b6c9f9a30a29b6f889ca2c3d6f1304faf503fa3d800f4281"
+  },
+  "runtime": {
+    "threads": 4,
+    "engine": "auto"
+  },
+  "workload": "product",
+  "config": {
+    "n": 120,
+    "repeats": 3,
+    "warmup": 5,
+    "threads_requested": 0,
+    "frames_dir": "webui/samples",
+    "unique_frames": 8,
+    "input_manifest_sha256": "25376f6e21f70bb04798ac04da927e48544d3889f2672f8e0ce6045e141f8264"
+  },
+  "stages_ms": {
+    "decode": {
+      "p50": 1.7,
+      "p95": 1.74,
+      "mean": 1.7
+    },
+    "stage1": {
+      "p50": 2.83,
+      "p95": 2.87,
+      "mean": 2.82
+    },
+    "see": {
+      "p50": 187.36,
+      "p95": 190.14,
+      "mean": 187.63
+    },
+    "prove_decide": {
+      "p50": 3.38,
+      "p95": 6.59,
+      "mean": 3.39
+    },
+    "render": {
+      "p50": 1.75,
+      "p95": 1.81,
+      "mean": 1.75
+    },
+    "dnn_pre": {
+      "p50": 0.63,
+      "p95": 0.66,
+      "mean": 0.63
+    },
+    "dnn_forward": {
+      "p50": 186.24,
+      "p95": 189.06,
+      "mean": 186.52
+    },
+    "dnn_post": {
+      "p50": 0.29,
+      "p95": 0.34,
+      "mean": 0.3
+    },
+    "evidence": {
+      "p50": 3.57,
+      "p95": 6.79,
+      "mean": 3.58
+    },
+    "total": {
+      "p50": 197.03,
+      "p95": 200.38,
+      "mean": 197.29
+    }
+  },
+  "ops_ms": {
+    "decode": {
+      "p50": 1.7,
+      "p95": 1.74,
+      "mean": 1.7
+    },
+    "stage1": {
+      "p50": 2.83,
+      "p95": 2.87,
+      "mean": 2.82
+    },
+    "dnn_pre": {
+      "p50": 0.63,
+      "p95": 0.66,
+      "mean": 0.63
+    },
+    "dnn_forward": {
+      "p50": 186.24,
+      "p95": 189.06,
+      "mean": 186.52
+    },
+    "dnn_post": {
+      "p50": 0.29,
+      "p95": 0.34,
+      "mean": 0.3
+    },
+    "evidence": {
+      "p50": 3.57,
+      "p95": 6.79,
+      "mean": 3.58
+    },
+    "render": {
+      "p50": 1.75,
+      "p95": 1.81,
+      "mean": 1.75
+    }
+  },
+  "forwards_per_frame": 1.0,
+  "repeats": [
+    {
+      "repeat": 1,
+      "wall_s": 23.71,
+      "fps": 5.06,
+      "cpu_util": 0.958,
+      "peak_rss_mb": 378.8,
+      "total_ms": {
+        "p50": 197.08,
+        "p95": 200.45,
+        "mean": 197.4
+      }
+    },
+    {
+      "repeat": 2,
+      "wall_s": 23.72,
+      "fps": 5.06,
+      "cpu_util": 0.958,
+      "peak_rss_mb": 860.4,
+      "total_ms": {
+        "p50": 197.11,
+        "p95": 200.66,
+        "mean": 197.45
+      }
+    },
+    {
+      "repeat": 3,
+      "wall_s": 23.67,
+      "fps": 5.07,
+      "cpu_util": 0.959,
+      "peak_rss_mb": 861.2,
+      "total_ms": {
+        "p50": 196.96,
+        "p95": 200.26,
+        "mean": 197.02
+      }
+    }
+  ],
+  "throughput_fps": 5.06,
+  "throughput_fps_range": [
+    5.06,
+    5.07
+  ],
+  "cpu_util": 0.958,
+  "peak_rss_mb": 378.8,
+  "cost": {
+    "price_hour_usd": 0.15952,
+    "price_source": "AWS Price List API 2026-10-20 (c8g.xlarge on-demand Linux us-east-1)",
+    "usd_per_1k_frames": 0.008742,
+    "survey_hour": {
+      "frames": 168.8,
+      "compute_s": 33.29,
+      "real_time_factor": 0.00925,
+      "usd": 0.001475
+    },
+    "assumptions": {
+      "ping_rate_hz": 15.0,
+      "pings_per_frame": 640,
+      "channels": 2
+    }
+  }
+}
