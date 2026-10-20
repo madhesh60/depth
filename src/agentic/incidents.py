@@ -78,6 +78,15 @@ CATALOGUE: dict[str, tuple[str, str, str, str, str]] = {
         "info", "act", "A display view failed",
         "the view is hidden; detections, tiers and routes are unaffected",
         "none required"),
+    "promise_not_applicable": (
+        "warning", "decide", "The recall promise does not apply to this recording",
+        "the promise is withdrawn for this survey; every proposal still reaches a person as a card, and the agent "
+        "asks for a full review",
+        "approve the full review (look at every frame), or treat the cards as hints only"),
+    "goal_not_met": (
+        "warning", "plan", "The goal cannot be met",
+        "the agent runs the best calibrated mode the budgets allow and states the promise it keeps",
+        "accept that promise, or raise the compute budget / lower the requested recall and re-run"),
 }
 
 # failures the studio can trigger on demand to show the fallback (?simulate=<code>)

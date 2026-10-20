@@ -84,8 +84,14 @@
             <option value="none">None (honest no-GPS)</option>
           </select>
         </label>
+        <label class="field" title="The recall promise the agent must keep. Agent decides: it keeps the strongest promise its calibrated perception modes and the compute budget allow, and says why in the Agent tab."><span>Goal: share of pots that must reach a person</span>
+          <select id="goalRecall"><option value="">Strongest available (agent decides)</option></select>
+        </label>
         <details class="opts">
           <summary>Options</summary>
+          <label class="field" title="Wall-clock budget for perception on this survey. The agent prices each mode with its measured pace and re-plans mid-run if it would overrun. Empty = no limit."><span>Compute budget (seconds)</span>
+            <input type="number" id="goalCompute" min="1" max="3600" step="1" placeholder="no limit" />
+          </label>
           <label class="field"><span>Analyst budget (minutes)</span>
             <input type="number" id="budgetMin" min="1" max="600" step="1" value="2" />
           </label>
@@ -352,6 +358,7 @@
       <section class="panel evidence-panel" data-when="analyze">
         <div class="panel-head"><span class="panel-title">Evidence</span><span class="panel-meta" id="evMeta"></span>
           <button class="mini-btn" id="missedBtn2" title="draw a box around an object the detector missed - it becomes a training label (M)">Mark missed</button></div>
+        <div class="perc-line" id="framePerception" hidden></div>
         <div class="inc-inline" id="frameIncidents"></div>
         <div class="evidence-grid" id="evidenceGrid">
           <p class="empty-hint">Analyze a frame to see the evidence for each find.</p>

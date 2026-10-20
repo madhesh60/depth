@@ -74,6 +74,7 @@ def facts(survey: dict, prov: Optional[dict] = None, public: bool = False) -> di
         "repeat_sightings_merged": m.get("repeat_merges", 0),
         "promise": {"recall": g.get("recall_promise"), "verified_recall_on_test": ver.get("recall"),
                     "held_on_test": ver.get("recall_promise_held"), "precision": g.get("precision_promise")},
+        "promise_withdrawn": (g.get("promise_withdrawn") or {}).get("why"),
         "auto_confirm": g.get("tau_confirm") is not None,
         "budget": ({"minutes": b.get("minutes"), "sec_per_card": b.get("sec_per_card"),
                     "sec_per_card_measured": not str(b.get("sec_per_card_source", "")).upper().startswith("ASSUMED"),
@@ -140,6 +141,9 @@ def template_brief(F: dict) -> str:
         held = (f" — verified on unseen test data: {_pct(p.get('verified_recall_on_test'))}"
                 if p.get("verified_recall_on_test") is not None else "")
         L.append(f"**The promise:** at least {_pct(p['recall'])} of real pots reach a human{held}.")
+    if F.get("promise_withdrawn"):
+        L.append(f"**No recall promise for this recording:** {F['promise_withdrawn']}. Review every frame by eye; "
+                 "the cards are hints.")
     if p.get("precision") is None:
         L.append("There is no precision promise, so nothing is confirmed automatically — every find is a card for a human.")
     L += ["", "## First hour", ""]

@@ -158,8 +158,37 @@ const STEP = {
   update_belief: ["Update", "P(pot)"], decide: ["Decide", "Tier"], handoff: ["Next", "Hand-off"],
   assess: ["Detect", "Detector alone"], geometry_check: ["Evidence", "Geometry (Stage 1)"],
   choose_tool: ["Choose", "Next OpenCV tool"], conflict: ["Conflict", "Evidence conflict"],
-  request_observation: ["Ask", "Another observation"],
+  request_observation: ["Ask", "Another observation"], look_harder: ["Detect", "Closer look (2×2 tiles)"],
+  replan: ["Re-plan", "Compute budget"],
 };
+/* the core loop (src/agentic/core.py): goal -> inspect -> choose how hard to look -> perceive -> plan */
+const CORE_STEP = {
+  inspect_data: ["Inspect", "Usable frames"], check_promise: ["Check", "Does the promise apply here?"],
+  measure_geometry: ["Sense", "Seabed: image vs sounder"],
+  choose_mode: ["Decide", "How hard to look"], perceive: ["Perceive", "OpenCV 5 on every frame"],
+  replan: ["Re-plan", "Compute budget"], retier: ["Re-plan", "Re-tier earlier frames"],
+  plan: ["Plan", "People and boat"],
+};
+const pctS = p => (p == null ? "—" : Math.round(p * 100) + "%");
+/* "How the agent decided": the goal, every perception mode it weighed, and its steps */
+function agentRunBlock(run) {
+  if (!run || !run.steps) return "";
+  const g = run.goal || {}, m = run.mode || {};
+  const ch = (run.steps.find(s => s.act === "choose_mode") || {}).options || [];
+  const goal = [g.recall != null ? `recall ≥ ${pctS(g.recall)}` : "recall: strongest available",
+    g.compute_s != null ? `compute ≤ ${g.compute_s} s` : "", g.analyst_minutes != null ? `analyst ${g.analyst_minutes} min` : "",
+    g.boat_minutes != null ? `boat ${g.boat_minutes} min` : ""].filter(Boolean);
+  const steps = run.steps.map(s => ({ tool: s.act, status: s.status,
+    rationale: s.why + (s.decided ? " -> " + s.decided : "") }));
+  return `<div class="cfx run-x"><div class="gate-h">How the agent decided<span>${escapeHtml(m.label || "legacy rules")}${m.promise != null ? ` · promise ≥ ${pctS(m.promise)}` : ""}${(run.replans || []).length ? " · re-planned mid-run" : ""}</span></div>
+    <div class="mb-tags">${goal.map(t => `<span class="mb-tag">${escapeHtml(t)}</span>`).join("")}</div>
+    ${ch.length ? `<table><thead><tr><th>Perception mode</th><th>Promise</th><th>Passes / frame</th><th>Cards (est.)</th><th>Compute (est.)</th><th></th></tr></thead><tbody>${ch.map(o =>
+      `<tr class="${o.chosen ? "chg" : ""}"><th>${escapeHtml(o.label)}</th><td>≥ ${pctS(o.promise)}</td><td>${o.passes_per_frame}</td>`
+      + `<td>${o.expected_cards ?? "—"}</td><td>${o.expected_compute_s != null ? o.expected_compute_s + " s" : "—"}</td>`
+      + `<td>${o.chosen ? "chosen" : escapeHtml((o.why_not || []).join("; ") || "weaker or costlier")}</td></tr>`).join("")}</tbody></table>` : ""}
+    ${chainBlock(steps, CORE_STEP)}
+    <p class="gate-note">${escapeHtml(chainText({ rationale: run.stop || "" }))}</p></div>`;
+}
 const PLAN_STEP = {
   triage: ["Triage", "Hazards"], voi_check: ["Ask", "Can more looking help?"], budget_check: ["Budget", "Analyst time"],
   stop_rule: ["Stop", "Where to stop"], human_override: ["Person", "Overrides kept"], route_update: ["Route", "Inspection route"],
@@ -309,6 +338,9 @@ async function loadHealth() {
     const cv = $("#pillCv"), md = $("#pillModel");
     if (h.recording && h.recording.available && $("#gpsRecording")) $("#gpsRecording").hidden = false;
     if ($("#apprPin")) { $("#apprPin").hidden = !h.approver_pin_required; $("#apprOpen").hidden = !!h.approver_pin_required; }
+    const gr = $("#goalRecall");
+    if (gr && h.modes && gr.options.length === 1) h.modes.forEach(m => gr.add(new Option(
+      `≥ ${pctS(m.promise)} · ${m.label} (${m.passes} pass${m.passes > 1 ? "es" : ""} / frame)`, String(m.promise))));
     cv.textContent = `OpenCV ${h.opencv}`;
     cv.className = "pill " + (String(h.opencv).startsWith("5") ? "pill-ok" : "pill");
     md.textContent = h.model_loaded ? "Ready" : h.model_error ? "Error" : "Warming up";
@@ -324,6 +356,7 @@ async function loadHealth() {
     if ($("#regBrief")) $("#regBrief").textContent = `${cal.model || h.model || ""}`;
     if ($("#regClasses")) $("#regClasses").textContent = `${(cal.names || []).length} · ${(cal.names || []).map(human).join(", ")}`;
     if ($("#regGateK")) $("#regGateK").textContent = `Gate · ${human(cal.guaranteed_class || "?")}`;
+    state.modes = h.modes || [];
     renderGuarantees(h.calibration);
     setSys(h.model_loaded ? "ok" : h.model_error ? "bad" : "busy",
            h.model_loaded ? (h.is_cool_path ? "Ready · COOL" : "Ready") : h.model_error ? "Model error" : "Warming up");
@@ -366,6 +399,8 @@ function renderGuarantees(c) {
   panel.innerHTML = `
     <div class="g-row" title="${g.requested_recall_achievable === false ? `The requested 90% is not achievable with this detector (proposal ceiling ${pct(g.recall_ceiling)}).` : ""}"><span class="g-badge g-recall">≥ ${pct(g.recall_promise)}</span>
       <span class="g-txt">of real pots reach a person<br>${held(v.recall_promise_held)}</span></div>
+    ${(state.modes || []).filter(m => m.name !== "standard").map(m => `<div class="g-row" title="${escapeHtml(m.label)}: ${m.passes} cv2.dnn passes per frame (STUDY-18). The agent uses it when the goal and the compute budget allow."><span class="g-badge g-recall">≥ ${pct(m.promise)}</span>
+      <span class="g-txt">with the closer look (${m.passes} passes / frame)<br>${held((m.verified || {}).promise_held)}${(m.verified || {}).recall != null ? ` <span class="muted">${(m.verified.recall * 100).toFixed(1)}%</span>` : ""}</span></div>`).join("")}
     <div class="g-row"><span class="g-badge g-prec">${g.precision_promise ? "≥ " + pct(g.precision_promise) : "none"}</span>
       <span class="g-txt">${g.precision_promise ? `of confirmed finds are real<br>${held(v.precision_promise_held)}` : "no auto-confirm: every find is checked by a person"}</span></div>
     <p class="panel-note">95% confidence · fit on validation, verified once on test · <a href="https://github.com/madhesh60/depth/blob/main/${escapeHtml(g.report || "docs/")}" target="_blank" rel="noopener">report</a></p>`;
@@ -772,6 +807,12 @@ function renderAnalyze(d) {
   $("#viewerEmpty").hidden = d.candidates.length > 0;
 
   const ph = $("#analyzePlaceholder"); ph.querySelector("h3").textContent = "Choose a sonar frame";
+  const ac = d.agent_choice, pc = d.perception || {}, fp = $("#framePerception");
+  if (fp) {
+    fp.hidden = !ac || !ac.mode;
+    if (ac && ac.mode) fp.innerHTML = `<b>${escapeHtml(ac.mode.label)}</b> · promise ≥ ${pctS(ac.mode.promise)} — ${escapeHtml(chainText({ rationale: ac.why }))}`
+      + (pc.passes ? ` <span class="muted">· the closer look added ${pc.new || 0}, raised ${pc.raised || 0}</span>` : "");
+  }
   const incs = d.incidents || [];
   $("#frameIncidents").innerHTML = incs.map(incidentRow).join("");
   if (incs.some(i => i.severity !== "info" || i.simulated)) Notices.show(incs, d.frame_id);
@@ -1042,9 +1083,11 @@ async function runSurvey(simulate) {
   const budget = Math.max(1, Math.min(600, parseFloat($("#budgetMin").value) || 2));
   const boat = parseFloat($("#boatMin").value);
   const boatQ = Number.isFinite(boat) && boat > 0 ? `&boat_minutes=${Math.min(1440, boat)}` : "";
+  const recall = parseFloat(($("#goalRecall") || {}).value), comp = parseFloat(($("#goalCompute") || {}).value);
+  const goalQ = (Number.isFinite(recall) ? `&recall=${recall}` : "") + (Number.isFinite(comp) && comp >= 1 ? `&compute_s=${Math.min(3600, comp)}` : "");
   try {
     // Surveys run as background jobs (no proxy timeouts, the server stays responsive); poll progress.
-    const job = await apiJSON(`${API}/api/jobs/survey?use_samples=1&gps=${gps}&budget_minutes=${budget}${boatQ}${simulate ? "&simulate=" + simulate : ""}${Active.q()}`, { method: "POST" });
+    const job = await apiJSON(`${API}/api/jobs/survey?use_samples=1&gps=${gps}&budget_minutes=${budget}${boatQ}${goalQ}${simulate ? "&simulate=" + simulate : ""}${Active.q()}`, { method: "POST" });
     Log.now({ tool: "queue_job", msg: `${job.job_id} · ${job.frames} frames queued`, t: "" });
     const d = await pollJob(job.job_id);
     state.survey = d;
@@ -1098,7 +1141,7 @@ function renderSurvey(d, opts = {}) {
         ? `${m.impact.person_confirmed} confirmed by people · ${m.impact.person_recovered} recovered`
         : (m.recovery_route.length ? `${m.route_length_m} m · confirmed finds` : "none yet — a person confirms"))}
     </div>
-    <div class="mb-tags">${gpsTag}${m.repeat_merges ? `<span class="mb-tag">${m.repeat_merges} repeat sighting${m.repeat_merges > 1 ? "s" : ""} merged</span>` : ""}<span class="mb-tag mb-gate">● Human approval required — nothing is dispatched automatically</span></div>`;
+    <div class="mb-tags">${promiseTag(m.guarantees || {})}${gpsTag}${m.repeat_merges ? `<span class="mb-tag">${m.repeat_merges} repeat sighting${m.repeat_merges > 1 ? "s" : ""} merged</span>` : ""}<span class="mb-tag mb-gate">● Human approval required — nothing is dispatched automatically</span></div>`;
   renderMap(d, opts.keepView); renderDownloads(d.survey_id, m); renderThumbs(d); renderHazards(d); renderEffort(d);
   renderAgentPanel(d); loadAudit(d.survey_id);
   if (!opts.keepView) loadBrief(d.survey_id);
@@ -1112,20 +1155,27 @@ function renderSurvey(d, opts = {}) {
   ]);
 }
 
+/* this survey's own promise: the mode the agent chose, or withdrawn when it does not apply here */
+function promiseTag(g) {
+  if (g.promise_withdrawn) return `<span class="mb-tag mb-synthetic" title="${escapeHtml(g.promise_withdrawn.why || "")}">No recall promise — this recording does not look like the calibration recordings</span>`;
+  if (g.recall_promise == null) return "";
+  return `<span class="mb-tag mb-real">Promise ≥ ${Math.round(g.recall_promise * 100)}%${g.perception_mode && g.perception_mode !== "standard" ? " · " + human(g.perception_mode) : ""}</span>`;
+}
 function surveyIncidents(d) {
   return [...((d.mission || {}).incidents || []), ...(d.frames || []).flatMap(f => f.incidents || [])];
 }
-const ACTION_LABEL = { inspect: "Inspection route", recover: "Recovery route", resurvey: "Re-survey passes" };
+const ACTION_LABEL = { inspect: "Inspection route", recover: "Recovery route", resurvey: "Re-survey passes", full_review: "Full review" };
 /* the Agent tab: dispatch gate, last re-plan, incidents, and the planner's decisions step by step */
 function renderAgentPanel(d) {
   const m = d.mission, disp = d.dispatch || {}, incs = surveyIncidents(d);
   const rp = (m.replans || []).slice(-1)[0];
-  const gate = ["inspect", "recover"].filter(a => disp[a]).map(a => `<div class="gate-row">
+  const gate = ["full_review", "inspect", "recover"].filter(a => disp[a]).map(a => `<div class="gate-row">
       <span class="gate-a">${ACTION_LABEL[a]}</span><span class="gate-n">${disp[a].targets} target${disp[a].targets === 1 ? "" : "s"}</span>
       <span class="st ${disp[a].status}">${disp[a].status}${disp[a].by ? " · " + escapeHtml(disp[a].by) : ""}</span></div>`).join("");
   const pending = Object.values(disp).filter(x => x.status === "pending").length;
   $("#agentMeta").textContent = `${(m.agent_log || []).length} steps${incs.length ? ` · ${incs.length} incident${incs.length > 1 ? "s" : ""}` : ""}`;
   $("#agentPanel").innerHTML = `
+    ${agentRunBlock(d.agent_run)}
     ${recoCards(d)}
     ${seabedBlock(d)}
     ${cfTable(d.opencv_counterfactual)}

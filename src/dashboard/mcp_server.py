@@ -153,8 +153,11 @@ def frame_overlay(sample_id: str) -> Image:
 @mcp.tool(annotations=_RUN)
 def run_survey(use_samples: bool = True, images_base64: Optional[list[str]] = None,
                frame_ids: Optional[list[str]] = None, budget_minutes: float = 5.0,
-               boat_minutes: Optional[float] = None, gps: str = "synthetic") -> dict:
-    """Run a whole survey: every frame through the agent, then chunk stitching, repeat-sighting merge,
+               boat_minutes: Optional[float] = None, gps: str = "synthetic",
+               recall: Optional[float] = None, compute_s: Optional[float] = None) -> dict:
+    """Run a whole survey toward a goal. ``recall`` = the recall promise to keep (e.g. 0.84); omitted, the
+    agent keeps the strongest promise its calibrated perception modes and the ``compute_s`` budget allow,
+    and says which mode it chose and why (``agent_run``). Then every frame goes through the agent, then chunk stitching, repeat-sighting merge,
     the review queue ordered by calibrated P(pot), the analyst budget, inspection/recovery routes,
     opposite-side re-survey passes and the Stage-1 counterfactual. gps='synthetic' lays a labelled demo
     track (the public frames carry no GPS); gps='none' gives a table-only plan; gps='recording' runs the
@@ -186,7 +189,10 @@ def run_survey(use_samples: bool = True, images_base64: Optional[list[str]] = No
             raise ValueError("no raw recording on this server")
         frames, track, _, _ = A._recording()
     sid = f"survey-{time.strftime('%Y%m%d-%H%M%S')}-{len(frames)}f-mcp"
-    d = A._run_survey(frames, gps, budget_minutes, None, sid, None, boat_minutes, track)
+    if recall is not None and not 0.5 <= recall <= 0.99:
+        raise ValueError("recall must be between 0.5 and 0.99")
+    d = A._run_survey(frames, gps, budget_minutes, None, sid, None, boat_minutes, track,
+                      recall=recall, compute_s=compute_s)
     m = d["mission"]
     rp = m.get("resurvey_plan") or {}
     cf = d.get("stage1_counterfactual") or {}
@@ -199,7 +205,17 @@ def run_survey(use_samples: bool = True, images_base64: Optional[list[str]] = No
             "resurvey": {"passes": len(rp.get("lines", [])), "boat_minutes": rp.get("boat_minutes_planned"),
                          "targets": f"{rp.get('targets_covered')}/{rp.get('targets_total')}"},
             "stage1_counterfactual": {k: cf.get(k) for k in ("n", "outside", "median_shift_m")} if cf.get("available") else None,
+            "agent": _agent_summary(d.get("agent_run") or {}),
             "human_approval_required": True, "provenance": d.get("provenance")}
+
+
+def _agent_summary(run: dict) -> dict:
+    """The core loop's decisions in brief: the goal, the perception mode it chose and why, each step."""
+    mode = run.get("mode") or {}
+    return {"goal": run.get("goal"), "mode": mode.get("name"), "promise": mode.get("promise"),
+            "steps": [f"{st['act']}: {st['why']}" + (f" -> {st['decided']}" if st.get("decided") else "")
+                      for st in run.get("steps") or []],
+            "replans": run.get("replans") or [], "stop": run.get("stop")}
 
 
 @mcp.tool(annotations=_READ)

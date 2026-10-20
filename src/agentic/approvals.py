@@ -24,7 +24,7 @@ import uuid
 from pathlib import Path
 from typing import Optional
 
-ACTIONS = ("inspect", "recover", "resurvey", "share_public", "other")
+ACTIONS = ("inspect", "recover", "resurvey", "full_review", "share_public", "other")
 DECISIONS = ("approved", "declined")
 STATUSES = ("pending", "approved", "declined", "withdrawn")
 REPO = Path(__file__).resolve().parents[2]

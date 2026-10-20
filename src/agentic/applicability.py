@@ -1,5 +1,5 @@
 """
-applicability.py — does the recall promise apply to THIS recording? (STUDY-18)
+applicability.py — does the recall promise apply to THIS recording? (STUDY-19)
 
 The recall promise is fit on the calibration recordings (``calibration.json``). It says nothing about a
 sonar the detector has never seen: on the cross-sonar split the validation threshold keeps only 11% of
@@ -13,7 +13,7 @@ before the agent keeps a promise it checks that the frames look like the frames 
   is its largest robust z-score; its **conformal p-value** is its rank among the calibration frames' own
   scores, so a frame like them is called atypical (p ≤ ``alpha_frame``) at most ``alpha_frame`` of the time.
 * **Per survey** — the promise is **withdrawn** when the 95% Clopper-Pearson lower bound of the atypical
-  share exceeds ``share_limit`` (set from 13 in-distribution training recordings, STUDY-18). One odd frame
+  share exceeds ``share_limit`` (set from 13 in-distribution training recordings, STUDY-19). One odd frame
   never withdraws it; a different sonar does.
 
 It is a coarse guard against a different sonar or rendering, not a fine-grained drift detector: the

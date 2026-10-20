@@ -28,7 +28,7 @@ from typing import Callable, Optional
 import cv2
 import numpy as np
 
-from .agent import ReLookAgent, render
+from .agent import AgentConfig, ReLookAgent, render
 from .geo import PingFix, geotag, synthetic_track, DEFAULT_M_PER_PX
 from .incidents import incident
 from .mission import export, plan_mission, DEFAULT_SEC_PER_CARD
@@ -67,10 +67,32 @@ class AgenticPipeline:
     def __init__(self, agent: Optional[ReLookAgent] = None, m_per_px: float = DEFAULT_M_PER_PX):
         self.agent = agent or ReLookAgent()
         self.m_per_px = m_per_px
+        self._agents: dict[str, ReLookAgent] = {}
+        self._ms_pass: Optional[float] = None               # measured cv2.dnn pass, moving average
 
-    def guarantees(self) -> dict:
+    def agent_for(self, mode: str) -> ReLookAgent:
+        """The frame agent for a perception mode (``core.py`` chooses it). All of them share the one
+        loaded detector; each carries the tiers calibrated for its mode."""
+        if mode == getattr(self.agent.cfg, "perception_mode", "standard"):
+            return self.agent
+        if mode not in self._agents:
+            self._agents[mode] = ReLookAgent(perceptor=self.agent.perceptor, shadow_prover=self.agent.shadow,
+                                             cfg=AgentConfig.from_calibration(mode))
+        return self._agents[mode]
+
+    def seed_pace(self, ms: Optional[float]) -> None:
+        """Start the pass-time estimate from a measured warm-up forward (before any frame ran)."""
+        if ms and self._ms_pass is None:
+            self._ms_pass = float(ms)
+
+    def ms_per_pass(self) -> Optional[float]:
+        """The measured time of one ``cv2.dnn`` forward pass on this machine (None until measured) —
+        what the agent prices its perception modes with."""
+        return None if self._ms_pass is None else round(self._ms_pass, 1)
+
+    def guarantees(self, agent: Optional[ReLookAgent] = None) -> dict:
         """The promises this run's tiers carry (shown on every report + in the UI)."""
-        t = getattr(self.agent.cfg, "tiers", None)
+        t = getattr((agent or self.agent).cfg, "tiers", None)
         if t is None:
             return {"mode": "legacy", "note": "no calibrated guarantee (thresholds are the legacy rules)"}
         g = dict(t.guarantees)
@@ -82,14 +104,17 @@ class AgenticPipeline:
     def run_frame(self, frame: np.ndarray, frame_id: str = "frame",
                   fix: Optional[PingFix] = None, nadir: Optional[str] = None,
                   progress_cb: Optional[Callable[[str, dict], None]] = None,
-                  faults: Optional[set] = None) -> FrameResult:
+                  faults: Optional[set] = None, agent: Optional[ReLookAgent] = None) -> FrameResult:
         faults = set(faults or ())
         # a real recording's sonar depth is a MEASURED altitude in metres -> heights in metres
         alt_m = fix.depth_m if (fix is not None and not fix.synthetic and fix.depth_m) else None
         geometry = ({"status": fix.geometry, "bottom_line": fix.bottom_line_px}
                     if fix is not None and fix.geometry else None)
-        result = self.agent.run_frame(frame, frame_id=frame_id, nadir=nadir, progress_cb=progress_cb, altitude_m=alt_m,
-                                      faults=faults, geometry=geometry)
+        result = (agent or self.agent).run_frame(frame, frame_id=frame_id, nadir=nadir, progress_cb=progress_cb,
+                                                 altitude_m=alt_m, faults=faults, geometry=geometry)
+        see = result.stage_ms.get("see")
+        if see:
+            self._ms_pass = see if self._ms_pass is None else 0.8 * self._ms_pass + 0.2 * see
         if fix is not None:
             if "invalid_geometry" in faults:              # failure drill: a corrupted GPS fix
                 fix = replace(fix, lat=float("nan"), ping_lat=None)
@@ -121,7 +146,6 @@ class AgenticPipeline:
         can interleave single-frame requests with a long survey on one shared network. ``incidents``:
         input problems found before the run (e.g. undecodable uploads) - reported with the survey."""
         faults = set(faults or ())
-        gps_available = bool(track)
         survey_incidents = list(incidents or [])
 
         frame_results: list[FrameResult] = []
@@ -147,6 +171,18 @@ class AgenticPipeline:
             frame_results.append(fr)
             if progress_cb:
                 progress_cb("frame_done", {"frame_id": frame_id, "counts": fr.counts})
+        return self.assemble(frame_results, track, survey_id, budget_minutes, sec_per_card, boat_minutes,
+                             survey_incidents, progress_cb)
+
+    def assemble(self, frame_results: list[FrameResult], track: Optional[dict[str, PingFix]], survey_id: str,
+                 budget_minutes: Optional[float] = None, sec_per_card: float = DEFAULT_SEC_PER_CARD,
+                 boat_minutes: Optional[float] = None, incidents: Optional[list] = None,
+                 progress_cb: Optional[Callable[[str, dict], None]] = None,
+                 guarantees: Optional[dict] = None) -> SurveyResult:
+        """Perceived frames -> hazards -> the mission plan (stitching, repeat sightings, queue, budget,
+        routes, re-survey passes). ``guarantees``: the promise of the mode the frames were run in."""
+        gps_available = bool(track)
+        survey_incidents = list(incidents or [])
 
         # chunk-boundary stitching (survey-level, non-gating): an object cut by the chunk boundary
         # is one hazard, not two. Never changes a verdict or a score.
@@ -173,7 +209,7 @@ class AgenticPipeline:
         merges = 0
         if gps_available:
             tracked, merges = merge_repeat_sightings(tracked)
-        mission = plan_mission(tracked, track if gps_available else None, self.guarantees(),
+        mission = plan_mission(tracked, track if gps_available else None, guarantees or self.guarantees(),
                                budget_minutes, sec_per_card, boat_minutes, merges, incidents=survey_incidents)
         if progress_cb:
             progress_cb("mission", mission.to_dict())

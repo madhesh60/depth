@@ -58,6 +58,7 @@ from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from src.agentic.pipeline import AgenticPipeline
+from src.agentic.core import Goal, SurveyAgent, calibrated_modes, choose_mode
 from src.agentic.agent import render
 from src.agentic.perception import Perceptor
 from src.agentic.shadow import ShadowProver
@@ -94,6 +95,7 @@ MAX_UPLOAD_MB = float(os.environ.get("DEPTH_MAX_UPLOAD_MB", "20"))
 MAX_FRAMES = int(os.environ.get("DEPTH_MAX_FRAMES", "50"))
 MAX_SYNC_FRAMES = int(os.environ.get("DEPTH_MAX_SYNC_FRAMES", "12"))
 MAX_SURVEYS = int(os.environ.get("DEPTH_MAX_SURVEYS", "24"))
+INTERACTIVE_S = float(os.environ.get("DEPTH_INTERACTIVE_S", "2.0"))   # compute budget of one /api/analyze call
 _IMAGE_TYPES = {"image/jpeg", "image/png", "image/bmp", "image/tiff", "image/webp", "application/octet-stream", ""}
 
 # ---- shared state ----------------------------------------------------------------------------
@@ -124,7 +126,7 @@ def get_pipeline() -> AgenticPipeline:
                 try:
                     pipe = AgenticPipeline()
                     t0 = time.perf_counter()
-                    pipe.agent.perceptor.warmup()
+                    pipe.seed_pace(pipe.agent.perceptor.warmup())      # the agent prices its modes with it
                     _MODEL_STATE["warmup_ms"] = round((time.perf_counter() - t0) * 1000, 1)
                     _PIPELINE = pipe
                     _MODEL_STATE["loaded"] = True
@@ -404,7 +406,8 @@ def _remember(result: SurveyResult) -> None:
 def _run_survey(frames, gps: str, budget_minutes: Optional[float], nadir: Optional[str],
                 survey_id: str, progress: Optional[Callable[[dict], None]] = None,
                 boat_minutes: Optional[float] = None, track: Optional[dict] = None,
-                faults: frozenset = frozenset(), problems: Optional[list] = None) -> dict:
+                faults: frozenset = frozenset(), problems: Optional[list] = None,
+                recall: Optional[float] = None, compute_s: Optional[float] = None) -> dict:
     faults = set(faults)
     if "corrupt_frame" in faults:                         # failure drill: an unreadable frame in the batch
         frames = list(frames) + [("drill_corrupt_frame", None)]
@@ -423,10 +426,11 @@ def _run_survey(frames, gps: str, budget_minutes: Optional[float], nadir: Option
             progress({"done": done["n"], "total": total, "stage": stage,
                       "frame": payload.get("frame_id")})
 
-    result = pipe.run_survey(frames, track=track, survey_id=survey_id, nadir=nadir,
-                             budget_minutes=budget_minutes, progress_cb=cb,
-                             frame_lock=_INFER_LOCK,      # per frame: /api/analyze can interleave
-                             boat_minutes=boat_minutes, faults=faults, incidents=problems)
+    goal = Goal(recall=recall, analyst_minutes=budget_minutes, boat_minutes=boat_minutes, compute_s=compute_s)
+    geometry = (_recording()[2].get("geometry") if gps == "recording" else None)
+    result = SurveyAgent(pipe).run(frames, goal=goal, track=track, survey_id=survey_id, nadir=nadir,
+                                   progress_cb=cb, frame_lock=_INFER_LOCK,   # per frame: /api/analyze can interleave
+                                   faults=faults, incidents=problems, geometry=geometry)
     for inc in result.mission.incidents:
         if inc["code"] == "missing_gps" and "missing_gps" in faults:
             inc["simulated"] = True
@@ -498,6 +502,12 @@ def _wanted_requests(s: SurveyResult) -> dict[str, tuple[list, str]]:
         out["recover"] = (list(m.recovery_route),
                           f"recover {len(m.recovery_route)} confirmed hazard(s)"
                           + (f", route {m.route_length_m} m" if m.route_length_m else "") + f"; {gps}")
+    wd = (m.guarantees or {}).get("promise_withdrawn")
+    if wd:                                                         # perception said the promise does not apply here
+        fids = [f.frame_id for f in s.frames]
+        out["full_review"] = (fids, f"Agent recommends: review all {len(fids)} frame(s) by eye. Reason: {wd['why']}. "
+                                    f"The recall promise (>= {round(100 * (wd.get('was') or 0))}%) was fit on other "
+                                    "recordings and is withdrawn for this survey; the cards are hints, not a promise")
     for L in (m.resurvey_plan or {}).get("lines") or []:          # one request per pass: each can be declined
         out["resurvey:" + ",".join(L["targets"])] = (
             list(L["targets"]),
@@ -579,6 +589,9 @@ def health():
         "limits": {"max_upload_mb": MAX_UPLOAD_MB, "max_frames": MAX_FRAMES, "max_sync_frames": MAX_SYNC_FRAMES},
         "recording": {"available": RECORDING_DAT.exists(), "name": RECORDING_DAT.stem},
         "approver_pin_required": pin_required(),
+        "modes": [m.to_dict() for m in calibrated_modes(cal)],
+        "ms_per_pass": _PIPELINE.ms_per_pass() if _PIPELINE is not None else None,
+        "interactive_s": INTERACTIVE_S,
         "cool": cool_attest.summary(),
     }
 
@@ -749,6 +762,8 @@ def sample_thumb(sample_id: str, size: int = Query(220, ge=32, le=640)):
 @app.post("/api/analyze")
 def analyze(sample: Optional[str] = Query(None), nadir: Optional[str] = Query(None),
             file: Optional[UploadFile] = File(None), simulate: Optional[str] = Query(None),
+            recall: Optional[float] = Query(None, ge=0.5, le=0.99, description="recall promise to keep (the goal)"),
+            compute_s: Optional[float] = Query(None, ge=0.2, le=60, description="compute budget, s (default interactive)"),
             active: bool = Query(False, description="run active vision even if not validated (EXPERIMENTAL)")):
     faults = _drills(simulate) | ({"opt:active"} if active is True else set())
     if "corrupt_frame" in faults:
@@ -777,11 +792,15 @@ def analyze(sample: Optional[str] = Query(None), nadir: Optional[str] = Query(No
 
     t0 = time.perf_counter()
     pipe = _pipeline_or_503(faults)
+    goal = Goal(recall=recall, compute_s=INTERACTIVE_S if compute_s is None else compute_s)
+    mode, choice = choose_mode(goal, calibrated_modes(), 1, pipe.ms_per_pass())
+    agent = pipe.agent_for(mode.name if mode else "standard")
     with _INFER_LOCK:
-        result = pipe.run_frame(frame, frame_id=frame_id, nadir=nadir, faults=faults)
+        result = pipe.run_frame(frame, frame_id=frame_id, nadir=nadir, faults=faults, agent=agent)
     payload = _frame_payload(frame, result)
     payload["wall_ms"] = round((time.perf_counter() - t0) * 1000, 1)
-    payload["guarantees"] = pipe.guarantees()
+    payload["guarantees"] = pipe.guarantees(agent)
+    payload["agent_choice"] = {"goal": goal.to_dict(), "mode": mode.to_dict() if mode else None, **choice}
     payload["provenance"] = provenance_stamp()
     payload["frame_ref"] = {"sample": sample} if (sample and file is None) else _frame_ref(frame_id)
     try:
@@ -797,6 +816,8 @@ def analyze(sample: Optional[str] = Query(None), nadir: Optional[str] = Query(No
 @app.post("/api/jobs/survey")
 def submit_survey(use_samples: bool = Query(False), gps: str = Query("synthetic"),
                   budget_minutes: Optional[float] = Query(None, ge=0, le=600),
+                  recall: Optional[float] = Query(None, ge=0.5, le=0.99, description="recall promise to keep (the goal)"),
+                  compute_s: Optional[float] = Query(None, ge=1, le=3600, description="compute budget for perception, s"),
                   nadir: Optional[str] = Query(None),
                   boat_minutes: Optional[float] = Query(None, ge=0, le=1440),
                   files: Optional[list[UploadFile]] = File(None), simulate: Optional[str] = Query(None),
@@ -818,7 +839,8 @@ def submit_survey(use_samples: bool = Query(False), gps: str = Query("synthetic"
     survey_id = f"survey-{time.strftime('%Y%m%d-%H%M%S')}-{len(frames)}f{'-rec' if track else ''}"
     probs = problems if gps != "recording" else []
     jid = _JOBS.submit(lambda progress: _run_survey(frames, gps, budget_minutes, nadir, survey_id, progress,
-                                                    boat_minutes, track, frozenset(faults), probs), total=len(frames))
+                                                    boat_minutes, track, frozenset(faults), probs, recall, compute_s),
+                       total=len(frames))
     return {"job_id": jid, "survey_id": survey_id, "frames": len(frames)}
 
 
@@ -833,6 +855,8 @@ def job_status(job_id: str):
 @app.post("/api/survey")
 def survey(use_samples: bool = Query(False), gps: str = Query("synthetic"),
            budget_minutes: Optional[float] = Query(None, ge=0, le=600),
+           recall: Optional[float] = Query(None, ge=0.5, le=0.99, description="recall promise to keep (the goal)"),
+           compute_s: Optional[float] = Query(None, ge=1, le=3600, description="compute budget for perception, s"),
            nadir: Optional[str] = Query(None),
            files: Optional[list[UploadFile]] = File(None), simulate: Optional[str] = Query(None),
            boat_minutes: Optional[float] = Query(None, ge=0, le=1440),
@@ -850,7 +874,8 @@ def survey(use_samples: bool = Query(False), gps: str = Query("synthetic"),
                                  f"{MAX_SYNC_FRAMES} (runs in the background, poll /api/jobs/<id>)")
     survey_id = f"survey-{time.strftime('%Y%m%d-%H%M%S')}-{len(frames)}f{'-rec' if track else ''}"
     return JSONResponse(_run_survey(frames, gps, budget_minutes, nadir, survey_id, track=track,
-                                    boat_minutes=boat_minutes, faults=frozenset(faults), problems=problems))
+                                    boat_minutes=boat_minutes, faults=frozenset(faults), problems=problems,
+                                    recall=recall, compute_s=compute_s))
 
 
 @app.get("/api/recording")

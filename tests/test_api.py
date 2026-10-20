@@ -92,7 +92,9 @@ def test_analyze_and_report_path():
     assert "counts" in body and "overlay_png" in body and body["overlay_png"].startswith("data:image")
     for c in body["candidates"]:
         assert c["verdict"] in ("confirmed", "review", "low_risk")
-        tools = [st["tool"] for st in c["trace"]]          # voi_check ... decide -> handoff
+        tools = [st["tool"] for st in c["trace"]]          # [look_harder] voi_check ... decide -> handoff
+        if tools[0] == "look_harder":                    # the closer tile look proposed / raised this find
+            tools = tools[1:]
         assert tools[0] == "voi_check" and "decide" in tools and tools[-1] == "handoff"
 
     s = client.post("/api/survey?use_samples=1&gps=synthetic")

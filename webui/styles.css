@@ -962,3 +962,11 @@ body.is-busy .viewer-placeholder { visibility: hidden; }
 .lg-t { background: rgb(235, 60, 60); } .lg-s { background: rgb(40, 150, 255); } .lg-a { background: rgb(90, 210, 60); }
 .geo-why { font: var(--t-12); color: var(--txt-2); margin: 4px 0 8px; }
 .geo-why b { color: var(--txt); font-weight: 600; }
+
+/* the core loop: how the agent decided (goal, perception modes, steps) */
+.run-x .mb-tags { margin: 2px 0 6px; }
+.run-x td:last-child { color: var(--txt-3); font-size: 11px; }
+.run-x .chain { margin-top: 10px; }
+.perc-line { font: 400 12px/1.45 var(--sans); color: var(--txt-2); padding: 8px 10px; margin-bottom: 10px;
+  border: 1px solid var(--line); border-radius: 8px; background: var(--panel-2, transparent); }
+.perc-line b { color: var(--txt); font-weight: 500; }
