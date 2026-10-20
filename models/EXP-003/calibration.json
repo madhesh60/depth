@@ -103,5 +103,68 @@
     "suspended_weight": 2.0,
     "relief_weight": 1.5,
     "relief_m": 0.5
+  },
+  "modes": {
+    "look_harder": {
+      "label": "look harder",
+      "tile_frac": 0.6,
+      "merge_iou": 0.5,
+      "forward_passes_per_frame": 5,
+      "tau_review": 0.055,
+      "recall_promise": 0.84,
+      "recall_ceiling": 0.8925,
+      "cards_per_frame_cal": 4.933,
+      "p_pot_bins": [
+        {
+          "lo": 0.0553,
+          "hi": 0.0758,
+          "p_pot": 0.0294,
+          "n": 134
+        },
+        {
+          "lo": 0.0758,
+          "hi": 0.1019,
+          "p_pot": 0.0588,
+          "n": 134
+        },
+        {
+          "lo": 0.1019,
+          "hi": 0.1474,
+          "p_pot": 0.0956,
+          "n": 134
+        },
+        {
+          "lo": 0.1474,
+          "hi": 0.2252,
+          "p_pot": 0.1397,
+          "n": 134
+        },
+        {
+          "lo": 0.2252,
+          "hi": 0.315,
+          "p_pot": 0.3529,
+          "n": 134
+        },
+        {
+          "lo": 0.315,
+          "hi": 0.7808,
+          "p_pot": 0.5809,
+          "n": 134
+        }
+      ],
+      "verified_on_test": {
+        "recall": 0.8598,
+        "recall_lcb": 0.8198,
+        "promise_held": true,
+        "cards_per_frame": 3.859
+      },
+      "standard_cards_per_frame_test": 2.683,
+      "report": "docs/reports/look_harder.md",
+      "fit": {
+        "split": "Calibration: `DATASET/03_yolo_ready_dataset_v2b/val` *wcp_ss_*.jpg \u2014 163 unique frames, recordings ['Rec10', 'Rec12', 'Rec16']",
+        "verified_on": "Verification: `DATASET/03_yolo_ready_dataset_v2b/test` *wcp_ss_*.jpg \u2014 199 unique frames, recordings ['Rec14', 'Rec8', 'Rec9']",
+        "created": "2026-10-20"
+      }
+    }
   }
 }

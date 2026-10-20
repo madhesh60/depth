@@ -56,10 +56,28 @@ class GuaranteedTiers:
     policy: str = ""
 
     @classmethod
-    def from_calibration(cls, cal) -> Optional["GuaranteedTiers"]:
+    def from_calibration(cls, cal, mode: str = "standard") -> Optional["GuaranteedTiers"]:
+        """The tiers of one perception mode: ``standard`` = ``tiers``; any other name = its entry in
+        ``modes`` (fit and verified for that mode only — a promise is valid only for the mode it was
+        calibrated on). None when the mode is not calibrated."""
         t = cal.tiers
         if t.get("tau_review") is None:
             return None
+        if mode != "standard":
+            m = cal.modes.get(mode)
+            if not m or m.get("tau_review") is None:
+                return None
+            vt = m.get("verified_on_test") or {}
+            return cls(tau_review=float(m["tau_review"]), tau_confirm=None, relook_mode=None,
+                       guaranteed_class=cal.guaranteed_class,
+                       non_hazard_classes=tuple(t.get("non_hazard_classes") or ()),
+                       p_pot_bins=list(m.get("p_pot_bins") or []),
+                       guarantees={"recall_promise": m.get("recall_promise"), "precision_promise": None,
+                                   "recall_ceiling": m.get("recall_ceiling"), "requested_recall_achievable": False,
+                                   "verified_on_test": {"recall": vt.get("recall"),
+                                                        "recall_promise_held": vt.get("promise_held")},
+                                   "report": m.get("report")},
+                       policy=mode)
         return cls(tau_review=float(t["tau_review"]),
                    tau_confirm=None if t.get("tau_confirm") is None else float(t["tau_confirm"]),
                    relook_mode=t.get("relook_mode"), escalate_clahe=bool(t.get("escalate_clahe")),

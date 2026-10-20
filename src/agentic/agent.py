@@ -75,10 +75,20 @@ class AgentConfig:
     tiers: Optional[GuaranteedTiers] = None
     # compute budget: re-looks per frame (the stop rule); the rest are skipped + recorded
     max_relooks: int = field(default_factory=lambda: int(os.environ.get("DEPTH_MAX_RELOOKS", "16")))
+    # perception mode (chosen per run by core.py from the operator's goal): "standard" = one full-frame
+    # look; "look_harder" = + the 2×2 tile pass; ``look_harder`` holds its geometry from calibration.json
+    perception_mode: str = "standard"
+    look_harder: Optional[dict] = None
 
     @classmethod
-    def from_calibration(cls) -> "AgentConfig":
-        return cls(tiers=GuaranteedTiers.from_calibration(load_calibration()))
+    def from_calibration(cls, mode: str = "standard") -> "AgentConfig":
+        cal = load_calibration()
+        tiers = GuaranteedTiers.from_calibration(cal, mode)
+        if tiers is None and mode != "standard":
+            raise ValueError(f"perception mode {mode!r} is not calibrated for {cal.data.get('model')}")
+        m = cal.modes.get(mode) if mode != "standard" else None
+        return cls(tiers=tiers, perception_mode=mode,
+                   look_harder={"tile_frac": float(m["tile_frac"]), "merge_iou": float(m["merge_iou"])} if m else None)
 
 
 class ReLookAgent:
@@ -135,10 +145,11 @@ class ReLookAgent:
             progress_cb("stage1", {"altitude_px": cf.altitude_px, "nadir": orient.label})
 
         t0 = time.perf_counter()
-        dets, _see = self.tools.detect(det_in)
-        if "no_detection" in self._faults:                  # failure drill: an empty frame
-            dets = []
+        dets, see_step = self.tools.detect(det_in)
         see_ms = (time.perf_counter() - t0) * 1000
+        dets, sources, perception = self._look_harder(det_in, dets, see_step)
+        if "no_detection" in self._faults:                  # failure drill: an empty frame (after every look)
+            dets, sources = [], []
         if progress_cb:
             progress_cb("see", {"candidates": len(dets), "nadir": orient.label})
 
@@ -149,8 +160,15 @@ class ReLookAgent:
             candidates = [self._decide_legacy(det_in, gray, d, cf) for d in dets]
             n_inf = 1 + sum(sum(s.tool in ("zoom_relook", "enhance_relook") for s in c.trace)
                             for c in candidates)
-        for c in candidates:                                     # Stage-1 geometry for Act (geotag)
+        for c, src in zip(candidates, sources):                 # Stage-1 geometry for Act (geotag)
             _attach_geometry(c, cf)
+            if src != "full":
+                c.trace.insert(0, AgentStep(
+                    tool="look_harder", latency_ms=0.0, conf_after=round(c.conf, 4), status="done",
+                    rationale=("only the closer 2×2 tile look proposed this find - the full-frame look did not"
+                               if src == "tiles" else "the closer 2×2 tile look raised this find's score"),
+                    detail={"source": src}))
+        n_inf += perception.get("passes", 0)
         prove_decide_ms = (time.perf_counter() - t0) * 1000
         if progress_cb:
             progress_cb("decide", {"counts": _counts(candidates)})
@@ -162,9 +180,39 @@ class ReLookAgent:
             stage_ms={"stage1": stage1_ms, "see": see_ms, "prove_decide": prove_decide_ms,
                       "inferences": float(n_inf)},
             nadir=orient.label, orientation=orient.to_dict(), stage1=s1,
-            incidents=_frame_incidents(frame_id, candidates, cf, self._faults),
-            active=self._active_info(),
+            incidents=_frame_incidents(frame_id, candidates, cf, self._faults) + ([incident(
+                "tool_failed", f"{frame_id}: the look-harder tile pass failed - {perception['fallback']}",
+                frame_id=frame_id, simulated="tool_failed" in self._faults)] if perception.get("fallback") else []),
+            active=self._active_info(), perception=perception,
         )
+
+    def _look_harder(self, frame, dets: list[Detection], see_step: AgentStep):
+        """Frame-level value of information: does this run's goal need a closer look at the whole
+        frame? Only in the ``look_harder`` mode, whose stronger promise was calibrated WITH the tile
+        pass (STUDY-18) — the standard promise holds without it, so there a second look buys nothing
+        the promise needs. A failed tile pass falls back to the first look and is reported."""
+        mode = self.cfg.perception_mode
+        info = {"mode": mode, "promise": (self.cfg.tiers.recall_promise if self.cfg.tiers else None),
+                "steps": [see_step.to_dict()], "passes": 0}
+        if not self.cfg.look_harder:
+            info["steps"].append(AgentStep(
+                tool="look_harder", status="skipped", latency_ms=0.0,
+                rationale="standard mode: its recall promise is calibrated on the full-frame look alone, so "
+                          "a closer look is not needed to keep it (the goal chose this mode)",
+                detail={"reason": "mode_standard"}).to_dict())
+            return dets, ["full"] * len(dets), info
+        lh = self.cfg.look_harder
+        try:
+            if "tool_failed" in self._faults:
+                raise RuntimeError("simulated tile-pass failure (failure drill)")
+            merged, src, step = self.tools.look_harder(frame, dets, lh["tile_frac"], lh["merge_iou"])
+        except Exception as e:
+            info["steps"].append(_failed_step("look_harder", e, None).to_dict())
+            info["fallback"] = "first look only - this frame does not carry the look-harder promise"
+            return dets, ["full"] * len(dets), info
+        info["steps"].append(step.to_dict())
+        info.update(passes=4, new=step.detail["new"], raised=step.detail["raised"])
+        return merged, src, info
 
     def _active_info(self) -> dict:
         em = self.evidence_model

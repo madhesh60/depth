@@ -194,6 +194,7 @@ class FrameResult:
     stage1: dict = field(default_factory=dict)                 # Stage-1 canonicalisation record
     incidents: list = field(default_factory=list)             # failures + fallbacks (incidents.py)
     active: dict = field(default_factory=dict)                 # active-vision mode + its validation status
+    perception: dict = field(default_factory=dict)             # perception mode + the frame-level steps (look harder)
 
     def by_verdict(self, v: Verdict) -> list[Candidate]:
         return [c for c in self.candidates if c.verdict is v]
@@ -215,6 +216,7 @@ class FrameResult:
             "candidates": [c.to_dict() for c in self.candidates],
             "incidents": list(self.incidents),
             "active": dict(self.active),
+            "perception": dict(self.perception),
         }
 
 
@@ -296,11 +298,15 @@ class SurveyResult:
     mission: MissionPlan
     track: Optional[dict] = None          # the GPS track used (kept for re-planning; not serialised)
     plan_args: dict = field(default_factory=dict)   # budget / boat minutes the plan was made with
+    agent_run: dict = field(default_factory=dict)   # the core loop's record: goal, decisions, stop (core.py)
 
     def to_dict(self) -> dict:
-        return {
+        d = {
             "survey_id": self.survey_id,
             "frames": [f.to_dict() for f in self.frames],
             "tracked": [t.to_dict() for t in self.tracked],
             "mission": self.mission.to_dict(),
         }
+        if self.agent_run:
+            d["agent_run"] = _json(self.agent_run)
+        return d

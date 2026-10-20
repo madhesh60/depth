@@ -148,6 +148,13 @@ class Calibration:
         return dict(self.data["tiers"].get("guarantees") or {})
 
     @property
+    def modes(self) -> dict:
+        """Extra calibrated perception modes beyond the standard tiers, each with its own fitted
+        threshold and promise (``modes.look_harder``: ``study_look_harder.py``, STUDY-18). A mode is
+        written only after it passed its gates, so its presence means it may be used."""
+        return copy.deepcopy(self.data.get("modes") or {})
+
+    @property
     def severity(self) -> dict:
         """How bad a hazard is IF it is real — an OPERATOR POLICY, not fitted from data. Keys:
         ``class_weight`` (per class, default 1), ``suspended_weight`` (box above the tracked seabed:

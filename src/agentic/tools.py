@@ -23,12 +23,12 @@ from typing import Callable, Optional, TypeVar
 import numpy as np
 
 from src.detection.infer import Detection
-from .perception import Perceptor
+from .perception import Perceptor, merge_candidates
 from .shadow import ShadowProver
 from .types import AgentStep, RelookResult, ShadowProof
 
 T = TypeVar("T")
-_NET_TOOLS = {"detect", "zoom_relook", "relook_band"}      # share the one cv2.dnn net
+_NET_TOOLS = {"detect", "zoom_relook", "relook_band", "look_harder"}   # share the one cv2.dnn net
 
 
 def default_timeout_s() -> float:
@@ -98,6 +98,22 @@ class Toolbox:
             tool="detect", rationale=f"full-frame scan found {len(dets)} candidates ({n_fg} {g})",
             latency_ms=round(ms, 1), detail={"n": len(dets)},
         )
+
+    def look_harder(self, frame: np.ndarray, dets: list[Detection], tile_frac: float,
+                    merge_iou: float) -> tuple[list[Detection], list[str], AgentStep]:
+        """The second, closer look at the whole frame (2×2 tiles, 4 forward passes) folded into the
+        first look. Returns the merged candidates, where each came from, and the step."""
+        t0 = time.perf_counter()
+        extra = self._guard("look_harder", lambda: self.perceptor.look_harder(frame, tile_frac))
+        merged, src = merge_candidates(dets, extra, merge_iou)
+        ms = (time.perf_counter() - t0) * 1000
+        new, raised = src.count("tiles"), src.count("full+tiles")
+        return merged, src, AgentStep(
+            tool="look_harder", latency_ms=round(ms, 1),
+            rationale=(f"2×2 tile pass ({tile_frac:.0%} tiles, the scale the detector was trained on): "
+                       f"{len(extra)} finds -> {new} new candidate(s) the full-frame look did not propose, "
+                       f"{raised} first-look score(s) raised"),
+            detail={"tile_finds": len(extra), "new": new, "raised": raised, "passes": 4, "tile_frac": tile_frac})
 
     # -- Prove: Stage-1 water column (geometry, no inference) -------------------------------
     def water_column_check(self, cf, bbox) -> tuple[Optional[bool], Optional[AgentStep]]:
