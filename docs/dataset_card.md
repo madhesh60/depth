@@ -7,7 +7,7 @@ Honest provenance for the training data. The data itself is git-ignored (S3); th
 
 | Source | Sensor | Content | License |
 |---|---|---|---|
-| PINGEcosystem crab-pot | **side-scan sonar** | derelict crab-pots (the real target) | card metadata CC-BY-SA-4.0, card text "GPL"; now gated — asked the authors (`docs/outreach.md`) |
+| PINGEcosystem crab-pot | **side-scan sonar** | derelict crab-pots (the real target) | card metadata CC-BY-SA-4.0, card text "GPL"; now gated — asked the authors (`docs/notes/outreach.md`) |
 | UATD | **forward-looking sonar** | placed test objects (cylinder, tyre, cage…) | CC-BY-4.0 |
 | SeabedObjects-KLSG | side-scan sonar | shipwrecks | research use |
 | AI4Shipwrecks | side-scan sonar | shipwrecks | check page before publishing |

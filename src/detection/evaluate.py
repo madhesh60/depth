@@ -1,8 +1,8 @@
 """evaluate.py — honest, deploy-faithful evaluation of the Stage-2 ONNX detector.
 
 Runs the **exact artifact that ships** (``best.onnx`` via ``cv2.dnn`` / ``YoloOnnxDetector``
-— no torch) over a YOLO split and reports, in one pass, the four evaluation gaps flagged in
-``docs/WINNING_REPORT.md`` / ``NEEDTOFIX.md``:
+— no torch) over a YOLO split and reports, in one pass, the four evaluation gaps flagged in the
+initial review (``docs/notes/initial_review.md``):
 
 * **per-class AP@0.5** (VOC all-points), plus P/R/F1                              (baseline)
 * **VAL-tuned per-class confidence thresholds** — the test split is scored ONCE   (#10)

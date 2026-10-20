@@ -19,7 +19,7 @@ Stage 1 (``src.cv_pipeline.canonical``) supplies the two measured inputs:
 
 Honesty (report §5.9): the Hugging Face crab-pot frames carry **no GPS**. In that case we attach no
 coordinates and flag ``gps_available = False`` — we never stamp one fake lat/lon onto every object
-(the exact bug called out in ``docs/WINNING_REPORT.md``). For demos a clearly-labelled *synthetic*
+(the exact bug called out in ``docs/notes/initial_review.md``). For demos a clearly-labelled *synthetic*
 track can be generated (``synthetic_track``), but every object it produces is marked
 ``synthetic=True`` and surfaced as "SYNTHETIC DEMO GPS — not real coordinates" downstream.
 """

@@ -1,8 +1,8 @@
 # Competition Rules & Requirements — OpenCV AI Competition 2026
 
 > Reference digest of the official rules, curated for Team Syndicate. Authoritative source
-> is the organisers' site; this file is a working summary. See [`AGENT.md`](../AGENT.md) for
-> our submitted proposal and [`architecture.md`](../architecture.md) for how we satisfy each
+> is the organisers' site; this file is a working summary. See [`AGENT.md`](../../AGENT.md) for
+> our submitted proposal and [`architecture.md`](../../architecture.md) for how we satisfy each
 > requirement.
 
 **Sponsor:** Amazon Web Services · **Administrator:** OpenCV Foundation

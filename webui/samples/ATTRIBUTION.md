@@ -12,7 +12,7 @@ https://doi.org/10.3390/jmse14100951
 **License note (checked 2026-09-28):** the dataset card's metadata says `cc-by-sa-4.0`, while its text
 says "released under the GPL license", and access is now gated (contact sharing). We follow the
 metadata; if GPL applies instead, this repository's AGPL-3.0 is compatible with GPL-3.0. We have asked
-the authors to confirm (see `docs/outreach.md`).
+the authors to confirm (see `docs/notes/outreach.md`).
 
 They are redistributed here under the same license (ShareAlike). They carry **no GPS**; any map
 shown for them in the DEPTH demo uses a clearly-labelled synthetic track.

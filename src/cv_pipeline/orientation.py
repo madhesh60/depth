@@ -3,8 +3,8 @@ orientation.py — where is the sonar (nadir) in this frame? Decided by SOURCE R
 
 The old ``ShadowProver.calibrate_nadir`` guessed the nadir edge from the darkest/flattest image
 border. On real PINGMapper sonograms — whose nadir is *always* the top edge — that guess was right
-only 26% of the time (NEEDTOIMPROVE §4.3), which pointed the shadow search and the geotag range the
-wrong way on 3 of 4 frames. Orientation is now resolved in this order:
+only 26% of the time (24 Sep technical review, §4.3), which pointed the shadow search and the geotag
+range the wrong way on 3 of 4 frames. Orientation is now resolved in this order:
 
 1. an explicit override from the caller (API ``?nadir=top|bottom|left|right``) — rule ``"user"``;
 2. a **source rule** from the filename (verified by eye on real frames, ``runs/_look``):

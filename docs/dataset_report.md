@@ -99,8 +99,8 @@ usable boxes", "1,461 polygon lines need conversion", and "5 classes" are **no l
 Those blockers are resolved by the reprocessing.
 
 **Open decision (for the owner):** ship the cleaner 4-class `fishing_gear` taxonomy, or
-re-introduce `rope_line` as a distinct 5th class to match the proposal. See
-[`TODO.md`](../TODO.md) Phase 1 and [`architecture.md`](../architecture.md) §12.
+re-introduce `rope_line` as a distinct 5th class to match the proposal. **Resolved by dataset v2:**
+neither — v2 and v2b use two classes, `ghost_gear` and `wreck_debris` ([`dataset_card.md`](dataset_card.md)).
 
 ---
 

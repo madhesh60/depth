@@ -2,7 +2,7 @@
 
 > How to drive this build with Claude Code: **you make the ML and product decisions;
 > Claude executes, tests, documents, and moves the project forward.** Reference material,
-> not a spec. See [`CLAUDE.md`](../CLAUDE.md) for the enforced session instructions.
+> not a spec. See [`CLAUDE.md`](../../CLAUDE.md) for the enforced session instructions.
 
 ---
 
@@ -36,7 +36,7 @@ engineer, not dependent on the tool.
 
 ## 3. The experiment loop
 
-Maintain [`experiments.md`](../experiments.md). Every run records model, dataset version,
+Maintain [`experiments.md`](../../experiments.md). Every run records model, dataset version,
 input size, augmentation, hyperparameters, and metrics (P / R / mAP / per-class / confusion),
 plus error analysis and the next hypothesis. This turns random training into a research loop:
 
@@ -70,10 +70,9 @@ uncommitted directory.
 
 | File | Update cadence |
 |---|---|
-| [`progress.md`](../progress.md) | End of every session |
-| [`experiments.md`](../experiments.md) | After every training run |
-| [`TODO.md`](../TODO.md) | As tasks open/close |
-| [`architecture.md`](../architecture.md) | When a structural decision changes |
+| [`progress.md`](../../progress.md) | End of every session |
+| [`experiments.md`](../../experiments.md) | After every training run |
+| [`architecture.md`](../../architecture.md) | When a structural decision changes |
 
 ---
 
@@ -97,7 +96,7 @@ uncommitted directory.
 
 ---
 
-## 8. Month plan (mirrors [`TODO.md`](../TODO.md))
+## 8. Month plan
 
 - **Week 1 — Foundation:** architecture, dataset audit, research, model selection, AWS design, baseline.
 - **Week 2 — ML:** data quality → augmentation → training → evaluation → error analysis → repeat (controlled experiments, not 20 random models).
@@ -113,7 +112,7 @@ uncommitted directory.
 3. Prefer simple, maintainable design; no unnecessary abstractions.
 4. Run tests/validation after significant changes; never hide errors.
 5. Never modify the test set or introduce data leakage.
-6. Track decisions in `architecture.md`, progress in `progress.md`, experiments in `experiments.md`, open work in `TODO.md`.
+6. Track decisions in `architecture.md`, progress in `progress.md`, experiments in `experiments.md`.
 7. Analyse false positives/negatives, not just aggregate accuracy.
 8. For AWS: prioritise reliability, security, reasonable cost.
 9. Every feature must support the core problem — no impressive-but-pointless additions.

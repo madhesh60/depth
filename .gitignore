@@ -46,3 +46,6 @@ data_exp*.yaml
 # local UI screenshot / CDP verification scratch (not a deliverable)
 .shots/
 _shots/
+
+# local tool config
+.claude/
