@@ -25,10 +25,13 @@ load_test() {   # load_test <label>: run on the box over SSM (the origin is clos
   if [ "$APPLY" != "1" ]; then echo "(dry run) would run src.bench.load_test on the box"; return; fi
   SSM_COMMENT="DEPTH load test" ssm_run "$iid" "cd /opt/depth && set -a && . /etc/depth/admin.env && set +a && \
 python3 -m src.bench.load_test http://127.0.0.1:8000 --label $label --admin-token \"\$DEPTH_ADMIN_TOKEN\" \
---out /tmp >/tmp/load_$label.log 2>&1; tail -5 /tmp/load_$label.log 1>&2; cat /tmp/load_$label.json" \
-    > "benchmarks/load_test__$label.json" || echo "load test FAILED - see the SSM output above"
-  python -I -c 'import json,sys; d=json.load(open(sys.argv[1])); print("checks:", d.get("checks"))' \
-    "benchmarks/load_test__$label.json" 2>/dev/null || echo "(no JSON result - inspect benchmarks/load_test__$label.json)"
+--out /tmp >/tmp/load_$label.log 2>&1; tail -5 /tmp/load_$label.log 1>&2; gzip -9c /tmp/load_$label.json | base64 -w0" \
+    > "$WORK/load_$label.b64" || echo "load test FAILED - see the SSM output above"
+  # SSM returns at most 24,000 characters of output: the JSON travels gzipped + base64
+  mkdir -p benchmarks/load
+  python -I -c 'import base64,gzip,json,sys; d=json.loads(gzip.decompress(base64.b64decode(open(sys.argv[1]).read())))
+open(sys.argv[2],"w").write(json.dumps(d,indent=2)); print("passed:", d.get("passed"), d.get("checks"))' \
+    "$WORK/load_$label.b64" "benchmarks/load/load_test__$label.json" || echo "(no JSON result - see $WORK/load_$label.b64)"
 }
 
 if [ "$PHASE" = now ]; then
