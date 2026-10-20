@@ -75,6 +75,21 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ## 4. Session log
 
+### 2026-10-20 (sweep 63) — EC2 benchmarks without COOL; load test passed; COOL waits on AWS Support
+
+- **COOL blocked by payment:** Marketplace rejects the account's payment method (SBI RuPay; AWS India offers
+  card + netbanking only). The user opened an AWS Support case (COOL payment + CloudFront verification), 1–2 days.
+- `infra/golive.sh`: the rest of the AWS work as two commands. `PHASE=now` (no COOL) ran: benchmarks A + B on
+  self-terminating machines, then the load test on the demo server. `PHASE=cool` is ready for the subscription.
+- **Measured (stock OpenCV 5, 4 threads):** c8i.xlarge x86 **157 ms/frame**, c8g.xlarge Graviton4 **197 ms**;
+  per 1k frames $0.0082 vs $0.0087; real 1-h recording RTF 0.0135 vs 0.0171. Stock Graviton is slower at equal
+  size: negative result kept, and the bar COOL must clear. The network is 93–98% of the frame.
+- **Load test (c8g.large demo, rehearsal):** 4 clients + 1 survey, 120 s: 291/291 ok, analyze p95 2.0 s
+  (mark 3 s), health p95 8 ms, survey done in 18 s, 0 errors — **passed**.
+- Fix: SSM returns ≤ 24,000 characters, which cut the load-test JSON; it now travels gzip + base64, into
+  `benchmarks/load/` (out of `compare`'s glob).
+- `docs/lucidchart_diagram.md`: Mermaid source for Lucidchart (Insert → Diagram as code).
+
 ### 2026-10-19 (sweep 62) — First AWS contact: COOL found by its product code; CloudFront needs account verification
 
 - **COOL located from the CLI.** `describe-images --owners aws-marketplace` gives the Graviton4 listing's

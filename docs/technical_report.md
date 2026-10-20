@@ -231,15 +231,19 @@ known crab pots.
 | full product path (EXP-003) | laptop x86, stock OpenCV 5, 8 threads | 252 ms | 3.3 | 51 s (RTF 0.014) |
 | OpenCV-only stages (decode, Stage 1, evidence, render) | laptop x86 | 25 ms | 40 | 4 s |
 | full product path, 1 thread (EXP-001) | laptop x86 | 523 ms | 1.9 | 89 s |
-| **⏳ pending:** x86 stock · Graviton stock · **Graviton COOL** | EC2 c7i / c8g | — | — | — |
+| full product path, 4 threads (EC2, 2026-10-20) | c8i.xlarge x86, stock OpenCV 5 | 157 ms | 6.4 | 26.5 s · $0.0014 |
+| full product path, 4 threads (EC2, 2026-10-20) | c8g.xlarge Graviton4, stock OpenCV 5 | 197 ms | 5.1 | 33.3 s · $0.0015 |
+| real 1-h recording end to end (EC2) | c8i.xlarge x86 / c8g.xlarge Graviton4, stock | — | — | RTF 0.0135 / 0.0171 |
+| load test, 4 clients + 1 survey, 120 s | c8g.large demo server (stock, rehearsal) | p95 2.0 s (mark 3 s) | 291/291 ok | **passed** |
+| **⏳ pending:** Graviton **COOL** (c8g.xlarge + c8g.large) | Marketplace subscription waiting on AWS | — | — | — |
 
 **Proposal targets vs delivered.** Stated plainly, because judges compare the two:
 
 | proposal target | delivered | reading |
 |---|---|---|
 | mAP@0.5 ≥ 0.70 | **0.319** (both classes); **crab pots 0.482** (v2b test) | **not met.** Six clean training runs did not close it; the diagnosis points at the data. The recall promise below makes the shortfall safe to use: every pot the promise covers reaches a person. |
-| < 300 ms per frame | 252 ms p50 / 530 ms p95 (laptop, full product path) | met at p50, not at p95. Graviton + COOL numbers pending. |
-| ≥ 5 FPS | 3.3 FPS | not met. It is also the wrong yardstick for side-scan: one frame per ~21 s of sonar arrives from the boat. What matters is survey-hours processed: **51 s of compute per hour of sonar (70× faster than real time)**. |
+| < 300 ms per frame | 157 ms (x86) / 197 ms (Graviton stock) p50 on EC2, 4 threads; laptop 252 / 530 ms | **met on EC2** at p50 and p95. Graviton COOL pending. |
+| ≥ 5 FPS | 6.4 FPS (x86) / 5.1 FPS (Graviton stock) on EC2; 3.3 on the laptop | met on EC2. It is also the wrong yardstick for side-scan: one frame per ~21 s of sonar arrives from the boat. What matters is survey-hours processed: **51 s of compute per hour of sonar (70× faster than real time)**. |
 | (not in the proposal) | ≥ 79% of pots reach a person, verified on unseen data (81%) | added: a promise instead of an average |
 
 The 3-way benchmark ([`infra/README.md`](../infra/README.md)) uses the same code, the same frames and

@@ -209,8 +209,8 @@ test-tuned "CONFIRMED 0.737" is 0.58 unseen — retired).
 
 **Runtime (laptop x86, stock OpenCV 5, full product path, EXP-003):** 252 ms/frame p50 (network ≈ 92%;
 the OpenCV-only stages run at 40 fps); one survey-hour of sonar (~169 frames) processed in **51 s**
-(real-time factor 0.014). Results are committed in [`benchmarks/`](benchmarks). Graviton/COOL numbers:
-`infra/bench_cool.sh` on EC2 (pending).
+(real-time factor 0.014). **On EC2 (2026-10-20, 4 threads, stock OpenCV 5):** 157 ms/frame on c8i.xlarge x86, 197 ms on c8g.xlarge Graviton4 — stock Graviton is *slower* at equal size, which is the bar COOL has to clear; the c8g.large demo server passed the load test (4 clients + 1 survey: 291/291, p95 2.0 s). Results are committed in [`benchmarks/`](benchmarks) · [`docs/cool_benchmark.md`](docs/cool_benchmark.md). EC2 numbers come from
+`infra/golive.sh` (x86 + Graviton stock now, Graviton COOL once the Marketplace subscription is active).
 
 **Real recording** (raw Humminbird, Colorado River, 150.6 s, real per-ping GPS —
 [`docs/raw_recording.md`](docs/raw_recording.md)): 3,453 pings per channel parsed with 0 malformed;
@@ -219,7 +219,7 @@ cross-check (STUDY-16); the full agent in ~4 s (~40× faster than the recording)
 2 review cards = **48 cards per hour of sonar** on water with no known pots — the false-alarm load
 this model would put on an analyst there.
 
-**Pending:** the timed study and the blinded audit with people, and the EC2 / COOL benchmark. The
+**Pending:** the timed study and the blinded audit with people, and the Graviton **COOL** runs (the Marketplace subscription is with AWS Support). The
 weights are published (GitHub Release `exp003-v1`, SHA-256 checked by `fetch_model`). EXP-003 is
 deployed; EXP-002/004/005 were trained and did not beat it
 ([`docs/exp005_diagnosis.md`](docs/exp005_diagnosis.md)).
