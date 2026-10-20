@@ -16,7 +16,7 @@ blow the <300 ms/frame budget and dilutes COOL's measured contribution). See
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, asdict, field
+from dataclasses import dataclass, asdict
 from typing import Optional
 
 

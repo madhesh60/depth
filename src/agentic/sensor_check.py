@@ -32,11 +32,8 @@ src.agentic.sensor_check`` writes the report (``docs/sensor_check.md``).
 """
 from __future__ import annotations
 
-import argparse
-import math
 import time
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Optional
 
 import numpy as np

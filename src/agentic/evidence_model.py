@@ -210,7 +210,6 @@ def _shadow_cost_ms(model: str) -> float:
     import cv2
     import numpy as np
     from .shadow import ShadowProver, ShadowConfig
-    from .calibrate import list_frames
     blob = json.loads((REPO / "runs" / "calib" / f"{model}_val.json").read_text())
     root = REPO / "DATASET" / "03_yolo_ready_dataset_v2b" / "val" / "images"
     prover, ts = ShadowProver(ShadowConfig(nadir="top")), []

@@ -551,7 +551,7 @@ def report(dat: Path) -> str:
          f"consistent one. With this scale, ground range is in real metres and shadow heights are "
          f"`h/H × the sonar's measured depth` (the rule: metres only with a measured altitude).", "",
          "## 3. The whole agent on it", "",
-         f"![a real frame and the real track](img/raw_recording.jpg)", "",
+         "![a real frame and the real track](img/raw_recording.jpg)", "",
          f"- {len(frames)} frames (500 pings each, port + starboard) in **{wall:.1f} s** on this laptop — {P['duration_s'] / wall:.0f}× "
          f"faster than the recording.",
          f"- **{len(res.tracked)} review cards**, 0 auto-confirmed (no precision promise), P(pot) "

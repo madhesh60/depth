@@ -34,7 +34,7 @@ from .incidents import incident
 from .mission import export, plan_mission, DEFAULT_SEC_PER_CARD
 from .stitch import stitch_boundaries
 from .resurvey import merge_repeat_sightings
-from .types import Candidate, FrameResult, MissionPlan, SurveyResult, TrackedObject, Verdict
+from .types import Candidate, FrameResult, SurveyResult, TrackedObject, Verdict
 
 REPO = Path(__file__).resolve().parents[2]
 _TRACKED_VERDICTS = (Verdict.CONFIRMED, Verdict.REVIEW)

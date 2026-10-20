@@ -68,7 +68,7 @@ from src.detection.calibration import SHIPPED_MODEL, load_calibration
 from src.detection.infer import configure_runtime, DEFAULT_ONNX
 from . import samples as samples_mod
 from .jobs import JobStore, REPORT_FORMATS, PUBLIC_FORMATS
-from src.agentic.provenance import stamp as provenance_stamp, short as provenance_short
+from src.agentic.provenance import stamp as provenance_stamp
 from .metrics import Metrics
 from src.agentic.feedback import FeedbackStore
 from src.agentic import study as study_mod
@@ -174,7 +174,7 @@ def _notify(event: str, payload: dict) -> None:
 
 def _survey_event(d: dict) -> dict:
     m, sid = d["mission"], d["survey_id"]
-    rp, cf = m.get("resurvey_plan") or {}, d.get("stage1_counterfactual") or {}
+    rp = m.get("resurvey_plan") or {}
     idx = {t["oid"]: t for t in d["tracked"]}
     return {"survey_id": sid, "frames": len(d.get("frames") or []), "counts": m["counts"],
             "gps": "none" if not m["gps_available"] else ("synthetic" if m["gps_synthetic"] else "real"),

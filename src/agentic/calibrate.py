@@ -47,8 +47,7 @@ import numpy as np
 from src.detection.calibration import load_calibration, save_calibration, DEFAULT_MODEL
 from src.detection.frames import unique_frames, frame_key, recording_of
 from src.detection.infer import DEFAULT_ONNX, _iou
-from .guarantees import (cp_lower, cp_upper, tau_confirm, tau_review, achievable_recall,
-                         best_recall_guarantee, precision_at, default_grid)
+from .guarantees import (cp_lower, cp_upper, tau_confirm, tau_review, best_recall_guarantee, precision_at, default_grid)
 from .perception import Perceptor
 from .shadow import ShadowProver, ShadowConfig
 

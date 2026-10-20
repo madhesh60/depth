@@ -28,7 +28,6 @@ import time
 from pathlib import Path
 
 import cv2
-import numpy as np
 
 from .config import Stage1Config, QUALITY_PRESET
 from .pipeline import Stage1Pipeline

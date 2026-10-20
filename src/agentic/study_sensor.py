@@ -243,7 +243,7 @@ def report(design: dict, fresh: dict | None) -> str:
         f = fresh
         L += ["", f"## Fresh recording — {f['recording']} ({f['family']}, {f['freq_hz'] / 1000:.0f} kHz, "
               f"{f['duration_s'] / 60:.0f} min, {f['chunks']} chunks) — run once", "",
-              f"Verdicts: " + ", ".join(f"{v} {k.replace('_', ' ')}" for k, v in f["result"]["counts"].items())
+              "Verdicts: " + ", ".join(f"{v} {k.replace('_', ' ')}" for k, v in f["result"]["counts"].items())
               + f" · {f['result']['iterations']} scale iteration(s) · {f['seconds']:.0f} s on this laptop "
               f"for a {f['duration_s'] / 60:.0f}-min recording.", ""]
         L += _criteria(f)

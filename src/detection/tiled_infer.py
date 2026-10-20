@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
-from typing import Sequence
 
 import cv2
 import numpy as np

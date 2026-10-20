@@ -32,7 +32,7 @@ import numpy as np
 
 from src.agentic.calibrate import FLOOR, MATCH_IOU, V1, _gt, list_frames
 from src.detection.evaluate import voc_ap
-from src.detection.infer import DEFAULT_ONNX, Detection, YoloOnnxDetector, nms, _iou
+from src.detection.infer import DEFAULT_ONNX, YoloOnnxDetector, nms, _iou
 
 REPO = Path(__file__).resolve().parents[2]
 OUT = REPO / "runs" / "study13"
