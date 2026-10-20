@@ -4,7 +4,7 @@ _`python -m src.agentic.effort` · model EXP-003 · verification split: `DATASET
 
 Timings: **ASSUMED (no user study yet)** — 20 s per frame (manual), 8 s per card, manual recall 1.00, card accuracy 1.00.
 
-![effort curve](img/effort_curve.png)
+![effort curve](../img/effort_curve.png)
 
 | at the recall promise (≥ 79%) | manual review | DEPTH queue |
 |---|--:|--:|

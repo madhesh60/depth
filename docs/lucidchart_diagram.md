@@ -1,6 +1,6 @@
 # Architecture diagram — Lucidchart source
 
-The as-built deployment ([architecture.md](../architecture.md), [infra/README.md](../infra/README.md)), written
+The as-built deployment ([architecture.md](architecture.md), [infra/README.md](../infra/README.md)), written
 so you can paste it into Lucidchart: **Insert → Diagram as code → Mermaid**, paste the block, then style it.
 Export as SVG to `docs/img/architecture.svg` when done.
 
@@ -70,5 +70,5 @@ flowchart LR
   BF --> C[C c8g.xlarge Graviton<br/>COOL]
   BF --> D[D c8g.large Graviton<br/>COOL · demo size]
   A & B & C & D -->|results + AWS-signed receipt, then self-terminate| S3[(S3)]
-  S3 --> CMP[src.bench.compare → docs/cool_benchmark.md]
+  S3 --> CMP[src.bench.compare → docs/reports/cool_benchmark.md]
 ```

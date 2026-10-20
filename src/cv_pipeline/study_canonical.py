@@ -16,7 +16,7 @@ Part B — with EXP-001 on its unseen crab-pot sonograms (v1 val Rec19 + v1 test
   * detector input ``raw`` vs ``gray`` vs ``gain`` (range-gain normalised): recall ceiling at the
     detector floor (conf 0.05) and AP@0.3/0.5 for crab pots, with a paired frame-bootstrap CI.
 
-Writes ``docs/stage1_canonical.md`` + ``runs/stage1/study.json``.
+Writes ``docs/reports/stage1_canonical.md`` + ``runs/stage1/study.json``.
 
     python -m src.cv_pipeline.study_canonical [--skip-detector]
 """
@@ -277,8 +277,8 @@ def main():
     out = REPO / "runs" / "stage1"
     out.mkdir(parents=True, exist_ok=True)
     (out / "study.json").write_text(json.dumps({"part_a": a, "part_b": b}, indent=1))
-    (REPO / "docs" / "stage1_canonical.md").write_text(report(a, b), encoding="utf-8")
-    print("wrote docs/stage1_canonical.md")
+    (REPO / "docs" / "reports" / "stage1_canonical.md").write_text(report(a, b), encoding="utf-8")
+    print("wrote docs/reports/stage1_canonical.md")
 
 
 if __name__ == "__main__":

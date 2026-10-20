@@ -26,7 +26,7 @@ so `sensor_check.py` runs a loop per 500-ping chunk, each step an `AgentStep`:
 
 The survey's plan opens with `sensor_crosscheck` → `geometry_update` / `geometry_withheld` (which
 hazards were placed with corrected geometry). Studio: Survey → Agent → **Seabed cross-check**.
-Validation: [`sensor_check.md`](sensor_check.md) (STUDY-16; fresh 1-h recording, criteria committed
+Validation: [`sensor_check.md`](reports/sensor_check.md) (STUDY-16; fresh 1-h recording, criteria committed
 before the run; one of three failed and is reported).
 
 ## 1 · Per candidate (Analyze → evidence card → "Agent decision")
@@ -113,10 +113,10 @@ With the **Active vision · experimental** switch on (`?active=1`), each find's 
 **Agent trace**: DETECT → evidence collected → agent decision → OpenCV tool selected → new evidence →
 (evidence conflict) → decision changed → human approval → new survey plan, built only from the
 logged steps. Tools are chosen by value of information (`active.py`); see
-[`evidence_model_exp003.md`](evidence_model_exp003.md) for why it is not on by default.
+[`evidence_model_exp003.md`](reports/evidence_model_exp003.md) for why it is not on by default.
 
 Every opposite-side pass is its own approval request — the Agent tab shows *Agent recommends:
 Perform opposite-side resurvey RSn · Reason: … · [Approve] [Reject]*. Reject → the agent drops that
 pass for good, re-ranks the boat time over the rest, and moves its targets to the front of the
 inspection queue (`human_declined` in the plan). The Agent tab also shows **Does OpenCV change the
-plan?** — the same survey re-planned without the OpenCV evidence ([`opencv_counterfactual.md`](opencv_counterfactual.md)).
+plan?** — the same survey re-planned without the OpenCV evidence ([`opencv_counterfactual.md`](reports/opencv_counterfactual.md)).

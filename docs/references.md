@@ -27,12 +27,12 @@ the same principle applied to sonar:
    99% sonar** (the product domain) for false-positive control.
 2. **Label refinement** → the documented audit + v1 rebuild (dropped 1,096 full-frame boxes,
    sliver/degenerate boxes, corrupt scan, leakage-free split by clip, taxonomy lock). See
-   `docs/dataset_report.md` and `DATASET/scripts/{audit_dataset,build_dataset_v1}.py`.
+   `DATASET/scripts/{audit_dataset,build_dataset_v1}.py` and the dataset card.
 
 Our own STUDY-01 (a model-side trick — classical ROI-gating — gave no gain) independently
 echoes the "data > model" lesson.
 
-**Honest gap this reference exposes (drives v2, see `experiments.md`):** our negatives are
+**Honest gap this reference exposes (drives v2, see `docs/experiments.md`):** our negatives are
 concentrated in one source — `mpulse` (1,086 of 1,120) — while **`crabpot`, the source of the
 `fishing_gear` false positives (background→fishing_gear 0.79, precision 0.50), has only 21**.
 The paper prescribes *more, domain-matched* negatives; v2 should mine empty/clutter crab-pot

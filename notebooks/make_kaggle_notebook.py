@@ -16,7 +16,7 @@ What the previous runs established:
 - two classes beat ghost-only (EXP-004g).
 
 What still limits the model is **ranking against false alarms**, and the gap between training frames
-and new recordings (`docs/exp004_diagnosis.md`). A post-processing fix for duplicate boxes was tested
+and new recordings (`docs/reports/exp004_diagnosis.md`). A post-processing fix for duplicate boxes was tested
 on validation and rejected.
 
 EXP-005 = EXP-004's cleaned data and EXP-003's recipe (SGD 0.01, fixed tiles, 640 px, 2 classes), with

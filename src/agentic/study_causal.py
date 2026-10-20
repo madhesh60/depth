@@ -332,8 +332,8 @@ def main():
     out = REPO / "runs" / "causal"
     out.mkdir(parents=True, exist_ok=True)
     (out / "study.json").write_text(json.dumps(res, indent=1, default=str))
-    (REPO / "docs" / "causal_trace.md").write_text(report(res), encoding="utf-8")
-    print("wrote docs/causal_trace.md")
+    (REPO / "docs" / "reports" / "causal_trace.md").write_text(report(res), encoding="utf-8")
+    print("wrote docs/reports/causal_trace.md")
 
 
 if __name__ == "__main__":

@@ -8,7 +8,7 @@ _`python -m src.agentic.study_sensor` · thresholds set on the design recording 
 
 ## Design recording — R01224 (9xx/11xx/helix, 455 kHz, 150.6 s)
 
-![design overlays](img/sensor_check_design.jpg)
+![design overlays](../img/sensor_check_design.jpg)
 
 _Red: OpenCV tracker alone · blue: the sounder's altitude at the final scale · green: what the agent accepted._
 
@@ -49,7 +49,7 @@ Verdicts: 104 agree, 39 corrected, 137 recovered, 0 image trusted, 0 not measure
 | C2 scale stable across halves | gap ≤ reported uncertainty | 1.984 vs 2.002 cm/sample: gap 0.9%, uncertainty ±5.0% | **PASS** |
 | C3 gross tracker failures caught | none accepted as is | 3 chunk(s) > 50% off a steady sounder → 3 corrected; accepted as is: 0 | **PASS** |
 
-![fresh audit sheet](img/sensor_check_fresh.jpg)
+![fresh audit sheet](../img/sensor_check_fresh.jpg)
 
 _16 chunks drawn at random (seed 0, stratified by verdict). Red: tracker alone · blue: sounder · green: accepted._
 

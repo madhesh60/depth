@@ -1,16 +1,15 @@
 """
-pipeline.py — Stage 1 classical-CV candidate generation for marine-debris detection.
+pipeline.py — the retired Stage-1 contour pipeline (the STUDY-01 negative result).
 
-This is the **COOL core workload**: the classical OpenCV pass that runs CPU-only on AWS
-Graviton (via COOL) and produces candidate Regions of Interest (ROIs) for the Stage 2 YOLO
-verifier. It ingests a side-scan sonar frame and returns geometry-filtered candidate boxes,
-plus a per-op latency breakdown used by the Arm-vs-x86 / COOL-vs-stock benchmark.
+Classical OpenCV candidate generation that was first meant as a Stage-2 ROI gate and as the COOL
+workload. STUDY-01 retired both roles: classical CV has no discriminative power on this sonar, and
+COOL is measured on the product workload instead (``src/bench/product_bench.py``). The product's
+Stage 1 is ``canonical.py``. This module is kept to reproduce STUDY-01 and for ``infer.py``'s
+``roi_guided`` mode, which the product does not use.
 
 Design
 ------
-* Every op is timed individually (``Stage1Result.timings_ms``) so the benchmark can prove
-  *where* the compute goes — the ops COOL accelerates (resize, adaptive-gaussian threshold,
-  contour detection) should dominate, which is what makes the COOL speedup attributable.
+* Every op is timed individually (``Stage1Result.timings_ms``).
 * Behaviour is fully driven by ``Stage1Config`` — no magic numbers here.
 * Pure OpenCV + NumPy, CPU-only: no GPU-only ops, so the identical code runs on Graviton.
 

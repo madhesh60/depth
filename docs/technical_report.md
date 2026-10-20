@@ -22,11 +22,11 @@ Graviton + COOL**.
 | claim | evidence |
 |---|---|
 | **≥ 79% of pots reach a human** (95% confidence), fit on held-out recordings and verified once on unseen test: **81.1% (LCB 76.7%)** — EXP-003, the deployed detector | [`calibration_exp003.md`](calibration_exp003.md) |
-| Stage 1 measures the sonar's altitude without labels; port and starboard agree to **1.6 px** (random pairs 5.3 px) | [`stage1_canonical.md`](stage1_canonical.md) |
-| OpenCV output changes the agent's actions: without Stage 1, **151 of 222** pins leave their own error circle and 4 of 40 re-survey passes regroup (EXP-003, v2b test); the shadow changes no decision (evidence only) | [`causal_trace.md`](causal_trace.md) |
-| Break-even analyst time: DEPTH meets the promise faster than manual review if a card takes **< 6.88 s** (timings assumed until the study runs) | [`effort_curve.md`](effort_curve.md) |
-| Full product path **252 ms/frame p50** on a laptop CPU; one survey-hour of sonar in **51 s** | [`cool_benchmark.md`](cool_benchmark.md) |
-| A **raw sonar recording with real GPS** is read directly and checked against physics (GPS speed vs the speed field r = 0.95; course vs heading 2.4°), with a **measured range scale** (2.03 cm/sample ± 10.2% after the agent cross-checks its seabed track against the depth sounder) → pins and heights in real metres | [`raw_recording.md`](raw_recording.md) |
+| Stage 1 measures the sonar's altitude without labels; port and starboard agree to **1.6 px** (random pairs 5.3 px) | [`stage1_canonical.md`](reports/stage1_canonical.md) |
+| OpenCV output changes the agent's actions: without Stage 1, **151 of 222** pins leave their own error circle and 4 of 40 re-survey passes regroup (EXP-003, v2b test); the shadow changes no decision (evidence only) | [`causal_trace.md`](reports/causal_trace.md) |
+| Break-even analyst time: DEPTH meets the promise faster than manual review if a card takes **< 6.88 s** (timings assumed until the study runs) | [`effort_curve.md`](reports/effort_curve.md) |
+| Full product path **252 ms/frame p50** on a laptop CPU; one survey-hour of sonar in **51 s** | [`cool_benchmark.md`](reports/cool_benchmark.md) |
+| A **raw sonar recording with real GPS** is read directly and checked against physics (GPS speed vs the speed field r = 0.95; course vs heading 2.4°), with a **measured range scale** (2.03 cm/sample ± 10.2% after the agent cross-checks its seabed track against the depth sounder) → pins and heights in real metres | [`raw_recording.md`](reports/raw_recording.md) |
 | A person's decision makes the agent **re-plan** the recovery route, queue, budget and passes; an impact ledger measures the reviewed precision | [`agentic_vision.md`](agentic_vision.md) |
 
 ---
@@ -125,7 +125,7 @@ validation recordings and verifies on test. Training runs on Kaggle; the runtime
 | Display | agent's-eye view, overlays, JPEG encode, twin texture | what the human sees |
 
 The runtime has **no torch dependency**. The same ONNX is evaluated in `cv2.dnn`, so deploy-time
-numbers equal evaluation numbers ([`eval_exp001.md`](eval_exp001.md)).
+numbers equal evaluation numbers ([`eval_exp001.md`](reports/eval_exp001.md)).
 
 ---
 
@@ -146,11 +146,11 @@ All numbers are on **unique frames** (Roboflow augmentation copies removed), and
 | recall ceiling (any proposal ≥ 0.05) | 0.85 / 0.84 | calibration / verification |
 
 We report the crab-pot number because it is the one that matters, not the aggregate. Reports with the
-confusion matrix and PR curve: [`eval_exp003_test.md`](eval_exp003_test.md),
-[`…_official398`](eval_exp003_test_official398.md), [`…_xsonar`](eval_exp003_test_xsonar.md). The gap to
+confusion matrix and PR curve: [`eval_exp003_test.md`](reports/eval_exp003_test.md),
+[`…_official398`](reports/eval_exp003_test_official398.md), [`…_xsonar`](reports/eval_exp003_test_xsonar.md). The gap to
 GhostVision is real; the diagnosis puts it in the data, not the recipe
-([`exp003_diagnosis.md`](exp003_diagnosis.md)). The earlier 4-class baseline EXP-001 (dataset v1) is in
-[`eval_exp001.md`](eval_exp001.md).
+([`exp003_diagnosis.md`](reports/exp003_diagnosis.md)). The earlier 4-class baseline EXP-001 (dataset v1) is in
+[`eval_exp001.md`](reports/eval_exp001.md).
 
 ### 4.2 The agent's promises (Agentic Vision: task success)
 
@@ -164,7 +164,7 @@ Tiers are fit on the **calibration split** (held-out recordings Rec10 / 12 / 16:
 
 ### 4.3 Does OpenCV output change what the agent does? (required evidence)
 
-[`causal_trace.md`](causal_trace.md) (STUDY-12) runs the same survey three ways: the full product,
+[`causal_trace.md`](reports/causal_trace.md) (STUDY-12) runs the same survey three ways: the full product,
 with Stage-1 geometry withheld, and with the shadow withheld. It then diffs every downstream
 decision. Results with EXP-003 on v2b test, 80 unique crab-pot frames, 223 hazards:
 
@@ -186,7 +186,7 @@ exports its decision log.
 
 ### 4.4 Human effort
 
-The effort curve ([`effort_curve.md`](effort_curve.md)) compares three review modes:
+The effort curve ([`effort_curve.md`](reports/effort_curve.md)) compares three review modes:
 
 - **manual review** (every frame);
 - **a confidence-sorted list**;
@@ -204,19 +204,19 @@ frames, manual review 56.3.
 
 The failure gallery was measured on the earlier EXP-001 (its verification split, v1 test, 92 unique
 frames) and has not been re-run for EXP-003. There, 19 of 138 pots (14%) never reached a human
-([`failure_gallery.md`](failure_gallery.md), with contact sheets):
+([`failure_gallery.md`](reports/failure_gallery.md), with contact sheets):
 
 - **32% of missed pots touch the frame edge**, against 11% of found pots;
 - missed pots have lower contrast and sit farther in range;
 - they are **not** smaller.
 
 We tried seam inference across chunk boundaries (STUDY-11b): **no recall gain, not shipped**
-([`seam_inference.md`](seam_inference.md)). Most of these edges are augmentation crops, which dataset
+([`seam_inference.md`](reports/seam_inference.md)). Most of these edges are augmentation crops, which dataset
 v2b removes. We also tried a larger input with a flipped second view (STUDY-13,
-[`scale_tta.md`](scale_tta.md)): +0.10 AP on the calibration recording, but **−0.06 AP on unseen data**.
+[`scale_tta.md`](reports/scale_tta.md)): +0.10 AP on the calibration recording, but **−0.06 AP on unseen data**.
 Not shipped.
 
-**Real, out-of-domain water (STUDY-14, [`raw_recording.md`](raw_recording.md)).** We ran the full agent on a
+**Real, out-of-domain water (STUDY-14, [`raw_recording.md`](reports/raw_recording.md)).** We ran the full agent on a
 raw Humminbird recording with real per-ping GPS: the Colorado River at Horseshoe Bend, 150.6 s, with no
 known crab pots.
 
@@ -287,12 +287,12 @@ on Spot → S3.
 ## 6. Limitations (stated in the product, not hidden)
 
 - **Scope.** One bay's crab pots and one sonar family. On another sonar (`test_xsonar`) AP@0.5 is 0.34 and the val-tuned threshold does not transfer (recall 0.11): a new sonar needs re-calibration.
-- **Detector.** Crab-pot AP@0.5 0.48 and F1 0.41 on the official split, against GhostVision's 0.71–0.73. EXP-003 raised the recall ceiling from 0.72 to 0.85 and the promise from ≥ 65% to ≥ 79%. EXP-004 / 005 (cleaner data) did not beat it ([`exp005_diagnosis.md`](exp005_diagnosis.md)). EXP-002 failed as underfit (`optimizer=auto` built AdamW 0.00167; [`exp002_diagnosis.md`](exp002_diagnosis.md)).
+- **Detector.** Crab-pot AP@0.5 0.48 and F1 0.41 on the official split, against GhostVision's 0.71–0.73. EXP-003 raised the recall ceiling from 0.72 to 0.85 and the promise from ≥ 65% to ≥ 79%. EXP-004 / 005 (cleaner data) did not beat it ([`exp005_diagnosis.md`](reports/exp005_diagnosis.md)). EXP-002 failed as underfit (`optimizer=auto` built AdamW 0.00167; [`exp002_diagnosis.md`](reports/exp002_diagnosis.md)).
 - **Wreck debris** is weak (AP 0.16): most training wrecks are off-domain fish-finder screenshots.
 - **Calibration.** Calibration uses three recordings whose frames are correlated. That is why the promise is verified on a separate split.
 - **Labels.** Labels are incomplete, so precision is a lower estimate (the audit will quantify this).
 - **GPS.** The public crab-pot frames carry no GPS, so their demo track is synthetic and labelled as such everywhere, including the counterfactual's metres. The raw-recording path has **real** per-ping GPS and a measured range scale, but that recording is a river with no known pots: it measures false alarms, not recall.
-- **Heights.** On crab-pot frames heights are relative (h/H). On raw recordings they are in metres from the sonar's measured depth. The range scale there is measured: the tracker alone made 5 false picks among the 11 first-estimate chunks, the agent's cross-check against the depth sounder resolves them (STUDY-16, [`sensor_check.md`](sensor_check.md)), and the remaining uncertainty (± 10.2%) is carried into every error radius.
+- **Heights.** On crab-pot frames heights are relative (h/H). On raw recordings they are in metres from the sonar's measured depth. The range scale there is measured: the tracker alone made 5 false picks among the 11 first-estimate chunks, the agent's cross-check against the depth sounder resolves them (STUDY-16, [`sensor_check.md`](reports/sensor_check.md)), and the remaining uncertainty (± 10.2%) is carried into every error radius.
 - **Effort.** Analyst seconds per card are assumed until the study measures them.
 
 ## 7. Responsible use
@@ -313,14 +313,14 @@ Details: [`responsible_use.md`](responsible_use.md) · [`model_card.md`](model_c
 - **STUDY-03/04** — the acoustic shadow as a filter hurts recall; kept as evidence only.
 - **STUDY-07** — re-look vs confidence: no gain on unseen data. The old test-tuned "CONFIRMED 0.737" is 0.58 on unseen data, and was retired.
 - **STUDY-08** — range-gain detector input: no gain for EXP-001.
-- **STUDY-15** — active vision (value-of-information tool choice): both registered validation checks failed, so it is off by default and labelled experimental ([`evidence_model_exp003.md`](evidence_model_exp003.md)).
+- **STUDY-15** — active vision (value-of-information tool choice): both registered validation checks failed, so it is off by default and labelled experimental ([`evidence_model_exp003.md`](reports/evidence_model_exp003.md)).
 - **EXP-002, EXP-004, EXP-005** — training runs that did not beat EXP-003; each has a diagnosis.
 - **STUDY-11b** — seam inference: no recall gain.
 - **STUDY-13** — a larger input and a flipped second view: +0.10 AP on the calibration recording, but
   **−0.06 AP on unseen data**. Not shipped. It also changed the EXP-002 plan, which now trains 640 and
   1024 px and lets the held-out recordings and a speed gate choose.
 
-Log: [`experiments.md`](../experiments.md).
+Log: [`experiments.md`](experiments.md).
 
 ## 9. Reproduce
 

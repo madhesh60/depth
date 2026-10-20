@@ -19,14 +19,14 @@ must start with the marker and end its header with ``21``, sample counts are cap
 (``MAX_RETURNS``), file sizes are capped (``MAX_FILE_BYTES``), a corrupt ping is skipped with a
 recorded issue (resync on the next marker) instead of crashing, and nothing is executed or written.
 
-Validation (``validate()``; report ``docs/raw_recording.md``) — before any number is trusted:
+Validation (``validate()``; report ``docs/reports/raw_recording.md``) — before any number is trusted:
 GPS speed vs the sonar's speed field, course-over-ground vs heading, record/time monotonicity,
 and port/starboard agreement. The **range scale** is *measured*: sonar depth (m, from the unit)
 ÷ Stage-1 bottom-track altitude (px) — see ``src/agentic/pipeline.py``.
 
     python -m src.cv_pipeline.humminbird fetch                 # the PINGMapper small sample (SHA-256 pinned)
     python -m src.cv_pipeline.humminbird info  <dir>/R.DAT     # what is inside a recording
-    python -m src.cv_pipeline.humminbird validate <dir>/R.DAT  # the checks → docs/raw_recording.md
+    python -m src.cv_pipeline.humminbird validate <dir>/R.DAT  # the checks → docs/reports/raw_recording.md
 """
 from __future__ import annotations
 
@@ -553,7 +553,7 @@ def report(dat: Path) -> str:
          f"consistent one. With this scale, ground range is in real metres and shadow heights are "
          f"`h/H × the sonar's measured depth` (the rule: metres only with a measured altitude).", "",
          "## 3. The whole agent on it", "",
-         "![a real frame and the real track](img/raw_recording.jpg)", "",
+         "![a real frame and the real track](../img/raw_recording.jpg)", "",
          f"- {len(frames)} frames (500 pings each, port + starboard) in **{wall:.1f} s** on this laptop — {P['duration_s'] / wall:.0f}× "
          f"faster than the recording.",
          f"- **{len(res.tracked)} review cards**, 0 auto-confirmed (no precision promise), P(pot) "
@@ -592,8 +592,8 @@ def main():
             print(fetch_sample(LARGE_DIR, LARGE_FILES))
         return
     if a.cmd == "report":
-        (REPO / "docs" / "raw_recording.md").write_text(report(Path(a.dat)), encoding="utf-8")
-        print("wrote docs/raw_recording.md + docs/img/raw_recording.jpg")
+        (REPO / "docs" / "reports" / "raw_recording.md").write_text(report(Path(a.dat)), encoding="utf-8")
+        print("wrote docs/reports/raw_recording.md + docs/img/raw_recording.jpg")
         return
     rec = read_recording(Path(a.dat))
     if a.cmd == "info":

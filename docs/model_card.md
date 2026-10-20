@@ -13,9 +13,9 @@
   16), not ultralytics' default fitness: epoch 67.
 - **Why EXP-003:** best of six clean runs (EXP-002–005). EXP-002 underfit (`optimizer=auto` built AdamW
   0.00167; tiles left cut objects unlabelled), EXP-004 / 005 changed the data and did not beat it
-  ([`exp003_diagnosis.md`](exp003_diagnosis.md), [`exp005_diagnosis.md`](exp005_diagnosis.md)).
+  ([`exp003_diagnosis.md`](reports/exp003_diagnosis.md), [`exp005_diagnosis.md`](reports/exp005_diagnosis.md)).
 - **Earlier baseline:** EXP-001 (4 classes, dataset v1). Its numbers stay in
-  [`eval_exp001.md`](eval_exp001.md) and [`calibration_exp001.md`](calibration_exp001.md).
+  [`eval_exp001.md`](reports/eval_exp001.md) and [`calibration_exp001.md`](calibration_exp001.md).
 
 ## Intended use
 
@@ -34,8 +34,8 @@ autonomous removal decisions.
 ## Metrics — read per class, not the aggregate
 
 Deploy-faithful (`cv2.dnn`, the shipped ONNX), thresholds tuned on **val**, each test split scored once
-([`eval_exp003_test.md`](eval_exp003_test.md), [`…_official398`](eval_exp003_test_official398.md),
-[`…_xsonar`](eval_exp003_test_xsonar.md)):
+([`eval_exp003_test.md`](reports/eval_exp003_test.md), [`…_official398`](reports/eval_exp003_test_official398.md),
+[`…_xsonar`](reports/eval_exp003_test_xsonar.md)):
 
 | split | class | n_gt | AP@0.5 (95% CI) | AP@0.5:0.95 | P / R / F1 at val threshold |
 |---|---|--:|--:|--:|--:|
@@ -46,7 +46,7 @@ Deploy-faithful (`cv2.dnn`, the shipped ONNX), thresholds tuned on **val**, each
 
 mAP@0.5 on v2b test: **0.319** (target 0.70, **not met**). The gap to GhostVision is real and reported as
 is; the remaining problems are in the data (off-domain wreck screenshots, loose wreck boxes), not the
-training recipe ([`exp003_diagnosis.md`](exp003_diagnosis.md) §3).
+training recipe ([`exp003_diagnosis.md`](reports/exp003_diagnosis.md) §3).
 
 **Agent tiers (`docs/calibration_exp003.md`):** fit on the held-out validation recordings (163 unique
 frames, 186 pots), verified once on unseen test (199 unique frames, 264 pots). Promise: **≥ 79% of pots
@@ -65,7 +65,7 @@ is not leakage-free on v2b test.
 `python -m src.bench.product_bench` on the full product path (decode → Stage 1 → `cv2.dnn` → evidence →
 render), laptop x86 (stock OpenCV 5.0.0, 8 threads): **252 ms/frame p50, 3.3 fps**; the network is ~90%
 of it (`cv2.dnn` forward alone 167 ms p50). The OpenCV-only stages run at 40 fps. Results:
-[`benchmarks/`](../benchmarks), report [`cool_benchmark.md`](cool_benchmark.md). Graviton + COOL numbers
+[`benchmarks/`](../benchmarks), report [`cool_benchmark.md`](reports/cool_benchmark.md). Graviton + COOL numbers
 come from `infra/bench_cool.sh` on EC2 (**not yet run**).
 
 ## Limitations & ethics

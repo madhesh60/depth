@@ -17,9 +17,9 @@ Stage 1 (``src.cv_pipeline.canonical``) supplies the two measured inputs:
   objects in one frame no longer share one boat position (PINGMapper convention: ping order = time
   order, left to right in a sonogram).
 
-Honesty (report §5.9): the Hugging Face crab-pot frames carry **no GPS**. In that case we attach no
+Honesty: the Hugging Face crab-pot frames carry **no GPS**. In that case we attach no
 coordinates and flag ``gps_available = False`` — we never stamp one fake lat/lon onto every object
-(the exact bug called out in ``docs/notes/initial_review.md``). For demos a clearly-labelled *synthetic*
+(an early version did exactly that). For demos a clearly-labelled *synthetic*
 track can be generated (``synthetic_track``), but every object it produces is marked
 ``synthetic=True`` and surfaced as "SYNTHETIC DEMO GPS — not real coordinates" downstream.
 """
@@ -35,7 +35,7 @@ from .types import Candidate
 _EARTH_R = 6_371_000.0     # metres
 DEFAULT_M_PER_PX = 0.05    # demo range scale: a 640px frame ≈ 32 m across-track (per-survey in reality)
 GPS_ERR_M = 3.0            # consumer GNSS horizontal error assumed for real recordings (stated, not measured)
-HEADING_ERR_DEG = 6.0      # p90 |course over ground − heading| measured on the PINGMapper sample (docs/raw_recording.md)
+HEADING_ERR_DEG = 6.0      # p90 |course over ground − heading| measured on the PINGMapper sample (docs/reports/raw_recording.md)
 
 
 @dataclass

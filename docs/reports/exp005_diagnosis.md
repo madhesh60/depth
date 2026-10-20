@@ -31,7 +31,7 @@ Every training-recipe lever has been measured on validation:
 What is left is **data**: the validation labels, more recordings, and the wreck set.
 
 Tables: [`exp005_diagnosis_tables.md`](exp005_diagnosis_tables.md). Kit:
-[`kaggle_training.md`](kaggle_training.md).
+[`kaggle_training.md`](../kaggle_training.md).
 
 ## 1. The runs (Kaggle T4 ×2, SGD 0.01, 640 px, fixed tiles, 150 epochs with early stopping)
 

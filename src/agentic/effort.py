@@ -23,7 +23,7 @@ Honesty notes (printed in the report):
   seabed, where manual review still pays per frame.
 
 Writes ``models/<MODEL>/effort_curve.json`` (small, tracked — the UI recomputes curves live from it
-with any timings) and ``docs/effort_curve.md`` + ``docs/img/effort_curve.png``.
+with any timings) and ``docs/reports/effort_curve.md`` + ``docs/img/effort_curve.png``.
 
     python -m src.agentic.effort [--sec-per-frame 20 --sec-per-card 8]
 """
@@ -75,7 +75,7 @@ def build(model: str = "EXP-001") -> dict:
         "detector_list": [[c["f"], c["tp"]] for c in survey],
         "depth_queue": [[c["tp"], c["p"]] for c in depth],
         "frames_per_survey_hour": round(FRAMES_PER_SURVEY_HOUR, 2),
-        "note": "verification split (unseen, unique frames); timings are parameters — see docs/effort_curve.md",
+        "note": "verification split (unseen, unique frames); timings are parameters — see docs/reports/effort_curve.md",
     }
 
 
@@ -187,7 +187,7 @@ def report(E: dict, C: dict, provenance: str) -> str:
          f"_`python -m src.agentic.effort` · model {E['model']} · verification split: {E['split']}_", "",
          f"Timings: **{provenance}** — {p['sec_per_frame']:.0f} s per frame (manual), {p['sec_per_card']:.0f} s per "
          f"card, manual recall {p['manual_recall']:.2f}, card accuracy {p['card_accuracy']:.2f}.", "",
-         "![effort curve](img/effort_curve.png)", "",
+         "![effort curve](../img/effort_curve.png)", "",
          f"| at the recall promise (≥ {C['promise']:.0%}) | manual review | DEPTH queue |", "|---|--:|--:|",
          f"| analyst minutes for these {E['frames']} frames | {mt['manual'] if mt['manual'] is None else round(mt['manual'], 1)} | "
          f"{mt['depth'] if mt['depth'] is None else round(mt['depth'], 1)} |",
@@ -230,7 +230,7 @@ def main():
     C = curves(E, **params)
     (REPO / "models" / model / "effort_curve.json").write_text(json.dumps(E), encoding="utf-8")
     chart(E, C, REPO / "docs" / "img" / "effort_curve.png", prov)
-    (REPO / "docs" / "effort_curve.md").write_text(report(E, C, prov), encoding="utf-8")
+    (REPO / "docs" / "reports" / "effort_curve.md").write_text(report(E, C, prov), encoding="utf-8")
     print(json.dumps({k: C[k] for k in ("promise", "minutes_to_promise", "cards_to_promise",
                                         "breakeven_sec_per_card", "per_survey_hour_min",
                                         "forecast_at_promise", "actual_at_promise")}, indent=1))

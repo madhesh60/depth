@@ -17,7 +17,7 @@ Steps (each is the existing, tested tool — this only wires them in the right o
 5. **evaluate** deploy-faithfully (``src.detection.evaluate``): v2b unique-frame test, the official
    398-frame split (GhostVision head-to-head — leakage-free for v2b-trained models) and the
    cross-sonar ``test_xsonar`` (orange Contact crops), thresholds tuned on val only;
-6. **report** ``docs/onboard_<name>.md`` — the numbers next to EXP-001's, and how to switch the
+6. **report** ``docs/reports/onboard_<name>.md`` — the numbers next to EXP-001's, and how to switch the
    app (``DEPTH_MODEL=<name>``) locally and on the COOL server.
 """
 from __future__ import annotations
@@ -194,7 +194,7 @@ def main():
                              ("test_xsonar", [])):
             if not (root / split / "images").exists():
                 continue
-            out = REPO / "docs" / f"eval_{tag}_{split}.md"
+            out = REPO / "docs" / "reports" / f"eval_{tag}_{split}.md"
             if _run(common + ["--test-split", split, "--out", str(out)] + extra, env, log) == 0:
                 evals[split] = out
 
@@ -251,8 +251,8 @@ def main():
           "```bash", f"DEPTH_MODEL={name} python -m uvicorn src.dashboard.app:app --port 8000   # local", "```",
           f"COOL server: `aws s3 cp models/{name}/best.onnx s3://<bucket>/models/{name}/best.onnx`, then set "
           f"`DEPTH_MODEL={name}` in `infra/depth.service` (or re-run `setup_cool_instance.sh` with `DEPTH_MODEL={name}`).",
-          "", "Log every number above in `experiments.md` (EXP-002 entry) before switching the demo.", ""]
-    rp = REPO / "docs" / f"onboard_{tag}.md"
+          "", "Log every number above in `docs/experiments.md` before switching the demo.", ""]
+    rp = REPO / "docs" / "reports" / f"onboard_{tag}.md"
     rp.write_text("\n".join(L), encoding="utf-8")
     print(f"\n== done -> {rp.relative_to(REPO)}")
     for w in warn:

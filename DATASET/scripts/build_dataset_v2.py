@@ -1,7 +1,7 @@
 """
 build_dataset_v2.py — honest, sonar-only, 2-class dataset (ghost_gear + wreck_debris).
 
-Fixes the data bugs from the initial review (docs/notes/initial_review.md) that v1 still carries:
+Fixes the data bugs that v1 still carries:
   * Marine PULSE pipeline/platform images each got ONE full-frame box in v0, which v1's
     full-frame filter then deleted -> 955 pictures of REAL man-made objects became "empty
     seabed". They have no usable localisation, so v2 DROPS them (never trains them as

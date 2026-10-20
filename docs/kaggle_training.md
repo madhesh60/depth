@@ -5,12 +5,12 @@ in with ONE command.
 
 History:
 
-- EXP-002 was underfit ([`exp002_diagnosis.md`](exp002_diagnosis.md)).
+- EXP-002 was underfit ([`exp002_diagnosis.md`](reports/exp002_diagnosis.md)).
 - EXP-003 fixed that and raised the recall promise from 65% to 79%
-  ([`exp003_diagnosis.md`](exp003_diagnosis.md)).
-- EXP-004's data cleanup helped wrecks but not pots ([`exp004_diagnosis.md`](exp004_diagnosis.md)).
+  ([`exp003_diagnosis.md`](reports/exp003_diagnosis.md)).
+- EXP-004's data cleanup helped wrecks but not pots ([`exp004_diagnosis.md`](reports/exp004_diagnosis.md)).
 - EXP-005's stronger brightness/scale jitter made pots **worse** on both seeds (Δ −0.10 / −0.07). The
-  recipe search is done; EXP-003 stays the best ([`exp005_diagnosis.md`](exp005_diagnosis.md)).
+  recipe search is done; EXP-003 stays the best ([`exp005_diagnosis.md`](reports/exp005_diagnosis.md)).
 
 **What EXP-005 builds on** (all measured on the held-out validation recordings):
 
@@ -134,7 +134,7 @@ Onboarding:
 4. **Fits the guaranteed tiers on the validation recordings and verifies them once on test.**
 5. Evaluates on the v2b test, the **official 398-frame split** (GhostVision head-to-head) and the
    cross-sonar test.
-6. Writes `docs/onboard_<name>.md`, with loud warnings if anything fails.
+6. Writes `docs/reports/onboard_<name>.md`, with loud warnings if anything fails.
 
 **Pick the winner on validation, never on test:** the higher ghost AP and recall ceiling within the
 speed budget. Then switch:
@@ -151,7 +151,7 @@ DEPTH_MODEL=EXP-005 python -m uvicorn src.dashboard.app:app --port 8000
 - official 398-frame split F1 within 0.05 of GhostVision (0.71–0.73)
 - recall promise ≥ 90% (95% confidence), held on test
 
-Log EXP-005 / EXP-005a in `experiments.md` with the diagnosis and the onboarding reports linked,
+Log EXP-005 / EXP-005a in `docs/experiments.md` with the diagnosis and the onboarding reports linked,
 **including if they miss these targets**.
 
 ---

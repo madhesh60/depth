@@ -368,7 +368,7 @@ def _geometry_summary(meta: dict) -> Optional[dict]:
         return None
     chunks = [{"frame_id": fid, **{k: v for k, v in (m.get("geometry") or {}).items() if k != "lines"}}
               for fid, m in meta["frames"].items() if m.get("geometry")]
-    return {**g, "chunks": chunks, "report": "docs/sensor_check.md"}
+    return {**g, "chunks": chunks, "report": "docs/reports/sensor_check.md"}
 
 
 def _collect_frames(use_samples: bool, files: Optional[list[UploadFile]],

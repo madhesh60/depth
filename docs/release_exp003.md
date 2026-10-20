@@ -21,7 +21,7 @@
 | recall promise: share of pots that reach a human (95% confidence) | **≥ 79%** | fit on validation (Rec10/12/16) |
 | the promise on unseen data | **held: 81.1%** (lower bound 76.7%) | v2b test, 264 pots, scored once |
 | ghost gear AP@0.5 (95% CI) | 0.482 (0.43–0.55) | v2b test, 285 pots |
-| wreck debris AP@0.5 | 0.156 (weak: see [`exp005_diagnosis.md`](exp005_diagnosis.md)) | v2b test, 70 boxes |
+| wreck debris AP@0.5 | 0.156 (weak: see [`exp005_diagnosis.md`](reports/exp005_diagnosis.md)) | v2b test, 70 boxes |
 | GhostVision head-to-head, F1 | 0.41 (GhostVision reports 0.71–0.73) | official 398-frame split |
 | cross-sonar ghost gear AP@0.5 | 0.34 | `test_xsonar` |
 | `cv2.dnn` forward, p50 | 167 ms | laptop x86, 8 threads |
@@ -29,9 +29,9 @@
 Why this model: it beat every later run on the held-out recordings (paired bootstrap; EXP-004 and
 EXP-005 analyses). Records:
 
-- [`onboard_exp003.md`](onboard_exp003.md)
-- [`exp003_diagnosis.md`](exp003_diagnosis.md)
-- [`exp005_diagnosis.md`](exp005_diagnosis.md)
+- [`onboard_exp003.md`](reports/onboard_exp003.md)
+- [`exp003_diagnosis.md`](reports/exp003_diagnosis.md)
+- [`exp005_diagnosis.md`](reports/exp005_diagnosis.md)
 
 ## Licence — decide before publishing
 

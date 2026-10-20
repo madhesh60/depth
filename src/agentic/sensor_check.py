@@ -28,7 +28,7 @@ scale (at most MAX_ITERS times) — the agent revising its own measurement model
 
 The thresholds below were set on Test-Small-DS (R01224, Colorado River) and are design constants;
 the fresh check is the 1-h Solix recording Test-Large-DS (Pearl River) — ``python -m
-src.agentic.sensor_check`` writes the report (``docs/sensor_check.md``).
+src.agentic.sensor_check`` writes the report (``docs/reports/sensor_check.md``).
 """
 from __future__ import annotations
 

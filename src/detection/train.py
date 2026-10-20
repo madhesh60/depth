@@ -1,7 +1,7 @@
 """
 train.py — Stage-2 detector training (YOLO11) with sonar-aware settings, then ONNX export + packaging.
 
-EXP-003 recipe — the EXP-002 post-mortem (``docs/exp002_diagnosis.md``) fixed in code:
+EXP-003 recipe — the EXP-002 post-mortem (``docs/reports/exp002_diagnosis.md``) fixed in code:
 
 * **explicit optimizer (SGD, lr0 0.01).** EXP-002 passed ``lr0 0.01`` but left ``optimizer=auto``,
   which in ultralytics 8.4 silently picks **AdamW at lr 0.002·5/(4+nc) = 0.00167** whenever the run

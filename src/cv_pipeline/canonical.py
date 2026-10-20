@@ -20,7 +20,7 @@ Per frame, in order:
    (display + geotag range) and as :meth:`CanonicalFrame.ground_range_px` for single points.
 5. **range-gain normalisation** — side-scan returns fade with range; a per-range-row gain
    (median profile below the seabed, smoothed) equalises it. Offered as a detector-input option;
-   whether it helps the *deployed* model is measured, not assumed (``experiments.md`` STUDY-08).
+   whether it helps the *deployed* model is measured, not assumed (``docs/experiments.md`` STUDY-08).
 6. **water-column mask** — a box entirely above the tracked seabed is in the water column (fish,
    bubbles, surface noise), not on the seabed.
 

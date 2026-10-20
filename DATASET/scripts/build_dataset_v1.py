@@ -1,7 +1,7 @@
 """
 build_dataset_v1.py — Produce the clean, training-ready dataset (v1) from the raw v0 split.
 
-Fixes the audit-verified problems (see docs/dataset_report.md):
+Fixes the audit-verified problems (found by DATASET/scripts/audit_dataset.py):
   #1/#2 Leakage + baked augmentation  -> split at the SOURCE-FRAME level (a frame and all its
         augmentations live in exactly one split). Train keeps augmentations; val/test get
         ONLY the original frame -> clean, honest evaluation, zero leakage by construction.

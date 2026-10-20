@@ -24,7 +24,7 @@ Rows = predicted, columns = true. The `background` row counts missed objects; th
 | **wreck_debris** | 0 | 0 | 0 |
 | **background** | 343 | 0 | 0 |
 
-![PR curve](img/pr_exp003_test_official398.png)
+![PR curve](../img/pr_exp003_test_official398.png)
 
 
 ## 2. Per-sensor (the product is SONAR)

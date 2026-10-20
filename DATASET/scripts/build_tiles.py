@@ -9,13 +9,13 @@ tiled inference"; crab pots are small — 91% of EXP-001's misses were < 10% of 
   (no box) are kept at ``bg_keep`` so the detector still sees empty seabed.
 * **No unlabelled partial objects.** EXP-002's builder dropped a cut-off box from a tile's labels but
   left its pixels, which taught "object = background". That happened in 49% of the times a wreck
-  appeared in a tile and 8% for ghost gear (``docs/exp002_diagnosis.md``). Now:
+  appeared in a tile and 8% for ghost gear (``docs/reports/exp002_diagnosis.md``). Now:
   - a frame is tiled only if every box is small (longest side ≤ ``max_tile_box`` of the frame). Large
     wrecks gain nothing from tiles and are always cut by them; those frames stay full-frame only;
   - the visible part of any box a tile still cuts below ``min_vis`` is **inpainted**
     (``cv2.inpaint``, Telea) from the surrounding seabed, so the tile carries no unlabelled object.
 * ``--no-tiles``: full frames only, with the same ``data.yaml`` layout. This is the comparison arm.
-* **EXP-004 data cleanup** (``docs/exp003_diagnosis.md``), all applied to TRAIN only:
+* **EXP-004 data cleanup** (``docs/reports/exp003_diagnosis.md``), all applied to TRAIN only:
   - ``--drop-sources seabed`` drops the off-domain "seabed" frames: colour screenshots of consumer
     fish-finder displays, with on-screen interface. They supplied most of the wreck labels, and
     look nothing like the side-scan sonar we deploy on.

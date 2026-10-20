@@ -2,7 +2,7 @@
 compare.py — turn the per-machine benchmark JSONs into the COOL evidence report (+ chart).
 
 Reads ``benchmarks/<label>__<workload>.json`` (``product_bench.py``), ``<label>__parity.json`` and
-``<label>__receipt.json``, and writes ``docs/cool_benchmark.md``:
+``<label>__receipt.json``, and writes ``docs/reports/cool_benchmark.md``:
 
 * one row per run — machine (architecture · instance type), OpenCV provenance (COOL only when ``cv2`` was
   loaded from ``/opt/cool``), threads, p50/p95, throughput across repeats, CPU use, peak memory, cost;
@@ -343,7 +343,7 @@ def chart(runs: list[dict], out: Path) -> None:
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[1])
     ap.add_argument("--dir", default=str(REPO / "benchmarks"))
-    ap.add_argument("--out", default=str(REPO / "docs" / "cool_benchmark.md"))
+    ap.add_argument("--out", default=str(REPO / "docs" / "reports" / "cool_benchmark.md"))
     ap.add_argument("--chart", default=str(REPO / "docs" / "img" / "cool_benchmark.png"))
     a = ap.parse_args()
     d = Path(a.dir)

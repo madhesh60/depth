@@ -4,7 +4,7 @@
 > EXP-002; the classical-CV ROI gate was **retired** (STUDY-01) and Stage 1 is now **sonar
 > canonicalisation** in the product path (bottom tracking, STUDY-08); the AWS plan is **one EC2
 > Graviton instance on the COOL AMI behind CloudFront** — Lambda / API Gateway / DynamoDB / Amplify /
-> SageMaker below are superseded. Current state: [`README.md`](README.md),
+> SageMaker below are superseded. Current state: [`README.md`](../README.md),
 > [`experiments.md`](experiments.md), [`progress.md`](progress.md).
 
 **PS**

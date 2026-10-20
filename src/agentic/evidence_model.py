@@ -375,7 +375,7 @@ def main():
     a = ap.parse_args()
     d = build(a.model)
     model_path(a.model).write_text(json.dumps(d, indent=2), encoding="utf-8")
-    doc = REPO / "docs" / f"evidence_model_{a.model.lower().replace('-', '')}.md"
+    doc = REPO / "docs" / "reports" / f"evidence_model_{a.model.lower().replace('-', '')}.md"
     doc.write_text(report(d), encoding="utf-8")
     print(report(d))
     print(f"-> {model_path(a.model)}\n-> {doc}")

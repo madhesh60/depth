@@ -1,7 +1,7 @@
 # Runtime — the live FastAPI app + OpenCV-5 inference (cv2.dnn, torch-free).
 # This is what runs on the Graviton + COOL demo server; keep it small.
 # Pinned EXACTLY to the versions the demo is tested on (competition rule: OpenCV 5
-# must do real work — see docs/notes/initial_review.md §5.1).
+# must do real work).
 #   Training / ONNX export deps -> requirements-train.txt (Kaggle GPU only)
 #   Test-suite deps             -> requirements-dev.txt
 opencv-python-headless==5.0.0.93

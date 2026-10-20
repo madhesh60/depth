@@ -67,14 +67,14 @@ flowchart TD
 (`choose_tool` → tool → `update_belief` [→ `conflict`])* → skipped tools with their reason →
 [`request_observation`] → `decide` → `handoff`. The calibrated tiers do not change.
 
-**Measured result (STUDY-15, [`evidence_model_exp003.md`](evidence_model_exp003.md)) — not validated:**
+**Measured result (STUDY-15, [`evidence_model_exp003.md`](reports/evidence_model_exp003.md)) — not validated:**
 on the test split it raised ACCEPT precision 67% → 73% and left fewer real pots at the bottom
 (49 → 36), but both registered gates failed: test log-loss got worse (0.637 → 0.648) and on the fresh
 cross-sonar split ACCEPT precision fell 0.86 → 0.848 with more real targets in WATCH (127 → 161).
 It is therefore **off by default**; the studio's *Active vision · experimental* switch (and
 `?active=1`) runs it, labelled. What OpenCV changes by default is measured separately and holds:
 Stage-1 geometry moves pins (median 6.5 m on the samples, 17 of 27 outside their own error circle)
-and regroups re-survey passes ([`opencv_counterfactual.md`](opencv_counterfactual.md), STUDY-12).
+and regroups re-survey passes ([`opencv_counterfactual.md`](reports/opencv_counterfactual.md), STUDY-12).
 
 ## 2. The toolbox (`tools.py`)
 
@@ -181,7 +181,7 @@ shown as evidence with a relative height, never used to accept or reject.
 (`src/cv_pipeline/humminbird.py`). Each pin comes from its own ping's GPS fix and heading. Its
 distance is the Stage-1 ground range × a range scale **measured** from the sonar's depth ÷ the
 Stage-1 altitude. So on real data Stage 1 decides *where* and *how far* in metres
-([`raw_recording.md`](raw_recording.md)).
+([`raw_recording.md`](reports/raw_recording.md)).
 
 **Person-confirmed loop (perception → decision → person → re-plan → action).** EXP-003 supports no
 precision promise, so the agent auto-confirms nothing; the recovery route is built from what a named
@@ -229,7 +229,7 @@ precision in that confidence band, with the auditors' own reliability measured.
 ## 7. Mapping to the Agentic-Vision rubric
 
 **Required evidence — "a trace showing OpenCV 5 output changing a later decision/action":**
-[`docs/causal_trace.md`](causal_trace.md) (STUDY-12) runs the same survey with each OpenCV output
+[`docs/reports/causal_trace.md`](reports/causal_trace.md) (STUDY-12) runs the same survey with each OpenCV output
 withheld and diffs every downstream decision. Without Stage 1's bottom track, 151 of 222 pins land
 outside their own error circle and 4 of 40 re-survey passes regroup (EXP-003, v2b test) (tiers unchanged — it is not a
 gate); without the shadow nothing changes (evidence only). It also prints one hazard's full chain,
@@ -237,7 +237,7 @@ and every survey exports its decision log (`mission.trace.jsonl`).
 
 | Criterion | Weight | Where it's met |
 |---|---:|---|
-| Substantive OpenCV 5 + agent | 30% | the agent's tools *are* OpenCV ops: Stage-1 bottom tracking, `cv2.remap` slant→ground, luminance; `cv2.dnn` detect; re-look + CLAHE; thin-line shadow; water-column check; sensor cross-check re-runs the OpenCV tracker on a conflict. **Proof OpenCV matters:** with Stage 1 removed, 151 of 222 pins leave their error circle (`docs/causal_trace.md`) |
+| Substantive OpenCV 5 + agent | 30% | the agent's tools *are* OpenCV ops: Stage-1 bottom tracking, `cv2.remap` slant→ground, luminance; `cv2.dnn` detect; re-look + CLAHE; thin-line shadow; water-column check; sensor cross-check re-runs the OpenCV tracker on a conflict. **Proof OpenCV matters:** with Stage 1 removed, 151 of 222 pins leave their error circle (`docs/reports/causal_trace.md`) |
 | Orchestration & autonomy | 25% | stated objective; value-of-information tool use; compute, analyst **and boat** budgets; **sensor cross-check** decides per chunk which sensor to trust, re-tracks and re-fits the range scale with no person (STUDY-16, on by default); stitching; repeat-sighting merge; routes; opposite-side re-survey planning (§3, §6) |
 | Task effectiveness | 20% | a recall promise that **held on unseen test** (≥ 79%, held at 81.1%); honest "no auto-confirm"; cross-check validated on a fresh 1-h recording (2 of 3 pre-registered checks passed; the failure is reported); effort study built, not yet run with people (§4, §6) |
 | Failure handling & human control | 15% | a failed tool never raises: the agent falls back to the detector score and sends the find to a person; failure drills you can run (`?simulate=tool_failed`, `tool_timeout`, `no_detection`); bounded LOW-RISK tier; budgeted REVIEW queue; **person-confirmed loop** re-plans routes from a named person's ✓ / ✕ / recovered; MCP agents can only *ask* (`approvals.py`); missed-pot labels; blinded audit (§5, §6) |

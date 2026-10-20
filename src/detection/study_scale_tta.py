@@ -197,7 +197,7 @@ def report(out: dict) -> str:
               "by default. Train both 640 and 1024 on v2b and let the held-out recordings (Rec10/12/16) and the "
               "latency gate decide (`docs/kaggle_training.md`).", "",
               "_Outcome (2026-09-30): both sizes were trained (EXP-002 / EXP-002s). Both were underfit and tied "
-              "on validation (ghost AP 0.25 vs 0.25; `docs/exp002_diagnosis.md`), so EXP-003 trains at 640 px and "
+              "on validation (ghost AP 0.25 vs 0.25; `docs/reports/exp002_diagnosis.md`), so EXP-003 trains at 640 px and "
               "the resolution question stays open._", ""]
     L += ["---", "_Latency is not reported: this run shared the laptop with other work (640-px forwards ranged "
           "270–1650 ms), so only the relative cost (passes × pixels) is used above._", ""]
@@ -207,11 +207,11 @@ def report(out: dict) -> str:
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[1])
     ap.add_argument("--sizes", default="640,800,960,1024")
-    ap.add_argument("--report-only", action="store_true", help="rewrite docs/scale_tta.md from runs/study13/result.json")
+    ap.add_argument("--report-only", action="store_true", help="rewrite docs/reports/scale_tta.md from runs/study13/result.json")
     a = ap.parse_args()
     if a.report_only:
-        (REPO / "docs" / "scale_tta.md").write_text(report(json.loads((OUT / "result.json").read_text())), encoding="utf-8")
-        print("wrote docs/scale_tta.md")
+        (REPO / "docs" / "reports" / "scale_tta.md").write_text(report(json.loads((OUT / "result.json").read_text())), encoding="utf-8")
+        print("wrote docs/reports/scale_tta.md")
         return
     sizes = [int(s) for s in a.sizes.split(",")]
     res = {"protocol": "select on v1 val (Rec19) with paired bootstrap; verify once on v1 test", "val": {}, "test": {}}
@@ -240,7 +240,7 @@ def main():
            "val": {k: {**clean(r), "vs_baseline": r.get("vs_baseline")} for k, r in res["val"].items()},
            "test": {k: (clean(r) if isinstance(r, dict) and "_per" in r else r) for k, r in res["test"].items()}}
     (OUT / "result.json").write_text(json.dumps(out, indent=1))
-    (REPO / "docs" / "scale_tta.md").write_text(report(out), encoding="utf-8")
+    (REPO / "docs" / "reports" / "scale_tta.md").write_text(report(out), encoding="utf-8")
     print(json.dumps(out, indent=1))
 
 

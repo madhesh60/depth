@@ -14,7 +14,7 @@
 #   ./infra/bench_fleet.sh                       # plan (dry run)
 #   APPLY=1 ./infra/bench_fleet.sh               # run, wait, download into benchmarks/
 #   TARGETS="A C" APPLY=1 ./infra/bench_fleet.sh # a subset (e.g. under a small vCPU quota)
-#   then: python -m src.bench.compare            # → docs/cool_benchmark.md
+#   then: python -m src.bench.compare            # → docs/reports/cool_benchmark.md
 set -euo pipefail
 cd "$(dirname "$0")/.."
 . infra/lib.sh

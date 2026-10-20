@@ -7,6 +7,11 @@ dataset version, model, augmentation, and hyperparameters that produced it.
 
 **Related:** [`architecture.md`](architecture.md) · [`progress.md`](progress.md)
 
+> **Removed one-off scripts (2026-10-20).** The EXP-001-era study scripts named in older entries —
+> `src/detection/{ablation_fp,error_analysis,fn_gallery,tiled_infer}.py` and
+> `src/cv_pipeline/{tune_coverage,benchmark}.py` — left the tree; they remain in git history at
+> commit `9d37a68`. Reports referenced as `docs/<name>.md` now live in `docs/reports/`.
+
 ---
 
 ## Conventions
@@ -159,12 +164,12 @@ Promote each into the log below with full results as it runs.
   cm/sample (gap to beam physics 14.5% → 7.8%); heights on the lost-lock chunk 0.36 m → 0.11 m (the
   old pipeline used the bad sounder reading).
 - **Decision:** on by default for raw recordings; the failed criterion stays in
-  [`docs/sensor_check.md`](docs/sensor_check.md). Report: `python -m src.agentic.study_sensor`.
+  [`docs/reports/sensor_check.md`](reports/sensor_check.md). Report: `python -m src.agentic.study_sensor`.
 
 ### STUDY-15 — Active vision: should OpenCV evidence change the agent's action? (NOT VALIDATED — off by default)
 
 - Tools: `python -m src.agentic.evidence_model` → `models/EXP-003/evidence_model.json` +
-  `docs/evidence_model_exp003.md`; `python -m src.agentic.counterfactual` → `docs/opencv_counterfactual.md`.
+  `docs/reports/evidence_model_exp003.md`; `python -m src.agentic.counterfactual` → `docs/reports/opencv_counterfactual.md`.
   Policy: `src/agentic/active.py` (value of information over the action ACCEPT ≥ 0.60 / REVIEW /
   WATCH < 0.15 — design constants, not fit; the cheapest tool that could flip the action runs next).
 - Fit (val = Rec10/12/16, 573 candidates ≥ τ_review, 157 real): per detector band, the likelihood
@@ -191,7 +196,7 @@ Promote each into the log below with full results as it runs.
 
 ### STUDY-14 — A raw sonar recording with real GPS, read directly (physics-validated)
 
-- Tool: `python -m src.cv_pipeline.humminbird report` → `docs/raw_recording.md` + `docs/img/raw_recording.jpg`.
+- Tool: `python -m src.cv_pipeline.humminbird report` → `docs/reports/raw_recording.md` + `docs/img/raw_recording.jpg`.
   Data: PINGMapper sample `Test-Small-DS` (Zenodo 10.5281/zenodo.6604666 archives only Git-LFS
   pointers; the objects come from the author's repository, each file SHA-256 pinned). It is recording
   R01224: a Humminbird 9xx, 67-byte headers, 455 kHz, 150.6 s, 3,453 pings per side-scan channel.
@@ -219,11 +224,11 @@ Promote each into the log below with full results as it runs.
 - **Reading.** No crab pots are known in this reach and there is no ground truth, so every card is a
   false alarm or an unknown object: **191 cards per hour of sonar** on out-of-domain water. This is a
   false-alarm measurement, not a recall one. The real-GPS path is ready for a labelled crab-pot
-  recording (asked for in `docs/notes/outreach.md`).
+  recording (asked for in an outreach email draft).
 
 ### STUDY-13 — Larger input + flipped second view for EXP-001 (NEGATIVE — not shipped)
 
-- Tool: `python -m src.detection.study_scale_tta` → `docs/scale_tta.md`. EXP-001 weights exported at
+- Tool: `python -m src.detection.study_scale_tta` → `docs/reports/scale_tta.md`. EXP-001 weights exported at
   640 / 800 / 960 / 1024 (static), each with and without an along-track flip pass (fused `union` or
   `mean`); `cv2.dnn`, floor 0.05, IoU ≥ 0.3, unique frames, paired frame-bootstrap 95% CI.
   **Protocol fixed before looking:** qualify on the calibration split (v1 val, Rec19) — AP gain CI
@@ -241,7 +246,7 @@ Promote each into the log below with full results as it runs.
 ### STUDY-12 — Counterfactual: does OpenCV 5 output change what the agent *does*?
 
 - Tool: `python -m src.agentic.study_causal [--frames …/v1/test/images --limit 80]` →
-  `docs/causal_trace.md`. Same frames, synthetic track (one recording = one line), model and
+  `docs/reports/causal_trace.md`. Same frames, synthetic track (one recording = one line), model and
   calibration in every arm; analyst budget 2 min. Arms: **full** · **no_stage1** (Stage-1 geometry
   withheld from Prove/Act; detections and tiers identical) · **no_shadow**. No re-look arm: EXP-001's
   policy spends no re-looks (STUDY-07).
@@ -294,7 +299,7 @@ Promote each into the log below with full results as it runs.
 
 ### STUDY-11b — Seam inference across chunk boundaries (NEGATIVE — not shipped)
 
-- Tool: `python -m src.detection.study_seam` → `docs/seam_inference.md`. Windows straddling each chunk
+- Tool: `python -m src.detection.study_seam` → `docs/reports/seam_inference.md`. Windows straddling each chunk
   boundary (`seam.py`), mapped back and merged with class-aware NMS; unique frames, IoU ≥ 0.3, paired
   frame-bootstrap 95% CI.
 - Recall ceiling unchanged on both unseen splits (0.724 → 0.724 calibration; 0.862 → 0.862
@@ -305,7 +310,7 @@ Promote each into the log below with full results as it runs.
 
 ### STUDY-11a — Failure gallery: why EXP-001 misses pots (measured, not assumed)
 
-- Tool: `python -m src.detection.failure_gallery` → `docs/failure_gallery.md` (verification split,
+- Tool: `python -m src.detection.failure_gallery` → `docs/reports/failure_gallery.md` (verification split,
   92 unique frames, 138 pots, floor 0.05, match IoU ≥ 0.3).
 - **19 pots (14%) never reach a human.** Compared with the 119 found pots (medians / shares):
 
@@ -333,7 +338,7 @@ Promote each into the log below with full results as it runs.
 
 **Why.** Review X-2: the impact claim ("minutes per survey-hour") was never measured.
 **Setup.** `python -m src.agentic.effort` on the EXP-001 verification split (92 unique frames,
-138 pots — every frame has ≥ 1 pot); `docs/effort_curve.md`. Timings ASSUMED until the Study-mode
+138 pots — every frame has ≥ 1 pot); `docs/reports/effort_curve.md`. Timings ASSUMED until the Study-mode
 sessions exist (`docs/user_study.md`).
 
 | at the recall promise (≥ 65%) | manual (every frame) | DEPTH queue |
@@ -352,7 +357,7 @@ DEPTH's order equals confidence order for EXP-001 (STUDY-07); its measurable ext
 ### EXP-005 / EXP-005a — cleaned data + stronger brightness/scale jitter, two seeds — DONE (NEGATIVE)
 
 - Status: **trained (Kaggle T4 ×2, 2026-10-04), diagnosed; not onboarded** (worse than EXP-003; test not
-  scored). Record: [`docs/exp005_diagnosis.md`](docs/exp005_diagnosis.md).
+  scored). Record: [`docs/reports/exp005_diagnosis.md`](reports/exp005_diagnosis.md).
 - Why: the remaining measured weakness is generalisation to new recordings. Fit on training frames is
   AP@0.3 0.74 vs 0.49 on validation, and validation peaks mid-run. Sonar gain differs per recording.
 - Recipe: EXP-003's (SGD 0.01, fixed tiles, 640 px, 150 ep, 2 classes) on EXP-004's cleaned data, with
@@ -400,8 +405,8 @@ DEPTH's order equals confidence order for EXP-001 (STUDY-07); its measurable ext
 ### EXP-004 / EXP-004g — EXP-003's recipe on cleaned data (+ a ghost-gear-only arm) — DONE (NEGATIVE for ghost gear)
 
 - Status: **trained (Kaggle T4 ×2, 2026-10-03), diagnosed; not onboarded** (no gain over EXP-003; test not
-  scored). Record: [`docs/exp004_diagnosis.md`](docs/exp004_diagnosis.md).
-- Why: after EXP-003, what is left is data ([`docs/exp003_diagnosis.md`](docs/exp003_diagnosis.md)):
+  scored). Record: [`docs/reports/exp004_diagnosis.md`](reports/exp004_diagnosis.md).
+- Why: after EXP-003, what is left is data ([`docs/reports/exp003_diagnosis.md`](reports/exp003_diagnosis.md)):
   - the wreck class learned from 389 off-domain colour fish-finder screenshots;
   - the side-scan shipwreck labels are loose;
   - 139 training frames are rotated copies.
@@ -430,7 +435,7 @@ DEPTH's order equals confidence order for EXP-001 (STUDY-07); its measurable ext
 
 - Status: **kit fixed, CPU smoke-tested, notebook ready** (`notebooks/exp004_kaggle.ipynb`,
   `docs/kaggle_training.md`); the GPU run is pending (Kaggle T4 ×2).
-- What changed (from the EXP-002 post-mortem, `docs/exp002_diagnosis.md`):
+- What changed (from the EXP-002 post-mortem, `docs/reports/exp002_diagnosis.md`):
   - **explicit SGD at lr 0.01**, with the optimizer actually built recorded in `model_meta.json`;
   - about 8–11 k optimizer steps;
   - tiles that never leave an unlabelled partial object: frames with large boxes are not tiled, and
@@ -449,7 +454,7 @@ DEPTH's order equals confidence order for EXP-001 (STUDY-07); its measurable ext
   Then `onboard_model` scores test once.
 - Targets (unchanged): ceiling ≥ 0.85 · crab-pot AP@0.5 ≥ 0.60 · F1 within 0.05 of GhostVision ·
   promise ≥ 90%.
-- Result (Kaggle T4 ×2, 2026-10-02; full record in [`docs/exp003_diagnosis.md`](docs/exp003_diagnosis.md)):
+- Result (Kaggle T4 ×2, 2026-10-02; full record in [`docs/reports/exp003_diagnosis.md`](reports/exp003_diagnosis.md)):
 
   | | EXP-003 (fixed tiles) | EXP-003f (full frames) |
   |---|--:|--:|
@@ -477,8 +482,8 @@ DEPTH's order equals confidence order for EXP-001 (STUDY-07); its measurable ext
 ### EXP-002 / EXP-002s — YOLO11s on v2b + tiles, 1024 px / 640 px (NEGATIVE — underfit, not deployed)
 
 - Status: **trained on Kaggle T4 ×2 (2026-09-30), rejected on validation; test NOT scored.**
-  Post-mortem: [`docs/exp002_diagnosis.md`](docs/exp002_diagnosis.md); tables:
-  [`docs/exp002_diagnosis_tables.md`](docs/exp002_diagnosis_tables.md).
+  Post-mortem: [`docs/reports/exp002_diagnosis.md`](reports/exp002_diagnosis.md); tables:
+  [`docs/reports/exp002_diagnosis_tables.md`](reports/exp002_diagnosis_tables.md).
 - Recipe as run:
   - v2b train as full frames + 2×2 tiles (5,746 images);
   - 30 epochs, patience 8, cosine LR, sonar-aware augmentation;
@@ -520,7 +525,7 @@ whether its image normalisation helps the deployed detector.
 orientation by source rule; **bottom tracking** (first dip-then-rise after the transducer ring-down
 in a robust row profile, then per ping in a window, median + mean along track); slant → ground
 range (`cv2.remap`); range-gain normalisation; water-column mask. `python -m
-src.cv_pipeline.study_canonical` → `docs/stage1_canonical.md`.
+src.cv_pipeline.study_canonical` → `docs/reports/stage1_canonical.md`.
 Part A (no labels): **un-augmented originals only** — frame keys with exactly one copy in the raw
 HF archive (107 of 1,214; Roboflow crop/zoom copies change the pixel scale, so an altitude in px is
 only meaningful on originals — found when the first run on "unique" v1 frames gave port/starboard
@@ -615,7 +620,7 @@ rotated mosaics. Shadow statistic measured on **952 labelled pots vs 952 same-si
 
 ### STUDY-05 — Deploy-faithful evaluation: val-tuned thresholds, per-domain tables, bootstrap CIs
 - Date: 2026-09-24 · Status: done · Code: `src/detection/evaluate.py`; reproduce:
-  `python -m src.detection.evaluate --bootstrap 1000`. Artifacts: `docs/eval_exp001.md`,
+  `python -m src.detection.evaluate --bootstrap 1000`. Artifacts: `docs/reports/eval_exp001.md`,
   `runs/EXP-001/eval/metrics.json`.
 - Hypothesis / purpose: the 0.822 headline is **domain-inflated** and its per-class thresholds were
   picked by looking at the **test** set (WINNING_REPORT #10/#11/#13). Re-evaluate the **exact shipped
@@ -870,7 +875,7 @@ Decision & next
   aug recipe is sound; the open problem is `fishing_gear` recall, not overall capacity.
 - Next experiment (**EXP-002**): before touching the class problem, isolate whether the ~62%
   baked-in augmentation is helping or just doubling the online aug — originals-only train vs. this
-  run (per `docs/notes/colab_baseline.md` §7). Then attack `fishing_gear` recall via oversampling /
+  run (per the Colab baseline note, §7; removed 2026-10-20). Then attack `fishing_gear` recall via oversampling /
   focal (EXP-004) once the FN cause is confirmed from the confusion matrix.
 
 <!-- template retained below for the next run:

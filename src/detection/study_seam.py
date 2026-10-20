@@ -170,8 +170,8 @@ def main():
     out = REPO / "runs" / "seam"
     out.mkdir(parents=True, exist_ok=True)
     (out / "study.json").write_text(json.dumps(res, indent=1))
-    (REPO / "docs" / "seam_inference.md").write_text(report(res), encoding="utf-8")
-    print("wrote docs/seam_inference.md")
+    (REPO / "docs" / "reports" / "seam_inference.md").write_text(report(res), encoding="utf-8")
+    print("wrote docs/reports/seam_inference.md")
 
 
 if __name__ == "__main__":

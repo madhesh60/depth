@@ -11,8 +11,8 @@ AWS Graviton / Arm — notably ``resize``, adaptive-gaussian thresholding, and c
 detection. The defaults here deliberately bias Stage 1 toward those ops so the Arm-vs-x86
 and COOL-vs-stock benchmarks show a real, attributable speedup. The one heavy op that COOL
 does *not* accelerate — ``fastNlMeansDenoising`` — is available but OFF by default (it can
-blow the <300 ms/frame budget and dilutes COOL's measured contribution). See
-``docs/dataset_report.md`` and the module README.
+blow the <300 ms/frame budget and dilutes COOL's measured contribution). The pipeline is the
+STUDY-01 record (``docs/experiments.md``); COOL is measured on the product workload instead.
 """
 from __future__ import annotations
 

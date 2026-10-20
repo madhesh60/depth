@@ -230,7 +230,7 @@ def report(design: dict, fresh: dict | None) -> str:
          "until the scale stops moving. Every call, skip and verdict is an `AgentStep` in the trace and the "
          "survey's Agent tab.", "",
          f"## Design recording — {d['recording']} ({d['family']}, {d['freq_hz'] / 1000:.0f} kHz, {d['duration_s']} s)", "",
-         "![design overlays](img/sensor_check_design.jpg)", "",
+         "![design overlays](../img/sensor_check_design.jpg)", "",
          "_Red: OpenCV tracker alone · blue: the sounder's altitude at the final scale · green: what the agent accepted._", ""]
     L += _table(d)
     L += ["", f"Scale: first estimate {d['first_scale']['m_per_sample'] * 100:.3f} cm/sample → "
@@ -247,7 +247,7 @@ def report(design: dict, fresh: dict | None) -> str:
               + f" · {f['result']['iterations']} scale iteration(s) · {f['seconds']:.0f} s on this laptop "
               f"for a {f['duration_s'] / 60:.0f}-min recording.", ""]
         L += _criteria(f)
-        L += ["", "![fresh audit sheet](img/sensor_check_fresh.jpg)", "",
+        L += ["", "![fresh audit sheet](../img/sensor_check_fresh.jpg)", "",
               f"_{len(f['audit'])} chunks drawn at random (seed 0, stratified by verdict). Red: tracker alone · blue: "
               f"sounder · green: accepted._", ""]
         if f.get("audit_note"):
@@ -293,7 +293,7 @@ def main():
     sheet(d, [("port", 0), ("starboard", 0), ("port", 2), ("port", 4), ("starboard", 5), ("starboard", 6)],
           REPO / "docs" / "img" / "sensor_check_design.jpg", cols=3)
     f = None
-    res_path = REPO / "docs" / "sensor_check.json"
+    res_path = REPO / "docs" / "reports" / "sensor_check.json"
     if not a.no_fresh and FRESH.exists():
         f = run(FRESH)
         f["audit"] = [list(k) for k in audit_picks(f)]
@@ -301,7 +301,7 @@ def main():
         f["audit_note"] = a.audit_note
     res_path.write_text(json.dumps({"design": _strip(d), "fresh": _strip(f) if f else None}, indent=1, default=str),
                         encoding="utf-8")
-    (REPO / "docs" / "sensor_check.md").write_text(report(d, f), encoding="utf-8")
+    (REPO / "docs" / "reports" / "sensor_check.md").write_text(report(d, f), encoding="utf-8")
     print("design:", json.dumps({k: d[k] for k in ("c1", "c2", "c3")}, default=str))
     if f:
         print("fresh:", json.dumps({k: f[k] for k in ("c1", "c2", "c3")}, default=str), f["result"]["counts"])

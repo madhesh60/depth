@@ -6,7 +6,7 @@ For each detection the gatherer runs the agent's evidence tools and fuses them i
 
 * **re-look persistence** (primary) — does the detection re-fire when zoomed in? This is the signal
   that actually separates true crab-pots from the detector's speckle false-positives
-  (``experiments.md`` STUDY-03).
+  (``docs/experiments.md`` STUDY-03).
 * **acoustic shadow** (secondary) — shown where it genuinely exists; contributes to the score only
   when a shadow is measurable (a minority of larger objects), and yields a height estimate.
 * **echo strength** — reported for the evidence card; deliberately NOT weighted into the score

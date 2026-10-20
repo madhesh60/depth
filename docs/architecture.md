@@ -1,8 +1,8 @@
 # DEPTH — architecture (as built)
 
-**Related:** [`README.md`](README.md) · [`experiments.md`](experiments.md) · [`progress.md`](progress.md) ·
-[`infra/README.md`](infra/README.md) · [`docs/agentic_vision.md`](docs/agentic_vision.md) · proposal of record
-[`AGENT.md`](AGENT.md) (the as-built design below supersedes its Lambda/DynamoDB/Amplify/SageMaker plan)
+**Related:** [`README.md`](../README.md) · [`experiments.md`](experiments.md) · [`progress.md`](progress.md) ·
+[`infra/README.md`](../infra/README.md) · [`docs/agentic_vision.md`](agentic_vision.md) · proposal of record
+[`docs/proposal.md`](proposal.md) (the as-built design below supersedes its Lambda/DynamoDB/Amplify/SageMaker plan)
 
 DEPTH turns side-scan sonar frames into a **human-approved cleanup plan** for derelict fishing gear
 (ghost pots) and wreck debris. Every find comes with evidence; the agent's tiers carry **calibrated
@@ -26,7 +26,7 @@ torch-free on **OpenCV 5**, CPU-only, on **AWS Graviton with COOL**.
 
 ## 2. System at a glance
 
-![DEPTH architecture](docs/img/architecture.svg)
+![DEPTH architecture](img/architecture.svg)
 
 _Solid = built and tested; dashed amber = AWS, scripted in `infra/` and deployed on the AWS day;
 dashed violet = optional. Text version:_
@@ -82,7 +82,7 @@ now **measures geometry** the later stages need, ~5 ms per 640² frame:
 Validation without labels on 107 un-augmented originals (STUDY-08): port vs starboard on the same
 pings agree to a median **1.6 px** (null 5.3 px); consecutive chunks 1.2 px; 97% tracked.
 
-**Sensor cross-check** (`src/agentic/sensor_check.py`, STUDY-16 → `docs/sensor_check.md`, on by
+**Sensor cross-check** (`src/agentic/sensor_check.py`, STUDY-16 → `docs/reports/sensor_check.md`, on by
 default for raw recordings). Per 500-ping chunk the agent checks OpenCV's bottom track against the
 depth sounder; on a conflict it re-runs the OpenCV tracker in a window the steady sounder sets
 (`canonical.edge_picks` / `line_quality`), trusts a coherent image edge where the sounder lost lock,
@@ -90,7 +90,7 @@ re-tracks from the other channel, or withholds the geometry; then it re-fits the
 sounder-backed chunks and re-checks until it converges. The accepted line reaches Stage 1 through
 `Canonicaliser.apply_geometry`; a withheld one widens the geotag error by the altitude bound.
 
-**Raw recordings** (`src/cv_pipeline/humminbird.py`, STUDY-14 → `docs/raw_recording.md`). A defensive
+**Raw recordings** (`src/cv_pipeline/humminbird.py`, STUDY-14 → `docs/reports/raw_recording.md`). A defensive
 reader for Humminbird `.DAT` + `B00x.SON/IDX` (9xx/11xx/Helix and Solix):
 
 * **Header walking and bounds.** It walks the tag-structured ping headers (the length is derived,
@@ -165,7 +165,7 @@ evidence made ACCEPT more precise (67% → 73%) and left fewer real pots at the 
 both registered gates **failed** — test log-loss 0.637 → 0.648, and on `test_xsonar` ACCEPT precision
 0.86 → 0.848 with more real targets in WATCH (127 → 161). So it is **off by default** and the studio
 runs it only behind the **Active vision · experimental** switch (`?active=1`; `DEPTH_ACTIVE=off`
-disables it). Report: [`docs/evidence_model_exp003.md`](docs/evidence_model_exp003.md).
+disables it). Report: [`docs/reports/evidence_model_exp003.md`](reports/evidence_model_exp003.md).
 
 ## 7. Act — survey level (`src/agentic/pipeline.py`, `resurvey.py`, `mission.py`, `geo.py`)
 
@@ -190,7 +190,7 @@ disables it). Report: [`docs/evidence_model_exp003.md`](docs/evidence_model_exp0
   re-ranked over the remaining passes and its targets move to the front of the inspection queue.
 * **Detector only vs + Stage 1 + OpenCV evidence** (`counterfactual.py`; both arms share the `cv2.dnn` detections) — every survey re-plans itself with the OpenCV
   outputs removed (detector action, slant-range pins) and diffs decision, priority, geolocation,
-  re-survey route and approvals; shown in the Agent tab ([`docs/opencv_counterfactual.md`](docs/opencv_counterfactual.md)).
+  re-survey route and approvals; shown in the Agent tab ([`docs/reports/opencv_counterfactual.md`](reports/opencv_counterfactual.md)).
 * **exports** — GeoJSON / GPX / KML / CSV / JSON, synthetic GPS always labelled; every format but CSV
   carries the provenance stamp; `trace` = the agent decision log (JSONL, never public); `?public=1`
   generalises protected-site (wreck) positions.
@@ -308,9 +308,9 @@ workers (Spot) → S3.
 
 EXP-002 (1024 px and a 640-px twin, full frames + tiles) ran on Kaggle and was **rejected on
 validation** (ghost AP 0.25). It was underfit, because `optimizer=auto` silently swapped in AdamW at lr
-0.00167, and the tiles left cut objects unlabelled ([`docs/exp002_diagnosis.md`](docs/exp002_diagnosis.md)).
+0.00167, and the tiles left cut objects unlabelled ([`docs/reports/exp002_diagnosis.md`](reports/exp002_diagnosis.md)).
 EXP-003 fixes both: explicit SGD and fixed tiles, with a tiles vs full-frames arm at 640 px
-([`docs/kaggle_training.md`](docs/kaggle_training.md)). `python -m src.detection.diagnose` now checks every new
+([`docs/kaggle_training.md`](kaggle_training.md)). `python -m src.detection.diagnose` now checks every new
 model on validation per source and on its own training frames before onboarding. Onboarding
 times each model against EXP-001 (`--max-ms`); STUDY-13 showed resolution must be chosen on held-out
 recordings.
@@ -342,8 +342,8 @@ Weights: `python -m src.detection.fetch_model` (GitHub Release `exp003-v1`, SHA-
 src/cv_pipeline/  canonical.py (Stage 1) · humminbird.py (raw recordings, STUDY-14) · orientation.py ·
                   study_canonical.py (STUDY-08) · pipeline.py (retired ROI gate, STUDY-01 record)
 src/detection/    infer.py · calibration.py · evaluate.py · export_onnx.py · train.py ·
-                  onboard_model.py · fetch_model.py · fp_audit.py · frames.py · error_analysis.py ·
-                  tiled_infer.py · failure_gallery.py · seam.py · study_seam.py (11b) · study_scale_tta.py (13)
+                  onboard_model.py · fetch_model.py · fp_audit.py · frames.py ·
+                  failure_gallery.py · seam.py · study_seam.py (11b) · study_scale_tta.py (13)
 src/agentic/      agent.py · perception.py · shadow.py · tools.py · evidence.py · policy.py · incidents.py ·
                   sensor_check.py (STUDY-16) · active.py + evidence_model.py (STUDY-15) ·
                   guarantees.py · calibrate.py · geo.py · stitch.py · resurvey.py · mission.py ·

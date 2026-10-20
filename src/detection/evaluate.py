@@ -1,14 +1,14 @@
 """evaluate.py — honest, deploy-faithful evaluation of the Stage-2 ONNX detector.
 
 Runs the **exact artifact that ships** (``best.onnx`` via ``cv2.dnn`` / ``YoloOnnxDetector``
-— no torch) over a YOLO split and reports, in one pass, the four evaluation gaps flagged in the
-initial review (``docs/notes/initial_review.md``):
+— no torch) over a YOLO split and reports, in one pass, the baseline metrics plus four evaluation
+gaps an early project review found:
 
-* **per-class AP@0.5** (VOC all-points), plus P/R/F1                              (baseline)
-* **VAL-tuned per-class confidence thresholds** — the test split is scored ONCE   (#10)
-* **per-source and per-sensor tables** — the aggregate mAP hides the truth        (#11)
-* **bootstrap 95% CIs** on the headline metrics                                   (#13)
-* **GhostVision head-to-head** on the official crab-pot split                     (#24)
+* **per-class AP@0.5** (VOC all-points), plus P/R/F1 (the baseline)
+* **VAL-tuned per-class confidence thresholds** — the test split is scored ONCE
+* **per-source and per-sensor tables** — the aggregate mAP hides the truth
+* **bootstrap 95% CIs** on the headline metrics
+* **GhostVision head-to-head** on the official crab-pot split
   — *gated on a leakage-free model*. EXP-001 trained on v1, which mixed the official
   crab-pot test frames into training, so the head-to-head is **SKIPPED** for it (printing a
   leaked number would be dishonest). v2b models (EXP-002+) respect the split.
@@ -551,7 +551,7 @@ def main():
     ap.add_argument("--official-split", default=None)
     ap.add_argument("--leakage-free", action="store_true",
                     help="assert the model did NOT train on the official split (enables §4)")
-    ap.add_argument("--out", default=None, help="default docs/eval_<model>_<test-split>.md")
+    ap.add_argument("--out", default=None, help="default docs/reports/eval_<model>_<test-split>.md")
     ap.add_argument("--val-split", default="val", help="split dir used to tune thresholds")
     ap.add_argument("--test-split", default="test",
                     help="split dir scored once (e.g. test | test_official398 | test_xsonar)")
@@ -562,7 +562,7 @@ def main():
     args.root = args.root or str(default_root(args.model))
     args.imgsz = args.imgsz or cal.imgsz
     args.iou_nms = args.iou_nms if args.iou_nms is not None else cal.iou_nms
-    args.out = args.out or str(REPO / "docs" / f"eval_{args.model.lower().replace('-', '')}_{args.test_split}.md")
+    args.out = args.out or str(REPO / "docs" / "reports" / f"eval_{args.model.lower().replace('-', '')}_{args.test_split}.md")
     names = args.names.split(",") if args.names else cal.names
     root = Path(args.root)
     if not (root / args.test_split / "images").exists():

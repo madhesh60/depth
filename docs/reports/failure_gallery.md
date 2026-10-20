@@ -6,7 +6,7 @@ _`python -m src.detection.failure_gallery` · EXP-001 · verification split `tes
 
 Green = the labelled pot; grey = any candidate that touched it (below IoU 0.3). Caption: size (px), local contrast (box mean ÷ ring mean).
 
-![missed pots](img/failure_misses.jpg)
+![missed pots](../img/failure_misses.jpg)
 
 | measured on every labelled pot | missed (median) | found (median) |
 |---|--:|--:|
@@ -22,7 +22,7 @@ Green = the labelled pot; grey = any candidate that touched it (below IoU 0.3). 
 
 Amber = the false alarm; green = labelled pots nearby. Several look like real, unlabelled returns — the blinded audit (Audit tab, STUDY-10) measures how many.
 
-![false alarms](img/failure_false_alarms.jpg)
+![false alarms](../img/failure_false_alarms.jpg)
 
 _Crops: PINGEcosystem crab-pot dataset, CC-BY-SA-4.0 (see `webui/samples/ATTRIBUTION.md`)._
 

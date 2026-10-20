@@ -33,7 +33,7 @@ First-estimate per-chunk values (cm / sample): 1.58, 2.09, 2.1, 2.19, 2.19, 2.19
 
 ## 3. The whole agent on it
 
-![a real frame and the real track](img/raw_recording.jpg)
+![a real frame and the real track](../img/raw_recording.jpg)
 
 - 14 frames (500 pings each, port + starboard) in **3.6 s** on this laptop — 42× faster than the recording.
 - **2 review cards**, 0 auto-confirmed (no precision promise), P(pot) 0.12–0.20; heights 0.11–0.11 m where a shadow was measured.

@@ -103,7 +103,7 @@ def without_opencv(survey, stage1_cf: Optional[dict] = None) -> dict:
                     "ground range. Recall is identical (every find still reaches a person)."}
 
 
-# ---- CLI: the shipped samples, both modes -> docs/opencv_counterfactual.md -------------------------
+# ---- CLI: the shipped samples, both modes -> docs/reports/opencv_counterfactual.md -------------------------
 def main():
     """python -m src.agentic.counterfactual  — one survey of the shipped samples (synthetic track,
     analyst budget 2 min, boat budget 30 min), active vision OFF (the default) and EXPERIMENTAL."""
@@ -154,7 +154,7 @@ def main():
     L.append("Validation status of the evidence-driven actions: see "
              "[`evidence_model_exp003.md`](evidence_model_exp003.md) — both registered checks failed, so they are "
              "off by default. The Stage-1 rows (geolocation, re-survey route) are on in both modes (STUDY-12).")
-    out = Path(__file__).resolve().parents[2] / "docs" / "opencv_counterfactual.md"
+    out = Path(__file__).resolve().parents[2] / "docs" / "reports" / "opencv_counterfactual.md"
     out.write_text("\n".join(L) + "\n", encoding="utf-8")
     print("\n".join(L))
     print(f"-> {out}")

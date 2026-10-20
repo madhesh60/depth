@@ -16,7 +16,7 @@ concentrated by size or contrast. What holds the score down is **ranking against
 - with 186 pots in 3 recordings, validation cannot resolve changes smaller than about ±0.07.
 
 Tables: [`exp004_diagnosis_tables.md`](exp004_diagnosis_tables.md). Kit and procedure:
-[`kaggle_training.md`](kaggle_training.md).
+[`kaggle_training.md`](../kaggle_training.md).
 
 ## 1. The runs (Kaggle T4 ×2, SGD 0.01, 640 px, fixed tiles; train without the 412 fish-finder screenshots and 88 rotated copies)
 

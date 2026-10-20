@@ -173,7 +173,7 @@ class ReLookAgent:
         d = em.data
         return {"mode": self._active_mode, "validated": bool(em.use),
                 "status": d.get("actions_reason"), "belief": d.get("belief_reason"),
-                "report": f"docs/evidence_model_{str(d.get('model', '')).lower().replace('-', '')}.md",
+                "report": f"docs/reports/evidence_model_{str(d.get('model', '')).lower().replace('-', '')}.md",
                 "thresholds": em.thresholds, "costs_ms": em.costs}
 
     # ======================================================================= calibrated mode

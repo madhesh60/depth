@@ -10,7 +10,7 @@
   0.71–0.73.
 
 The remaining problems are in the **data**, not the training. EXP-004 targets them
-([`kaggle_training.md`](kaggle_training.md)). Tables:
+([`kaggle_training.md`](../kaggle_training.md)). Tables:
 [`exp003_diagnosis_tables.md`](exp003_diagnosis_tables.md) · onboarding:
 [`onboard_exp003.md`](onboard_exp003.md) · evaluations: [test](eval_exp003_test.md),
 [official 398](eval_exp003_test_official398.md), [cross-sonar](eval_exp003_test_xsonar.md).

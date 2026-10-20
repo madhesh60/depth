@@ -85,8 +85,8 @@ def headline(c: dict) -> str:
     large = c["runs"]["graviton_cool_large"]
     if _is_cool(large):
         parts.append(f"the c8g.large demo size on COOL: {_p50(large):.0f} ms")
-    return "; ".join(parts) + " (×>1 = COOL faster; [`docs/cool_benchmark.md`](docs/cool_benchmark.md), " \
-        "receipt verified: [`docs/cool_verification.md`](docs/cool_verification.md))."
+    return "; ".join(parts) + " (×>1 = COOL faster; [`docs/reports/cool_benchmark.md`](docs/reports/cool_benchmark.md), " \
+        "receipt verified: [`docs/reports/cool_verification.md`](docs/reports/cool_verification.md))."
 
 
 def apply(c: dict, dry: bool = False) -> list[str]:

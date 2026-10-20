@@ -7,7 +7,7 @@ Honest provenance for the training data. The data itself is git-ignored (S3); th
 
 | Source | Sensor | Content | License |
 |---|---|---|---|
-| PINGEcosystem crab-pot | **side-scan sonar** | derelict crab-pots (the real target) | card metadata CC-BY-SA-4.0, card text "GPL"; now gated — asked the authors (`docs/notes/outreach.md`) |
+| PINGEcosystem crab-pot | **side-scan sonar** | derelict crab-pots (the real target) | card metadata CC-BY-SA-4.0, card text "GPL"; now gated — we asked the authors to confirm |
 | UATD | **forward-looking sonar** | placed test objects (cylinder, tyre, cage…) | CC-BY-4.0 |
 | SeabedObjects-KLSG | side-scan sonar | shipwrecks | research use |
 | AI4Shipwrecks | side-scan sonar | shipwrecks | check page before publishing |
@@ -96,7 +96,7 @@ The v1 class *names* over-claimed. What the data actually is, and the v2 rename:
 ## Measured quality of v2b (2026-10-02, after EXP-002)
 
 These are measured, not assumed. Reproduce with `python -m src.detection.diagnose` (the model-based
-checks) and the census in [`exp002_diagnosis.md`](exp002_diagnosis.md).
+checks) and the census in [`exp002_diagnosis.md`](reports/exp002_diagnosis.md).
 
 | check | v2b | what it means |
 |---|---|---|
@@ -109,7 +109,7 @@ checks) and the census in [`exp002_diagnosis.md`](exp002_diagnosis.md).
 | rotation artifacts | 351 training frames are still black-bordered rotated copies (manifest). Some confident detections sit on those borders | border edges look like objects; the copies teach a geometry that real sonar never has |
 | validation power | 3 recordings, **186 ghost boxes, 20 wreck boxes**. Per-recording ghost AP for one model spans 0.23–0.57 | the wreck val metric is noise-level (1 box = 5% recall); judge the ghost class by recording |
 
-**Next data fixes, in order** (updated after EXP-004 / 005, [`exp005_diagnosis.md`](exp005_diagnosis.md)):
+**Next data fixes, in order** (updated after EXP-004 / 005, [`exp005_diagnosis.md`](reports/exp005_diagnosis.md)):
 
 1. Run the blinded audit on val, then add the confirmed missing pots as **v2c** labels. Never edit test.
 2. ~~Report AP at IoU 0.3 beside 0.5.~~ Done: `python -m src.detection.diagnose` reports both.

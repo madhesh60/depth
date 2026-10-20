@@ -16,7 +16,7 @@ Legacy notes follow.
 Kept separate from the agent orchestration so the same rule drives both the offline calibration
 (``calibrate.py``) and the live agent (``agent.py``) — they can never drift.
 
-Thresholds were tuned on the real crab-pot test split (``experiments.md`` STUDY-03 / STUDY-04):
+Thresholds were tuned on the real crab-pot test split (``docs/experiments.md`` STUDY-03 / STUDY-04):
 
 * **CONFIRMED** — a candidate is auto-trusted when *either* independently-calibrated path fires:
     - ``relook.conf ≥ confirm_relook`` (0.40): the detection re-fires strongly when zoomed in

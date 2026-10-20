@@ -36,7 +36,7 @@ from typing import Any, Optional
 
 REPO = Path(__file__).resolve().parents[2]
 MODELS_DIR = REPO / "models"
-SHIPPED_MODEL = "EXP-003"          # the model used when $DEPTH_MODEL is unset (docs/exp005_diagnosis.md)
+SHIPPED_MODEL = "EXP-003"          # the model used when $DEPTH_MODEL is unset (docs/reports/exp005_diagnosis.md)
 DEFAULT_MODEL = os.environ.get("DEPTH_MODEL", SHIPPED_MODEL)
 
 # Built-in fallback == the values the product shipped with before calibration.json existed, so a

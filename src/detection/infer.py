@@ -6,8 +6,8 @@ ultralytics/torch at inference time). Thresholds, NMS IoU and class-aware NMS co
 ``models/<MODEL>/calibration.json`` (``calibration.py``) — the single threshold source.
 
 * ``full_frame``  — run the detector on the whole frame (the product path).
-* ``roi_guided``  — the retired Stage-1 ROI gate, kept only to reproduce STUDY-01
-  (``ablation_fp.py``); it is not used by the product.
+* ``roi_guided``  — the retired Stage-1 ROI gate (the STUDY-01 negative result); it is not used by
+  the product.
 
 YOLO11/YOLOv8 detect head: the ONNX output is ``(1, 4+nc, N)`` — 4 bbox (cx,cy,w,h in
 letterboxed 640-space) followed by ``nc`` class scores, transposed. We letterbox on the

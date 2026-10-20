@@ -39,7 +39,7 @@ if [ "$PHASE" = now ]; then
   TARGETS="A B" ./infra/bench_fleet.sh
   load_test c8g_large_rehearsal
   if [ "$APPLY" = "1" ]; then python -m src.bench.compare; fi
-  say "done - commit benchmarks/ + docs/cool_benchmark.md; later: PHASE=cool APPLY=1 ./infra/golive.sh"
+  say "done - commit benchmarks/ + docs/reports/cool_benchmark.md; later: PHASE=cool APPLY=1 ./infra/golive.sh"
   exit 0
 fi
 
@@ -62,7 +62,7 @@ REHEARSAL=0 ./infra/deploy.sh
 if [ "$APPLY" = "1" ]; then
   URL=$(stack_output "$STACK" Url)
   if [ -n "$URL" ] && [ "$URL" != None ]; then SRC="$URL"; else SRC=runs/infra/receipt.json; fi
-  python -m src.bench.verify_cool "$SRC" --md docs/cool_verification.md --json runs/infra/verify.json     || die "the COOL receipt did not verify - stop here and look"
+  python -m src.bench.verify_cool "$SRC" --md docs/reports/cool_verification.md --json runs/infra/verify.json     || die "the COOL receipt did not verify - stop here and look"
 fi
 load_test c8g_large_cool
 
@@ -73,10 +73,10 @@ tail -8 "$WORK/bench_cool.log"
 python -m src.bench.compare
 python -m src.bench.cool_docs
 if [ "${COMMIT:-1}" = "1" ]; then
-  git add benchmarks docs/cool_benchmark.md docs/img/cool_benchmark.png docs/cool_verification.md
+  git add benchmarks docs/reports/cool_benchmark.md docs/img/cool_benchmark.png docs/reports/cool_verification.md
   git commit -qm "data: Graviton COOL benchmarks, verified COOL receipt and load test" || true
   git add README.md docs/technical_report.md
   git commit -qm "docs: COOL numbers in the report and README" || true
   git push -q origin HEAD && echo "pushed"
 fi
-echo "done - COOL is live. Read docs/cool_benchmark.md; update progress.md / experiments.md wording if the result surprises."
+echo "done - COOL is live. Read docs/reports/cool_benchmark.md; update docs/progress.md / docs/experiments.md wording if the result surprises."

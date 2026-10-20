@@ -16,7 +16,7 @@ the same two classes (EXP-001: ``fishing_gear`` → ghost_gear, ``pipe_cylinder`
 recordings, so its val numbers are an optimistic upper bound and not a fair target.
 
     python -m src.detection.diagnose --zip EXP-003_complete.zip --zip EXP-003f_complete.zip
-    python -m src.detection.diagnose --zip EXP-002_complete.zip --train-sample 200 --out docs/exp002_diagnosis_tables.md
+    python -m src.detection.diagnose --zip EXP-002_complete.zip --train-sample 200 --out docs/reports/exp002_diagnosis_tables.md
 """
 from __future__ import annotations
 
@@ -185,7 +185,7 @@ def main():
     ap.add_argument("--baseline", default="EXP-001", help="baseline model mapped to v2b classes ('' = none)")
     ap.add_argument("--train-sample", type=int, default=200, help="random training frames for the fit check")
     ap.add_argument("--seed", type=int, default=0)
-    ap.add_argument("--out", default="", help="markdown report (default docs/diagnose_<names>.md)")
+    ap.add_argument("--out", default="", help="markdown report (default docs/reports/diagnose_<names>.md)")
     a = ap.parse_args()
     work = REPO / "runs" / "_diagnose"
     models = [Model.from_zip(Path(z), work) for z in a.zip]
@@ -217,7 +217,7 @@ def main():
     L += table("Fit check — wreck debris on the model's own training frames", models, results, "train", 1, per_source=False)
     if base:
         L += [f"_{base.name} {base.record['note']}._", ""]
-    out = Path(a.out) if a.out else REPO / "docs" / f"diagnose_{'_'.join(names)}.md"
+    out = Path(a.out) if a.out else REPO / "docs" / "reports" / f"diagnose_{'_'.join(names)}.md"
     out.write_text("\n".join(L), encoding="utf-8")
     print("\n".join(L))
     print(f"\n-> {out}")

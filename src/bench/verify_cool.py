@@ -5,7 +5,7 @@ verify_cool.py — check a DEPTH server's COOL execution receipt from anywhere (
     python -m src.bench.verify_cool receipt.json                           # a saved /api/cool response
         [--analyze]            # also run one sample through /api/analyze and check its provenance names
                                # the same signed document (the output is tied to the attested machine)
-        [--md docs/cool_verification.md] [--json out.json]
+        [--md docs/reports/cool_verification.md] [--json out.json]
 
 What is checked (exit code 0 only if every REQUIRED check passes):
 

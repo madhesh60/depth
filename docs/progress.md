@@ -4,7 +4,7 @@
 This is the living status of the project. Update it at the end of every working session:
 what moved, what's blocked, what's next. Newest entries at the top of §4.
 
-**Related:** [`README.md`](README.md) · [`architecture.md`](architecture.md) ·
+**Related:** [`README.md`](../README.md) · [`architecture.md`](architecture.md) ·
 [`experiments.md`](experiments.md)
 
 ---
@@ -27,19 +27,19 @@ what moved, what's blocked, what's next. Newest entries at the top of §4.
 | Milestone | Status | Notes |
 |---|---|---|
 | Grant awarded ($150) | ✅ Done | Secured. 2nd half unlocked at check-in. |
-| Proposal (AGENT.md) | ✅ Done | Proposal of record; the as-built design (`architecture.md`) supersedes it where they differ. |
+| Proposal (`docs/proposal.md`) | ✅ Done | Proposal of record; the as-built design (`docs/architecture.md`) supersedes it where they differ. |
 | Dataset built (v0, 32,981 imgs) | ✅ Done | 7 sources remapped to 5 classes; split 30444/1263/1274. |
-| Dataset audit | ✅ Done | Issues catalogued in `docs/dataset_report.md`. |
-| Project docs | ✅ Done | README · architecture · progress · experiments · `docs/` (map: `docs/README.md`). |
+| Dataset audit | ✅ Done | Issues found by `DATASET/scripts/audit_dataset.py` (the v0 report retired 2026-10-20; the dataset card is current). |
+| Project docs | ✅ Done | README at the root; everything else in `docs/` (map: `docs/README.md`), reports in `docs/reports/`. |
 | Dataset fixes (v1) | ✅ Done | Clean split built: 0 leakage, full-frame boxes removed, 1,099 background negatives, 4-class taxonomy locked. `03_yolo_ready_dataset_v1/`. |
 | Dataset v2 (honest, sonar-only) | ✅ Done | `build_dataset_v2.py`: 2-class (`ghost_gear`+`wreck_debris`), fixes 3 data bugs from the initial review (mpulse full-frame mislabel dropped, 1,547 empty crab-pot frames recovered, optical dropped, UATD held out). train 6,291 / val 626 / test 469, leakage 0/0/0, official crab-pot 398-test LOCKED. |
 | **Dataset v2b** | ✅ Done | `build_dataset_v2b.py`: 2-class, sonar-only, one copy per Roboflow frame; val = held-out recordings Rec10/12/16; test = 214 unique crab-pot frames, plus `test_official398/` (GhostVision head-to-head) and `test_xsonar/` (cross-sonar). **EXP-002 to EXP-005 train on it.** |
 | OpenCV 5 (rule 1) | ✅ Done | Env on **5.0.0.93** (was 4.12); requirements split + pinned exactly; `/api/health` reports it. |
 | Stage 1 classical CV | ✅ Done (reframed twice) | **2026-09-24: in the product path as sonar canonicalisation** (`canonical.py`, STUDY-08: bottom-tracked altitude validated port-vs-starboard 1.6 px; ground range → geotag; ~5 ms/frame). Earlier: **Reframed** (STUDY-01): not a Stage-2 ROI gate (no discriminative power on this sonar) — now the CPU **sonar-preprocessing workload** for the COOL benchmark. `src/cv_pipeline/` + 3-way harness. Local x86: 29 ms/frame, 30.5 FPS. Needs Graviton+COOL run. |
-| Stage 1→2 wiring (cv2.dnn) | ✅ Done | `infer.py` (ONNX via `cv2.dnn`, full_frame + roi_guided) + `ablation_fp.py` + `tune_coverage.py`. ONNX verified loading/forward. |
+| Stage 1→2 wiring (cv2.dnn) | ✅ Done | `infer.py` (ONNX via `cv2.dnn`, full_frame + roi_guided). ONNX verified loading/forward. The STUDY-01 ablation scripts left the tree on 2026-10-20 (git history: `9d37a68`). |
 | Stage 2 baseline train | ✅ Done | EXP-001 (yolo11s detect, v1, Kaggle T4): test mAP@0.5 0.822, inflated by an optical-only class; sonar crab-pot AP@0.5 **0.473** (STUDY-05). Superseded by EXP-003. |
 | **Deployed detector** | ✅ Done | EXP-003 (YOLO11s, 640 px, v2b, 2 classes; default since 2026-10-06; Release `exp003-v1`): crab-pot AP@0.5 **0.482** (95% CI 0.43–0.55), mAP@0.5 0.319 on v2b test — the proposal's 0.70 is **not met**. Five later runs (EXP-003f, 004, 004g, 005, 005a) did not beat it. |
-| Evaluation + ablation | ✅ Done | `evaluate.py` (deploy-faithful cv2.dnn): val-tuned thresholds/test-once, per-sensor & per-source tables, bootstrap CIs, mAP@0.5:0.95, confusion matrix, PR curves (`docs/eval_exp003_test.md`). GhostVision head-to-head on the official 398-frame split: F1 0.41 vs their reported 0.71–0.73. |
+| Evaluation + ablation | ✅ Done | `evaluate.py` (deploy-faithful cv2.dnn): val-tuned thresholds/test-once, per-sensor & per-source tables, bootstrap CIs, mAP@0.5:0.95, confusion matrix, PR curves (`docs/reports/eval_exp003_test.md`). GhostVision head-to-head on the official 398-frame split: F1 0.41 vs their reported 0.71–0.73. |
 | Reporting engine | ✅ Done | `src/agentic/{geo,mission}.py`: honest geotag + GeoJSON/GPX/KML/CSV/JSON exports. |
 | Dashboard | ✅ Done | Zero-build static web app (`webui/`), served by FastAPI; hardened (job queue, per-frame model lock, upload limits, shipped samples, vendored Leaflet). See→Prove→Decide→Act stepper, evidence cards (conf→relook), agent trace, Leaflet hazard map + recovery route, downloads, honesty banners. Verified under uvicorn. |
 | AWS deployment | 🟡 Partly run | One stack, `infra/cfn/depth.yaml` via `infra/deploy.sh` (dry run by default): c8g COOL AMI + CloudFront + S3 + alarms. 2026-10-19: everything except CloudFront created (the account needs AWS Support verification first, so `EnableCdn=false` for now). The COOL subscription is still pending, so a rehearsal runs on stock Ubuntu. |
@@ -68,7 +68,7 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
   profile `hackathon`, us-east-1.
 
 Current numbers, each with its split: README "At a glance" and
-[`docs/technical_report.md`](docs/technical_report.md).
+[`docs/technical_report.md`](technical_report.md).
 
 ---
 
@@ -110,7 +110,7 @@ Current numbers, each with its split: README "At a glance" and
 ### 2026-10-20 (sweep 64) — last two audit items closed; everything left is COOL, diagram, report, video
 
 - Audit item 7: STUDY-16 now says PINGMapper already offers sounder *or* image seabed picks; DEPTH's addition is
-  the per-chunk cross-check (`study_sensor.py` text + `docs/sensor_check.md`).
+  the per-chunk cross-check (`study_sensor.py` text + `docs/reports/sensor_check.md`).
 - Audit item 8: no automatic zoom tour after Analyze (the Tour button plays it); top tabs scroll on phones
   (≤ 600 px); `?mode=survey` deep link. Full suite: 225 passed.
 
@@ -311,7 +311,7 @@ Every finding was re-measured before anything changed; all held.
   re-fits the range scale and re-checks until it converges. On by default (`frames_and_track`).
 - STUDY-16: thresholds from Test-Small-DS; fresh 1-h Solix recording (Test-Large-DS, `fetch --large`;
   Solix DAT reader fixed) run once against criteria committed beforehand: C2, C3 pass, C1 fails as
-  registered (reported; post-hoc same-pairs analysis labelled). `docs/sensor_check.md`.
+  registered (reported; post-hoc same-pairs analysis labelled). `docs/reports/sensor_check.md`.
 - Studio: Survey → Agent **Seabed cross-check** (verdict chips, OpenCV overlay, per-chunk steps);
   the **guided demo now walks the agentic loop** (active-vision conflict, drill, cross-check,
   recommend → decline → re-plan) with EXP-003's real numbers and no COOL claim.
@@ -341,7 +341,7 @@ Every finding was re-measured before anything changed; all held.
   ("Agent recommends … Reason …"); a declined pass is dropped, boat time re-ranked, targets moved to
   the front of the inspection queue (`mission.decline_resurvey`, `/api/approvals/{id}/decide`).
 - `counterfactual.py`: every survey re-plans itself WITHOUT the OpenCV evidence; the Agent tab and
-  `docs/opencv_counterfactual.md` show what changes (decision, priority, geolocation, route, approvals).
+  `docs/reports/opencv_counterfactual.md` show what changes (decision, priority, geolocation, route, approvals).
 - UI: Agent trace on every evidence card, recommendation cards with Approve / Reject, the with/without
   table, the experimental switch; the loading indicator is now one centred card (spinning arc, the
   step in words, a slim bar for surveys) — the top hairline sweep is gone.
@@ -364,7 +364,7 @@ Every finding was re-measured before anything changed; all held.
 - **Ask:** show the rubric's SEE → PROVE → DECIDE → ACT as a real agent workflow. The agent has to weigh
   confidence, evidence quality and the analyst + boat budgets, choose its tools and record skipped ones,
   explain itself, handle failures safely, and leave every operational decision to a person (the LLM
-  only writes). Map: [`docs/agentic_loop.md`](docs/agentic_loop.md).
+  only writes). Map: [`docs/agentic_loop.md`](agentic_loop.md).
 - **Per candidate:** every trace is now one chain: `voi_check` ("can another observation change the
   decision?") → evidence tools, each **done / skipped / failed** with the reason (`AgentStep.status`) →
   `update_belief` (P(pot) before → after) → `decide` → `handoff`. Per-frame **compute budget / stop rule**
@@ -460,7 +460,7 @@ Every finding was re-measured before anything changed; all held.
   - Stop recipe search (six clean runs).
   - Next: switch the default to EXP-003, audit the validation labels; an optional second EXP-003 seed
     for run-to-run spread.
-- Record: `docs/exp005_diagnosis.md` (+ tables).
+- Record: `docs/reports/exp005_diagnosis.md` (+ tables).
 
 ### 2026-10-06 (sweep 49) — Studio polish: liquid glass + a pixel-level defect sweep
 - **Ask:** keep the current elite studio, polish every detail, bring back the glassmorphism, Apple-like
@@ -579,7 +579,7 @@ Every finding was re-measured before anything changed; all held.
   - EXP-003 remains the best clean model.
   - The next run that can move the number is EXP-005, on audited labels (v2c, train/val only), with
     two seeds.
-  - Record: `docs/exp004_diagnosis.md` (+ tables).
+  - Record: `docs/reports/exp004_diagnosis.md` (+ tables).
 
 ### 2026-10-02 (sweep 44) — Apple-like type: SF Pro on Apple devices, sentence case everywhere
 - **Font stack:** `-apple-system` / SF Pro first, so Mac and iOS show Apple's own font. SF Pro cannot
@@ -758,7 +758,7 @@ Every finding was re-measured before anything changed; all held.
   AP@0.5 on the held-out recordings is **0.25**, and wreck AP is about 0.01. They were rejected on
   validation; **test was not scored**.
 - **Diagnosis** (deploy path, val per source + a fit check on 200 of each model's own training
-  frames; [`docs/exp002_diagnosis.md`](docs/exp002_diagnosis.md)):
+  frames; [`docs/reports/exp002_diagnosis.md`](reports/exp002_diagnosis.md)):
   - ghost AP on its *own training frames* is only **0.42 / 0.41**, so the models are **underfit**;
   - the pots are proposed (recall ceiling 0.83) but scored low;
   - cause 1, **our kit's bug**: `optimizer=auto` → ultralytics 8.4 silently built **AdamW at lr
@@ -883,7 +883,7 @@ Every finding was re-measured before anything changed; all held.
 - Technical report: **proposal targets vs delivered** stated plainly (crab-pot AP 0.473 < 0.70; 3.9 FPS
   < 5, and why survey-hours are the right yardstick: 43 s per hour of sonar); STUDY-13 added; test count
   + fetch step updated.
-- `docs/outreach.md` (now `docs/notes/outreach.md`): two email drafts (quote + a recording with real GPS) and who to send them to —
+- `docs/outreach.md` (removed 2026-10-20): two email drafts (quote + a recording with real GPS) and who to send them to —
   for the owner to send; nothing is sent from here.
 
 ### 2026-09-28 (sweep 30) — Reproducibility: model fetch + CI
@@ -905,7 +905,7 @@ Every finding was re-measured before anything changed; all held.
   suite 133 passed.
 
 ### 2026-09-28 (sweep 28) — STUDY-13 (accuracy without retraining) + speed-aware EXP-002 kit
-- **STUDY-13** (`src/detection/study_scale_tta.py`, `docs/scale_tta.md`): 640 / 800 / 960 / 1024-px
+- **STUDY-13** (`src/detection/study_scale_tta.py`, `docs/reports/scale_tta.md`): 640 / 800 / 960 / 1024-px
   inputs × along-track flip TTA for EXP-001. The pre-registered qualifier (800 / mean: +0.10 AP,
   +0.08 ceiling on the calibration recording) **did not hold on the verification split** (AP −0.06,
   ceiling +0.01, 3× compute) → not shipped; logged as a negative result.
@@ -1027,7 +1027,7 @@ Every finding was re-measured before anything changed; all held.
 - Tests +1 unit, API check; suite 113 passed. Browser-verified (92 overlay layers, clean toggle).
 
 ### 2026-09-26 (sweep 20) — STUDY-12: the counterfactual trace (OpenCV output → the agent's actions)
-- **`src/agentic/study_causal.py`** → `docs/causal_trace.md`: the rules ask for "a trace showing
+- **`src/agentic/study_causal.py`** → `docs/reports/causal_trace.md`: the rules ask for "a trace showing
   OpenCV 5 output changing a later decision/action"; a counterfactual shows *cause*. The same survey
   runs as full / Stage-1 geometry withheld / shadow withheld and every downstream decision is diffed.
 - **Result (v1 test, 80 unique frames, 264 hazards):** without Stage 1 — 0 tier flips (never a gate)
@@ -1069,7 +1069,7 @@ Every finding was re-measured before anything changed; all held.
   (7/7 steps, no console errors).
 
 ### 2026-09-25 (sweep 16) — Failure gallery with measured failure modes (STUDY-11a)
-- `src/detection/failure_gallery.py` → `docs/failure_gallery.md` + two contact sheets (12 misses
+- `src/detection/failure_gallery.py` → `docs/reports/failure_gallery.md` + two contact sheets (12 misses
   across sizes, 12 most confident false alarms). **Finding:** 32% of missed pots touch the frame edge
   (11% of found) — chunk-boundary cuts are the largest failure mode; misses are lower-contrast and
   farther in range, and NOT smaller. The report's reading is generated from the numbers.
@@ -1168,7 +1168,7 @@ Every finding was re-measured before anything changed; all held.
   a detector list (survey order) and the DEPTH queue (P(pot) order) + the promise point, the
   break-even, per-survey-hour minutes, and **forecast vs actual** (the agent forecast 84.5 real pots
   at the promise point; 90 were real). Writes `models/<MODEL>/effort_curve.json` (UI replays it),
-  `docs/effort_curve.md` + chart.
+  `docs/reports/effort_curve.md` + chart.
 - **`src/agentic/study.py` + Study mode:** counterbalanced **2×2 Latin square** (frame halves ×
   task order; nobody sees a frame twice), manual arm (click every pot, timed per frame) and cards
   arm (the agent's queue, Y/N, timed per card), server-side scoring vs labels (clicks within a box
@@ -1226,7 +1226,7 @@ Review M-5 / I-1 prep / X-6 / §3.7 (not yet executed on AWS — scheduled for t
   `cv2.dnn` → evidence/tiers → render) + a `cv` workload (OpenCV image ops only, where COOL/KleidiCV
   acts); threads pinned; **$/1k frames** and **per survey-hour** compute, real-time factor and $.
   `fingerprint.py` records arch / vCPUs / EC2 type / AMI / `cv2.__file__` (`/opt/cool` ⇒ COOL) /
-  model + calibration sha256 / git commit. `compare.py` → `docs/cool_benchmark.md` + chart with the
+  model + calibration sha256 / git commit. `compare.py` → `docs/reports/cool_benchmark.md` + chart with the
   (B→C) COOL-on-identical-Graviton and (A→C) x86→Graviton+COOL rows.
 - **Local reference (laptop x86, stock OpenCV 5):** product **p50 238 ms/frame** (target < 300),
   one thread 522 ms; the network is ~86% of the time; OpenCV-only share 22 ms; **one survey-hour of
@@ -1422,7 +1422,7 @@ Start of the NEEDTOIMPROVE review sweep (M-3 + part of I-5/I-6).
   Lambda/dashboard), collects detections once at a low floor and caches them, then computes everything
   from the cache: VOC all-points AP@0.5, P/R/F1, **val-tuned per-class thresholds (test scored once)**,
   **per-sensor & per-source tables**, and **bootstrap 95% CIs**. 30/30 tests still green.
-- **Ran it full (val 1,204 + test 1,276 imgs, 1,000 bootstrap resamples).** Results (`docs/eval_exp001.md`):
+- **Ran it full (val 1,204 + test 1,276 imgs, 1,000 bootstrap resamples).** Results (`docs/reports/eval_exp001.md`):
   - **Aggregate mAP@0.5 0.827** — *independently reproduces* the ultralytics 0.822 (cross-validates
     both the train run and this evaluator).
   - **Honest per-sensor truth:** `fishing_gear` (crab pots) on **SONAR** = AP **0.473 / R 0.599**;
@@ -1540,7 +1540,7 @@ Start of the NEEDTOIMPROVE review sweep (M-3 + part of I-5/I-6).
   STUDY-03 CONFIRMED precision), calibrated honestly on the test split (STUDY-04). Then AWS/COOL.
 
 ### 2026-09-23 (cont.4) — WINNING_REPORT critical fixes: OpenCV 5 pinned; dataset v2 (honest, sonar-only)
-- **Acted on `docs/WINNING_REPORT.md`** (now `docs/notes/initial_review.md`; the full strategic audit). This session cleared the two
+- **Acted on `docs/WINNING_REPORT.md`** (removed 2026-10-20; the full strategic audit). This session cleared the two
   rule-/model-critical blockers it flagged, before spending any more Kaggle hours on the buggy v1.
 - **OpenCV 5 for real (rule 1).** Local env moved off OpenCV 4.12 → **5.0.0.93** (removed the stale
   dual `opencv-python`/`-headless` 4.x install; `cv2.dnn` present; Intel IPP here, KleidiCV is the

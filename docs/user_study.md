@@ -34,7 +34,7 @@ find each way. Built into the app: **Study** tab.
   and the per-frame speed-up.
 - `src/agentic/effort.py` / **Analyst effort** panel: once a session exists, the effort curve uses
   the measured timings instead of the assumed ones (`python -m src.agentic.effort` regenerates
-  `docs/effort_curve.md`). The **break-even card time** says how fast card review must be for DEPTH
+  `docs/reports/effort_curve.md`). The **break-even card time** says how fast card review must be for DEPTH
   to beat manual review at the recall promise.
 
 Report whatever the study shows — including if manual review is faster.
