@@ -83,11 +83,11 @@ fishing gear and wreck debris.
 ## Dataset (`DATASET/`, git-ignored)
 
 - `03_yolo_ready_dataset_v1/` — 4-class; train 26,533 · val 1,204 · test 1,276. EXP-001 trained on it.
-- **`03_yolo_ready_dataset_v2b/`** — EXP-002/003 train on it (`build_dataset_v2b.py`). 2-class,
+- **`03_yolo_ready_dataset_v2b/`** — EXP-002/003 train on its tiled copy (below; `build_dataset_v2b.py`). 2-class,
   sonar-only; val = held-out recordings Rec10/12/16; test = 214 unique crab-pot frames; also
   `test_official398/` (GhostVision head-to-head) and `test_xsonar/` (cross-sonar). Its `data.yaml`
   is UTF-8 with **no `path:` key** — keep it that way.
-- `03_yolo_ready_dataset_v2b_tiles/` — `build_tiles.py`: full frames + 2×2 tiles.
+- `03_yolo_ready_dataset_v2b_tiles/` — `build_tiles.py`: full frames + 2×2 tiles. EXP-002/003 train on it.
 - `external/pingmapper_sample/` (Test-Small-DS, R01224, 150.6 s) and `external/pingmapper_large/`
   (Test-Large-DS, 1 h, never used to set a threshold). Fetched with SHA-256 pins; never redistribute.
 - The 8 demo frames in `webui/samples/` are v2b **test** frames, flagged `heldout`. Never train on them.

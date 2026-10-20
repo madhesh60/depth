@@ -7,7 +7,10 @@ full agent on **one EC2 Graviton4 instance launched from the COOL Marketplace AM
 The earlier Lambda / API Gateway / DynamoDB / Amplify / SageMaker plan stays **retired**: COOL ships as an
 AMI, so only EC2 can run the product on COOL.
 
-_Status: written, linted (cfn-lint 1.57.2, 0 findings) and dry-run checked; the AWS runs are pending._
+_Status (2026-10-20): written, linted (cfn-lint 1.57.2, 0 findings) and dry-run checked. Applied on 2026-10-19
+without CloudFront (`ENABLE_CDN=0`, AWS account verification pending) and in rehearsal mode (stock OpenCV 5,
+COOL subscription pending). Stock x86 + Graviton benchmarks and the demo-server load test ran on 2026-10-20
+([`cool_benchmark.md`](../docs/reports/cool_benchmark.md)); the COOL runs wait on the subscription._
 
 ## Architecture
 

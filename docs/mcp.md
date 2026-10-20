@@ -83,7 +83,7 @@ only ask. Requests with unknown hazard or pass IDs are refused.
 |---|---|
 | `DEPTH_MCP_TOKEN` | bearer token required on `/mcp` (401 otherwise). The AWS setup generates one into root-only `/etc/depth/mcp.env`. |
 | `DEPTH_MCP_ALLOWED_HOSTS` | extra Host names for DNS-rebinding protection. Localhost is allowed by default; other hosts get 421. `*` disables the check **only if a token is set**. |
-| `DEPTH_APPROVER_PIN` | deciding a request needs the PIN |
+| `DEPTH_APPROVER_PIN` | deciding a request needs the PIN. The AWS setup generates one into root-only `/etc/depth/approver.env` (`DEPTH_APPROVALS_OPEN=1` skips it). |
 | `DEPTH_MCP_MAX_FRAMES` | frames per `run_survey` over MCP (default 24; use the jobs API for more) |
 
 The decision log (`trace`) is never exported with `public=true`. Coordinates from the synthetic demo

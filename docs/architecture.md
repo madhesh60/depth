@@ -102,8 +102,9 @@ reader for Humminbird `.DAT` + `B00x.SON/IDX` (9xx/11xx/Helix and Solix):
   * GPS speed = 0.1 × the speed field, r = 0.95;
   * course vs heading median 2.4°;
   * the depth field is in decimetres.
-* **Measured range scale.** It is the sonar depth (m) ÷ the Stage-1 altitude (samples), 2.19 cm/sample
-  ± 14.5%. The uncertainty is the larger of the robust spread and the gap to beam physics.
+* **Measured range scale.** It is the sonar depth (m) ÷ the Stage-1 altitude (samples): first estimate
+  2.19 cm/sample ± 14.5%, then **2.03 cm/sample ± 10.2%** after the sensor cross-check (STUDY-16,
+  above). The uncertainty is the larger of the robust spread and the gap to beam physics.
 
 ## 4. See — the detector (`src/detection/infer.py`, `calibration.py`)
 

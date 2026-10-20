@@ -20,15 +20,16 @@ Madhesh) · **Targets:** Agentic Vision · Best Use of COOL · **License:** AGPL
 
 | | number | measured on |
 |---|--:|---|
-| **Recall promise** — pots that reach a person (95% confidence) | **≥ 79%**, held at **81.1%** | fit on held-out recordings, verified once on 199 unseen frames / 264 pots |
-| Crab-pot detector, AP@0.5 · AP@0.5:0.95 | **0.482** (95% CI 0.43–0.55) · 0.165 | v2b test, 214 unique frames |
+| **Recall promise** — pots that reach a person (95% confidence) | **≥ 79%**, held at **81.1%** | fit on held-out recordings, verified once on 199 unseen frames / 264 pots (the test frames that carry a recording ID: Rec8/9/14) |
+| Crab-pot detector, AP@0.5 · AP@0.5:0.95 | **0.482** (95% CI 0.43–0.55) · 0.165 | v2b test, all 214 unique crab-pot frames / 285 pots |
 | OpenCV's seabed measurement moves the boat | **151 of 222** pins leave their own error circle without it | STUDY-12, v2b test |
 | Stage-1 altitude, port vs starboard (no labels needed) | agree to **1.6 px** (random pairs 5.3 px) | STUDY-08 |
 | Full product path on a laptop CPU | **252 ms/frame** p50 · one survey-hour in **51 s** | `benchmarks/`, x86, stock OpenCV 5 |
 | Raw sonar recording, real GPS | range scale **2.03 cm/sample ± 10.2%**, measured | Colorado River, Humminbird |
 | Tests | **225**, CI on every push; 3 need optional data and skip without it (the raw recording, the unpublished EXP-001 weights) | `pytest -q` |
 
-**Not yet measured, and said so:** Graviton + COOL timings (scripted, AWS day), analyst minutes saved
+**Not yet measured, and said so:** Graviton + COOL timings (stock Graviton and x86 were measured on EC2 on
+2026-10-20, §4; the COOL runs wait on the Marketplace subscription), analyst minutes saved
 (the timed study needs people), audited false-alarm precision (the blinded audit needs people). The
 detector misses the proposal's 0.70 mAP target; §4 says by how much and why.
 
@@ -73,7 +74,7 @@ wraps one in **promises you can check** and **measurements instead of assumption
 | **People decide, the agent re-plans** | a named person's ✓ / ✕ on a card (and a crew's *recovered* / *not found*) makes the agent re-plan the recovery route, queue, budget and re-survey passes; an **impact ledger** measures the reviewed precision (95% CI) | Survey tab · [`docs/agentic_vision.md`](docs/agentic_vision.md) |
 | **Humans teach it** | ✓ / ✕ / **＋ missed pot** on any frame → fine-tune set + hard negatives | `python -m src.agentic.feedback export` |
 | **The agent re-measures its own geometry** | on a raw recording it cross-checks OpenCV's seabed track against the **depth sounder** per chunk; on a conflict it **re-runs the OpenCV tracker** where the sounder points, trusts the image where the sounder lost lock, withholds what neither supports, then re-fits the range scale until it converges. Fresh 1-h recording: 280 of 280 chunks resolved, all 3 gross tracker failures corrected; one registered criterion failed and is reported | [`docs/reports/sensor_check.md`](docs/reports/sensor_check.md) |
-| **Real sonar recordings, real GPS** | reads a **raw Humminbird recording** (`.DAT` + `.SON`/`.IDX`) directly — per-ping GPS, heading, speed and depth, checked against physics (GPS speed vs speed field r = 0.95, course vs heading 2.4° median) — and **measures the range scale** (sonar depth ÷ Stage-1 altitude: 2.19 cm/sample ± 14.5%), so pins and heights are in real metres | [`docs/reports/raw_recording.md`](docs/reports/raw_recording.md) |
+| **Real sonar recordings, real GPS** | reads a **raw Humminbird recording** (`.DAT` + `.SON`/`.IDX`) directly — per-ping GPS, heading, speed and depth, checked against physics (GPS speed vs speed field r = 0.95, course vs heading 2.4° median) — and **measures the range scale** (sonar depth ÷ Stage-1 altitude: first estimate 2.19 cm/sample ± 14.5%, **2.03 cm/sample ± 10.2%** after the sensor cross-check), so pins and heights are in real metres | [`docs/reports/raw_recording.md`](docs/reports/raw_recording.md) |
 | **OpenCV output drives actions — shown by counterfactual** | the same survey re-run with each OpenCV output withheld: without Stage 1, **151 of 222** pins fall outside their own error circle and 4 of 40 re-survey passes regroup (EXP-003, v2b test); without the shadow, nothing changes (evidence only). Live in the product: **"⊘ without Stage 1"** on the survey map draws the ghost pins | [`docs/reports/causal_trace.md`](docs/reports/causal_trace.md) |
 | **Plugs into any console** | **OGC API – Features** (QGIS / ArcGIS read hazards, passes, routes and approved work orders), **signed webhooks** to mission-control / dispatch systems, and a drop-in `<depth-hazards>` web component — the Connect tab has live URLs and snippets | [`docs/integrations.md`](docs/integrations.md) |
 | **Plugs into any agent (MCP)** | DEPTH is an MCP server — stdio for Claude Desktop / Code, Streamable HTTP at `/mcp` for remote agents (bearer token). 13 tools run the loop and read the evidence; the only write is **asking** a person, who approves in the studio | [`docs/mcp.md`](docs/mcp.md) |
@@ -172,7 +173,7 @@ PINGMapper's sample data (MIT code, Zenodo 10.5281/zenodo.6604666), fetched hash
 
 ## 4. Results (honest — every number names its split)
 
-**Detector — EXP-003, the deployed model** (YOLO11s, 640 px, dataset v2b, 2 classes), `cv2.dnn`
+**Detector — EXP-003, the deployed model** (YOLO11s, 640 px, dataset v2b tiles, 2 classes), `cv2.dnn`
 ([`docs/reports/onboard_exp003.md`](docs/reports/onboard_exp003.md)):
 
 | | value | split |

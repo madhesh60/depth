@@ -1,4 +1,4 @@
-# Progress Log — Marine Debris Detection System
+# Progress Log — DEPTH
 
 **Team Syndicate · OpenCV AI Competition 2026**
 This is the living status of the project. Update it at the end of every working session:
@@ -38,7 +38,7 @@ what moved, what's blocked, what's next. Newest entries at the top of §4.
 | Stage 1 classical CV | ✅ Done (reframed twice) | **2026-09-24: in the product path as sonar canonicalisation** (`canonical.py`, STUDY-08: bottom-tracked altitude validated port-vs-starboard 1.6 px; ground range → geotag; ~5 ms/frame). Earlier: **Reframed** (STUDY-01): not a Stage-2 ROI gate (no discriminative power on this sonar) — now the CPU **sonar-preprocessing workload** for the COOL benchmark. `src/cv_pipeline/` + 3-way harness. Local x86: 29 ms/frame, 30.5 FPS. Needs Graviton+COOL run. |
 | Stage 1→2 wiring (cv2.dnn) | ✅ Done | `infer.py` (ONNX via `cv2.dnn`, full_frame + roi_guided). ONNX verified loading/forward. The STUDY-01 ablation scripts left the tree on 2026-10-20 (git history: `9d37a68`). |
 | Stage 2 baseline train | ✅ Done | EXP-001 (yolo11s detect, v1, Kaggle T4): test mAP@0.5 0.822, inflated by an optical-only class; sonar crab-pot AP@0.5 **0.473** (STUDY-05). Superseded by EXP-003. |
-| **Deployed detector** | ✅ Done | EXP-003 (YOLO11s, 640 px, v2b, 2 classes; default since 2026-10-06; Release `exp003-v1`): crab-pot AP@0.5 **0.482** (95% CI 0.43–0.55), mAP@0.5 0.319 on v2b test — the proposal's 0.70 is **not met**. Five later runs (EXP-003f, 004, 004g, 005, 005a) did not beat it. |
+| **Deployed detector** | ✅ Done | EXP-003 (YOLO11s, 640 px, v2b tiles, 2 classes; default since 2026-10-06; Release `exp003-v1`): crab-pot AP@0.5 **0.482** (95% CI 0.43–0.55), mAP@0.5 0.319 on v2b test — the proposal's 0.70 is **not met**. Five later runs (EXP-003f, 004, 004g, 005, 005a) did not beat it. |
 | Evaluation + ablation | ✅ Done | `evaluate.py` (deploy-faithful cv2.dnn): val-tuned thresholds/test-once, per-sensor & per-source tables, bootstrap CIs, mAP@0.5:0.95, confusion matrix, PR curves (`docs/reports/eval_exp003_test.md`). GhostVision head-to-head on the official 398-frame split: F1 0.41 vs their reported 0.71–0.73. |
 | Reporting engine | ✅ Done | `src/agentic/{geo,mission}.py`: honest geotag + GeoJSON/GPX/KML/CSV/JSON exports. |
 | Dashboard | ✅ Done | Zero-build static web app (`webui/`), served by FastAPI; hardened (job queue, per-frame model lock, upload limits, shipped samples, vendored Leaflet). See→Prove→Decide→Act stepper, evidence cards (conf→relook), agent trace, Leaflet hazard map + recovery route, downloads, honesty banners. Verified under uvicorn. |

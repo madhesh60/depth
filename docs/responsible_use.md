@@ -73,6 +73,7 @@ the [dataset card](dataset_card.md). Respect each source's attribution and share
 - **Public-demo protection (2026-09-28):** per-client rate limits on the expensive endpoints (429 +
   Retry-After; `src/dashboard/ratelimit.py`), a cap on queued survey jobs (503), a bearer token on
   `/mcp`, an admin token for webhook management (both generated root-only by the setup script), and
-  webhook targets checked against private / link-local addresses. A production deployment also sets
-  `DEPTH_APPROVER_PIN` so only people holding the PIN can decide; the public judge demo leaves it unset
-  so judges can try the human loop.
+  webhook targets checked against private / link-local addresses. The AWS setup also generates an
+  **approver PIN** (root-only `/etc/depth/approver.env`), so only people holding it can decide; the
+  judges receive it privately with the submission. `DEPTH_APPROVALS_OPEN=1` skips the PIN, and the
+  studio then says that approvals are open to anyone.
