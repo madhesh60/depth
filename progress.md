@@ -75,6 +75,13 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ## 4. Session log
 
+### 2026-10-20 (sweep 64) — last two audit items closed; everything left is COOL, diagram, report, video
+
+- Audit item 7: STUDY-16 now says PINGMapper already offers sounder *or* image seabed picks; DEPTH's addition is
+  the per-chunk cross-check (`study_sensor.py` text + `docs/sensor_check.md`).
+- Audit item 8: no automatic zoom tour after Analyze (the Tour button plays it); top tabs scroll on phones
+  (≤ 600 px); `?mode=survey` deep link. Full suite: 225 passed.
+
 ### 2026-10-20 (sweep 63) — EC2 benchmarks without COOL; load test passed; COOL waits on AWS Support
 
 - **COOL blocked by payment:** Marketplace rejects the account's payment method (SBI RuPay; AWS India offers
