@@ -1,9 +1,10 @@
 """
 agent.py — the **Decide** stage: a deterministic, logged, human-gated agent with a stated objective.
 
-**Objective (calibrated mode — the product default):** meet the two promises in
-``models/<MODEL>/calibration.json`` — "≥ R% of pots reach a human" and "≥ P% of CONFIRMED are real"
-(``guarantees.py``) — while spending the **least compute and the fewest human cards**. For every
+**Objective (calibrated mode — the product default):** keep the promises fitted in
+``models/<MODEL>/calibration.json`` (``guarantees.py``) — "≥ R% of pots reach a human", plus "≥ P% of
+CONFIRMED are real" *only when* calibration can support one (EXP-003 cannot: ``tau_confirm`` is null, so
+nothing is auto-confirmed) — while spending the **least compute and the fewest human cards**. For every
 candidate the agent asks *"can more looking change this tier?"* (value of information):
 
 * detector confidence ≥ τ_confirm → **CONFIRMED** with no extra compute (a re-look cannot change it);
@@ -94,10 +95,9 @@ class ReLookAgent:
         self.detector_input = load_calibration().detector_input
         self._faults: set[str] = set()                      # failure drills for this call (?simulate=)
         self._active_mode = "off"
-        # active vision: the measured evidence model decides which OpenCV tool runs next (active.py).
-        # Used only when its fresh-split check passed (evidence_model.json "use"); DEPTH_ACTIVE=0 = off.
-        # Default: on only if its validation gates passed ("use"); a caller can switch it on per run as
-        # EXPERIMENTAL (faults/options token "opt:active", the studio's switch); DEPTH_ACTIVE=off disables it.
+        # active vision (active.py) picks the next OpenCV tool from a measured evidence model. On only if its
+        # validation gates passed (evidence_model.json "use"); else per run as EXPERIMENTAL ("opt:active",
+        # the studio's switch). DEPTH_ACTIVE=on forces it, DEPTH_ACTIVE=off disables it.
         self.evidence_model = EvidenceModel.load() if self.cfg.tiers is not None else None
         self.evidence = None                                # the model in force for the current run
 
@@ -179,14 +179,44 @@ class ReLookAgent:
     # ======================================================================= calibrated mode
     def _decide_calibrated(self, frame, gray, dets: list[Detection], cf: CanonicalFrame,
                            altitude_m: Optional[float] = None):
-        tiers = self.cfg.tiers
-        nadir = cf.orientation.nadir
+        """The calibrated loop, in four steps:
+        1. value of information: which candidates could more looking move to another tier?
+        2. compute budget (the stop rule): re-look only the likeliest of those; record the rest as skipped;
+        3. re-look the band, batched (+ CLAHE if calibration showed it helps);
+        4. per candidate: physical evidence → belief update → tier → handoff to a person."""
         traces: list[list[AgentStep]] = [[] for _ in dets]
         relooks: list[Optional[RelookResult]] = [None] * len(dets)
         scores = [d.conf for d in dets]
         failed: list[bool] = [False] * len(dets)
 
-        # 0) value of information: can another observation change this candidate's outcome?
+        band = self._budget(dets, self._voi_pass(dets, traces), traces)                    # steps 1 + 2
+        n_inf = 1 + self._relook_band(frame, dets, band, traces, relooks, scores, failed)  # step 3 (+1 = detect)
+        for i in range(len(dets)):
+            if not any(s.tool == "zoom_relook" for s in traces[i]):
+                traces[i].append(AgentStep(tool="zoom_relook", status="skipped", latency_ms=0.0,
+                                           rationale="value of information 0: a re-look could not change this tier",
+                                           detail={"reason": "voi_zero"}))
+
+        out: list[Candidate] = []                                                         # step 4
+        for i, det in enumerate(dets):
+            trace = traces[i]
+            rl = relooks[i] or RelookResult(found=False, conf=0.0, gain=0.0, scale=1.0)
+            if relooks[i] is not None:
+                rl.gain = round(rl.conf - det.conf, 4)
+            if self._active_ok(det):
+                # the active loop asks its own value-of-information question per tool
+                trace[:] = [s for s in trace if s.tool != "voi_check" and not (
+                    s.tool in ("zoom_relook", "enhance_relook") and s.status == "skipped")]
+                proof, wc, rl_a, res, n_a = self._active(i, det, frame, gray, cf, altitude_m, trace, failed)
+                n_inf += n_a
+                out.append(self._finish_active(det, trace, proof, wc, rl_a or rl, res, failed[i]))
+                continue
+            proof, wc = self._physical_evidence(i, det, gray, cf, altitude_m, trace, failed)
+            out.append(self._decide_one(det, rl, relooks[i] is not None, scores[i], proof, wc, trace, failed[i]))
+        return out, n_inf
+
+    def _voi_pass(self, dets: list[Detection], traces) -> list[int]:
+        """Step 1: ask "can another observation change the decision?" of every candidate."""
         band = []
         for i, d in enumerate(dets):
             yes, why = self._voi(d)
@@ -195,8 +225,11 @@ class ReLookAgent:
                                                "answer": "yes" if yes else "no"}))
             if yes:
                 band.append(i)
-        # compute budget (stop rule): the likeliest band candidates first; the rest are skipped
-        band.sort(key=lambda i: -dets[i].conf)
+        return band
+
+    def _budget(self, dets: list[Detection], band: list[int], traces) -> list[int]:
+        """Step 2 (stop rule): keep the ``max_relooks`` likeliest; the rest go to a person on their score."""
+        band = sorted(band, key=lambda i: -dets[i].conf)
         cap = max(0, int(self.cfg.max_relooks))
         for i in band[cap:]:
             traces[i].append(AgentStep(
@@ -204,143 +237,131 @@ class ReLookAgent:
                 rationale=f"compute budget spent ({cap} re-looks this frame, used on the likelier finds) -> "
                           f"stop: goes to a person on its detector score",
                 detail={"reason": "compute_budget", "budget": cap}))
-        band = sorted(band[:cap])
+        return sorted(band[:cap])
 
-        n_inf = 1                                                          # the detect pass
-        escalated: set[int] = set()
-        if band:
-            items = [dets[i] for i in band]
+    def _relook_band(self, frame, dets, band, traces, relooks, scores, failed) -> int:
+        """Step 3: batched re-look, then CLAHE for those still below tau_confirm. Returns inferences spent.
+        A tool failure is contained: those candidates keep the detector score and are marked ``failed``."""
+        if not band:
+            return 0
+        tiers, n_inf, escalated = self.cfg.tiers, 0, set()
+        try:
+            if "tool_failed" in self._faults:
+                raise RuntimeError("simulated re-look failure (failure drill)")
+            res, steps, n = self.tools.relook_band(frame, [dets[i] for i in band], tiers.relook_mode, enhance=False)
+            n_inf += n
+            for i, r, s in zip(band, res, steps):
+                relooks[i], scores[i] = r, tiers.score(dets[i].conf, r.conf)
+                traces[i].append(s)
+        except Exception as e:                                         # contained: fall back, tell a person
+            for i in band:
+                failed[i] = True
+                traces[i].append(_failed_step("zoom_relook", e, dets[i].conf))
+
+        ok = [i for i in band if not failed[i]]
+        still = [i for i in ok if tiers.tau_confirm is None or scores[i] < tiers.tau_confirm]
+        if tiers.escalate_clahe and still:
             try:
-                if "tool_failed" in self._faults:
-                    raise RuntimeError("simulated re-look failure (failure drill)")
-                res, steps, n = self.tools.relook_band(frame, items, tiers.relook_mode, enhance=False)
-                n_inf += n
-                for i, r, s in zip(band, res, steps):
-                    relooks[i], scores[i] = r, tiers.score(dets[i].conf, r.conf)
+                res2, steps2, n2 = self.tools.relook_band(frame, [dets[i] for i in still],
+                                                           tiers.relook_mode, enhance=True)
+                n_inf += n2
+                for i, r, s in zip(still, res2, steps2):
                     traces[i].append(s)
-            except Exception as e:                                         # contained: fall back, tell a person
-                for i in band:
+                    escalated.add(i)
+                    if r.conf > relooks[i].conf:
+                        relooks[i] = r
+                    scores[i] = tiers.score(dets[i].conf, relooks[i].conf)
+            except Exception as e:
+                for i in still:
                     failed[i] = True
-                    traces[i].append(_failed_step("zoom_relook", e, dets[i].conf))
-            # optional CLAHE escalation - only for band candidates still below tau_confirm
-            ok = [i for i in band if not failed[i]]
-            still = [i for i in ok if tiers.tau_confirm is None or scores[i] < tiers.tau_confirm]
-            if tiers.escalate_clahe and still:
-                try:
-                    res2, steps2, n2 = self.tools.relook_band(frame, [dets[i] for i in still],
-                                                               tiers.relook_mode, enhance=True)
-                    n_inf += n2
-                    for i, r, s in zip(still, res2, steps2):
-                        traces[i].append(s)
-                        escalated.add(i)
-                        if r.conf > relooks[i].conf:
-                            relooks[i] = r
-                        scores[i] = tiers.score(dets[i].conf, relooks[i].conf)
-                except Exception as e:
-                    for i in still:
-                        failed[i] = True
-                        traces[i].append(_failed_step("enhance_relook", e, dets[i].conf))
-            for i in ok:
-                if i in escalated or failed[i]:
-                    continue
-                why = ("calibration showed a CLAHE pass does not improve the calibrated score -> not spent"
-                       if not tiers.escalate_clahe else "score already at/above tau_confirm -> no further looking")
-                traces[i].append(AgentStep(tool="enhance_relook", status="skipped", rationale=why, latency_ms=0.0,
-                                           detail={"reason": "no_value"}))
-        for i in range(len(dets)):
-            if not any(s.tool == "zoom_relook" for s in traces[i]):
-                traces[i].append(AgentStep(tool="zoom_relook", status="skipped", latency_ms=0.0,
-                                           rationale="value of information 0: a re-look could not change this tier",
-                                           detail={"reason": "voi_zero"}))
-
-        out: list[Candidate] = []
-        for i, det in enumerate(dets):
-            trace = traces[i]
-            rl = relooks[i] or RelookResult(found=False, conf=0.0, gain=0.0, scale=1.0)
-            if relooks[i] is not None:
-                rl.gain = round(rl.conf - det.conf, 4)
-            if self._active_ok(det):
-                # the active loop asks its own value-of-information question per tool (below)
-                trace[:] = [s for s in trace if s.tool != "voi_check" and not (
-                    s.tool in ("zoom_relook", "enhance_relook") and s.status == "skipped")]
-                proof, wc, rl_a, res, n_a = self._active(i, det, frame, gray, cf, altitude_m, trace, failed)
-                n_inf += n_a
-                out.append(self._finish_active(det, trace, proof, wc, rl_a or rl, res, failed[i]))
+                    traces[i].append(_failed_step("enhance_relook", e, dets[i].conf))
+        for i in ok:
+            if i in escalated or failed[i]:
                 continue
-            # physical evidence for the card (cheap, no inference): Stage-1 water column, shadow +
-            # relative height against the TRACKED altitude
-            wc = None
-            try:
-                wc, s = self.tools.water_column_check(cf, det.bbox)
-                trace.append(s if s is not None else AgentStep(
-                    tool="water_column_check", status="skipped", latency_ms=0.0,
-                    rationale="seabed not tracked on this frame -> water-column check not possible (not guessed)",
-                    detail={"reason": "not_measured"}))
-            except Exception as e:
-                failed[i] = True
-                trace.append(_failed_step("water_column_check", e, None))
-            try:
-                if "tool_failed" in self._faults and i == 0:
-                    raise RuntimeError("simulated shadow-tool failure (failure drill)")
-                if "tool_timeout" in self._faults and i == 0:
-                    self.tools.simulate_hang("shadow_check")
-                proof, s = self.tools.shadow_check(gray, det.bbox, nadir, altitude_px=_altitude_for(cf, det.bbox),
-                                                   altitude_m=altitude_m)
-                trace.append(s)
-            except Exception as e:
-                failed[i] = True
-                proof = _no_proof(det.bbox)
-                trace.append(_failed_step("shadow_check", e, None))
-            if proof.has_shadow and proof.orientation_known:
-                _, s = self.tools.estimate_height(proof)
-                trace.append(s)
+            why = ("calibration showed a CLAHE pass does not improve the calibrated score -> not spent"
+                   if not tiers.escalate_clahe else "score already at/above tau_confirm -> no further looking")
+            traces[i].append(AgentStep(tool="enhance_relook", status="skipped", rationale=why, latency_ms=0.0,
+                                       detail={"reason": "no_value"}))
+        return n_inf
+
+    def _physical_evidence(self, i, det: Detection, gray, cf: CanonicalFrame, altitude_m, trace, failed):
+        """Step 4a, cheap (no inference): water column (Stage 1), shadow, height vs the TRACKED altitude."""
+        wc = None
+        try:
+            wc, s = self.tools.water_column_check(cf, det.bbox)
+            trace.append(s if s is not None else AgentStep(
+                tool="water_column_check", status="skipped", latency_ms=0.0,
+                rationale="seabed not tracked on this frame -> water-column check not possible (not guessed)",
+                detail={"reason": "not_measured"}))
+        except Exception as e:
+            failed[i] = True
+            trace.append(_failed_step("water_column_check", e, None))
+        try:
+            if "tool_failed" in self._faults and i == 0:
+                raise RuntimeError("simulated shadow-tool failure (failure drill)")
+            if "tool_timeout" in self._faults and i == 0:
+                self.tools.simulate_hang("shadow_check")
+            proof, s = self.tools.shadow_check(gray, det.bbox, cf.orientation.nadir,
+                                               altitude_px=_altitude_for(cf, det.bbox), altitude_m=altitude_m)
+            trace.append(s)
+        except Exception as e:
+            failed[i] = True
+            proof = _no_proof(det.bbox)
+            trace.append(_failed_step("shadow_check", e, None))
+        if proof.has_shadow and proof.orientation_known:
+            _, s = self.tools.estimate_height(proof)
+            trace.append(s)
+        else:
+            trace.append(AgentStep(tool="estimate_height", status="skipped", latency_ms=0.0,
+                                   rationale="no measurable shadow -> height not estimable (never assumed)",
+                                   detail={"reason": "no_shadow"}))
+        return proof, wc
+
+    def _decide_one(self, det: Detection, rl: RelookResult, relooked: bool, score: float,
+                    proof: ShadowProof, wc, trace: list[AgentStep], failed: bool) -> Candidate:
+        """Step 4b: belief update → tier → evidence card → handoff to a person."""
+        tiers = self.cfg.tiers
+        # P(pot) from the detector alone -> after the evidence (both calibrated on held-out recordings)
+        hazard = det.cls_name == tiers.guaranteed_class and det.conf >= tiers.tau_review
+        p0 = tiers.p_pot(det.conf) if hazard else None
+        p1 = tiers.p_pot(score) if hazard else None
+        if p0 is not None and p1 is not None:
+            if abs(p1 - p0) < 1e-9:
+                why = (f"P(pot) stays {p1:.0%} (calibrated on held-out recordings from the detector score); "
+                       f"the shadow / height / water-column evidence is shown to the person, not folded into "
+                       f"the calibrated number")
             else:
-                trace.append(AgentStep(tool="estimate_height", status="skipped", latency_ms=0.0,
-                                       rationale="no measurable shadow -> height not estimable (never assumed)",
-                                       detail={"reason": "no_shadow"}))
-
-            # probability update: P(pot) from the detector alone -> after the evidence
-            hazard = det.cls_name == tiers.guaranteed_class and det.conf >= tiers.tau_review
-            p0 = tiers.p_pot(det.conf) if hazard else None
-            p1 = tiers.p_pot(scores[i]) if hazard else None
-            if p0 is not None and p1 is not None:
-                if abs(p1 - p0) < 1e-9:
-                    why = (f"P(pot) stays {p1:.0%} (calibrated on held-out recordings from the detector score); "
-                           f"the shadow / height / water-column evidence is shown to the person, not folded into "
-                           f"the calibrated number")
-                else:
-                    why = (f"P(pot) {p0:.0%} from the detector alone -> {p1:.0%} after the re-look "
-                           f"({'raised' if p1 > p0 else 'lowered'}; calibrated on held-out recordings)")
-                trace.append(AgentStep(
-                    tool="update_belief", latency_ms=0.0, conf_before=round(det.conf, 4), conf_after=round(scores[i], 4),
-                    rationale=why, detail={"p_prior": p0, "p_post": p1}))
-
-            verdict, why, p = self._tier(det, scores[i], relooks[i] is not None)
-            if failed[i] and verdict is Verdict.CONFIRMED and scores[i] > det.conf:
-                verdict, p = Verdict.REVIEW, tiers.p_pot(det.conf)        # never auto-confirm on partial evidence
-                why += " -> but an evidence tool failed, so a person decides (REVIEW)"
-            notes = evidence_notes(det.conf, det.cls_name, rl, proof)
-            if wc:
-                notes.append("sits in the water column above the tracked seabed (fish / bubbles / surface "
-                             "return?) - not on the seabed; a human should check it")
-            if relooks[i] is None and det.cls_name == tiers.guaranteed_class and not failed[i]:
-                notes[0] = "re-look: not needed - it could not change this tier (value of information 0)"
-            if failed[i]:
-                notes.insert(0, "an evidence tool failed on this find - the agent used the detector's own score "
-                                "and sent it to a person (see the trace)")
-            evidence = Evidence(relook=rl, shadow=proof, echo_ratio=proof.echo_ratio,
-                                evidence_score=round(scores[i], 4), notes=notes, p_pot=p)
+                why = (f"P(pot) {p0:.0%} from the detector alone -> {p1:.0%} after the re-look "
+                       f"({'raised' if p1 > p0 else 'lowered'}; calibrated on held-out recordings)")
             trace.append(AgentStep(
-                tool="decide", rationale=why, latency_ms=0.0, conf_before=round(det.conf, 4),
-                conf_after=round(scores[i], 4),
-                detail={"verdict": verdict.value, "score": round(scores[i], 4), "p_pot": p,
-                        "tau_review": tiers.tau_review, "tau_confirm": tiers.tau_confirm,
-                        "relooked": relooks[i] is not None, "mode": "calibrated", "tool_failed": failed[i]},
-            ))
-            trace.append(_handoff(verdict, p))
-            out.append(Candidate(bbox=det.bbox, cls_id=det.cls_id, cls_name=det.cls_name,
-                                 conf=det.conf, evidence=evidence, verdict=verdict, trace=trace))
-        return out, n_inf
+                tool="update_belief", latency_ms=0.0, conf_before=round(det.conf, 4), conf_after=round(score, 4),
+                rationale=why, detail={"p_prior": p0, "p_post": p1}))
+
+        verdict, why, p = self._tier(det, score, relooked)
+        if failed and verdict is Verdict.CONFIRMED and score > det.conf:
+            verdict, p = Verdict.REVIEW, tiers.p_pot(det.conf)            # never auto-confirm on partial evidence
+            why += " -> but an evidence tool failed, so a person decides (REVIEW)"
+        notes = evidence_notes(det.conf, det.cls_name, rl, proof)
+        if wc:
+            notes.append("sits in the water column above the tracked seabed (fish / bubbles / surface "
+                         "return?) - not on the seabed; a human should check it")
+        if not relooked and det.cls_name == tiers.guaranteed_class and not failed:
+            notes[0] = "re-look: not needed - it could not change this tier (value of information 0)"
+        if failed:
+            notes.insert(0, "an evidence tool failed on this find - the agent used the detector's own score "
+                            "and sent it to a person (see the trace)")
+        evidence = Evidence(relook=rl, shadow=proof, echo_ratio=proof.echo_ratio,
+                            evidence_score=round(score, 4), notes=notes, p_pot=p)
+        trace.append(AgentStep(
+            tool="decide", rationale=why, latency_ms=0.0, conf_before=round(det.conf, 4),
+            conf_after=round(score, 4),
+            detail={"verdict": verdict.value, "score": round(score, 4), "p_pot": p,
+                    "tau_review": tiers.tau_review, "tau_confirm": tiers.tau_confirm,
+                    "relooked": relooked, "mode": "calibrated", "tool_failed": failed},
+        ))
+        trace.append(_handoff(verdict, p))
+        return Candidate(bbox=det.bbox, cls_id=det.cls_id, cls_name=det.cls_name,
+                         conf=det.conf, evidence=evidence, verdict=verdict, trace=trace)
 
     # ======================================================================= active vision
     def _active_ok(self, det: Detection) -> bool:
