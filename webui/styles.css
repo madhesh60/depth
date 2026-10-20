@@ -878,6 +878,7 @@ body.is-busy .run-toast .spin { display: block; animation: breathe 1.2s ease-in-
 }
 @media (max-width: 980px) { .workspace { grid-template-columns: 200px minmax(0, 1fr) 270px; } .sample-grid { grid-template-columns: 1fr; } .demo-btn { display: none; } }
 @media (max-width: 860px) { .workspace { grid-template-columns: 1fr; grid-auto-rows: min-content; overflow-y: auto; } .canvas { min-height: 70vh; } :root { --dock-h: 150px; } }
+@media (max-width: 600px) { .modes { max-width: 100%; overflow-x: auto; scrollbar-width: none; flex-shrink: 1; } .mode-btn { flex: none; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; } }
 @media (prefers-reduced-transparency: reduce) { :root { --glass: #0b0d10; --glass-strong: #101317; --blur: none; --blur-strong: none; } .sea { display: none; } }
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { :root { --glass: rgba(11, 13, 16, .96); --glass-strong: rgba(16, 19, 23, .98); } }

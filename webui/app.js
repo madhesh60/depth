@@ -440,6 +440,8 @@ function wireModes() {
     if (b.dataset.mode === "audit") { loadAuditSummary(); }
     if (b.dataset.mode === "connect") { Connect.load(); }
   });
+  const m0 = new URLSearchParams(location.search).get("mode");   // deep link: ?mode=survey
+  if (m0) setTimeout(() => setMode(m0), 0);
 }
 
 function wireViewerControls() {
@@ -787,7 +789,7 @@ function renderAnalyze(d) {
   buildClassLegend(ordered);
   applyFilters();
   streamLog(d, ordered);
-  maybeAutoTour();
+  // no automatic zoom tour after Analyze: it surprised first-time users (audit 2026-10-13 §4.7); the Tour button plays it
 }
 
 /* class cut/toggle legend */
@@ -917,7 +919,6 @@ function hideAgentEye() { const ae = $("#agentEye"); if (ae) ae.hidden = true; }
 
 /* cinematic auto-tour */
 let _tourTimer = null;
-function maybeAutoTour() { if (state._boxes.length && !state._tourOptOut && Twin.dim !== "3d") setTimeout(() => { if (!state._tourOptOut && !state._tour && Twin.dim !== "3d") playGazeTour(false); }, 750); }
 function playGazeTour() {
   endTour();
   const ids = $$(".ev-card:not(.ev-under)").map(c => +c.dataset.id);
