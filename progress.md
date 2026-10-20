@@ -75,6 +75,17 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ## 4. Session log
 
+### 2026-10-20 (sweep 65) — code readability pass against the Agentic Vision rubric
+
+- `agent.py`: the 165-line calibrated loop is now four named steps (`_voi_pass` → `_budget` → `_relook_band` →
+  `_physical_evidence` + `_decide_one`). Proven behaviour-identical: same traces, notes, P(pot) and tiers on the
+  8 demo frames, with and without the `tool_failed` drill (16 runs, 62 candidates). Header no longer implies a
+  precision promise EXP-003 does not make.
+- Lint: 13 unused imports, 2 empty f-strings, 1 dead variable removed (`ruff --select F` clean).
+- `docs/agentic_vision.md`: rubric table now names the sensor cross-check, failure drills, person-confirmed
+  re-plan and the 151/222 counterfactual. `architecture.md` §12: a read-the-code-in-this-order path.
+- Studio smoke test on a fresh server: pages, analyze, drill, sample survey OK. Full suite: 225 passed.
+
 ### 2026-10-20 (sweep 64) — last two audit items closed; everything left is COOL, diagram, report, video
 
 - Audit item 7: STUDY-16 now says PINGMapper already offers sounder *or* image seabed picks; DEPTH's addition is
