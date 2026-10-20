@@ -98,25 +98,34 @@ Details: [infra/README.md](infra/README.md).
 ## Key commands
 
 ```bash
-python -m uvicorn src.dashboard.app:app --port 8000        # the studio (Analyze/Survey/Study/Audit)
-pytest -q                                                  # test suite
-python -m src.agentic.calibrate                            # guaranteed tiers (val) → verified once (test)
-python -m src.detection.evaluate [--model M --test-split S]  # deploy-faithful detector eval
-python -m src.detection.diagnose --zip EXP-003_complete.zip        # val per source + fit check (never test)
-python -m src.detection.onboard_model --zip EXP-003_complete.zip   # plug in a Kaggle-trained model
-python notebooks/make_kaggle_notebook.py                     # regenerate the Kaggle notebook (exp004_kaggle.ipynb)
-python -m src.agentic.effort                               # analyst-effort curve
-python -m src.bench.product_bench --label <host>            # benchmark this machine
-python -m src.agentic.feedback stats|export                 # human labels → fine-tune set
-python -m src.detection.fp_audit build|summary              # blinded false-alarm audit
-python -m src.agentic.study_causal [--frames DIR]           # STUDY-12 counterfactual trace
-python -m src.dashboard.mcp_server                          # MCP over stdio (HTTP: /mcp on the server)
-python -m src.detection.fetch_model                         # the detector weights (SHA-256 checked)
-python -m src.cv_pipeline.humminbird fetch [--large]|validate|report  # raw recording with real GPS (STUDY-14)
-python -m src.agentic.study_sensor                         # STUDY-16 sensor cross-check (design + fresh recording)
-python -m src.detection.study_scale_tta                     # STUDY-13 (input size + flip TTA)
-python -m src.agentic.evidence_model                        # STUDY-15 active-vision evidence (val -> test -> fresh)
-python -m src.agentic.counterfactual                        # same survey: detector only vs + Stage 1 + evidence
+# Run and check
+python -m uvicorn src.dashboard.app:app --port 8000    # the studio (Analyze/Survey/Study/Audit)
+pytest -q                                              # test suite
+python -m ruff check .                                 # lint (configuration: pyproject.toml)
+python -m src.detection.fetch_model                    # the detector weights (SHA-256 checked)
+python -m src.dashboard.mcp_server                     # MCP over stdio (HTTP: /mcp on the server)
+
+# Detector, agent, people
+python -m src.detection.evaluate                       # deploy-faithful eval [--model M --test-split S]
+python -m src.agentic.calibrate                        # guaranteed tiers (val) → verified once (test)
+python -m src.agentic.effort                           # analyst-effort curve
+python -m src.agentic.feedback stats|export            # human labels → fine-tune set
+python -m src.detection.fp_audit build|summary         # blinded false-alarm audit
+python -m src.bench.product_bench --label <host>       # benchmark this machine
+
+# Studies (numbered as in experiments.md)
+python -m src.agentic.study_causal [--frames DIR]      # STUDY-12 counterfactual trace
+python -m src.detection.study_scale_tta                # STUDY-13 input size + flip TTA
+python -m src.cv_pipeline.humminbird fetch [--large]   # STUDY-14 real-GPS recording (--large: + the 1-h one)
+python -m src.cv_pipeline.humminbird validate|report   # STUDY-14 physics checks · report
+python -m src.agentic.evidence_model                   # STUDY-15 active-vision evidence (val → test → fresh)
+python -m src.agentic.study_sensor                     # STUDY-16 sensor cross-check (design + fresh)
+python -m src.agentic.counterfactual                   # same survey: detector only vs + Stage 1 + evidence
+
+# A new Kaggle-trained model: validation per source + fit check (never test), then plug it in
+python notebooks/make_kaggle_notebook.py               # regenerate notebooks/exp005_kaggle.ipynb
+python -m src.detection.diagnose --zip EXP-003_complete.zip
+python -m src.detection.onboard_model --zip EXP-003_complete.zip
 ```
 
 ## Environment
@@ -130,23 +139,29 @@ profile `hackathon`, us-east-1); login + the MCP wizard are deferred to the AWS 
 ## Repo layout
 
 ```
-src/cv_pipeline/  canonical.py (Stage 1) · humminbird.py (raw recordings) · orientation.py ·
-                  study_canonical.py · pipeline.py (STUDY-01 record)
+src/cv_pipeline/  canonical.py (Stage 1) · humminbird.py (raw recordings) · orientation.py · study_canonical.py ·
+                  pipeline.py + config.py (STUDY-01 record) · benchmark.py · tune_coverage.py
 src/detection/    infer · calibration · evaluate · export_onnx · train · onboard_model · fetch_model ·
-                  diagnose · fp_audit · frames · failure_gallery · seam / study_seam (11b) · study_scale_tta (13)
-src/agentic/      agent · perception · shadow · tools · policy · guarantees · calibrate · geo · stitch ·
+                  diagnose · fp_audit · frames · failure_gallery · seam / study_seam (11b) · study_scale_tta (13) ·
+                  EXP-001-era studies: ablation_fp · error_analysis · fn_gallery · tiled_infer
+src/agentic/      agent · perception · shadow · evidence · tools · policy · guarantees · calibrate · geo · stitch ·
                   resurvey · mission (plan_mission / apply_human) · pipeline · approvals · brief · twin ·
-                  provenance · feedback · study · effort · study_causal (12) · types
-src/bench/        product_bench · fingerprint · compare · cool_attest · verify_cool · load_test (COOL)
+                  incidents · provenance · feedback · study · effort · study_causal (12) ·
+                  active / evidence_model / counterfactual (15) · sensor_check / study_sensor (16) · types
+src/bench/        product_bench · fingerprint · compare · cool_attest · verify_cool · cool_docs · load_test (COOL)
 src/dashboard/    app (FastAPI) · jobs · metrics · samples · mcp_server · ogc · integrations · ratelimit · origin_guard
 webui/            zero-build studio · twin3d.js · embed/depth-embed.js · samples/ (8 CC-BY-SA frames) ·
                   audit/ crops · vendor/leaflet · vendor/three
 infra/            cfn/depth.yaml · deploy.sh · teardown.sh · update_server.sh · setup_cool_instance.sh ·
-                  depth.service · bench_fleet.sh · bench_userdata.sh · bench_cool.sh · lib.sh
-models/<MODEL>/   calibration.json · effort_curve.json · fp_audit_val.json (weights: Release exp003-v1 via fetch_model)
+                  depth.service · golive.sh · bench_fleet.sh · bench_userdata.sh · bench_cool.sh · lib.sh
+models/<MODEL>/   calibration.json · effort_curve.json · fp_audit_val.json; EXP-003 also evidence_model.json ·
+                  model_meta.json (weights: Release exp003-v1 via fetch_model)
 benchmarks/       product_bench JSON results (tracked; EC2 / COOL runs land here too)
-docs/README.md    the documentation map (start here)
+notebooks/        exp005_kaggle.ipynb, generated by make_kaggle_notebook.py (monitor_cell.py is its cell 5)
+DATASET/scripts/  dataset builders (v1 · v2 · v2b · tiles · samples) + audit and label viewer
+docs/README.md    the documentation map (start here); docs/notes/ holds the working notes
 tests/            pytest suite (CI: .github/workflows/tests.yml)
+pyproject.toml    ruff lint configuration only (no package metadata)
 ```
 
 ## Git & delivery workflow

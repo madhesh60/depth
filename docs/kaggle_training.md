@@ -106,7 +106,10 @@ Download both zips from **Output** into the repo root. Then run the check: per-s
 frames. It never touches test.
 
 ```bash
-python -m src.detection.diagnose --zip EXP-003_complete.zip --zip EXP-005_complete.zip --zip EXP-005a_complete.zip
+python -m src.detection.diagnose \
+    --zip EXP-003_complete.zip \
+    --zip EXP-005_complete.zip \
+    --zip EXP-005a_complete.zip
 ```
 
 **Pass bar:**
@@ -156,5 +159,14 @@ Log EXP-005 / EXP-005a in `experiments.md` with the diagnosis and the onboarding
 Rebuild the upload package (only if the Kaggle dataset is gone or the data changed):
 
 ```bash
-python -c "import zipfile,pathlib; s=pathlib.Path('DATASET/03_yolo_ready_dataset_v2b'); z=zipfile.ZipFile('runs/kaggle_upload/depth-v2b.zip','w'); [z.write(p, p.relative_to(s.parent).as_posix()) for p in sorted(s.rglob('*')) if p.is_file()]; z.write('webui/samples/ATTRIBUTION.md','03_yolo_ready_dataset_v2b/DATA_ATTRIBUTION.md'); z.close()"
+python -c "
+import pathlib, zipfile
+src = pathlib.Path('DATASET/03_yolo_ready_dataset_v2b')
+pathlib.Path('runs/kaggle_upload').mkdir(parents=True, exist_ok=True)
+with zipfile.ZipFile('runs/kaggle_upload/depth-v2b.zip', 'w') as z:
+    for p in sorted(src.rglob('*')):
+        if p.is_file():
+            z.write(p, p.relative_to(src.parent).as_posix())
+    z.write('webui/samples/ATTRIBUTION.md', '03_yolo_ready_dataset_v2b/DATA_ATTRIBUTION.md')
+"
 ```

@@ -53,7 +53,10 @@ EXP-005 analyses). Records:
 ## Publish (owner only)
 
 ```bash
-gh release create exp003-v1 models/EXP-003/best.onnx --repo madhesh60/depth --title "EXP-003 detector weights" --notes-file docs/release_exp003.md
+gh release create exp003-v1 models/EXP-003/best.onnx \
+    --repo madhesh60/depth \
+    --title "EXP-003 detector weights" \
+    --notes-file docs/release_exp003.md
 ```
 
 Then check: `python -m src.detection.fetch_model` on a fresh clone installs it and the hash matches.

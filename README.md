@@ -26,7 +26,7 @@ Madhesh) · **Targets:** Agentic Vision · Best Use of COOL · **License:** AGPL
 | Stage-1 altitude, port vs starboard (no labels needed) | agree to **1.6 px** (random pairs 5.3 px) | STUDY-08 |
 | Full product path on a laptop CPU | **252 ms/frame** p50 · one survey-hour in **51 s** | `benchmarks/`, x86, stock OpenCV 5 |
 | Raw sonar recording, real GPS | range scale **2.03 cm/sample ± 10.2%**, measured | Colorado River, Humminbird |
-| Tests | **205**, CI on every push; 3 need optional data and skip without it (the raw recording, the unpublished EXP-001 weights) | `pytest -q` |
+| Tests | **225**, CI on every push; 3 need optional data and skip without it (the raw recording, the unpublished EXP-001 weights) | `pytest -q` |
 
 **Not yet measured, and said so:** Graviton + COOL timings (scripted, AWS day), analyst minutes saved
 (the timed study needs people), audited false-alarm precision (the blinded audit needs people). The
@@ -35,17 +35,19 @@ detector misses the proposal's 0.70 mAP target; §4 says by how much and why.
 **For judges — five minutes from a clean clone:**
 
 ```bash
-git clone https://github.com/madhesh60/depth.git && cd depth
-pip install -r requirements.txt && python -m src.detection.fetch_model   # 38 MB, SHA-256 checked
-python -m src.cv_pipeline.humminbird fetch                               # raw recording with real GPS (11 MB)
-python -m uvicorn src.dashboard.app:app --port 8000                      # http://localhost:8000 → ▶ 60-s demo
+git clone https://github.com/madhesh60/depth.git
+cd depth
+pip install -r requirements.txt                       # torch-free runtime: OpenCV 5.0.0.93, FastAPI
+python -m src.detection.fetch_model                   # the detector: 38 MB, SHA-256 checked
+python -m src.cv_pipeline.humminbird fetch            # a raw sonar recording with real GPS: 11 MB
+python -m uvicorn src.dashboard.app:app --port 8000   # open http://localhost:8000 → ▶ 60-s demo
 ```
 
 ### How the evidence maps to the judging criteria
 
 | criterion | where DEPTH shows it |
 |---|---|
-| **Technical execution** — OpenCV 5 doing real work | Stage 1 (bottom track with `cv2.Sobel` / `cv2.blur`, slant→ground `cv2.remap`), YOLO11 through `cv2.dnn`, shadow + re-look evidence; deploy-faithful evaluation with CIs, mAP@0.5:0.95, confusion matrix, PR curves ([`eval_exp003_test.md`](docs/eval_exp003_test.md)); 205 tests; deadlines + fallbacks on every tool |
+| **Technical execution** — OpenCV 5 doing real work | Stage 1 (bottom track with `cv2.Sobel` / `cv2.blur`, slant→ground `cv2.remap`), YOLO11 through `cv2.dnn`, shadow + re-look evidence; deploy-faithful evaluation with CIs, mAP@0.5:0.95, confusion matrix, PR curves ([`eval_exp003_test.md`](docs/eval_exp003_test.md)); 225 tests; deadlines + fallbacks on every tool |
 | **Agentic Vision** — perception changes the next action | on by default and measured: OpenCV's seabed measurement decides where the pins go (without it 151 of 222 leave their own error circle and 4 of 40 re-survey passes regroup — [`causal_trace.md`](docs/causal_trace.md)); the agent cross-checks that seabed against the depth sounder and re-tracks on a conflict ([`sensor_check.md`](docs/sensor_check.md)); opposite-side passes ranked by information per boat-minute; a person's decline re-plans, an approval issues a work order (§2). Per-frame active vision is built and tested but failed its own validation, so it is off by default ([`evidence_model_exp003.md`](docs/evidence_model_exp003.md)) |
 | **Innovation** | statistical promises on an imperfect detector ([`calibration_exp003.md`](docs/calibration_exp003.md)); the agent cross-checks its own seabed track against the depth sounder ([`sensor_check.md`](docs/sensor_check.md)); shadow-flip prediction for second looks |
 | **Real-world impact** | raw Humminbird recordings with real GPS, routes, budgets, GPX/KML/GeoJSON, OGC API, webhooks, MCP; a severity hook for the review queue (suspended or tall finds weighted up; an operator policy, not yet exercised: no find in the demo data has a measured risk factor) |
@@ -142,9 +144,9 @@ validated (STUDY-12). Switch it on in the studio (**Active vision · experimenta
 ## 3. Try it (no sonar files needed)
 
 ```bash
-pip install -r requirements.txt                    # torch-free runtime: OpenCV 5.0.0.93, FastAPI
-python -m src.detection.fetch_model                # the trained detector (38 MB, SHA-256 checked)
-python -m src.cv_pipeline.humminbird fetch         # optional: a raw sonar recording with real GPS (11 MB, SHA-256 pinned)
+pip install -r requirements.txt                       # torch-free runtime: OpenCV 5.0.0.93, FastAPI
+python -m src.detection.fetch_model                   # the detector: 38 MB, SHA-256 checked
+python -m src.cv_pipeline.humminbird fetch            # optional: a raw recording with real GPS: 11 MB
 python -m uvicorn src.dashboard.app:app --port 8000   # open http://localhost:8000
 ```
 
@@ -241,19 +243,27 @@ Every document, grouped by what it proves: [`docs/README.md`](docs/README.md).
 ## 6. Reproduce
 
 ```bash
-pytest -q                                              # test suite
-python -m src.agentic.calibrate                        # fit + verify the guaranteed tiers
-python -m src.detection.evaluate                       # deploy-faithful detector evaluation
-python -m src.cv_pipeline.study_canonical              # STUDY-08 (Stage 1)
-python -m src.agentic.effort                           # analyst-effort curve
-python -m src.bench.product_bench --label my_host      # benchmark this machine (product workload)
-python -m src.detection.diagnose --zip EXP-003_complete.zip        # why a new model is (not) good: val + fit check
-python -m src.detection.onboard_model --zip EXP-003_complete.zip   # plug in a new model (+ speed gate)
-python -m src.agentic.study_causal --frames DATASET/03_yolo_ready_dataset_v2b/test/images --limit 80   # STUDY-12
-python -m src.agentic.evidence_model                  # STUDY-15: evidence LRs (val) -> test -> fresh split
-python -m src.agentic.counterfactual                  # the same survey: detector only vs + Stage 1 + OpenCV evidence
-python -m src.detection.study_scale_tta               # STUDY-13 input size + flip TTA
-python -m src.cv_pipeline.humminbird report           # STUDY-14 raw recording, real GPS
+pip install -r requirements-dev.txt                 # runtime + test + lint dependencies
+pytest -q                                           # test suite
+python -m ruff check .                              # lint (configuration: pyproject.toml)
+python -m src.detection.evaluate                    # deploy-faithful detector evaluation
+python -m src.agentic.calibrate                     # fit + verify the guaranteed tiers
+python -m src.agentic.effort                        # analyst-effort curve
+python -m src.agentic.counterfactual                # same survey: detector only vs + Stage 1 + evidence
+python -m src.bench.product_bench --label my_host   # benchmark this machine (product workload)
+python -m src.cv_pipeline.study_canonical           # STUDY-08: Stage 1 altitude, port vs starboard
+python -m src.detection.study_scale_tta             # STUDY-13: input size + flip TTA
+python -m src.cv_pipeline.humminbird report         # STUDY-14: raw recording, real GPS
+python -m src.agentic.evidence_model                # STUDY-15: evidence LRs (val) → test → fresh split
+python -m src.agentic.study_sensor                  # STUDY-16: seabed track vs depth sounder
+
+# STUDY-12: the counterfactual trace on up to 80 v2b test frames
+python -m src.agentic.study_causal \
+    --frames DATASET/03_yolo_ready_dataset_v2b/test/images --limit 80
+
+# A new Kaggle-trained model: diagnose on validation (never test), then plug it in (+ speed gate)
+python -m src.detection.diagnose --zip EXP-003_complete.zip
+python -m src.detection.onboard_model --zip EXP-003_complete.zip
 ```
 Datasets are git-ignored (large); their builders are in `DATASET/scripts/`
 ([`docs/dataset_card.md`](docs/dataset_card.md)). Deploy: [`infra/README.md`](infra/README.md).
@@ -264,19 +274,23 @@ Datasets are git-ignored (large); their builders are in `DATASET/scripts/`
 src/cv_pipeline/  Stage 1 (canonical.py) · raw Humminbird reader (humminbird.py) · retired ROI gate (STUDY-01)
 src/detection/    cv2.dnn detector, calibration, evaluation, training, onboarding (+ speed gate), model fetch,
                   false-alarm audit, failure gallery, STUDY-11b / 13
-src/agentic/      See→Prove→Decide→Act agent, active vision (active, evidence_model, counterfactual),
-                  guarantees, geo, routes, re-survey, person-confirmed loop,
+src/agentic/      See→Prove→Decide→Act agent, sensor cross-check (STUDY-16), active vision (active,
+                  evidence_model, counterfactual), guarantees, geo, routes, re-survey, person-confirmed loop,
                   approvals, mission brief, 3D twin, provenance, labels, study, effort, STUDY-12
-src/bench/        COOL benchmark (product workload, provenance, comparison)
+src/bench/        COOL benchmark (product workload, provenance, comparison, COOL receipt)
 src/dashboard/    FastAPI service (jobs, limits, rate limits, metrics) · MCP server · OGC API · webhooks
-webui/            zero-build studio (+ three.js twin) · embed/depth-embed.js (drop-in panel)
+webui/            zero-build studio (+ three.js twin) · embed/depth-embed.js (drop-in panel) · 8 sample frames
 infra/            Graviton + COOL deploy (dry-run by default) + 3-way benchmark
 models/<MODEL>/   calibration.json + effort/audit data (weights: GitHub Release, fetch_model)
-docs/             technical report, cards, calibration, evaluation, studies, MCP, integrations, …
-.github/          CI: the test suite on every push
+benchmarks/       measured benchmark results (JSON): laptop and EC2
+tests/            the pytest suite, run by CI on every push (.github/workflows/tests.yml)
+notebooks/        the Kaggle training notebook and its generator
+DATASET/scripts/  dataset builders (the data itself is git-ignored)
+docs/             technical report, cards, calibration, evaluation, studies, MCP, integrations, …;
+                  notes/ holds the working notes
 ```
-Documentation map: [`docs/README.md`](docs/README.md). Logs: [`experiments.md`](experiments.md) (every study, including negative results) ·
-[`progress.md`](progress.md) · [`TODO.md`](TODO.md).
+Documentation map: [`docs/README.md`](docs/README.md). Logs: [`experiments.md`](experiments.md) (every study,
+including negative results) · [`progress.md`](progress.md).
 
 ## 8. Responsible use & license
 

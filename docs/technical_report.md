@@ -325,16 +325,22 @@ Log: [`experiments.md`](../experiments.md).
 ## 9. Reproduce
 
 ```bash
-pip install -r requirements-dev.txt
-python -m src.detection.fetch_model                          # the detector (Release exp003-v1), SHA-256 checked
-pytest -q                                                    # 205 tests (CI: .github/workflows/tests.yml)
-python -m uvicorn src.dashboard.app:app --port 8000          # studio → "▶ 60-s demo"
-python -m src.agentic.calibrate                              # fit + verify the guarantees
-python -m src.detection.evaluate                             # deploy-faithful detector eval (+ mAP@0.5:0.95, confusion, PR)
-python -m src.agentic.study_causal --frames DATASET/03_yolo_ready_dataset_v2b/test/images --limit 80   # STUDY-12
-python -m src.detection.study_scale_tta                      # STUDY-13
-python -m src.cv_pipeline.humminbird fetch && python -m src.cv_pipeline.humminbird report   # STUDY-14
-python -m src.bench.product_bench --label <host>             # benchmark this machine
+pip install -r requirements-dev.txt                   # runtime + test + lint dependencies
+python -m src.detection.fetch_model                   # the detector (Release exp003-v1), SHA-256 checked
+pytest -q                                             # 225 tests (CI: .github/workflows/tests.yml)
+python -m uvicorn src.dashboard.app:app --port 8000   # studio → "▶ 60-s demo"
+python -m src.agentic.calibrate                       # fit + verify the guarantees
+python -m src.detection.evaluate                      # deploy-faithful eval (+ mAP@0.5:0.95, confusion, PR)
+python -m src.detection.study_scale_tta               # STUDY-13
+python -m src.bench.product_bench --label <host>      # benchmark this machine
+
+# STUDY-12: the counterfactual trace on up to 80 v2b test frames
+python -m src.agentic.study_causal \
+    --frames DATASET/03_yolo_ready_dataset_v2b/test/images --limit 80
+
+# STUDY-14: the raw recording with real GPS
+python -m src.cv_pipeline.humminbird fetch
+python -m src.cv_pipeline.humminbird report
 ```
 
 Checked on a fresh clone (2026-10-12): `fetch_model` installed the published weights with a matching

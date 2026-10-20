@@ -5,8 +5,7 @@ each experiment states a **hypothesis**, records the exact config, reports metri
 with **error analysis** + the **next** experiment. No result is trusted without knowing the
 dataset version, model, augmentation, and hyperparameters that produced it.
 
-**Related:** [`architecture.md`](architecture.md) · [`progress.md`](progress.md) ·
-[`TODO.md`](TODO.md)
+**Related:** [`architecture.md`](architecture.md) · [`progress.md`](progress.md)
 
 ---
 
@@ -220,7 +219,7 @@ Promote each into the log below with full results as it runs.
 - **Reading.** No crab pots are known in this reach and there is no ground truth, so every card is a
   false alarm or an unknown object: **191 cards per hour of sonar** on out-of-domain water. This is a
   false-alarm measurement, not a recall one. The real-GPS path is ready for a labelled crab-pot
-  recording (asked for in `docs/outreach.md`).
+  recording (asked for in `docs/notes/outreach.md`).
 
 ### STUDY-13 — Larger input + flipped second view for EXP-001 (NEGATIVE — not shipped)
 
@@ -647,7 +646,7 @@ Results — **the aggregate is confirmed AND shown to be misleading:**
 
 ### STUDY-04 — Adaptive triage controller + a second CONFIRMED path (high detector confidence)
 - Date: 2026-09-23 · Status: done · Code: `src/agentic/` (`policy.py`, `agent.py`, `tools.py`,
-  `pipeline.py`, `calibrate.py`); reproduce: `python -m src.agentic.calibrate --frames 160 --out runs/prove`
+  `pipeline.py`, `calibrate.py`); reproduce (at `14f08cf`; the flags changed later): `python -m src.agentic.calibrate --frames 160 --out runs/prove`
 - Hypothesis: STUDY-03 auto-confirms via **one** signal (re-look ≥ 0.40). Two ideas could safely
   confirm *more* true pots (→ a non-empty recovery route in the demo, higher task success): (a) a
   **corroboration** rule "high detector conf **and** a CLEAR acoustic shadow at a plausible height",
@@ -697,7 +696,7 @@ Decision & next
 
 ### STUDY-03 — See→Prove→Decide: shadow is NOT a gate; re-look persistence IS (agentic triage)
 - Date: 2026-09-23 · Status: done · Code: `src/agentic/` (`shadow.py`, `perception.py`,
-  `evidence.py`, `policy.py`, `calibrate.py`); reproduce: `python -m src.agentic.calibrate --frames 110`
+  `evidence.py`, `policy.py`, `calibrate.py`); reproduce (at `912dbb9`; the flags changed later): `python -m src.agentic.calibrate --frames 110`
 - Hypothesis: the acoustic **shadow** (bright echo + dark far-range shadow — the side-scan debris
   cue STUDY-01 said Stage 1 ignores) proves a detection is a real object, so shadow-gating the hot
   detector (fishing_gear conf 0.10) kills its false positives while keeping recall.
@@ -871,7 +870,7 @@ Decision & next
   aug recipe is sound; the open problem is `fishing_gear` recall, not overall capacity.
 - Next experiment (**EXP-002**): before touching the class problem, isolate whether the ~62%
   baked-in augmentation is helping or just doubling the online aug — originals-only train vs. this
-  run (per `docs/colab_baseline.md` §7). Then attack `fishing_gear` recall via oversampling /
+  run (per `docs/notes/colab_baseline.md` §7). Then attack `fishing_gear` recall via oversampling /
   focal (EXP-004) once the FN cause is confirmed from the confusion matrix.
 
 <!-- template retained below for the next run:

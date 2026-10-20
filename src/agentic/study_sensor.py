@@ -22,7 +22,7 @@ choices being judged:
 * **visual audit** — an overlay sheet of chunks sampled at random (seed 0) is published; the
   developer's reading of it is reported as a non-blind check, the images are there to be re-read.
 
-    python -m src.agentic.study_sensor [--fresh-only] [--no-fresh]
+    python -m src.agentic.study_sensor [--no-fresh] [--audit-note TEXT]
 """
 from __future__ import annotations
 
