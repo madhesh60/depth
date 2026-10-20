@@ -209,7 +209,10 @@ test-tuned "CONFIRMED 0.737" is 0.58 unseen — retired).
 
 **Runtime (laptop x86, stock OpenCV 5, full product path, EXP-003):** 252 ms/frame p50 (network ≈ 92%;
 the OpenCV-only stages run at 40 fps); one survey-hour of sonar (~169 frames) processed in **51 s**
-(real-time factor 0.014). **On EC2 (2026-10-20, 4 threads, stock OpenCV 5):** 157 ms/frame on c8i.xlarge x86, 197 ms on c8g.xlarge Graviton4 — stock Graviton is *slower* at equal size, which is the bar COOL has to clear; the c8g.large demo server passed the load test (4 clients + 1 survey: 291/291, p95 2.0 s). Results are committed in [`benchmarks/`](benchmarks) · [`docs/cool_benchmark.md`](docs/cool_benchmark.md). EC2 numbers come from
+(real-time factor 0.014). **On EC2 (2026-10-20, 4 threads, stock OpenCV 5):** 157 ms/frame on c8i.xlarge x86, 197 ms on c8g.xlarge Graviton4 — stock Graviton is *slower* at equal size, which is the bar COOL has to clear; the c8g.large demo server passed the load test (4 clients + 1 survey: 291/291, p95 2.0 s). Results are committed in [`benchmarks/`](benchmarks) · [`docs/cool_benchmark.md`](docs/cool_benchmark.md).
+<!-- cool:readme -->
+**Graviton + COOL:** measured automatically the moment the Marketplace subscription is active (`PHASE=cool ./infra/golive.sh`).
+<!-- /cool:readme --> EC2 numbers come from
 `infra/golive.sh` (x86 + Graviton stock now, Graviton COOL once the Marketplace subscription is active).
 
 **Real recording** (raw Humminbird, Colorado River, 150.6 s, real per-ping GPS —

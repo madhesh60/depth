@@ -4,11 +4,11 @@
 #   PHASE=now  APPLY=1 ./infra/golive.sh   # needs no COOL: benchmarks A (x86) + B (Graviton stock),
 #                                          # load test on the running (rehearsal) server
 #   PHASE=cool APPLY=1 ./infra/golive.sh   # the moment the COOL subscription is accepted:
-#                                          # swap in the COOL AMI -> verify the receipt -> benchmarks C + D
-#                                          # -> load test on COOL -> docs/cool_benchmark.md
+#                                          # benchmarks C + D (in parallel) + swap in the COOL AMI -> verify
+#                                          # -> load test -> compare -> fill README/report -> commit + push
 #
 # Without APPLY=1 it only prints the plan (each step's own dry run). Results land in benchmarks/ and docs/;
-# commit them afterwards. Needs `aws login --profile hackathon`.
+# PHASE=cool commits + pushes them itself (COMMIT=0 to skip). Needs `aws login --profile hackathon`.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 . infra/lib.sh
@@ -48,17 +48,35 @@ AMI_CHECK=$("$AWS_CLI" ec2 describe-images --image-ids "${COOL_AMI_ID:-ami-033e4
   --query 'Images[0].ImageId' --output text 2>&1 | tr -d '\r' || true)
 echo "COOL AMI visible: $AMI_CHECK (deploy.sh re-checks the subscription itself)"
 
-say "2/4 rehearsal -> COOL (replaces only the instance; ~15-25 min)"
-REHEARSAL=0 ./infra/deploy.sh
+# the benchmark machines don't need the demo server: they run while the instance is replaced (~40 -> ~25 min)
+say "2/4 benchmarks on COOL in the background: C (c8g.xlarge) + D (c8g.large)"
 if [ "$APPLY" = "1" ]; then
-  python -m src.bench.verify_cool runs/infra/receipt.json --md docs/cool_verification.md \
-    --json runs/infra/verify.json || die "the COOL receipt did not verify - stop here and look"
+  TARGETS="C D" ./infra/bench_fleet.sh > "$WORK/bench_cool.log" 2>&1 &
+  BENCH_PID=$!
+else
+  TARGETS="C D" ./infra/bench_fleet.sh
 fi
 
-say "3/4 benchmarks on COOL: C (c8g.xlarge) + D (c8g.large)"
-TARGETS="C D" ./infra/bench_fleet.sh
-
+say "3/4 demo server: rehearsal -> COOL (replaces only the instance; ~15-25 min)"
+REHEARSAL=0 ./infra/deploy.sh
+if [ "$APPLY" = "1" ]; then
+  URL=$(stack_output "$STACK" Url)
+  if [ -n "$URL" ] && [ "$URL" != None ]; then SRC="$URL"; else SRC=runs/infra/receipt.json; fi
+  python -m src.bench.verify_cool "$SRC" --md docs/cool_verification.md --json runs/infra/verify.json     || die "the COOL receipt did not verify - stop here and look"
+fi
 load_test c8g_large_cool
+
 say "4/4 report"
-if [ "$APPLY" = "1" ]; then python -m src.bench.compare; fi
-echo "done - commit benchmarks/ docs/cool_benchmark.md docs/cool_verification.md; pin the product code in verify_cool.COOL_PRODUCT_CODES"
+if [ "$APPLY" != "1" ]; then echo "(dry run) would wait for the benchmarks, then compare + cool_docs + commit"; exit 0; fi
+wait "$BENCH_PID" || echo "benchmark fleet exited non-zero - see $WORK/bench_cool.log"
+tail -8 "$WORK/bench_cool.log"
+python -m src.bench.compare
+python -m src.bench.cool_docs
+if [ "${COMMIT:-1}" = "1" ]; then
+  git add benchmarks docs/cool_benchmark.md docs/img/cool_benchmark.png docs/cool_verification.md
+  git commit -qm "data: Graviton COOL benchmarks, verified COOL receipt and load test" || true
+  git add README.md docs/technical_report.md
+  git commit -qm "docs: COOL numbers in the report and README" || true
+  git push -q origin HEAD && echo "pushed"
+fi
+echo "done - COOL is live. Read docs/cool_benchmark.md; update progress.md / experiments.md wording if the result surprises."
