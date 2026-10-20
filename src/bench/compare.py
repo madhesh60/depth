@@ -326,13 +326,17 @@ def chart(runs: list[dict], out: Path) -> None:
     ax.invert_yaxis()
     ax.set_xlabel("mean latency per frame (ms), stacked by op", color=ink2, fontsize=8)
     ax.tick_params(colors=ink2, labelsize=8)
-    ax.grid(axis="x", color="#e4e3df", linewidth=0.6); ax.set_axisbelow(True)
-    ax.spines[["top", "right", "left"]].set_visible(False); ax.spines["bottom"].set_color("#c9c8c2")
+    ax.grid(axis="x", color="#e4e3df", linewidth=0.6)
+    ax.set_axisbelow(True)
+    ax.spines[["top", "right", "left"]].set_visible(False)
+    ax.spines["bottom"].set_color("#c9c8c2")
     leg = ax.legend(ncol=min(len(keys), 4), fontsize=7, frameon=False, loc="lower center", bbox_to_anchor=(0.5, 1.0))
     for t in leg.get_texts():
         t.set_color(ink2)
     out.parent.mkdir(parents=True, exist_ok=True)
-    fig.tight_layout(); fig.savefig(out, dpi=160, facecolor=surface); plt.close(fig)
+    fig.tight_layout()
+    fig.savefig(out, dpi=160, facecolor=surface)
+    plt.close(fig)
     print(f"chart -> {out}")
 
 

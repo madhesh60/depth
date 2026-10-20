@@ -302,7 +302,8 @@ def frames_and_track(rec: Recording, nchunk: int = 500, size: int = 640,
         frames.append((fid, cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)))
         cols = np.linspace(0, len(ps) - 1, size)
         pick = lambda arr: np.interp(cols, np.arange(len(ps)), arr).tolist()
-        lat = pick([p.lat for p in ps]); lon = pick([p.lon for p in ps])
+        lat = pick([p.lat for p in ps])
+        lon = pick([p.lon for p in ps])
         hd = np.unwrap(np.radians([p.heading_deg or 0.0 for p in ps]))
         heading = [float(np.degrees(h) % 360) for h in np.interp(cols, np.arange(len(ps)), hd)]
         depths = [p.depth_m for p in ps if p.depth_m and p.depth_m > 0]
@@ -400,7 +401,8 @@ def validate(rec: Recording, window_s: float = 5.0) -> dict:
             d = _haversine((ps[i].lat, ps[i].lon), (ps[j].lat, ps[j].lon))
             dt = (ps[j].time_ms - ps[i].time_ms) / 1000
             if dt > 0 and d > 2:
-                spd.append(d / dt); crs.append(_bearing((ps[i].lat, ps[i].lon), (ps[j].lat, ps[j].lon)))
+                spd.append(d / dt)
+                crs.append(_bearing((ps[i].lat, ps[i].lon), (ps[j].lat, ps[j].lon)))
                 spd_hdr.append(np.mean([p.speed_raw for p in ps[i:j] if p.speed_raw is not None] or [np.nan]))
                 hdg.append(ps[i].heading_deg)
         spd, spd_hdr = np.array(spd), np.array(spd_hdr)

@@ -63,7 +63,7 @@ def test_ogc_features_redaction_and_work_orders(tmp_path):
 
 def test_ogc_endpoints_conform():
     land = client.get("/ogc").json()
-    assert {"self", "service-desc", "conformance", "data"} <= {l["rel"] for l in land["links"]}
+    assert {"self", "service-desc", "conformance", "data"} <= {link["rel"] for link in land["links"]}
     assert "http://www.opengis.net/spec/ogcapi-features-1/1.0/conf/geojson" in client.get("/ogc/conformance").json()["conformsTo"]
     ids = [c["id"] for c in client.get("/ogc/collections").json()["collections"]]
     assert ids == ["hazards", "resurvey_passes", "routes", "work_orders"]

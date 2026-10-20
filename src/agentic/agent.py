@@ -753,7 +753,8 @@ def main():
     a = ap.parse_args()
 
     agent = ReLookAgent()
-    out = Path(a.out); out.mkdir(parents=True, exist_ok=True)
+    out = Path(a.out)
+    out.mkdir(parents=True, exist_ok=True)
     n = inf = 0
     for ip in _iter_images(Path(a.source)):
         frame = cv2.imread(str(ip))

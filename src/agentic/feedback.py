@@ -47,7 +47,8 @@ SOURCES = ("analyze", "survey", "study", "audit")
 
 
 def _iou(a, b) -> float:
-    ix = max(0, min(a[2], b[2]) - max(a[0], b[0])); iy = max(0, min(a[3], b[3]) - max(a[1], b[1]))
+    ix = max(0, min(a[2], b[2]) - max(a[0], b[0]))
+    iy = max(0, min(a[3], b[3]) - max(a[1], b[1]))
     inter = ix * iy
     u = (a[2] - a[0]) * (a[3] - a[1]) + (b[2] - b[0]) * (b[3] - b[1]) - inter
     return inter / u if u > 0 else 0.0
@@ -204,7 +205,8 @@ class FeedbackStore:
             n += 1
             real = any(_iou(r["bbox"], g) >= iou for g in gts)
             if r["decision"] in ("confirm", "missed"):
-                tp += real; fp += not real
+                tp += real
+                fp += not real
             elif r["decision"] == "reject" and real:
                 fn_conf += 1                            # a real pot the reviewer dismissed
         return {"judged_on_gt": n, "confirmed_real": tp, "confirmed_not_in_gt": fp,

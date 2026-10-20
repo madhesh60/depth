@@ -29,7 +29,8 @@ V1 = REPO / "DATASET" / "03_yolo_ready_dataset_v1"
 
 
 def _iou(a, b) -> float:
-    ix = max(0, min(a[2], b[2]) - max(a[0], b[0])); iy = max(0, min(a[3], b[3]) - max(a[1], b[1]))
+    ix = max(0, min(a[2], b[2]) - max(a[0], b[0]))
+    iy = max(0, min(a[3], b[3]) - max(a[1], b[1]))
     inter = ix * iy
     u = (a[2] - a[0]) * (a[3] - a[1]) + (b[2] - b[0]) * (b[3] - b[1]) - inter
     return inter / u if u > 0 else 0.0
@@ -41,7 +42,8 @@ def _contrast(g: np.ndarray, b) -> float:
     w, h = max(2, x2 - x1), max(2, y2 - y1)
     inner = g[max(0, y1):min(H, y2), max(0, x1):min(W, x2)].astype(np.float32)
     ring = g[max(0, y1 - h):min(H, y2 + h), max(0, x1 - w):min(W, x2 + w)].astype(np.float32)
-    rs = ring.sum() - inner.sum(); rn = ring.size - inner.size
+    rs = ring.sum() - inner.sum()
+    rn = ring.size - inner.size
     return float(inner.mean() / max(1.0, rs / max(1, rn))) if inner.size else 0.0
 
 
@@ -126,7 +128,8 @@ def run(model: str = "EXP-001", split: str = "test", n: int = 12) -> dict:
     tiles_m = [_tile(p["img"], p["bbox"], GREEN, [(c["bbox"], GREY) for c in p["cands"] if _iou(c["bbox"], p["bbox"]) > 0],
                      label=f"{int(p['size'])}px c{p['contrast']:.2f}") for p in pick_m]
     tiles_f = [_tile(f["img"], f["bbox"], AMBER, [(gb, GREEN) for gb in f["gt"]], label=f"conf {f['conf']:.2f}") for f in pick_f]
-    out = REPO / "docs" / "img"; out.mkdir(parents=True, exist_ok=True)
+    out = REPO / "docs" / "img"
+    out.mkdir(parents=True, exist_ok=True)
 
     def sheet(tiles, path):
         if not tiles:

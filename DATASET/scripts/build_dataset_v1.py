@@ -22,7 +22,6 @@ Then:   python DATASET/scripts/audit_dataset.py DATASET/03_yolo_ready_dataset_v1
 """
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import random
@@ -264,7 +263,10 @@ def main():
                 corrupt += 1
                 continue
             kept, (d_ff, d_tiny, d_sliver, d_bad) = clean_label(label_text[stem])
-            tot_ff += d_ff; tot_tiny += d_tiny; tot_sliver += d_sliver; tot_bad += d_bad
+            tot_ff += d_ff
+            tot_tiny += d_tiny
+            tot_sliver += d_sliver
+            tot_bad += d_bad
             link_or_copy(img, DST / split / "images" / img.name)
             (DST / split / "labels" / f"{stem}.txt").write_text("\n".join(kept))
             stats[split]["images"] += 1

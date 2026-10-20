@@ -329,7 +329,8 @@ def main():
             res["chain"] = chain(A, B)
         print(name, json.dumps(res["sets"][name], indent=1))
     res["reading"] = _reading(res)
-    out = REPO / "runs" / "causal"; out.mkdir(parents=True, exist_ok=True)
+    out = REPO / "runs" / "causal"
+    out.mkdir(parents=True, exist_ok=True)
     (out / "study.json").write_text(json.dumps(res, indent=1, default=str))
     (REPO / "docs" / "causal_trace.md").write_text(report(res), encoding="utf-8")
     print("wrote docs/causal_trace.md")

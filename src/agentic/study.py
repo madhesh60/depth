@@ -38,7 +38,8 @@ def study_dir() -> Path:
 
 
 def _iou(a, b) -> float:
-    ix = max(0, min(a[2], b[2]) - max(a[0], b[0])); iy = max(0, min(a[3], b[3]) - max(a[1], b[1]))
+    ix = max(0, min(a[2], b[2]) - max(a[0], b[0]))
+    iy = max(0, min(a[3], b[3]) - max(a[1], b[1]))
     inter = ix * iy
     u = (a[2] - a[0]) * (a[3] - a[1]) + (b[2] - b[0]) * (b[3] - b[1]) - inter
     return inter / u if u > 0 else 0.0
@@ -157,8 +158,10 @@ def score(p: dict, result: dict, cards_by_id: dict[str, dict]) -> dict:
         if real:
             used.add(j)
         yes = ans.get("decision") == "real"
-        conf_real += yes and real; conf_fake += yes and not real
-        dism_real += (not yes) and real; dism_fake += (not yes) and not real
+        conf_real += yes and real
+        conf_fake += yes and not real
+        dism_real += (not yes) and real
+        dism_fake += (not yes) and not real
         if ans.get("ms"):
             c_ms.append(float(ans["ms"]))
     real_cards = conf_real + dism_real
@@ -181,7 +184,8 @@ def score(p: dict, result: dict, cards_by_id: dict[str, dict]) -> dict:
 
 
 def save(rec: dict) -> Path:
-    d = study_dir(); d.mkdir(parents=True, exist_ok=True)
+    d = study_dir()
+    d.mkdir(parents=True, exist_ok=True)
     p = d / f"{rec['session_id']}.json"
     p.write_text(json.dumps(rec, indent=1), encoding="utf-8")
     return p
@@ -197,7 +201,8 @@ def summary(frames_per_survey_hour: Optional[float] = None, cards_per_frame: Opt
         xs = [x for x in xs if x is not None]
         return round(statistics.median(xs), 2) if xs else None
 
-    m_found = sum(s["manual"]["found"] for s in ss); m_gt = sum(s["manual"]["pots"] for s in ss)
+    m_found = sum(s["manual"]["found"] for s in ss)
+    m_gt = sum(s["manual"]["pots"] for s in ss)
     c_real = sum(s["cards"]["confirmed_real"] for s in ss)
     c_realcards = sum(s["cards"]["confirmed_real"] + s["cards"]["dismissed_real"] for s in ss)
     c_gt = sum(s["cards"]["pots"] for s in ss)

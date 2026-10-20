@@ -68,8 +68,8 @@ def main():
     samples = []
     for i, (side, chunk) in enumerate(picks, 1):
         src = find(a.recording, side, chunk)
-        lab = [l for l in (SRC / "labels" / f"{src.stem}.txt").read_text().splitlines() if l.strip()]
-        pots = sum(l.split()[0] == "0" for l in lab)
+        lab = [line for line in (SRC / "labels" / f"{src.stem}.txt").read_text().splitlines() if line.strip()]
+        pots = sum(line.split()[0] == "0" for line in lab)
         if not pots or is_rotated_copy(cv2.imread(str(src))):
             raise SystemExit(f"{src.name}: needs >= 1 labelled pot and no rotated border")
         stem = f"{a.recording}_wcp_ss_{side}_{chunk:05d}"

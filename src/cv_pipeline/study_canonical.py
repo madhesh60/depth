@@ -117,7 +117,8 @@ def _gt(label: Path, w: int, h: int, cls_id: int = 0):
 
 
 def _iou(a, b) -> float:
-    ix = max(0, min(a[2], b[2]) - max(a[0], b[0])); iy = max(0, min(a[3], b[3]) - max(a[1], b[1]))
+    ix = max(0, min(a[2], b[2]) - max(a[0], b[0]))
+    iy = max(0, min(a[3], b[3]) - max(a[1], b[1]))
     inter = ix * iy
     u = (a[2] - a[0]) * (a[3] - a[1]) + (b[2] - b[0]) * (b[3] - b[1]) - inter
     return inter / u if u > 0 else 0.0
@@ -134,7 +135,8 @@ def _label(dets, gts, thr):
                 if i > best:
                     best, bj = i, j
         if bj >= 0 and best >= thr:
-            used.add(bj); out.append((conf, 1))
+            used.add(bj)
+            out.append((conf, 1))
         else:
             out.append((conf, 0))
     return out
@@ -202,7 +204,8 @@ def part_b(C: Canonicaliser, modes=("raw", "gray", "gain"), reps: int = 1000) ->
         for _ in range(reps):
             idx = list(rng.integers(0, len(per_frame), len(per_frame)))
             a, b = summ(idx, m), summ(idx, "raw")
-            gains["ap30"].append(a["ap30"] - b["ap30"]); gains["ceiling"].append(a["ceiling"] - b["ceiling"])
+            gains["ap30"].append(a["ap30"] - b["ap30"])
+            gains["ceiling"].append(a["ceiling"] - b["ceiling"])
         res["modes"][m]["gain_vs_raw"] = {k: [round(float(np.mean(v)), 4), round(float(np.percentile(v, 2.5)), 4),
                                               round(float(np.percentile(v, 97.5)), 4)] for k, v in gains.items()}
     res["water_column"] = wc

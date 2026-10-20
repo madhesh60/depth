@@ -11,7 +11,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from src.agentic.geo import (offset_latlon, parse_side, range_px_from_nadir, geotag,
                              synthetic_track, haversine_m, PingFix)
-from src.detection.infer import Detection
 from src.agentic.types import Candidate
 
 

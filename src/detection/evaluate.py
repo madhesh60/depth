@@ -114,8 +114,10 @@ def _load_gt(label_path: Path, w: int, h: int) -> list[tuple[int, tuple[int, int
             continue
         c = int(float(p[0]))
         cx, cy, bw, bh = (float(x) for x in p[1:5])
-        x1 = int(round((cx - bw / 2) * w)); y1 = int(round((cy - bh / 2) * h))
-        x2 = int(round((cx + bw / 2) * w)); y2 = int(round((cy + bh / 2) * h))
+        x1 = int(round((cx - bw / 2) * w))
+        y1 = int(round((cy - bh / 2) * h))
+        x2 = int(round((cx + bw / 2) * w))
+        y2 = int(round((cy + bh / 2) * h))
         out.append((c, (x1, y1, x2, y2)))
     return out
 
@@ -231,8 +233,8 @@ def voc_ap(pts, n_gt: int) -> float:
 
 def prf_at(pts, n_gt: int, t: float) -> tuple[float, float, float, int, int, int]:
     """Precision/Recall/F1 (+ TP/FP/FN counts) at confidence threshold `t`."""
-    tp = sum(1 for c, l in pts if c >= t and l == 1)
-    fp = sum(1 for c, l in pts if c >= t and l == 0)
+    tp = sum(1 for c, hit in pts if c >= t and hit == 1)
+    fp = sum(1 for c, hit in pts if c >= t and hit == 0)
     fn = n_gt - tp
     p = tp / (tp + fp) if (tp + fp) else 0.0
     r = tp / n_gt if n_gt else float("nan")
@@ -273,7 +275,8 @@ def bootstrap_ci(records, cid: int, b: int, seed: int = 0):
         pts, n_gt = [], 0
         for j in idx:
             p, g = per_img[j]
-            pts.extend(p); n_gt += g
+            pts.extend(p)
+            n_gt += g
         a = voc_ap(pts, n_gt)
         if not np.isnan(a):
             aps.append(a)
@@ -362,11 +365,17 @@ def plot_pr(test_records, names, tuned, title: str, out_png: Path) -> Optional[P
         ax.plot([r], [p], "o", color=ln.get_color(), ms=6)
         ax.annotate(f"val-t {tuned[nm]:.2f}", (r, p), textcoords="offset points", xytext=(6, 6),
                     fontsize=8, color=ln.get_color())
-    ax.set_xlim(0, 1); ax.set_ylim(0, 1.02)
-    ax.set_xlabel("recall"); ax.set_ylabel("precision"); ax.set_title(title, fontsize=10)
-    ax.grid(alpha=0.3); ax.legend(loc="upper right", fontsize=8)
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1.02)
+    ax.set_xlabel("recall")
+    ax.set_ylabel("precision")
+    ax.set_title(title, fontsize=10)
+    ax.grid(alpha=0.3)
+    ax.legend(loc="upper right", fontsize=8)
     out_png.parent.mkdir(parents=True, exist_ok=True)
-    fig.tight_layout(); fig.savefig(out_png); plt.close(fig)
+    fig.tight_layout()
+    fig.savefig(out_png)
+    plt.close(fig)
     return out_png
 
 

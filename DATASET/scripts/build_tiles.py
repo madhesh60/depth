@@ -151,7 +151,7 @@ def pot_bank(src: Path, cls_id: int = 0, pad: float = 0.35, tail: float = 2.0) -
     for lp in sorted((src / "train" / "labels").glob("*.txt")):
         if resolve_orientation(lp.stem).nadir != "top":
             continue
-        labs = [l for l in read_labels(lp) if l[0] == cls_id]
+        labs = [row for row in read_labels(lp) if row[0] == cls_id]
         if not labs:
             continue
         im = cv2.imread(str(src / "train" / "images" / f"{lp.stem}.jpg"))

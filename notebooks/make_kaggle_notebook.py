@@ -97,7 +97,10 @@ root and tell Claude "EXP-005 done". The diagnosis comes first (validation per s
 paired comparison with EXP-003); test is scored once, only for the validation winner:
 
 ```bash
-python -m src.detection.diagnose --zip EXP-003_complete.zip --zip EXP-005_complete.zip --zip EXP-005a_complete.zip
+python -m src.detection.diagnose \\
+    --zip EXP-003_complete.zip \\
+    --zip EXP-005_complete.zip \\
+    --zip EXP-005a_complete.zip
 python -m src.detection.onboard_model --zip EXP-005_complete.zip --max-ms 700
 ```"""),
 ]
@@ -105,7 +108,7 @@ python -m src.detection.onboard_model --zip EXP-005_complete.zip --max-ms 700
 
 def as_source(text: str) -> list[str]:
     lines = text.strip("\n").split("\n")
-    return [l + "\n" for l in lines[:-1]] + [lines[-1]]
+    return [line + "\n" for line in lines[:-1]] + [lines[-1]]
 
 
 nb = {"cells": [{"cell_type": t, "metadata": {}, "source": as_source(s), **({"outputs": [], "execution_count": None} if t == "code" else {})}

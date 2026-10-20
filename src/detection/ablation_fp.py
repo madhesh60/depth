@@ -21,6 +21,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import sys
 import csv
 import time
 from pathlib import Path
@@ -30,7 +31,6 @@ import numpy as np
 import yaml
 
 REPO = Path(__file__).resolve().parents[2]
-import sys
 sys.path.insert(0, str(REPO))
 
 from src.detection.infer import YoloOnnxDetector, _iou, DEFAULT_ONNX  # noqa: E402
@@ -50,8 +50,10 @@ def load_gt(label_path: Path, w: int, h: int) -> list[tuple[int, tuple[int, int,
             continue
         cls = int(float(parts[0]))
         cx, cy, bw, bh = (float(v) for v in parts[1:5])
-        x1 = int((cx - bw / 2) * w); y1 = int((cy - bh / 2) * h)
-        x2 = int((cx + bw / 2) * w); y2 = int((cy + bh / 2) * h)
+        x1 = int((cx - bw / 2) * w)
+        y1 = int((cy - bh / 2) * h)
+        x2 = int((cx + bw / 2) * w)
+        y2 = int((cy + bh / 2) * h)
         gt.append((cls, (x1, y1, x2, y2)))
     return gt
 
@@ -81,7 +83,9 @@ class Tally:
         self.tp = self.fp = self.n_gt = 0
 
     def add(self, tp, fp, n_gt):
-        self.tp += tp; self.fp += fp; self.n_gt += n_gt
+        self.tp += tp
+        self.fp += fp
+        self.n_gt += n_gt
 
     @property
     def precision(self):

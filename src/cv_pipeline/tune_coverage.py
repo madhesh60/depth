@@ -19,6 +19,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import sys
 import time
 from dataclasses import replace
 from pathlib import Path
@@ -28,7 +29,6 @@ import numpy as np
 import yaml
 
 REPO = Path(__file__).resolve().parents[2]
-import sys
 sys.path.insert(0, str(REPO))
 
 from src.cv_pipeline.config import Stage1Config          # noqa: E402
@@ -98,11 +98,13 @@ def main():
     print(f"{len(frames)} frames from {args.split}\n")
 
     hdr = f"{'config':<14}{'coverage':>10}{'avg_rois':>10}{'ms/frame':>10}   per-class coverage"
-    print(hdr); print("-" * len(hdr))
+    print(hdr)
+    print("-" * len(hdr))
     for cname, cfg in CONFIGS.items():
         pipe = Stage1Pipeline(cfg)
         cov = tot = nroi = 0
-        cov_c = [0]*nc; tot_c = [0]*nc
+        cov_c = [0]*nc
+        tot_c = [0]*nc
         ms = []
         for im, gt in frames:
             t0 = time.perf_counter()
@@ -111,9 +113,11 @@ def main():
             rois = [c.bbox for c in res.candidates]
             nroi += len(rois)
             for gcls, gbox in gt:
-                tot += 1; tot_c[gcls] += 1
+                tot += 1
+                tot_c[gcls] += 1
                 if _backed_by_roi(gbox, rois, args.gate_iou):
-                    cov += 1; cov_c[gcls] += 1
+                    cov += 1
+                    cov_c[gcls] += 1
         coverage = cov/tot if tot else 0.0
         pc = " ".join(f"{names[c][:4]}:{(cov_c[c]/tot_c[c] if tot_c[c] else 0):.2f}"
                       for c in range(nc))

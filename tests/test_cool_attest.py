@@ -59,7 +59,7 @@ def _receipt(key, cert, doc, maps=COOL_MAPS, cv2_file=None, nocerts=True):
     opts = [pkcs7.PKCS7Options.Binary] + ([pkcs7.PKCS7Options.NoCerts] if nocerts else [])
     p7 = pkcs7.PKCS7SignatureBuilder().set_data(doc.encode()).add_signer(cert, key, hashes.SHA256()) \
         .sign(serialization.Encoding.PEM, opts).decode()
-    flat = "".join(l for l in p7.splitlines() if "PKCS7" not in l)
+    flat = "".join(line for line in p7.splitlines() if "PKCS7" not in line)
     body = "\n".join(flat[i:i + 76] for i in range(0, len(flat), 76))   # as IMDS serves it: 76-column lines
     cv2_file = cv2_file or "/opt/cool/venvs/python_3.12/lib/python3.12/site-packages/cv2/__init__.py"
     return {"aws_signed_identity": {"document": doc, "signature": sig, "rsa2048": body,

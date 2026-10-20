@@ -122,7 +122,8 @@ def score(frames: list[dict], mode: str) -> dict:
                 if j not in used and _iou(d[:4], g) > best:
                     best, bj = _iou(d[:4], g), j
             if bj >= 0 and best >= MATCH_IOU:
-                used.add(bj); fpts.append((d[4], 1))
+                used.add(bj)
+                fpts.append((d[4], 1))
             else:
                 fpts.append((d[4], 0))
         reach = sum(1 for g in gts if any(_iou(d[:4], g) >= MATCH_IOU for d in dets))
@@ -143,7 +144,8 @@ def paired_ci(base: dict, var: dict, reps: int = 1000, seed: int = 0) -> dict:
         agg = lambda P: (voc_ap([p for i in idx for p in P[i]["pts"]], sum(P[i]["n"] for i in idx)),
                          sum(P[i]["reach"] for i in idx) / max(1, sum(P[i]["n"] for i in idx)))
         (ab, cb), (av, cv) = agg(B), agg(V)
-        d_ap.append(av - ab); d_ceil.append(cv - cb)
+        d_ap.append(av - ab)
+        d_ceil.append(cv - cb)
     q = lambda v: [round(float(np.mean(v)), 4), round(float(np.percentile(v, 2.5)), 4), round(float(np.percentile(v, 97.5)), 4)]
     return {"d_ap30": q(d_ap), "d_ceiling": q(d_ceil)}
 

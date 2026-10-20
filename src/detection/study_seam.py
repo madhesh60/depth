@@ -48,7 +48,8 @@ def _gt(p: Path, W: int, H: int):
 
 
 def _iou(a, b):
-    ix = max(0, min(a[2], b[2]) - max(a[0], b[0])); iy = max(0, min(a[3], b[3]) - max(a[1], b[1]))
+    ix = max(0, min(a[2], b[2]) - max(a[0], b[0]))
+    iy = max(0, min(a[3], b[3]) - max(a[1], b[1]))
     inter = ix * iy
     u = (a[2] - a[0]) * (a[3] - a[1]) + (b[2] - b[0]) * (b[3] - b[1]) - inter
     return inter / u if u > 0 else 0.0
@@ -62,7 +63,8 @@ def _label(dets, gts, thr=0.3):
             if j not in used and _iou(d.bbox, g) > best:
                 best, bj = _iou(d.bbox, g), j
         if bj >= 0 and best >= thr:
-            used.add(bj); pts.append((d.conf, 1))
+            used.add(bj)
+            pts.append((d.conf, 1))
         else:
             pts.append((d.conf, 0))
     return pts, used
@@ -108,7 +110,8 @@ def _ap(pts, n):
 
 def summarise(recs: list[dict], reps: int = 1000, seed: int = 0) -> dict:
     def agg(rs, mode):
-        n = sum(r["n_gt"] for r in rs); ne = sum(r["edge_gt"] for r in rs)
+        n = sum(r["n_gt"] for r in rs)
+        ne = sum(r["edge_gt"] for r in rs)
         pts = [x for r in rs for x in r[mode]["pts"]]
         return {"pots": n, "ceiling": sum(r[mode]["found"] for r in rs) / max(1, n),
                 "edge_pots": ne, "edge_recall": sum(r[mode]["edge_found"] for r in rs) / max(1, ne),
@@ -122,7 +125,8 @@ def summarise(recs: list[dict], reps: int = 1000, seed: int = 0) -> dict:
         idx = rng.integers(0, len(recs), len(recs))
         rs = [recs[i] for i in idx]
         a, b = agg(rs, "seams"), agg(rs, "frame")
-        d_ceil.append(a["ceiling"] - b["ceiling"]); d_ap.append(a["ap30"] - b["ap30"])
+        d_ceil.append(a["ceiling"] - b["ceiling"])
+        d_ap.append(a["ap30"] - b["ap30"])
     ci = lambda v: [round(float(np.mean(v)), 4), round(float(np.percentile(v, 2.5)), 4), round(float(np.percentile(v, 97.5)), 4)]
     out["delta_ceiling"], out["delta_ap30"] = ci(d_ceil), ci(d_ap)
     return out
@@ -163,7 +167,8 @@ def main():
         recs = run_split(det, split)
         res[name] = summarise(recs)
         print(json.dumps(res[name], indent=1))
-    out = REPO / "runs" / "seam"; out.mkdir(parents=True, exist_ok=True)
+    out = REPO / "runs" / "seam"
+    out.mkdir(parents=True, exist_ok=True)
     (out / "study.json").write_text(json.dumps(res, indent=1))
     (REPO / "docs" / "seam_inference.md").write_text(report(res), encoding="utf-8")
     print("wrote docs/seam_inference.md")

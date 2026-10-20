@@ -44,7 +44,7 @@ def test_latest_decision_wins_and_export(tmp_path):
     out = st.export(tmp_path / "ds", ["fishing_gear", "pipe"])
     assert out["frames"] == 1 and out["positives"] == 2 and out["hard_negatives"] == 1
     lines = (tmp_path / "ds" / "labels" / "u_abc123.txt").read_text().splitlines()
-    assert len(lines) == 2 and all(l.startswith("0 ") for l in lines)
+    assert len(lines) == 2 and all(line.startswith("0 ") for line in lines)
     hn = json.loads((tmp_path / "ds" / "hard_negatives.json").read_text())
     assert hn[0]["bbox"] == [100, 50, 120, 70]
 

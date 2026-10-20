@@ -13,6 +13,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
 
 import cv2
@@ -20,7 +21,6 @@ import numpy as np
 import yaml
 
 REPO = Path(__file__).resolve().parents[2]
-import sys
 sys.path.insert(0, str(REPO))
 
 from src.detection.infer import YoloOnnxDetector, _iou, DEFAULT_ONNX  # noqa: E402
@@ -50,7 +50,8 @@ def main():
     imgs = sorted(q for q in img_dir.rglob("*") if q.suffix.lower() in {".jpg", ".jpeg", ".png"})
 
     det = YoloOnnxDetector(args.onnx, names=names, conf_thres=args.conf)
-    out_dir = Path(args.out); out_dir.mkdir(parents=True, exist_ok=True)
+    out_dir = Path(args.out)
+    out_dir.mkdir(parents=True, exist_ok=True)
 
     n_missed = n_total = n_saved = 0
     sizes = []

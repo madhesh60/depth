@@ -43,7 +43,8 @@ def test_summary_audited_precision_catch_and_kappa(tmp_path, monkeypatch):
     _setup(tmp_path, monkeypatch)
     for i, t in enumerate(["real", "real", "clutter", "noise"]):
         fp_audit.add_tag(f"a{i:03d}", t, "A")
-    fp_audit.add_tag("c000", "real", "A"); fp_audit.add_tag("c001", "clutter", "A")
+    fp_audit.add_tag("c000", "real", "A")
+    fp_audit.add_tag("c001", "clutter", "A")
     s = fp_audit.summary()
     assert s["complete"] and s["fp_real_share"] == 0.5
     assert s["band_precision_audited"] == round((6 + 2) / 10, 4)           # exact once the band is tagged

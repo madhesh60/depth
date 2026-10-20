@@ -166,7 +166,8 @@ class Stage1Pipeline:
                 continue
             # pad, map resized->original pixels, clamp
             px, py = int(bw * pad), int(bh * pad)
-            x1 = max(0, int((x - px) * scale));       y1 = max(0, int((y - py) * scale))
+            x1 = max(0, int((x - px) * scale))
+            y1 = max(0, int((y - py) * scale))
             x2 = min(int(w * scale), int((x + bw + px) * scale))
             y2 = min(int(h * scale), int((y + bh + py) * scale))
             out.append(Candidate((x1, y1, x2, y2), area_frac, solidity, extent, aspect))

@@ -29,12 +29,13 @@ def test_latin_square_rotates_halves_and_order(tmp_path, monkeypatch):
         study.save({"session_id": f"s{k}", "participant": "p", "index": k, "order": p["order"],
                     "manual": {"found": 0, "pots": 0, "false_clicks": 0, "frames": 0, "sec_per_frame": None},
                     "cards": {"confirmed_real": 0, "dismissed_real": 0, "pots": 0, "cards": 0, "frames": 0, "sec_per_card": None}})
-    halves = {h for h, _ in seen}; orders = {o for _, o in seen}
+    halves = {h for h, _ in seen}
+    orders = {o for _, o in seen}
     assert len(halves) == 2 and len(orders) == 2 and len(set(seen)) == 4      # all four cells of the 2x2
 
 
 def test_scoring_against_ground_truth(monkeypatch):
-    frames = _fake_frames(monkeypatch)
+    _fake_frames(monkeypatch)
     p = {"session_id": "s", "participant": "p", "index": 0, "order": ["manual", "cards"],
          "manual_frames": [{"frame_id": "F0"}, {"frame_id": "F1"}], "card_frames": [{"frame_id": "F2"}, {"frame_id": "F3"}]}
     cards = {"a": {"frame_id": "F2", "bbox": [20, 10, 28, 18]},             # real (matches F2's pot)

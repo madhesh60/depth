@@ -70,10 +70,14 @@ def measure_ms(onnx: Path, imgsz: int, n: int = 15) -> dict:
     blob = cv2.dnn.blobFromImage(np.random.default_rng(0).integers(0, 255, (imgsz, imgsz, 3), np.uint8),
                                  1 / 255.0, (imgsz, imgsz), swapRB=True)
     for _ in range(3):
-        net.setInput(blob); net.forward()
+        net.setInput(blob)
+        net.forward()
     ts = []
     for _ in range(n):
-        t = _t.perf_counter(); net.setInput(blob); net.forward(); ts.append((_t.perf_counter() - t) * 1000)
+        t = _t.perf_counter()
+        net.setInput(blob)
+        net.forward()
+        ts.append((_t.perf_counter() - t) * 1000)
     ts.sort()
     p50 = ts[len(ts) // 2]
     return {"imgsz": imgsz, "forward_ms_p50": round(p50, 1), "forward_ms_p95": round(ts[int(0.95 * (len(ts) - 1))], 1),

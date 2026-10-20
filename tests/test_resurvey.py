@@ -44,7 +44,8 @@ def test_resurvey_line_is_on_the_opposite_side_at_mid_swath():
     track = {"Rec1_wcp_ss_star_00001": PingFix(*boat, heading_deg=heading, synthetic=True)}
     plan = plan_resurvey([t], track, swath_m=32.0)
     L = plan["lines"][0]
-    mid_lat = (L["start"][0] + L["end"][0]) / 2; mid_lon = (L["start"][1] + L["end"][1]) / 2
+    mid_lat = (L["start"][0] + L["end"][0]) / 2
+    mid_lon = (L["start"][1] + L["end"][1]) / 2
     # the new pass runs 16 m EAST of the target (the far side), northbound, target on its PORT side
     assert abs(haversine_m((mid_lat, mid_lon), (t_lat, t_lon)) - 16.0) < 0.5
     assert mid_lon > t_lon and L["heading_deg"] == 0.0 and L["targets_on"] == "port"

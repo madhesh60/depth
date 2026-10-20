@@ -91,7 +91,6 @@ def test_recording_loop_refits_the_scale_until_it_stops_moving():
 
 
 def test_rejected_geometry_reaches_stage1_and_widens_the_error_radius():
-    from src.cv_pipeline.orientation import Orientation
     cf = Canonicaliser().process(np.dstack([sonogram(alt=150)[:200]] * 3), "R1_ss_port_00000", nadir="top")
     assert cf.orientation.nadir == "top"
     Canonicaliser.apply_geometry(cf, "not_measured", None)

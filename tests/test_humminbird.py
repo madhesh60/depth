@@ -40,11 +40,14 @@ def _write_recording(root: Path, n_pings: int = 60, corrupt: int | None = None) 
     dat = bytearray(64)
     dat[0], dat[1] = 0xC1, 0
     dat[20:24] = struct.pack(">I", 1382657324)
-    dat[24:28] = struct.pack(">i", -12413175); dat[28:32] = struct.pack(">i", 4396652)
+    dat[24:28] = struct.pack(">i", -12413175)
+    dat[28:32] = struct.pack(">i", 4396652)
     dat[32:42] = b"R00001.SON"
-    dat[44:48] = struct.pack(">I", n_pings * 2); dat[48:52] = struct.pack(">I", n_pings * 40)
+    dat[44:48] = struct.pack(">I", n_pings * 2)
+    dat[48:52] = struct.pack(">I", n_pings * 40)
     (root / "R00001.DAT").write_bytes(bytes(dat))
-    folder = root / "R00001"; folder.mkdir()
+    folder = root / "R00001"
+    folder.mkdir()
     rng = np.random.default_rng(0)
     for fname, beam in (("B002", 2), ("B003", 3)):
         son, idx = bytearray(), bytearray()
@@ -89,7 +92,8 @@ def test_truncated_and_absurd_input(tmp_path):
     (tmp_path / "t.SON").write_bytes(good + good[:40])              # second ping cut off
     ch = hb.read_son(tmp_path / "t.SON")
     assert len(ch.pings) == 1 and ch.issues
-    bad = bytearray(good); bad[62:66] = struct.pack(">I", 10 ** 9)  # sample count out of range
+    bad = bytearray(good)
+    bad[62:66] = struct.pack(">I", 10 ** 9)  # sample count out of range
     (tmp_path / "b.SON").write_bytes(bytes(bad))
     with pytest.raises(hb.HumError):
         hb.read_son(tmp_path / "b.SON")

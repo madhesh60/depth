@@ -55,7 +55,8 @@ def load_frames(src: Path) -> tuple[list[tuple[str, bytes]], str]:
     for p in paths:
         b = p.read_bytes()
         frames.append((p.stem, b))
-        h.update(p.name.encode()); h.update(hashlib.sha256(b).digest())
+        h.update(p.name.encode())
+        h.update(hashlib.sha256(b).digest())
     return frames, h.hexdigest()
 
 
@@ -286,7 +287,8 @@ def main():
             for m, v in per.items():
                 pooled[k].setdefault(m, []).extend(v)
 
-    od = Path(a.out); od.mkdir(parents=True, exist_ok=True)
+    od = Path(a.out)
+    od.mkdir(parents=True, exist_ok=True)
     common = {"label": a.label, "created": time.strftime("%Y-%m-%dT%H:%M:%S"), "fingerprint": fpr, "runtime": runtime}
     for k in kinds:
         R = reps[k]

@@ -163,7 +163,8 @@ def chart(E: dict, C: dict, out: Path, provenance: str) -> None:
     ax.set_ylabel("share of all labelled pots found", fontsize=8, color=ink2)
     ax.set_ylim(0, 1.0)
     ax.tick_params(colors=ink2, labelsize=8)
-    ax.grid(color="#e4e3df", linewidth=0.6); ax.set_axisbelow(True)
+    ax.grid(color="#e4e3df", linewidth=0.6)
+    ax.set_axisbelow(True)
     ax.spines[["top", "right"]].set_visible(False)
     for sp in ("left", "bottom"):
         ax.spines[sp].set_color("#c9c8c2")
@@ -171,7 +172,9 @@ def chart(E: dict, C: dict, out: Path, provenance: str) -> None:
     for t in leg.get_texts():
         t.set_color(ink2)
     out.parent.mkdir(parents=True, exist_ok=True)
-    fig.tight_layout(); fig.savefig(out, dpi=160, facecolor=surface); plt.close(fig)
+    fig.tight_layout()
+    fig.savefig(out, dpi=160, facecolor=surface)
+    plt.close(fig)
 
 
 def report(E: dict, C: dict, provenance: str) -> str:

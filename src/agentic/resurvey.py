@@ -220,7 +220,8 @@ def plan_resurvey(tracked: list[TrackedObject], track: dict[str, PingFix], boat_
                             "reason": f"boat budget: {spent:.1f} of {boat_minutes:g} min already planned, this pass "
                                       f"needs {L['boat_min']} min"})
             continue
-        chosen.append(L); spent += L["boat_min"]
+        chosen.append(L)
+        spent += L["boat_min"]
     for i, L in enumerate(chosen, 1):
         L["id"] = f"RS{i}"
         L["status"] = "PLANNED - not executed; needs human approval"

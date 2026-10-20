@@ -231,7 +231,8 @@ def main():
     frames = [(fid, im) for fid, im in frames if im is not None]
     track = synthetic_track([fid for fid, _ in frames]) if a.gps == "synthetic" else None
 
-    out = Path(a.out); out.mkdir(parents=True, exist_ok=True)
+    out = Path(a.out)
+    out.mkdir(parents=True, exist_ok=True)
     survey = AgenticPipeline().run_survey(frames, track=track, survey_id=Path(a.survey).name)
 
     for fr in survey.frames:

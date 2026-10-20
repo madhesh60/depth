@@ -14,13 +14,13 @@ Pure OpenCV + NumPy on top of the cv2.dnn detector in infer.py.
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
 
 import cv2
 import numpy as np
 
 REPO = Path(__file__).resolve().parents[2]
-import sys
 sys.path.insert(0, str(REPO))
 
 from src.detection.infer import (YoloOnnxDetector, Detection, PER_CLASS_CONF,  # noqa: E402
@@ -97,7 +97,8 @@ def main():
     args = p.parse_args()
 
     det = YoloOnnxDetector(args.onnx, conf_thres=PER_CLASS_CONF)
-    out_dir = Path(args.out); out_dir.mkdir(parents=True, exist_ok=True)
+    out_dir = Path(args.out)
+    out_dir.mkdir(parents=True, exist_ok=True)
     exts = {".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff"}
     src = Path(args.source)
     imgs = sorted(q for q in src.rglob("*") if q.suffix.lower() in exts) if src.is_dir() else [src]

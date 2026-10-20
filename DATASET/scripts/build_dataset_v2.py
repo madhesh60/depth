@@ -76,11 +76,14 @@ def clean_boxes(rows):
         x, y = min(max(x, 0.0), 1.0), min(max(y, 0.0), 1.0)
         w, h = min(max(w, 0.0), 1.0), min(max(h, 0.0), 1.0)
         if w > FULLFRAME_WH and h > FULLFRAME_WH:
-            d_ff += 1; continue
+            d_ff += 1
+            continue
         if w < SLIVER or h < SLIVER:
-            d_sliver += 1; continue
+            d_sliver += 1
+            continue
         if w * h < MIN_AREA:
-            d_tiny += 1; continue
+            d_tiny += 1
+            continue
         kept.append(f"{cls} {x:.6f} {y:.6f} {w:.6f} {h:.6f}")
     return kept, (d_ff, d_sliver, d_tiny)
 
@@ -135,7 +138,9 @@ def build_crabpot(dst_split_dir, corrupt_counter, drop_counter):
                 x, y, w, h = bx
                 rows.append((GHOST, (x + w / 2) / W, (y + h / 2) / H, w / W, h / H))
             kept, (d_ff, d_sl, d_ti) = clean_boxes(rows)
-            drop_counter[0] += d_ff; drop_counter[1] += d_sl; drop_counter[2] += d_ti
+            drop_counter[0] += d_ff
+            drop_counter[1] += d_sl
+            drop_counter[2] += d_ti
             stem = img.stem
             link_or_copy(img, dst_split_dir[v2split]["images"] / img.name)
             (dst_split_dir[v2split]["labels"] / f"{stem}.txt").write_text("\n".join(kept))
@@ -170,14 +175,14 @@ def gather_v0_sonar():
             continue                                  # originals only
         low = stem.lower()
         if low.startswith("shipwreck"):
-            src, group = "shipwreck", re.sub(r"_\d+$", "", stem)   # per wreck/object
+            group = re.sub(r"_\d+$", "", stem)                     # per wreck/object
         elif low.startswith("seabed"):
             m = re.search(r"(\d+)", stem)
             blk = int(m.group(1)) // 100 if m else 0               # 100-frame blocks
-            src, group = "seabed", f"seabed_{blk}"
+            group = f"seabed_{blk}"
         elif low.startswith("mpulse"):
             if "seabed_surface" in low or "residual_mound" in low or "mound" in low:
-                src, group = "mpulse_bg", "mpulse_bg"              # natural seabed -> background
+                group = "mpulse_bg"                                # natural seabed -> background
             else:
                 continue                                           # pipeline/platform -> DROP
         else:
@@ -189,7 +194,8 @@ def gather_v0_sonar():
             if len(t) != 5:
                 continue
             try:
-                c = int(float(t[0])); x, y, w, h = (float(v) for v in t[1:])
+                c = int(float(t[0]))
+                x, y, w, h = (float(v) for v in t[1:])
             except ValueError:
                 continue
             if c == V0_STRUCT:                        # debris -> wreck_debris
@@ -236,14 +242,16 @@ def build_uatd_holdout(dst):
         for s in SPLITS:
             lf = V0 / s / "labels" / f"{stem}.txt"
             if lf.exists():
-                text = lf.read_text(); break
+                text = lf.read_text()
+                break
         rows = []
         for ln in text.splitlines():
             t = ln.split()
             if len(t) != 5:
                 continue
             try:
-                c = int(float(t[0])); x, y, w, h = (float(v) for v in t[1:])
+                c = int(float(t[0]))
+                x, y, w, h = (float(v) for v in t[1:])
             except ValueError:
                 continue
             if c == V0_STRUCT:
@@ -257,7 +265,8 @@ def build_uatd_holdout(dst):
             continue
         link_or_copy(img, out_i / img.name)
         (out_l / f"{stem}.txt").write_text("\n".join(kept))
-        n_img += 1; n_box += len(kept)
+        n_img += 1
+        n_box += len(kept)
     (dst / "_holdout_uatd_fls" / "README.txt").write_text(
         "UATD forward-looking sonar — held-out generalisation eval ONLY (never trained on).\n"
         "Different sonar geometry + placed test objects; structural targets remapped to\n"
@@ -273,8 +282,10 @@ def main():
         shutil.rmtree(DST)
     dst_split_dir = {}
     for s in SPLITS:
-        di = DST / s / "images"; dl = DST / s / "labels"
-        di.mkdir(parents=True, exist_ok=True); dl.mkdir(parents=True, exist_ok=True)
+        di = DST / s / "images"
+        dl = DST / s / "labels"
+        di.mkdir(parents=True, exist_ok=True)
+        dl.mkdir(parents=True, exist_ok=True)
         dst_split_dir[s] = {"images": di, "labels": dl}
 
     corrupt = [0]
@@ -303,9 +314,12 @@ def main():
                 with Image.open(img) as im:
                     im.verify()
             except Exception:
-                corrupt[0] += 1; continue
+                corrupt[0] += 1
+                continue
             kept, (d_ff, d_sl, d_ti) = clean_boxes(rows)
-            wreck_drops[0] += d_ff; wreck_drops[1] += d_sl; wreck_drops[2] += d_ti
+            wreck_drops[0] += d_ff
+            wreck_drops[1] += d_sl
+            wreck_drops[2] += d_ti
             link_or_copy(img, dst_split_dir[s]["images"] / img.name)
             (dst_split_dir[s]["labels"] / f"{stem}.txt").write_text("\n".join(kept))
             stats[s]["images"] += 1

@@ -76,7 +76,9 @@ def fetch(model: str = SHIPPED_MODEL, url: str | None = None, sha256: str | None
         with urllib.request.urlopen(url, timeout=60) as r, tmp.open("wb") as f:
             total = int(r.headers.get("Content-Length") or 0)
             for b in iter(lambda: r.read(1 << 20), b""):
-                f.write(b); h.update(b); n += len(b)
+                f.write(b)
+                h.update(b)
+                n += len(b)
                 if not quiet and total:
                     print(f"\r  {n / 1e6:5.1f} / {total / 1e6:.1f} MB", end="", flush=True)
     except (urllib.error.URLError, OSError) as e:            # HTTPError is a URLError: a missing release, no network

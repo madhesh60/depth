@@ -73,8 +73,8 @@ def test_kaggle_safe_defaults(monkeypatch):
 def test_notebook_pins_the_tested_ultralytics():
     import json
     repo = Path(__file__).resolve().parents[1]
-    pin = next(l.split("==")[1].strip() for l in (repo / "requirements-train.txt").read_text().splitlines()
-               if l.startswith("ultralytics=="))
+    pin = next(line.split("==")[1].strip() for line in (repo / "requirements-train.txt").read_text().splitlines()
+               if line.startswith("ultralytics=="))
     nb = json.loads((repo / "notebooks" / "exp005_kaggle.ipynb").read_text(encoding="utf-8"))
     src = "".join("".join(c["source"]) for c in nb["cells"])
     assert f"ultralytics=={pin}" in src and "--cache\", \"none\"" in src and "EXP-005a" in src
@@ -85,12 +85,16 @@ def test_notebook_monitor_cell_reports_and_collects(tmp_path, monkeypatch):
     """Execute the notebook's status/wait/collect cell against a simulated Kaggle folder: one run
     finished (package copied), one stopped with a traceback (shown); no process alive. The kind of
     bug that broke the first Kaggle run (stale variables, wrong unpacking) would fail here."""
-    import json, subprocess, zipfile
+    import json
+    import subprocess
+    import zipfile
     repo = Path(__file__).resolve().parents[1]
     nb = json.loads((repo / "notebooks" / "exp005_kaggle.ipynb").read_text(encoding="utf-8"))
     cell = next("".join(c["source"]) for c in nb["cells"] if "STATUS / WAIT / COLLECT" in "".join(c["source"]))
     w = tmp_path
-    (w / "logs").mkdir(); (w / "depth/runs/EXP-005").mkdir(parents=True); (w / "depth/runs/EXP-005a").mkdir(parents=True)
+    (w / "logs").mkdir()
+    (w / "depth/runs/EXP-005").mkdir(parents=True)
+    (w / "depth/runs/EXP-005a").mkdir(parents=True)
     hdr = "epoch,metrics/recall(B),metrics/mAP50(B)\n"
     (w / "depth/runs/EXP-005/results.csv").write_text(hdr + "1,0.3,0.2\n2,0.4,0.3\n")
     (w / "depth/runs/EXP-005a/results.csv").write_text(hdr + "1,0.2,0.1\n")
@@ -189,11 +193,13 @@ def test_rotated_copies_are_detected_but_sonograms_are_not():
     import numpy as np
     rng = np.random.default_rng(0)
     sono = rng.integers(40, 200, (300, 300, 3), dtype=np.uint8)
-    nadir = sono.copy(); nadir[:, 140:160] = 0                       # black water column down the middle
+    nadir = sono.copy()
+    nadir[:, 140:160] = 0                                            # black water column down the middle
     rot = sono.copy()
     for y in range(300):                                              # a 45-degree rotated copy: black corners
         k = abs(150 - y)
-        rot[y, :k] = 0; rot[y, 300 - k:] = 0
+        rot[y, :k] = 0
+        rot[y, 300 - k:] = 0
     assert not bt.is_rotated_copy(sono) and not bt.is_rotated_copy(nadir) and bt.is_rotated_copy(rot)
 
 
@@ -207,12 +213,14 @@ def test_keep_classes_renumbers_and_drops():
 def test_label_patch_and_aug_knobs(tmp_path, monkeypatch):
     """EXP-005 kit: a reviewed label patch is merged into TRAIN labels at build time (val/test untouched),
     and the augmentation knobs reach ultralytics."""
-    import json, subprocess
+    import json
+    import subprocess
     import numpy as np
     import cv2
     src = tmp_path / "src"
     for d in ("train", "val", "test"):
-        (src / d / "images").mkdir(parents=True); (src / d / "labels").mkdir(parents=True)
+        (src / d / "images").mkdir(parents=True)
+        (src / d / "labels").mkdir(parents=True)
         cv2.imwrite(str(src / d / "images" / "Rec1_a.jpg"), np.full((64, 64, 3), 90, np.uint8))
         (src / d / "labels" / "Rec1_a.txt").write_text("0 0.2 0.2 0.1 0.1")
     (src / "data.yaml").write_text("nc: 2\nnames:\n- ghost_gear\n- wreck_debris\n", encoding="utf-8")

@@ -175,8 +175,11 @@ def replay(em: EvidenceModel, rows: list[dict], tiers) -> dict:
             out["conflicts"] += 1
             out["conflicts_resolved"] += bool(res["conflict_resolved"])
         out["resurvey_requested"] += res["request_resurvey"]
-        acts_with.append(res["action"]); acts_without.append(res["action0"])
-        p_with.append(res["p"]); p_without.append(p0); ys.append(r["tp"])
+        acts_with.append(res["action"])
+        acts_without.append(res["action0"])
+        p_with.append(res["p"])
+        p_without.append(p0)
+        ys.append(r["tp"])
     out["relook_share"] = round(out["tools"]["zoom_relook"] / max(1, len(R)), 3)
     out["actions"] = {}
     for name, acts in (("with_opencv", acts_with), ("without_opencv", acts_without)):

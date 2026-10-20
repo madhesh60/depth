@@ -11,7 +11,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from src.agentic.mission import build_mission, to_geojson, to_gpx, to_kml, to_csv, export
-from src.agentic.types import TrackedObject, Verdict, SurveyResult, MissionPlan
+from src.agentic.types import TrackedObject, Verdict, SurveyResult
 
 
 def _obj(oid, verdict, lat=None, lon=None, frame="f1"):

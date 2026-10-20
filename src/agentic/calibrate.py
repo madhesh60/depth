@@ -171,7 +171,9 @@ def label(frames: list[dict], score_fn) -> tuple[list[float], list[bool], list[f
             hit = bj >= 0 and best >= MATCH_IOU
             if hit:
                 used[bj] = True
-            s_all.append(score_fn(c)); tp_all.append(hit); conf_all.append(c["conf"])
+            s_all.append(score_fn(c))
+            tp_all.append(hit)
+            conf_all.append(c["conf"])
         for g in gts:
             ov = [c["conf"] for c in fr["cands"] if _iou(tuple(c["bbox"]), g) >= MATCH_IOU]
             pots.append(max(ov) if ov else 0.0)
@@ -182,8 +184,10 @@ def auc(pos, neg) -> float:
     pos, neg = np.asarray(pos, float), np.asarray(neg, float)
     if not len(pos) or not len(neg):
         return float("nan")
-    s = np.concatenate([pos, neg]); o = np.argsort(s, kind="mergesort")
-    r = np.empty(len(s)); r[o] = np.arange(1, len(s) + 1)
+    s = np.concatenate([pos, neg])
+    o = np.argsort(s, kind="mergesort")
+    r = np.empty(len(s))
+    r[o] = np.arange(1, len(s) + 1)
     # average ranks for ties
     for v in np.unique(s):
         m = s == v
@@ -339,8 +343,10 @@ def auc_gain_ci(frames: list[dict], name: str, reps: int = 1000, seed: int = 0) 
     n = len(per)
     for _ in range(reps):
         idx = rng.integers(0, n, n)
-        sb = [x for i in idx for x in per[i][0]]; tb = [x for i in idx for x in per[i][1]]
-        sp = [x for i in idx for x in per[i][2]]; tpp = [x for i in idx for x in per[i][3]]
+        sb = [x for i in idx for x in per[i][0]]
+        tb = [x for i in idx for x in per[i][1]]
+        sp = [x for i in idx for x in per[i][2]]
+        tpp = [x for i in idx for x in per[i][3]]
         tb, tpp = np.asarray(tb, bool), np.asarray(tpp, bool)
         sb, sp = np.asarray(sb), np.asarray(sp)
         if tb.all() or (~tb).all() or tpp.all() or (~tpp).all():

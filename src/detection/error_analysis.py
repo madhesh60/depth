@@ -19,6 +19,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import sys
 from collections import defaultdict
 from pathlib import Path
 
@@ -27,7 +28,6 @@ import numpy as np
 import yaml
 
 REPO = Path(__file__).resolve().parents[2]
-import sys
 sys.path.insert(0, str(REPO))
 
 from src.detection.infer import YoloOnnxDetector, DEFAULT_ONNX          # noqa: E402
@@ -60,7 +60,8 @@ def main():
     args = ap.parse_args()
 
     data = yaml.safe_load(Path(args.data).read_text())
-    names = data["names"]; nc = len(names)
+    names = data["names"]
+    nc = len(names)
     root = Path(args.data).parent
     img_dir = root / data[args.split]
     lbl_dir = Path(str(img_dir).replace("images", "labels"))
@@ -119,13 +120,17 @@ def main():
         print("  " + line(names[c], tallies[0.25]["all"][c]))
     overall = Tally()
     for c in range(nc):
-        T = tallies[0.25]["all"][c]; overall.tp += T.tp; overall.fp += T.fp; overall.n_gt += T.n_gt
+        T = tallies[0.25]["all"][c]
+        overall.tp += T.tp
+        overall.fp += T.fp
+        overall.n_gt += T.n_gt
     print("  " + line("ALL", overall))
 
     print("\n[2] Domain split @ conf 0.25 — recall per class (product = SONAR)")
     print(f"  {'class':<22}{'sonar R':>10}{'optical R':>12}   (sonar TP/GT | optical TP/GT)")
     for c in range(nc):
-        s = tallies[0.25]["sonar"][c]; o = tallies[0.25]["optical"][c]
+        s = tallies[0.25]["sonar"][c]
+        o = tallies[0.25]["optical"][c]
         print(f"  {names[c]:<22}{s.recall:>10.3f}{o.recall:>12.3f}   "
               f"({s.tp}/{s.n_gt} | {o.tp}/{o.n_gt})")
 

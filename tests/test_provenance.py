@@ -39,7 +39,8 @@ PROV = {"model": "T", "model_onnx_sha256": "ab" * 32, "calibration_sha256": "cd"
 def test_public_share_generalises_wrecks_and_drops_revealing_passes():
     s = _survey()
     tracked, mission, n = redact_public(s.tracked, s.mission)
-    w = next(t for t in tracked if t.oid == "H1"); p = next(t for t in tracked if t.oid == "H2")
+    w = next(t for t in tracked if t.oid == "H1")
+    p = next(t for t in tracked if t.oid == "H2")
     assert n == 1 and (w.lat, w.lon) == (37.81, -76.15) and w.geo_error_m >= 1100
     assert (p.lat, p.lon) == (37.801111, -76.149999)                         # cleanup targets keep precision
     assert [L["id"] for L in mission.resurvey_plan["lines"]] == ["RS2"]      # the pass at the wreck is gone
@@ -50,8 +51,8 @@ def test_public_share_generalises_wrecks_and_drops_revealing_passes():
 
 def test_trace_is_a_complete_decision_log_and_never_public():
     s = _survey()
-    lines = [json.loads(l) for l in export("trace", s, prov=PROV).strip().splitlines()]
-    kinds = [l["type"] for l in lines]
+    lines = [json.loads(line) for line in export("trace", s, prov=PROV).strip().splitlines()]
+    kinds = [rec["type"] for rec in lines]
     assert kinds[0] == "provenance" and lines[0]["opencv"]["is_cool_path"] is True
     assert kinds.count("step") == 2 and kinds.count("verdict") == 1 and kinds[-1] == "mission"
     assert lines[-1]["human_approval_required"] is True

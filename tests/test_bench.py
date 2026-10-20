@@ -25,7 +25,8 @@ def test_survey_hour_model():
 
 
 def test_manifest_hash_is_content_based(tmp_path):
-    (tmp_path / "a.jpg").write_bytes(b"one"); (tmp_path / "b.jpg").write_bytes(b"two")
+    (tmp_path / "a.jpg").write_bytes(b"one")
+    (tmp_path / "b.jpg").write_bytes(b"two")
     frames, h1 = load_frames(tmp_path)
     assert [f for f, _ in frames] == ["a", "b"]
     (tmp_path / "b.jpg").write_bytes(b"TWO")
@@ -68,9 +69,11 @@ def test_parity_tolerates_float_noise_but_catches_real_differences():
              "f2": [{"cls": "wreck_debris", "bbox": [100, 100, 200, 180], "conf": 0.3302, "tier": "review"}]}
     p = compare.parity(_parity_doc(a), _parity_doc(noisy))
     assert p["match"] == p["detections"] == 2 and p["extra"] == 0 and p["same_frames"]
-    tier_flip = json.loads(json.dumps(noisy)); tier_flip["f2"][0]["tier"] = "low_risk"
+    tier_flip = json.loads(json.dumps(noisy))
+    tier_flip["f2"][0]["tier"] = "low_risk"
     assert compare.parity(_parity_doc(a), _parity_doc(tier_flip))["match"] == 1
-    moved = json.loads(json.dumps(noisy)); moved["f1"][0]["bbox"] = [30, 30, 70, 70]
+    moved = json.loads(json.dumps(noisy))
+    moved["f1"][0]["bbox"] = [30, 30, 70, 70]
     p2 = compare.parity(_parity_doc(a), _parity_doc(moved))
     assert p2["missing"] == 1 and p2["extra"] == 1 and p2["first_problem"]
     assert not compare.parity(_parity_doc(a), _parity_doc(noisy, "m2"))["same_frames"]

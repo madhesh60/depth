@@ -7,7 +7,14 @@
 #   3. when nothing runs any more: copies the model packages to /kaggle/working (the Output panel)
 # While it waits: keep this tab open, and do NOT press Stop/Interrupt or Restart. A Jupyter interrupt
 # goes to the kernel's whole process group, which includes trainings launched without their own session.
-import csv, json, os, re, shutil, subprocess, sys, time
+import csv
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import time
 
 WORK = "/kaggle/working"
 RUNS_DIR, LOGS = f"{WORK}/depth/runs", f"{WORK}/logs"
@@ -69,7 +76,7 @@ def log_tail(n, k=4):
         f.seek(max(0, f.tell() - 16000))
         txt = f.read().decode("utf-8", "replace")
     txt = re.sub(r"\x1b\[[0-9;?]*[A-Za-z]", "", txt).replace("\r", "\n")
-    return [l.strip() for l in txt.split("\n") if l.strip()][-k:] or ["(log is empty)"]
+    return [line.strip() for line in txt.split("\n") if line.strip()][-k:] or ["(log is empty)"]
 
 
 def quiet_seconds(n):
@@ -144,8 +151,8 @@ def status():
             print("           log:", log_tail(n, 1)[0][:150])
         elif state == "STOPPED BEFORE FINISHING":
             print("           last log lines:")
-            for l in log_tail(n, 8):
-                print("             ", l[:170])
+            for line in log_tail(n, 8):
+                print("             ", line[:170])
     sys.stdout.flush()
     return any_alive
 
@@ -163,8 +170,8 @@ for n in NAMES:
     z = f"{RUNS_DIR}/{n}_complete.zip"
     if not os.path.exists(z):
         print(f"!! {n}: NO package - it stopped before finishing. Last log lines:")
-        for l in log_tail(n, 15):
-            print("    ", l[:200])
+        for line in log_tail(n, 15):
+            print("    ", line[:200])
         continue
     shutil.copy(z, f"{WORK}/{n}_complete.zip")
     mp = f"{RUNS_DIR}/{n}/model_meta.json"
