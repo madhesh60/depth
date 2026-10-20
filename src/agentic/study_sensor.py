@@ -218,7 +218,9 @@ def report(design: dict, fresh: dict | None) -> str:
          "itself. Stage 1 reads it off the image with OpenCV; the ping headers carry an independent depth sounder. "
          "On the design recording **neither is always right**: the tracker locked onto the transducer ring-down "
          "(8 samples against ~117) *with confidence 0.99*, and in the last third the sounder lost lock and jumped "
-         "between ~1.5 m and ~6 m from one reading to the next. Picking one sensor by rule is wrong either way.", "",
+         "between ~1.5 m and ~6 m from one reading to the next. Picking one sensor by rule is wrong either way. "
+         "(PINGMapper already lets a user choose the sounder *or* an image-based seabed pick for a whole run; "
+         "what is new here is checking the two against each other per chunk and deciding automatically.)", "",
          "**What the agent does** (`src/agentic/sensor_check.py`, per 500-ping chunk): OpenCV bottom track → is the "
          "sounder steady? → do they agree? → on a conflict, **re-run the OpenCV tracker** inside a window the steady "
          "sounder sets → accept it only if the edge is coherent (smooth ping to ping, ≥ 2× the speckle gradient) → "
