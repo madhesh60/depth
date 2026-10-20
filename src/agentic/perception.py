@@ -32,6 +32,35 @@ RELOOK_MATCH_PX = 12         # min half-window (px) to accept a re-fire as "the 
 MOSAIC_GRID = 2              # re-look mosaic = GRID x GRID cells in one detector input (4 crops / pass)
 
 
+def tile_windows(W: int, H: int, frac: float) -> list[tuple[int, int, int, int]]:
+    """The 2×2 grid of overlapping tiles ``(x0, y0, w, h)``, each ``frac`` of a side — the geometry
+    ``DATASET/scripts/build_tiles.py`` cut EXP-002/003's training tiles with (frac 0.6 → neighbours
+    share 20% of the frame)."""
+    tw, th = int(round(W * frac)), int(round(H * frac))
+    return [(x, y, tw, th) for y in (0, max(0, H - th)) for x in (0, max(0, W - tw))]
+
+
+def merge_candidates(base: Sequence[Detection], extra: Sequence[Detection],
+                     iou: float) -> tuple[list[Detection], list[str]]:
+    """Fold the look-harder finds into the first look, class-aware. A find that overlaps a first-look
+    box of its class at IoU ≥ ``iou`` raises that box's score to the higher of the two (the same object
+    seen twice); any other find is a new candidate. Returns the merged list and, per entry, where it
+    came from: ``full`` · ``full+tiles`` (score raised) · ``tiles`` (only the tile pass proposed it).
+    ``study_look_harder.py`` scores exactly this rule."""
+    from src.detection.infer import _iou
+    out = [Detection(d.bbox, d.cls_id, d.cls_name, d.conf) for d in base]
+    src = ["full"] * len(out)
+    for e in sorted(extra, key=lambda d: -d.conf):
+        hit = next((k for k, d in enumerate(out) if d.cls_name == e.cls_name and _iou(d.bbox, e.bbox) >= iou), None)
+        if hit is None:
+            out.append(Detection(e.bbox, e.cls_id, e.cls_name, e.conf))
+            src.append("tiles")
+        elif e.conf > out[hit].conf:
+            out[hit] = Detection(out[hit].bbox, out[hit].cls_id, out[hit].cls_name, e.conf)
+            src[hit] = "tiles" if src[hit] == "tiles" else "full+tiles"
+    return out, src
+
+
 def _relook_crop(frame: np.ndarray, bbox) -> Optional[tuple[np.ndarray, int, int]]:
     """The padded context window the re-look inspects → (crop, x0, y0) in frame pixels."""
     x1, y1, x2, y2 = bbox
@@ -72,6 +101,23 @@ class Perceptor:
     def perceive(self, frame: np.ndarray) -> list[Detection]:
         """Full-frame detection (the See stage)."""
         return self.detector.detect(frame)
+
+    # -- look harder: a second, closer look at the whole frame --------------------------------
+    def look_harder(self, frame: np.ndarray, tile_frac: float,
+                    cls_name: Optional[str] = None) -> list[Detection]:
+        """Re-detect on the 2×2 tile grid (:func:`tile_windows`; each tile is upscaled to the detector
+        input, about 1.7× closer than the full-frame look) and return the ``cls_name`` finds in frame
+        pixels. Four forward passes. It can propose objects the full-frame look never did — the
+        detector's recall ceiling, not its ranking, is what limits the recall promise."""
+        cls_name = cls_name or self.guaranteed_class
+        H, W = frame.shape[:2]
+        out = []
+        for x0, y0, tw, th in tile_windows(W, H, tile_frac):
+            for d in self.detector.detect(frame[y0:y0 + th, x0:x0 + tw]):
+                if d.cls_name == cls_name:
+                    x1, y1, x2, y2 = d.bbox
+                    out.append(Detection((x1 + x0, y1 + y0, x2 + x0, y2 + y0), d.cls_id, d.cls_name, d.conf))
+        return out
 
     # -- re-look tool (used by Prove/Decide) -------------------------------------------------
     def zoom_relook(
