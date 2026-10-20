@@ -21,6 +21,8 @@ Every number in these documents names its split and the command that regenerates
 | claim | report |
 |---|---|
 | ≥ 79% of pots reach a person (95% confidence), held at 81.1% on unseen test | [`calibration_exp003.md`](calibration_exp003.md) *(generated)* |
+| ≥ 84% when the agent looks harder (2×2 tile pass), held at 86.0% on unseen test (STUDY-18) | [`look_harder.md`](reports/look_harder.md) *(generated)* |
+| the agent withdraws its promise where it does not apply: another sonar flagged in 22 of 22 surveys (STUDY-19) | [`applicability.md`](reports/applicability.md) *(generated)* |
 | detector: crab-pot AP@0.5 0.482, mAP@0.5:0.95 0.106; confusion matrix + PR curve | [`eval_exp003_test.md`](reports/eval_exp003_test.md) · [`…_official398`](reports/eval_exp003_test_official398.md) · [`…_xsonar`](reports/eval_exp003_test_xsonar.md) *(generated)* |
 | why EXP-003 is the deployed model, and how it was plugged in | [`exp003_diagnosis.md`](reports/exp003_diagnosis.md) · [tables](reports/exp003_diagnosis_tables.md) *(generated)* · [`onboard_exp003.md`](reports/onboard_exp003.md) *(generated)* |
 | OpenCV's seabed measurement changes where the boat goes (STUDY-12) | [`causal_trace.md`](reports/causal_trace.md) *(generated)* |

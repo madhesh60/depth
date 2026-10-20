@@ -1,4 +1,4 @@
-# Experiment Register — Marine Debris Detection System
+# Experiment Register — DEPTH
 
 Every training / evaluation run gets one entry. This is the research loop, not a scoreboard:
 each experiment states a **hypothesis**, records the exact config, reports metrics, and ends
@@ -102,7 +102,7 @@ focus first, aug-ablation demoted.
 | ❌ EXP-004 | Clean data: no fish-finder screenshots, no rotated copies; + a ghost-only arm | No gain for pots (Δ −0.03 [−0.11, +0.05]); wreck ceiling 0.10 → 0.30 |
 | ❌ EXP-005 | Cleaned data + stronger brightness/scale jitter, two seeds | Worse for pots, both seeds: Δ −0.10 / −0.07 vs EXP-003; false alarms ×1.6–2.1 |
 | ✅ (in v2b) | **Sonar-only** training raises the target-domain numbers + removes the optical→natural_formation shortcut (optical debris is 0% and off-product) | filter to crabpot/uatd/mpulse/seabed/shipwreck |
-| (EXP-003 arms) | **Tiled train+infer** (SAHI-style slicing) beats one large frame for tiny targets — doubles as Stage-1's reframed tiling role | slice → detect per tile → merge |
+| ✅ STUDY-18 | **Tiled train+infer**: EXP-003 trained on tiles; the 2×2 tile pass at inference became the agent's *look-harder* mode | promise 79% → **84%**, held on test at 86.0% (cards / frame 2.68 → 3.86) |
 | (old plan) | Oversampling fishing_gear + small-object aug (copy_paste>0, scale-up mosaic) lifts recall | minority oversample + aug |
 | (old plan) | Aug ablation: are the ~62% baked-in v0 augs helping or just doubling online aug? | originals-only vs baked-aug (demoted) |
 
@@ -114,6 +114,60 @@ Promote each into the log below with full results as it runs.
 ---
 
 ## Experiment log
+
+### STUDY-19 — Does the promise apply to this recording? The applicability check (SHIPPED — on by default)
+
+- **Why.** The recall promise is fit on three crab-pot recordings and says nothing about a sonar the
+  detector has never seen. On `test_xsonar` the standard threshold keeps **23.9%** of 1,265 pots while
+  the tiers would print "≥ 79%" (cached once-run predictions) — a silent failure.
+- **Check** (`src/agentic/applicability.py`): eight OpenCV statistics per frame (brightness, contrast,
+  `cv2.Laplacian` speckle texture, `cv2.Sobel` along- vs across-track gradient, dark and saturated pixel
+  shares, HSV colour saturation, `cv2.calcHist` / `cv2.compareHist` histogram distance) → the frame's
+  largest robust z-score → a **conformal p-value** against the 163 calibration frames → atypical if p ≤
+  0.05. A survey loses its promise when the 95% Clopper-Pearson lower bound of its atypical share
+  exceeds the limit.
+- **Protocol** committed before any verification data was read (`eda1638`, registered as "STUDY-18";
+  renumbered because STUDY-17 is the COOL benchmark). Limit from design data only: the largest atypical
+  share over 13 in-distribution **training** recordings, rounded up to 0.05 → **0.20**. Gates: G1 no test
+  recording and not the demo frames flagged; G2 `test_xsonar` flagged.
+- **Design data** (train): in-distribution recordings 0–0.19 atypical (lower bounds ≤ 0.10); every other
+  source with more than one frame (seabed, TI, baycove, BC_POST, shipwreck) 0.97–1.00 → withdrawn.
+  Disclosed: colour saturation was added after the first design look, when grey-only features left the
+  colour-palette crab-pot surveys inside the in-distribution range (0.12–0.18).
+- **Verification (read once):** test Rec8 0.000 · Rec9 0.074 · Rec14 0.167 (lower bound 0.068) · the 8
+  demo frames 0.125 → the promise applies to all (**G1 PASS**); `test_xsonar` 1.000 → withdrawn, and in
+  22 of 22 25-frame chunks (**G2 PASS**). Reported without a gate: Test-Small-DS (Humminbird, Colorado
+  River) 0.500 (lower bound 0.264) and Test-Large-DS (Solix, Pearl River) 0.704 (0.655) → withdrawn.
+  The `--write` run recomputed the identical verification to store the reference; nothing was re-tuned.
+- **Decision:** shipped (`models/EXP-003/applicability.json`). The core loop checks every survey first;
+  a recording that fails runs without a recall promise, on the cheapest look, with an incident and a
+  "full review" approval request. The raw river recordings of the real-GPS demo now run that way.
+- **Limits:** a coarse guard against another sonar or rendering; it does not detect subtle site or gain
+  drift inside one sonar family, and passing it is not proof that the promise holds.
+  Report: [`docs/reports/applicability.md`](reports/applicability.md) · `python -m src.agentic.study_applicability --verify`.
+
+### STUDY-18 — Look harder: a stronger recall promise from a second look (SHIPPED — a calibrated mode)
+
+- **Why.** The promise is capped by the detector's recall ceiling (15% of pots are never proposed), not by
+  its ranking — that is why the re-look (STUDY-07) and scale TTA (STUDY-13) could not help. EXP-003 was
+  trained on full frames **and** 2×2 tiles (`build_tiles.py`), so a second look at the tile scale is one
+  the detector has seen.
+- **Mode `look_harder`:** the full-frame look + a 2×2 tile pass (tiles 60% of a side, 4 more `cv2.dnn`
+  passes), folded in by `perception.merge_candidates` (IoU ≥ 0.5) — the exact functions the product runs.
+- **Protocol** committed before the test split was scored (`94a3af5`, registered as "STUDY-17";
+  renumbered, see STUDY-19). Gates: G1 (calibration) its promise beats the standard promise; G2 (test,
+  scored once) its promise holds. Disclosed: the design was chosen after looking at the calibration split;
+  per-frame triggers were explored there and dropped (the recovered pots had no first-look signal).
+- **Calibration** (v2b val, 163 frames, 186 pots): ceiling 0.850 → **0.892** (paired frame bootstrap
+  +0.043, 95% CI +0.016..+0.076); promise **79% → 84%**; cards / frame 3.52 → 4.93. The tile pass proposed
+  8 pots the full-frame look never did and 171 tile-only candidates that hit no label.
+- **Verification (test, scored once, 199 frames, 264 pots):** standard 0.811 (lower bound 0.766) — held;
+  look harder **0.860 (lower bound 0.820) ≥ 84% — held** (**G1, G2 PASS**). Cards / frame 2.68 → 3.86.
+- **Decision:** shipped as `modes.look_harder` in `calibration.json`. The core loop (`core.py`) chooses it
+  from the operator's goal and compute budget: with no recall asked for it keeps the strongest promise the
+  compute budget allows; asked for ≥ 79% it takes the cheaper standard look. Cost: 4 extra passes per
+  frame (2.7 s per frame on the development laptop while throttled; EC2 numbers to follow).
+  Report: [`docs/reports/look_harder.md`](reports/look_harder.md) · `python -m src.agentic.study_look_harder --verify`.
 
 ### STUDY-17 — COOL on Graviton4 vs stock OpenCV vs x86: the product workload (REGISTERED 2026-10-19, not yet run)
 

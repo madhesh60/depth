@@ -44,6 +44,13 @@ fishing gear and wreck debris.
 
 ## How the system works (as built)
 
+**The core loop** (`src/agentic/core.py`, `SurveyAgent`) runs every survey toward the operator's goal
+(recall to keep; compute, analyst and boat minutes): inspect frames → **check the promise applies**
+(`applicability.py`, STUDY-19; withdrawn → no promise, cheapest look, `full_review` request) →
+**choose the perception mode** (`standard` ≥ 79% or `look_harder` ≥ 84% from `calibration.json`
+`modes`, STUDY-18) → perceive (re-plan to `standard` if the measured pace would overrun the compute
+budget) → plan → one approval request per action. Every step is logged in `agent_run`.
+
 0. **Input** — sonogram images, or a raw **Humminbird** recording (`.DAT`/`.SON`/`.IDX`) with real
    per-ping GPS, heading, speed and depth (`src/cv_pipeline/humminbird.py`). The range scale is
    measured as sonar depth ÷ Stage-1 altitude (STUDY-14, `docs/reports/raw_recording.md`).
@@ -55,7 +62,8 @@ fishing gear and wreck debris.
 2. **See** — YOLO11 ONNX via `cv2.dnn` (`src/detection/infer.py`), class-aware NMS.
 3. **Prove** — shadow, relative height, water-column check. This is evidence, never a silent gate.
 4. **Decide** — guaranteed tiers fit on held-out recordings (`src/agentic/calibrate.py`). EXP-003
-   promises ≥ 79% of pots reach a human (81% on test). There is no precision promise, so nothing is
+   promises ≥ 79% of pots reach a human with one look (81% on test) and ≥ 84% when the agent looks
+   harder (86% on test, `study_look_harder.py`). There is no precision promise, so nothing is
    auto-confirmed. **Active vision** (`active.py`, `evidence_model.py`, STUDY-15) failed both gates,
    so it is **off by default** (studio experimental switch / `?active=1`).
 5. **Act** — geotags, chunk stitching, repeat-sighting merge, routes, re-survey passes,
@@ -138,6 +146,8 @@ python -m src.cv_pipeline.humminbird fetch [--large]   # STUDY-14 data
 python -m src.cv_pipeline.humminbird validate|report   # STUDY-14 checks · report
 python -m src.agentic.evidence_model                   # STUDY-15
 python -m src.agentic.study_sensor                     # STUDY-16
+python -m src.agentic.study_look_harder --verify       # STUDY-18 (calibration -> test once)
+python -m src.agentic.study_applicability --verify     # STUDY-19 (fit -> verify once)
 python -m src.agentic.counterfactual                   # detector only vs + Stage 1 + evidence
 
 # New Kaggle model: validate per source (never test), then plug it in
@@ -152,7 +162,8 @@ python -m src.detection.onboard_model --zip EXP-003_complete.zip
 src/cv_pipeline/  canonical (Stage 1) · humminbird · orientation · study_canonical · pipeline + config (STUDY-01)
 src/detection/    infer · calibration · evaluate · export_onnx · train · onboard_model · fetch_model · diagnose ·
                   fp_audit · frames · failure_gallery · seam · study_seam · study_scale_tta
-src/agentic/      agent · perception · shadow · evidence · tools · policy · guarantees · calibrate · geo · stitch ·
+src/agentic/      core (the loop) · applicability · study_applicability · study_look_harder · agent · perception ·
+                  shadow · evidence · tools · policy · guarantees · calibrate · geo · stitch ·
                   resurvey · mission · pipeline · approvals · brief · twin · incidents · provenance · feedback ·
                   study · effort · study_causal · active · evidence_model · counterfactual · sensor_check ·
                   study_sensor · types
@@ -162,7 +173,8 @@ webui/            zero-build vanilla studio (index.html, app.js, styles.css, twi
                   audit/ · img/ · vendor/ (leaflet, three, fonts)
 infra/            cfn/depth.yaml · deploy.sh · teardown.sh · update_server.sh · setup_cool_instance.sh ·
                   depth.service · golive.sh · bench_fleet.sh · bench_userdata.sh · bench_cool.sh · lib.sh
-models/<MODEL>/   calibration.json · effort_curve.json · fp_audit_val.json (+ EXP-003: evidence_model.json, model_meta.json)
+models/<MODEL>/   calibration.json (+ modes.look_harder) · effort_curve.json · fp_audit_val.json (+ EXP-003:
+                  evidence_model.json, model_meta.json, applicability.json)
 benchmarks/       product_bench JSON results (tracked)
 notebooks/        exp005_kaggle.ipynb (generated) · make_kaggle_notebook.py · monitor_cell.py
 docs/             README (map) · architecture · proposal · progress · experiments · calibration_* · release_*;

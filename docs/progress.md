@@ -54,10 +54,12 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ## 3. Current state (2026-10-20)
 
-- **Working end to end:** the studio and the agent on CPU with OpenCV 5 — Stage 1, the EXP-003 detector
-  through `cv2.dnn`, evidence, guaranteed tiers, survey planning and person-approved actions — on the
-  sample frames and on a raw Humminbird recording with real GPS. 225 tests pass (CI on every push);
-  `ruff check .` is clean.
+- **Working end to end:** the studio and the agent on CPU with OpenCV 5 — the goal-driven core loop
+  (`core.py`: check the promise applies → choose how hard to look → perceive with a compute-budget watch →
+  plan → ask), Stage 1, the EXP-003 detector through `cv2.dnn`, evidence, guaranteed tiers (≥ 79% one
+  look, ≥ 84% looking harder), survey planning and person-approved actions — on the sample frames and on
+  a raw Humminbird recording with real GPS. `ruff check .` is clean; the full suite needs a re-run after
+  sweep 68 (the last full run was stopped by low system memory, see below).
 - **Waiting on AWS:** the Graviton + COOL runs (the Marketplace subscription is with AWS Support) and
   CloudFront (account verification). The stock EC2 benchmarks and the demo-server load test are done.
 - **Needs people:** the timed user study and the blinded false-alarm audit.
@@ -73,6 +75,35 @@ Current numbers, each with its split: README "At a glance" and
 ---
 
 ## 4. Session log
+
+### 2026-10-20 (sweep 68) — the agent at the core: a goal-driven loop, a stronger promise, and knowing when it does not apply
+
+- **Judge audit** (local `JUDGE_AUDIT.md`, git-excluded): 8 doc contradictions fixed (`849b253`); the
+  rules were checked for an AI-tool disclosure requirement (none found; misrepresentation is what the rules
+  reject).
+- **Core loop** (`src/agentic/core.py`, on by default for every survey, `/api/analyze`, MCP `run_survey`):
+  a `Goal` (recall to keep · compute · analyst · boat minutes) → `inspect_data` → `check_promise` →
+  `choose_mode` (every option logged with its promise, cards and compute) → `perceive` with a compute-budget
+  watch (`replan` + `retier` mid-run) → `plan` → approval requests. `SurveyResult.agent_run` records it;
+  the studio shows it ("How the agent decided", Survey → Goal selector, Options → Compute budget).
+- **STUDY-18 — look harder** (protocol committed first, `94a3af5`, registered as "STUDY-17" and renumbered:
+  STUDY-17 is the COOL benchmark): full frame + 2×2 tiles at the training tile scale. Calibration: ceiling
+  0.850 → 0.892, promise 79% → 84%. **Test, once: 86.0% (lower bound 82.0%) ≥ 84% — held**; cards / frame
+  2.68 → 3.86. Shipped as `calibration.json` `modes.look_harder`.
+- **STUDY-19 — applicability** (protocol committed first, `eda1638`): eight OpenCV statistics → conformal
+  p-values vs the calibration frames → promise withdrawn when the 95% lower bound of the atypical share
+  exceeds 0.20 (set on 13 training recordings). **Verified once:** all 3 test recordings and the demo frames
+  keep the promise; `test_xsonar` withdrawn (22 of 22 chunks), where one look keeps only 23.9% of the pots.
+  Both raw river recordings are withdrawn too, so the real-GPS demo now runs without a promise and asks for
+  a full review (`full_review` approval action, `promise_not_applicable` incident, the brief says why).
+- **Fixes found on the way:** the `no_detection` drill now empties the frame after both looks; `/api/analyze`
+  seeds the agent's pass-time estimate from the warm-up so the first call is priced too.
+- **Tests:** new `test_core.py` (11), `test_look_harder.py` (6), `test_applicability.py` (6) pass. The last
+  complete full run (before the applicability wiring) was 241 / 242 (the drill, since fixed). The full run
+  after the wiring was **stopped by Claude Code because the machine ran low on memory** — re-run before
+  pushing.
+- **Open:** EC2 cost of the look-harder mode (5 passes per frame) is not benchmarked; the per-candidate
+  re-look and active vision stay off (STUDY-07, STUDY-15).
 
 ### 2026-10-20 (sweep 67) — restructure: a minimal root, `docs/` and `docs/reports/`
 

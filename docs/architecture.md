@@ -39,10 +39,18 @@ dashed violet = optional. Text version:_
                      └► <name>_complete.zip ─► onboard_model.py: verify cv2.dnn ─► models/<name>/
                         ─► calibrate (val recordings) ─► evaluate (test · official 398 · cross-sonar)
                               └──────────────────────────────────────────────────────────────────────┘
+ AGENT (per survey: the core loop)                                                    src/agentic/core.py
+  goal (recall · compute · analyst · boat minutes) ─► inspect frames ─► does the promise apply here?
+         (OpenCV statistics vs the calibration recordings, conformal)                 src/agentic/applicability.py
+         no ─► promise withdrawn · cheapest look · full-review request to a person
+         yes ─► choose the perception mode (standard ≥ 79% · look harder ≥ 84%)        models/<MODEL>/calibration.json
+         ─► perceive every frame (below), watching the pace ─► overrun ─► re-plan: standard look, re-tier
+         ─► plan (SURVEY below) ─► one approval request per action ─► a person decides ─► re-plan
  RUNTIME (per frame, CPU, OpenCV 5)                                                  models/<MODEL>/calibration.json
   frame ─► STAGE 1  canonicalise: palette→luminance · orientation by source rule · bottom track
          │          (altitude px / ping) · slant→ground · water-column mask          src/cv_pipeline/canonical.py
          ─► SEE     YOLO11 ONNX via cv2.dnn · letterbox · class-aware NMS             src/detection/infer.py
+         │          look-harder mode: + 2×2 tiles (4 passes), merged at IoU ≥ 0.5     src/agentic/perception.py
          ─► PROVE   water_column_check · thin-line shadow · relative height (tracked altitude)
          │          · agent's-eye re-look view (display)                              src/agentic/{shadow,perception,tools}.py
          ─► DECIDE  guaranteed tiers (CONFIRMED / REVIEW / LOW-RISK) · value-of-information tool use
@@ -124,7 +132,35 @@ per-class floors, the guaranteed class, detector input, tiers. Weights resolve f
   Metres only with a measured altitude in metres (these frames carry no range scale).
 * **agent's-eye view** — the exact re-look crop (zoom + CLAHE), display-only.
 
-## 6. Decide — guaranteed tiers + value of information (`src/agentic/`)
+## 6. Decide — the core loop, guaranteed tiers, value of information (`src/agentic/`)
+
+### 6a. The core loop (`core.py`) — on by default for every survey
+
+The survey is run by an agent with a goal, not by a fixed pipeline (`SurveyAgent.run`):
+
+1. **inspect** — usable frames (corrupt / blank ones skipped and reported as incidents);
+2. **check the promise applies** (`applicability.py`, STUDY-19) — eight OpenCV statistics per frame
+   (brightness, contrast, `cv2.Laplacian` texture, `cv2.Sobel` anisotropy, dark / saturated shares, HSV
+   saturation, `cv2.compareHist` distance) → conformal p-value against the 163 calibration frames →
+   the promise is withdrawn when the 95% lower bound of the atypical share exceeds 0.20
+   (`models/<MODEL>/applicability.json`). Withdrawn ⇒ `recall_promise` is null in the plan, the cheapest
+   look runs, the `promise_not_applicable` incident is filed and the server asks a person to approve a
+   **full review** (`full_review` approval request);
+3. **choose how hard to look** (`choose_mode`) — the calibrated modes are `standard` (`tiers`) and
+   `look_harder` (`modes.look_harder`, STUDY-18). With a recall goal: the cheapest mode that keeps it
+   within the compute budget; without one: the strongest promise the compute budget allows. Each mode is
+   priced with the measured `cv2.dnn` pass time (seeded by the warm-up, then a moving average). The
+   analyst budget orders the queue (budget mode) and is reported as the share of the queue it covers;
+4. **perceive** every frame; if the measured pace would overrun the compute budget, **re-plan**: the
+   standard look for the remaining frames and the earlier ones re-tiered at the standard threshold (the
+   standard promise still holds — tile finds only add candidates, so recall at a fixed threshold cannot
+   fall);
+5. **plan** (`pipeline.assemble` → `mission`) and **hand off** — the server files one approval request per
+   action; each decision re-plans.
+
+Every step is logged in `SurveyResult.agent_run` (goal, options weighed, decision, what it saw, re-plans,
+stop reason) and shown in the studio's Agent tab; MCP `run_survey` returns it as `agent`. `/api/analyze`
+uses the same choice against an interactive compute budget (`DEPTH_INTERACTIVE_S`, 2 s).
 
 `calibrate.py` fits, on the calibration recordings only:
 * **τ_review** — the highest threshold whose Clopper–Pearson upper bound on the miss rate stays ≤ α
@@ -135,7 +171,10 @@ per-class floors, the guaranteed class, detector input, tiers. Weights resolve f
   promise, a re-look policy is adopted only with a significant paired-bootstrap gain.
 
 EXP-003 (deployed): **≥ 79% of pots reach a human, held on test (81.1%, LCB 76.7%)**; 90% not
-achievable (recall ceiling 0.85 on the calibration recordings).
+achievable (recall ceiling 0.85 on the calibration recordings). The **look-harder** mode (STUDY-18:
+full frame + 2×2 tiles, the scale EXP-003 trained on) raises the ceiling to 0.89 and keeps **≥ 84%,
+held on test (86.0%, LCB 82.0%)** at 3.86 vs 2.68 cards per test frame
+([`look_harder.md`](reports/look_harder.md)).
 
 EXP-001 (earlier): **≥ 65% of pots reach a human, held on test (86.2%, LCB 80.5%)**; 90% not achievable
 (recall ceiling 0.72 on the calibration recording); no precision promise → nothing auto-confirmed;
@@ -324,10 +363,13 @@ Weights: `python -m src.detection.fetch_model` (GitHub Release `exp003-v1`, SHA-
 
 ## 12. Code map
 
-**Read the code in this order** — it follows one frame from pixels to a person's decision:
+**Read the code in this order** — it follows a survey from the operator's goal to a person's decision:
 
+0. `src/agentic/core.py` → `SurveyAgent.run` — the core loop: goal → check the promise applies
+   (`applicability.py`) → `choose_mode` → perceive with a compute-budget watch → plan → hand off.
 1. `src/cv_pipeline/canonical.py` — Stage 1: palette → luminance, orientation, bottom track, slant → ground.
-2. `src/agentic/agent.py` → `ReLookAgent.run_frame` — the agent. `_decide_calibrated` is the loop in four
+2. `src/agentic/agent.py` → `ReLookAgent.run_frame` — the frame agent (`_look_harder` is the tile pass of
+   the look-harder mode). `_decide_calibrated` is the loop in four
    named steps: `_voi_pass` (can more looking change the tier?) → `_budget` (the stop rule) →
    `_relook_band` → `_physical_evidence` + `_decide_one` (belief → tier → handoff to a person).
 3. `src/agentic/tools.py` — the OpenCV tools the agent calls (`cv2.dnn` detect, re-look, CLAHE, shadow,
@@ -345,7 +387,9 @@ src/cv_pipeline/  canonical.py (Stage 1) · humminbird.py (raw recordings, STUDY
 src/detection/    infer.py · calibration.py · evaluate.py · export_onnx.py · train.py ·
                   onboard_model.py · fetch_model.py · fp_audit.py · frames.py ·
                   failure_gallery.py · seam.py · study_seam.py (11b) · study_scale_tta.py (13)
-src/agentic/      agent.py · perception.py · shadow.py · tools.py · evidence.py · policy.py · incidents.py ·
+src/agentic/      core.py (the core loop) · applicability.py + study_applicability.py (STUDY-19) ·
+                  study_look_harder.py (STUDY-18) · agent.py · perception.py · shadow.py · tools.py ·
+                  evidence.py · policy.py · incidents.py ·
                   sensor_check.py (STUDY-16) · active.py + evidence_model.py (STUDY-15) ·
                   guarantees.py · calibrate.py · geo.py · stitch.py · resurvey.py · mission.py ·
                   pipeline.py · approvals.py · feedback.py · study.py · effort.py · twin.py (3D twin) ·
@@ -364,11 +408,17 @@ DATASET/scripts/  audit_dataset · build_dataset_v1/v2/v2b · build_tiles · vis
 
 ## 13. Known limits (stated in the product)
 
-* Recall ceiling: EXP-003 reaches 0.85 on the calibration recordings, so the promise is 79%, not 90%. Five
-  later runs did not beat it; the limit is data (3 validation recordings, label noise), not the recipe.
+* Recall ceiling: EXP-003 reaches 0.85 on the calibration recordings with one look (promise 79%) and 0.89
+  when the agent looks harder (promise 84%) — not 90%. Five later runs did not beat it; the limit is data
+  (3 validation recordings, label noise), not the recipe.
+* The applicability check is coarse: it catches another sonar or rendering, not subtle drift within one
+  sonar family; passing it is not proof that the promise holds. The raw river recordings fail it, so the
+  real-GPS demo runs without a recall promise and asks for a full review.
+* Promises carry the Clopper-Pearson independence assumption; frames of one recording are correlated.
 * No precision promise yet → every find goes to a human.
 * Synthetic GPS for the shipped crab-pot frames (the HF frames carry none). The raw recording has
   real GPS and a measured scale, but it is a river with no known pots (a false-alarm measurement, not a
   recall one).
 * Minutes saved and label noise are **pending human measurements** (Study, Audit).
-* COOL numbers pending the EC2 runs; the local reference is x86.
+* COOL numbers pending the EC2 runs (stock x86 and Graviton measured); the look-harder mode's EC2 cost
+  (5 passes per frame) is not benchmarked yet.

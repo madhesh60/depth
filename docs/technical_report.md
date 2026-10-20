@@ -21,7 +21,9 @@ Graviton + COOL**.
 
 | claim | evidence |
 |---|---|
-| **≥ 79% of pots reach a human** (95% confidence), fit on held-out recordings and verified once on unseen test: **81.1% (LCB 76.7%)** — EXP-003, the deployed detector | [`calibration_exp003.md`](calibration_exp003.md) |
+| **≥ 84% of pots reach a human when the agent looks harder** (95% confidence; ≥ 79% with one look), fit on held-out recordings and verified once on unseen test: **86.0% (LCB 82.0%)**, and 81.1% (LCB 76.7%) with one look — EXP-003, the deployed detector | [`look_harder.md`](reports/look_harder.md) · [`calibration_exp003.md`](calibration_exp003.md) |
+| **The agent withdraws its promise where it does not apply**: on another sonar in 22 of 22 surveys (one look keeps 23.9% of the pots there), never on the 3 test recordings | [`applicability.md`](reports/applicability.md) |
+| **A goal-driven core loop** chooses how hard to look from the operator's goal and compute budget, and re-plans mid-run on its measured pace | [`core.py`](../src/agentic/core.py) · §2 |
 | Stage 1 measures the sonar's altitude without labels; port and starboard agree to **1.6 px** (random pairs 5.3 px) | [`stage1_canonical.md`](reports/stage1_canonical.md) |
 | OpenCV output changes the agent's actions: without Stage 1, **151 of 222** pins leave their own error circle and 4 of 40 re-survey passes regroup (EXP-003, v2b test); the shadow changes no decision (evidence only) | [`causal_trace.md`](reports/causal_trace.md) |
 | Break-even analyst time: DEPTH meets the promise faster than manual review if a card takes **< 6.88 s** (timings assumed until the study runs) | [`effort_curve.md`](reports/effort_curve.md) |
@@ -60,6 +62,15 @@ this take, and where exactly do I send the boat?"
 ## 2. Architecture
 
 ![architecture](img/architecture.svg)
+
+**The agent at the core** (`src/agentic/core.py`). A survey is run toward the operator's **goal** (the
+recall to keep; compute, analyst and boat minutes). The agent (1) inspects the frames, (2) checks that
+its promise applies — eight OpenCV statistics per frame, conformal p-values against the calibration
+recordings; if not, it withdraws the promise and asks a person for a full review (STUDY-19), (3) chooses
+how hard to look — the standard full-frame look (≥ 79%) or the look-harder mode with a 2×2 tile pass
+(≥ 84%, STUDY-18), priced with its measured `cv2.dnn` pass time, (4) perceives every frame through the
+stages below, re-planning to the standard look if the pace would overrun the compute budget, and (5) plans
+and asks. Every decision, with the options weighed, is logged in `agent_run`.
 
 The **runtime** processes each frame through five stages, all OpenCV 5 on CPU:
 
@@ -158,7 +169,9 @@ Tiers are fit on the **calibration split** (held-out recordings Rec10 / 12 / 16:
 186 pots) with Clopper–Pearson / Learn-Then-Test and **verified once** on the verification split (Rec8 /
 9 / 14: 199 unique frames, 264 pots) ([`calibration_exp003.md`](calibration_exp003.md)):
 
-- **Recall promise ≥ 79%** (95% confidence; the requested 90% is above the detector's 0.85 ceiling). Verified: **81.1%, lower confidence bound 76.7% — held.** EXP-001's promise was ≥ 65%.
+- **Recall promise ≥ 79%** with one look (95% confidence; the requested 90% is above the detector's 0.85 ceiling). Verified: **81.1%, lower confidence bound 76.7% — held.** EXP-001's promise was ≥ 65%.
+- **Recall promise ≥ 84% when the agent looks harder** (STUDY-18, [`look_harder.md`](reports/look_harder.md)): the full frame + a 2×2 tile pass at the scale EXP-003 trained on raises the ceiling to 0.892 (paired bootstrap +0.043, 95% CI +0.016..+0.076). Verified once: **86.0%, lower bound 82.0% — held**; cards per test frame 2.68 → 3.86; 4 more forward passes per frame. Protocol committed before the test split was scored.
+- **The promise is checked before it is kept** (STUDY-19, [`applicability.md`](reports/applicability.md)): another sonar (`test_xsonar`) is flagged in 22 of 22 surveys, where one look keeps only 23.9% of the pots; the 3 test recordings and the demo frames keep it. The raw river recordings are flagged too, so they run without a promise and with a full-review request.
 - **No precision promise is supportable** (best achievable 0.565 against the 0.85 target), so nothing is auto-confirmed and every find goes to a human. DEPTH says what it *cannot* promise.
 - Re-look vs plain confidence: no re-look policy beat confidence on the calibration recordings (STUDY-07, repeated for EXP-003). The shipped policy therefore spends 1 inference per frame, and the value-of-information agent records the re-looks it chose not to make.
 
@@ -286,7 +299,7 @@ on Spot → S3.
 
 ## 6. Limitations (stated in the product, not hidden)
 
-- **Scope.** One bay's crab pots and one sonar family. On another sonar (`test_xsonar`) AP@0.5 is 0.34 and the val-tuned threshold does not transfer (recall 0.11): a new sonar needs re-calibration.
+- **Scope.** One region's crab pots and one sonar family. On another sonar (`test_xsonar`) AP@0.5 is 0.34 and the val-tuned threshold does not transfer (recall 0.11): a new sonar needs re-calibration. The agent now detects that case and withdraws its promise (STUDY-19); the check is coarse — it catches another sonar or rendering, not subtle drift within one.
 - **Detector.** Crab-pot AP@0.5 0.48 and F1 0.41 on the official split, against GhostVision's 0.71–0.73. EXP-003 raised the recall ceiling from 0.72 to 0.85 and the promise from ≥ 65% to ≥ 79%. EXP-004 / 005 (cleaner data) did not beat it ([`exp005_diagnosis.md`](reports/exp005_diagnosis.md)). EXP-002 failed as underfit (`optimizer=auto` built AdamW 0.00167; [`exp002_diagnosis.md`](reports/exp002_diagnosis.md)).
 - **Wreck debris** is weak (AP 0.16): most training wrecks are off-domain fish-finder screenshots.
 - **Calibration.** Calibration uses three recordings whose frames are correlated. That is why the promise is verified on a separate split.
@@ -327,11 +340,13 @@ Log: [`experiments.md`](experiments.md).
 ```bash
 pip install -r requirements-dev.txt                   # runtime + test + lint dependencies
 python -m src.detection.fetch_model                   # the detector (Release exp003-v1), SHA-256 checked
-pytest -q                                             # 225 tests (CI: .github/workflows/tests.yml)
+pytest -q                                             # the test suite (CI: .github/workflows/tests.yml)
 python -m uvicorn src.dashboard.app:app --port 8000   # studio → "▶ 60-s demo"
 python -m src.agentic.calibrate                       # fit + verify the guarantees
 python -m src.detection.evaluate                      # deploy-faithful eval (+ mAP@0.5:0.95, confusion, PR)
 python -m src.detection.study_scale_tta               # STUDY-13
+python -m src.agentic.study_look_harder --verify      # STUDY-18: look harder (calibration -> test once)
+python -m src.agentic.study_applicability --verify    # STUDY-19: does the promise apply here?
 python -m src.bench.product_bench --label <host>      # benchmark this machine
 
 # STUDY-12: the counterfactual trace on up to 80 v2b test frames

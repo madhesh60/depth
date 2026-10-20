@@ -3,14 +3,52 @@
 **Marine-debris (ghost-gear) detection in side-scan sonar · Team Syndicate · DEPTH**
 
 > A chatbot that *explains* results does not qualify. DEPTH qualifies because **the picture result
-> changes the agent's next step**, under a **stated objective**: meet two calibrated promises — how
-> many pots reach a human, and how many auto-confirmed finds are real — while spending the least
-> compute and the fewest human minutes. Every decision is logged, every tier is calibrated on held-out
-> data, and a human approves every action.
+> changes the agent's next step**, under a **goal the operator states**: keep a calibrated recall
+> promise — how many pots reach a person — within the compute, analyst and boat time it is given. The
+> agent checks that its promise applies to the recording, chooses how hard to look, re-plans when its
+> measurements or budgets say so, and a named person approves every action. Every decision is logged
+> and every promise is calibrated on held-out recordings and verified once on unseen ones.
 
-Code: [`src/agentic/`](../src/agentic) · Live demo: the web app (`webui/`, served by
-`src/dashboard/app.py`) · Evidence: [`docs/calibration_exp001.md`](calibration_exp001.md)
-(regenerate with `python -m src.agentic.calibrate`).
+Code: [`src/agentic/core.py`](../src/agentic/core.py) (the core loop) and [`src/agentic/`](../src/agentic) ·
+Live demo: the web app (`webui/`, served by `src/dashboard/app.py`) · Evidence:
+[`calibration_exp003.md`](calibration_exp003.md), [`look_harder.md`](reports/look_harder.md),
+[`applicability.md`](reports/applicability.md), [`sensor_check.md`](reports/sensor_check.md),
+[`causal_trace.md`](reports/causal_trace.md).
+
+---
+
+## 0. The core loop — goal → check → decide → perceive → re-plan → ask (`core.py`, on by default)
+
+```mermaid
+flowchart TD
+  G["GOAL<br/>recall to keep · compute s · analyst min · boat min"] --> I["inspect frames<br/>corrupt / blank skipped + reported"]
+  I --> A{"does the promise apply here?<br/>OpenCV statistics vs the calibration recordings<br/>(conformal, STUDY-19)"}
+  A -->|"no"| W["withdraw the promise · cheapest look<br/>incident + FULL REVIEW request to a person"]
+  A -->|"yes"| M{"how hard to look?<br/>standard ≥ 79% (1 pass) · look harder ≥ 84% (5 passes)<br/>cheapest that keeps the goal, else strongest the compute budget allows"}
+  M --> P["perceive every frame<br/>Stage 1 · cv2.dnn (+ 2×2 tiles) · evidence"]
+  W --> P
+  P --> B{"measured pace over<br/>the compute budget?"}
+  B -->|"yes"| R["RE-PLAN: standard look for the rest<br/>re-tier earlier frames (promise kept)"]
+  R --> P
+  B -->|"no"| S["sense (raw recording): seabed track vs depth sounder<br/>re-track on conflict · re-fit the range scale (STUDY-16)"]
+  S --> L["plan: queue · analyst budget · routes ·<br/>opposite-side passes by information per boat-minute"]
+  L --> H["ask: one approval request per action"]
+  H --> D["a named person decides"]
+  D -->|"every decision"| L
+```
+
+| the agent decides alone | it asks a person | evidence it works |
+|---|---|---|
+| how hard to look (perception mode) | — | look harder: promise 79% → **84%**, held on unseen test at **86.0%** (lower bound 82.0%) — STUDY-18 |
+| whether its promise applies to this recording | a **full review** when it does not | another sonar: withdrawn in **22 of 22** surveys (one look keeps 23.9% of its pots there); kept for all 3 test recordings — STUDY-19 |
+| which seabed measurement to trust, per chunk | — | fresh 1-h recording: 280 of 280 chunks resolved, 3 of 3 gross tracker failures corrected — STUDY-16 |
+| where pins go and which passes are worth boat time | inspection / recovery routes, each re-survey pass | without Stage 1, 151 of 222 pins leave their own error circle — STUDY-12 |
+| when to stop (budget, nothing left to change) | — | every skip is logged with its reason |
+
+The same goal gives different runs on different data and machines: no recall asked → look harder;
+"≥ 79%" → the cheaper single look; a tight compute budget → the mode is priced with the measured pass
+time, and the run drops to one look mid-way if the pace would overrun; a raw river recording → no
+promise, a full-review request. Every step is in `agent_run` (Agent tab, API, MCP `run_survey`).
 
 ---
 
@@ -169,9 +207,11 @@ shown as evidence with a relative height, never used to accept or reject.
   JSON built after every tier, route and pass is fixed. If Claude on Amazon Bedrock writes it, the text
   is machine-checked (every number and ID must be a survey fact; human-approval / synthetic-GPS /
   assumed-card-time caveats must be present) and replaced by the deterministic template on any failure.
-- **Known limits (stated, not hidden):** one bay's crab pots and one sonar brand; calibration is a
-  single recording (hence the separate verification split); labels are incomplete, so precision is a
-  lower estimate; seconds-per-card is assumed until the user study.
+- **The promise is checked before it is kept** (STUDY-19): a recording that does not look like the
+  calibration recordings loses its promise, with an incident and a full-review request.
+- **Known limits (stated, not hidden):** one region's crab pots and one sonar family; calibration is 3
+  recordings (hence the separate verification split); labels are incomplete, so precision is a lower
+  estimate; seconds-per-card is assumed until the user study.
 
 ---
 
@@ -218,7 +258,8 @@ against labels). The effort curve then reports minutes to the recall promise for
 raw detector list and the DEPTH queue, plus the **break-even card time** (6.88 s for EXP-003 at 20 s/frame) —
 with assumed timings the DEPTH queue costs more than manual review at the promise (65.5 vs 56.3 min),
 and only the study with people decides the real answer. The
-agent's own forecast of "pots these minutes will buy" held on unseen data (84.5 forecast vs 90 real).
+agent's own forecast of "pots these minutes will buy" is biased low on unseen data (EXP-003: 162.5
+forecast vs 209 real at the promise point) — conservative, and reported as such.
 
 **Auditing the labels (`fp_audit.py`).** A blinded audit with catch trials asks whether the
 detector's most confident "false alarms" are really unlabelled objects — giving an exact audited
@@ -229,6 +270,9 @@ precision in that confidence band, with the auditors' own reliability measured.
 ## 7. Mapping to the Agentic-Vision rubric
 
 **Required evidence — "a trace showing OpenCV 5 output changing a later decision/action":**
+every survey's `agent_run` records which OpenCV result changed which decision — the applicability
+statistics withdrawing the promise and filing a full-review request (STUDY-19), the measured pass time
+choosing or downgrading the perception mode, the tile look adding candidates (STUDY-18).
 [`docs/reports/causal_trace.md`](reports/causal_trace.md) (STUDY-12) runs the same survey with each OpenCV output
 withheld and diffs every downstream decision. Without Stage 1's bottom track, 151 of 222 pins land
 outside their own error circle and 4 of 40 re-survey passes regroup (EXP-003, v2b test) (tiers unchanged — it is not a
@@ -238,8 +282,8 @@ and every survey exports its decision log (`mission.trace.jsonl`).
 | Criterion | Weight | Where it's met |
 |---|---:|---|
 | Substantive OpenCV 5 + agent | 30% | the agent's tools *are* OpenCV ops: Stage-1 bottom tracking, `cv2.remap` slant→ground, luminance; `cv2.dnn` detect; re-look + CLAHE; thin-line shadow; water-column check; sensor cross-check re-runs the OpenCV tracker on a conflict. **Proof OpenCV matters:** with Stage 1 removed, 151 of 222 pins leave their error circle (`docs/reports/causal_trace.md`) |
-| Orchestration & autonomy | 25% | stated objective; value-of-information tool use; compute, analyst **and boat** budgets; **sensor cross-check** decides per chunk which sensor to trust, re-tracks and re-fits the range scale with no person (STUDY-16, on by default); stitching; repeat-sighting merge; routes; opposite-side re-survey planning (§3, §6) |
-| Task effectiveness | 20% | a recall promise that **held on unseen test** (≥ 79%, held at 81.1%); honest "no auto-confirm"; cross-check validated on a fresh 1-h recording (2 of 3 pre-registered checks passed; the failure is reported); effort study built, not yet run with people (§4, §6) |
+| Orchestration & autonomy | 25% | **the core loop** (§0): an operator goal; the agent checks its promise applies, chooses its perception mode, watches its compute budget and re-plans mid-run, then plans and asks; value-of-information tool use; compute, analyst **and boat** budgets; **sensor cross-check** decides per chunk which sensor to trust, re-tracks and re-fits the range scale with no person (STUDY-16, on by default); stitching; repeat-sighting merge; routes; opposite-side re-survey planning (§3, §6) |
+| Task effectiveness | 20% | recall promises that **held on unseen test** (≥ 84% looking harder, held at 86.0%; ≥ 79% with one look, held at 81.1%); the promise withdrawn where it would fail silently (another sonar: 22 of 22); honest "no auto-confirm"; cross-check validated on a fresh 1-h recording (2 of 3 pre-registered checks passed; the failure is reported); effort study built, not yet run with people (§4, §6) |
 | Failure handling & human control | 15% | a failed tool never raises: the agent falls back to the detector score and sends the find to a person; failure drills you can run (`?simulate=tool_failed`, `tool_timeout`, `no_detection`); bounded LOW-RISK tier; budgeted REVIEW queue; **person-confirmed loop** re-plans routes from a named person's ✓ / ✕ / recovered; MCP agents can only *ask* (`approvals.py`); missed-pot labels; blinded audit (§5, §6) |
 | User experience | 10% | calm glass studio with five modes (Analyze · Survey · Study · Audit · Connect) and a guided 60-s demo: guarantee badges, evidence cards with the full trace, seabed overlay, map + routes + re-survey passes, person-confirmed recovery route, 3D twin, live effort curve, downloads |
 

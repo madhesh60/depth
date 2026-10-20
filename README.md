@@ -5,11 +5,14 @@
 > **DEPTH** = **D**etect · **E**vidence · **P**rove · **T**riage · **H**azard-map — the pipeline
 > stages spell the name.
 
-An agentic system that finds **derelict fishing gear (ghost pots) and wreck debris in side-scan
-sonar** and turns it into a human-approved cleanup plan. Every find **comes with evidence**; the
-agent's tiers carry **calibrated statistical promises**; it spends compute, analyst minutes and boat
-time only where they can change the outcome; every human decision becomes a training label. It runs
-torch-free on **OpenCV 5**, CPU-only, built for **AWS Graviton + COOL**.
+An agent that finds **derelict fishing gear (ghost pots) and wreck debris in side-scan sonar** and
+turns it into a human-approved cleanup plan. The operator gives it a **goal** — the share of pots that
+must reach a person, and the compute, analyst and boat time it may spend. The agent then **checks that
+its promise applies to this recording**, **chooses how hard to look**, perceives every frame with OpenCV
+5, **re-plans when its own measurements or budgets say so**, and asks a named person before anything is
+dispatched. Every find comes with evidence; every promise is calibrated on held-out recordings and
+verified once on unseen ones; every human decision becomes a training label. It runs torch-free on
+**OpenCV 5**, CPU-only, built for **AWS Graviton + COOL**.
 
 **Competition:** OpenCV AI Competition 2026 (AWS · OpenCV Foundation) · **Team:** Syndicate (solo —
 Madhesh) · **Targets:** Agentic Vision · Best Use of COOL · **License:** AGPL-3.0
@@ -20,7 +23,8 @@ Madhesh) · **Targets:** Agentic Vision · Best Use of COOL · **License:** AGPL
 
 | | number | measured on |
 |---|--:|---|
-| **Recall promise** — pots that reach a person (95% confidence) | **≥ 79%**, held at **81.1%** | fit on held-out recordings, verified once on 199 unseen frames / 264 pots (the test frames that carry a recording ID: Rec8/9/14) |
+| **Recall promise** — pots that reach a person (95% confidence) | **≥ 84%** when the agent looks harder, held at **86.0%** · ≥ 79% with one look, held at 81.1% | fit on held-out recordings, verified once on 199 unseen frames / 264 pots (the test frames that carry a recording ID: Rec8/9/14) — STUDY-18 |
+| **The agent knows when its promise does not apply** | another sonar: promise withdrawn in **22 of 22** surveys, where one look keeps only **23.9%** of pots · kept for all 3 test recordings | STUDY-19, verified once |
 | Crab-pot detector, AP@0.5 · AP@0.5:0.95 | **0.482** (95% CI 0.43–0.55) · 0.165 | v2b test, all 214 unique crab-pot frames / 285 pots |
 | OpenCV's seabed measurement moves the boat | **151 of 222** pins leave their own error circle without it | STUDY-12, v2b test |
 | Stage-1 altitude, port vs starboard (no labels needed) | agree to **1.6 px** (random pairs 5.3 px) | STUDY-08 |
@@ -49,8 +53,8 @@ python -m uvicorn src.dashboard.app:app --port 8000   # open http://localhost:80
 | criterion | where DEPTH shows it |
 |---|---|
 | **Technical execution** — OpenCV 5 doing real work | Stage 1 (bottom track with `cv2.Sobel` / `cv2.blur`, slant→ground `cv2.remap`), YOLO11 through `cv2.dnn`, shadow + re-look evidence; deploy-faithful evaluation with CIs, mAP@0.5:0.95, confusion matrix, PR curves ([`eval_exp003_test.md`](docs/reports/eval_exp003_test.md)); 225 tests; deadlines + fallbacks on every tool |
-| **Agentic Vision** — perception changes the next action | on by default and measured: OpenCV's seabed measurement decides where the pins go (without it 151 of 222 leave their own error circle and 4 of 40 re-survey passes regroup — [`causal_trace.md`](docs/reports/causal_trace.md)); the agent cross-checks that seabed against the depth sounder and re-tracks on a conflict ([`sensor_check.md`](docs/reports/sensor_check.md)); opposite-side passes ranked by information per boat-minute; a person's decline re-plans, an approval issues a work order (§2). Per-frame active vision is built and tested but failed its own validation, so it is off by default ([`evidence_model_exp003.md`](docs/reports/evidence_model_exp003.md)) |
-| **Innovation** | statistical promises on an imperfect detector ([`calibration_exp003.md`](docs/calibration_exp003.md)); the agent cross-checks its own seabed track against the depth sounder ([`sensor_check.md`](docs/reports/sensor_check.md)); shadow-flip prediction for second looks |
+| **Agentic Vision** — perception changes the next action | **the core loop** ([`core.py`](src/agentic/core.py), §2) works toward the operator's goal: OpenCV statistics decide whether its promise applies (withdrawn on another sonar in 22 of 22 surveys, with a full-review request — [`applicability.md`](docs/reports/applicability.md)); it chooses how hard to look (the 2×2 tile look lifts the promise from 79% to 84%, held at 86.0% — [`look_harder.md`](docs/reports/look_harder.md)); it re-plans mid-run when its measured pace would overrun the compute budget. Also on by default and measured: OpenCV's seabed measurement decides where the pins go (without it 151 of 222 leave their own error circle and 4 of 40 re-survey passes regroup — [`causal_trace.md`](docs/reports/causal_trace.md)); the agent cross-checks that seabed against the depth sounder and re-tracks on a conflict ([`sensor_check.md`](docs/reports/sensor_check.md)); opposite-side passes ranked by information per boat-minute; a person's decline re-plans, an approval issues a work order (§2). Per-frame active vision is built and tested but failed its own validation, so it is off by default ([`evidence_model_exp003.md`](docs/reports/evidence_model_exp003.md)) |
+| **Innovation** | statistical promises on an imperfect detector ([`calibration_exp003.md`](docs/calibration_exp003.md)), a goal-driven choice of how hard to look (two calibrated perception modes), and a conformal check that withdraws the promise where it does not apply; the agent cross-checks its own seabed track against the depth sounder ([`sensor_check.md`](docs/reports/sensor_check.md)); shadow-flip prediction for second looks |
 | **Real-world impact** | raw Humminbird recordings with real GPS, routes, budgets, GPX/KML/GeoJSON, OGC API, webhooks, MCP; a severity hook for the review queue (suspended or tall finds weighted up; an operator policy, not yet exercised: no find in the demo data has a measured risk factor) |
 | **UX** | zero-build studio: guided demo, evidence cards with the full agent trace, 3D twin, approvals inbox, failure drills (`?drills`) |
 | **Responsible cloud delivery** | Graviton + COOL deploy, dry-run by default, budgets first, provenance on every result ([`infra/README.md`](infra/README.md)); approver PIN; protected wrecks generalised in public exports ([`responsible_use.md`](docs/responsible_use.md)) |
@@ -64,9 +68,10 @@ wraps one in **promises you can check** and **measurements instead of assumption
 
 | | what DEPTH does | evidence |
 |---|---|---|
-| **Guaranteed tiers** | "≥ 79% of pots reach a human (95% confidence)" — fit on held-out recordings, verified once on unseen test (**held: 81.1%**; the test's own lower bound is 76.7%). It also says what it *cannot* promise (90% recall; any auto-confirm precision). | [`docs/calibration_exp003.md`](docs/calibration_exp003.md) |
+| **Guaranteed tiers, two ways to keep them** | "≥ 79% of pots reach a human (95% confidence)" with one look, **≥ 84%** when the agent looks harder — fit on held-out recordings, verified once on unseen test (**held: 81.1% and 86.0%**; lower bounds 76.7% and 82.0%). It also says what it *cannot* promise (90% recall; any auto-confirm precision). | [`docs/calibration_exp003.md`](docs/calibration_exp003.md) · [`look_harder.md`](docs/reports/look_harder.md) |
+| **Knows when its promise does not apply** | before keeping a promise, the agent compares every frame with the recordings the promise was fit on (OpenCV statistics → conformal p-values). Another sonar: withdrawn in 22 of 22 surveys — there one look keeps only 23.9% of the pots — and a person is asked to approve a full review | [`docs/reports/applicability.md`](docs/reports/applicability.md) |
 | **Stage 1 measures the sonar** | bottom tracking gives the sonar's altitude per ping → relative object height, slant→ground geotags. Validated with no labels: port vs starboard on the same pings agree to **1.6 px** (random pairs: 5.3 px). | [`docs/reports/stage1_canonical.md`](docs/reports/stage1_canonical.md) |
-| **Value-of-information agent** | spends compute only where it can change an outcome (with EXP-003, calibration found a second look cannot change a tier: re-looks did not beat plain confidence, STUDY-07, so it runs one inference per frame and logs each skipped look); orders the human queue by calibrated P(pot); **analyst budget** ("what do 10 minutes buy?") and **boat budget** | trace on every card |
+| **Goal-driven agent** | chooses how hard to look from the goal and the compute budget (the cheapest mode that keeps the goal, else the strongest the budget allows), prices each mode with its measured pace and re-plans mid-run if it would overrun; orders the human queue by calibrated P(pot); **analyst budget** ("what do 10 minutes buy?") and **boat budget**. Per find, a zoomed re-look cannot change a tier with EXP-003 (it did not beat plain confidence, STUDY-07), so it is skipped and the skip is logged | Agent tab · trace on every card |
 | **Active vision** (experimental) | the agent picks its next OpenCV tool by whether the result could change its decision; evidence conflicts trigger another observation — §2. Validation failed, so it is **off by default** and labelled | [`docs/reports/evidence_model_exp003.md`](docs/reports/evidence_model_exp003.md) |
 | **A physical second look** | plans re-survey passes on the **opposite side** at mid-swath, ranked by **information per boat-minute**; each is approved or rejected on its own, and a rejection makes the agent re-plan; each target predicts the bearing its **shadow must flip to** | map + GPX/GeoJSON |
 | **Minutes saved — to be measured** | a timed, counterbalanced user study built into the app (not yet run with people). Under today's *assumed* timings the DEPTH queue costs **more** than manual review at the recall promise (65.5 vs 56.3 min); break-even card time **6.88 s**. We report that instead of an invented "4 h → 10 min" | Study tab · [`docs/reports/effort_curve.md`](docs/reports/effort_curve.md) |
@@ -86,25 +91,50 @@ filter (STUDY-03/04), re-look vs plain confidence (STUDY-07), range-gain detecto
 seam inference across chunk boundaries (STUDY-11b), and a larger input + flipped second view
 (STUDY-13: +0.10 AP on the calibration recording, −0.06 on unseen data).
 
-## 2. The agentic loop — OpenCV result → decision → next action → new evidence → changed plan
+## 2. The agent — a goal, OpenCV tools, and a loop that re-plans on what it sees
 
-**On by default, with evidence:** the seabed cross-check (STUDY-16), the survey planner (Stage-1
-geometry moves pins and passes, STUDY-12) and the human approvals (a decline re-plans, an approval
-issues a work order; both in the test suite). **Per-frame active vision** (below the dashed line) is built and tested, but it failed its own
-validation, so it is off by default and labelled experimental. In default mode the agent still asks of
-every find whether another look could change the decision. With EXP-003 the answer is always no (a
-re-look did not beat plain confidence, STUDY-07), so it runs one inference per frame.
+The core loop ([`src/agentic/core.py`](src/agentic/core.py)) runs every survey, on by default. The
+operator states a **goal**; the agent decides how to meet it and logs every option it weighed (the
+studio's **Agent** tab, `agent_run` in the API, `run_survey` over MCP):
 
 ```
-Sonar frame ─► OpenCV 5: Stage 1 (bottom track, geometry) + YOLO11 via cv2.dnn
-            ─► evidence: water column · shadow · height ─► calibrated tier + P(pot) ─► a person's review queue
-Raw recording ─► OpenCV seabed track vs depth sounder ─► conflict? ─► OpenCV re-tracks ─► range scale re-fit ─► re-check
-Survey ─► pins from the measured geometry ─► opposite-side passes ranked by information per boat-minute
-Person ─► ✓ / ✕ a card or decline a pass ─► the agent re-plans route, queue, budget and passes · approve ─► work order
+Goal ─ recall to keep · compute budget · analyst minutes · boat minutes
+ 1 inspect      usable frames? (corrupt / blank ones skipped and reported)
+    check       does the promise apply here? OpenCV statistics of every frame vs the calibration recordings
+                 └ no ─► withdraw the promise · cheapest look · ask a person to approve a FULL REVIEW
+ 2 decide       how hard to look: standard (≥ 79%, 1 cv2.dnn pass/frame) or look harder (≥ 84%, + 2×2 tiles)
+                 = the cheapest mode that keeps the goal, else the strongest the compute budget allows
+ 3 perceive     every frame: Stage 1 · YOLO11 via cv2.dnn · evidence — and watch the pace:
+                 └ budget would overrun ─► RE-PLAN: standard look for the rest, re-tier the earlier frames
+    sense       raw recording: OpenCV seabed track vs depth sounder ─► conflict ─► re-track ─► re-fit the scale
+ 4 plan         review queue · analyst budget · routes · opposite-side passes ranked by information per boat-minute
+ 5 hand off     one approval request per action ─► a named person decides ─► every decision RE-PLANS
 - - - - - - - - - - - - - - - - experimental, off by default - - - - - - - - - - - - - - - - -
-Per find ─► next OpenCV tool = the cheapest one whose result could CHANGE the action (ACCEPT / REVIEW / WATCH), else stop
-         ─► new evidence ─► belief + action updated ─► conflict? ─► another observation
+Per find ─► next OpenCV tool = the cheapest one whose result could CHANGE the action, else stop (STUDY-15)
 ```
+
+**What the agent decides alone, and what it asks.** It decides how hard to look, whether its promise
+applies, which seabed measurement to trust, where pins go, which passes are worth boat time, and when to
+stop. It never dispatches: inspection and recovery routes, re-survey passes and full reviews are
+**requests** that a named person approves (MCP and API clients can only ask; an approver PIN guards the
+decision). Each decision re-plans the route, queue, budget and passes.
+
+**Does it work? Every agent decision below was validated before it was switched on** (protocol committed
+before the unseen data was scored):
+
+| decision (on by default) | evidence |
+|---|---|
+| **look harder** to keep a stronger promise | promise 79% → **84%**; on unseen test 81.1% → **86.0%** (lower bound 82.0%), cards / frame 2.68 → 3.86 — [`look_harder.md`](docs/reports/look_harder.md) (STUDY-18) |
+| **withdraw the promise** where it does not apply | another sonar: withdrawn in 22 of 22 surveys (one look keeps 23.9% of its pots there); kept for all 3 test recordings and the demo frames — [`applicability.md`](docs/reports/applicability.md) (STUDY-19) |
+| **re-measure the seabed** when image and sounder disagree | fresh 1-h recording: 280 of 280 chunks resolved, 3 of 3 gross tracker failures corrected; one registered criterion failed and is reported — [`sensor_check.md`](docs/reports/sensor_check.md) (STUDY-16) |
+| **put pins where the measured geometry says** | without Stage 1, 151 of 222 pins leave their own error circle — [`causal_trace.md`](docs/reports/causal_trace.md) (STUDY-12) |
+| re-plan on a person's decision | in the test suite: a decline drops the pass and re-ranks boat time; an approval issues a work order |
+
+The same goal produces different runs: with no recall asked for, the agent looks harder (≥ 84%); asked
+for ≥ 79% it takes the cheaper single look; with a tight compute budget it prices both modes with its
+measured pace and drops to one look, mid-run if needed; on the raw river recordings it withdraws the
+promise and asks for a full review. **Per-frame active vision** (below the dashed line) is built and
+tested, but it failed its own validation, so it stays off by default and labelled experimental.
 
 | feature | what the agent does | where |
 |---|---|---|
@@ -151,7 +181,9 @@ python -m src.cv_pipeline.humminbird fetch            # optional: a raw recordin
 python -m uvicorn src.dashboard.app:app --port 8000   # open http://localhost:8000
 ```
 
-Press **▶ 60-s demo** in the top bar for a guided walk through everything below, or explore the modes (plus a 3D twin view):
+Press **▶ 60-s demo** in the top bar for a guided walk through everything below, or explore the modes (plus a 3D twin view).
+In **Survey**, the *Goal* selector sets the recall the agent must keep (default: the strongest it can) and
+*Options → Compute budget* gives it a time limit; the **Agent** tab shows how it decided:
 * **Analyze** — pick a sample frame → *Run See → Prove → Decide*: the tracked seabed, verdict-coloured
   boxes, an evidence card per find (tier promise, P(pot), shadow, relative height, full agent trace),
   the agent's-eye re-look view; label finds, or draw a **missed pot** (`M`).
@@ -205,9 +237,11 @@ recordings ([`docs/reports/exp005_diagnosis.md`](docs/reports/exp005_diagnosis.m
 | crab pots on **sonar** — AP@0.5 / recall | **0.473 / 0.599** — the number that matters |
 | recall ceiling on unseen recordings (any proposal ≥ 0.05) | 0.72 (Rec19) – 0.86 (Rec3/4/6/10) |
 
-**Agent** — recall promise **≥ 79%** with EXP-003 (fit on the validation recordings, held on test at
-81.1%, lower bound 76.7%; EXP-001's was ≥ 65%); nothing auto-confirmed (no precision promise is
-supportable); 1 inference/frame (re-look did not beat confidence on unseen data; the old
+**Agent** — recall promise **≥ 84%** when it looks harder (2×2 tile pass, 5 inferences/frame; held on
+test at 86.0%, lower bound 82.0%) and **≥ 79%** with one look (held at 81.1%, lower bound 76.7%;
+EXP-001's was ≥ 65%), both fit on the validation recordings; the promise is withdrawn on recordings
+that do not look like them (another sonar: 22 of 22 surveys). Nothing auto-confirmed (no precision
+promise is supportable); the per-candidate re-look did not beat confidence on unseen data (the old
 test-tuned "CONFIRMED 0.737" is 0.58 unseen — retired).
 
 **Runtime (laptop x86, stock OpenCV 5, full product path, EXP-003):** 252 ms/frame p50 (network ≈ 92%;
@@ -257,6 +291,8 @@ python -m src.detection.study_scale_tta             # STUDY-13: input size + fli
 python -m src.cv_pipeline.humminbird report         # STUDY-14: raw recording, real GPS
 python -m src.agentic.evidence_model                # STUDY-15: evidence LRs (val) → test → fresh split
 python -m src.agentic.study_sensor                  # STUDY-16: seabed track vs depth sounder
+python -m src.agentic.study_look_harder --verify    # STUDY-18: look harder (calibration -> test once)
+python -m src.agentic.study_applicability --verify  # STUDY-19: does the promise apply? (fit -> verify once)
 
 # STUDY-12: the counterfactual trace on up to 80 v2b test frames
 python -m src.agentic.study_causal \
@@ -275,9 +311,10 @@ Datasets are git-ignored (large); their builders are in `DATASET/scripts/`
 src/cv_pipeline/  Stage 1 (canonical.py) · raw Humminbird reader (humminbird.py) · retired ROI gate (STUDY-01)
 src/detection/    cv2.dnn detector, calibration, evaluation, training, onboarding (+ speed gate), model fetch,
                   false-alarm audit, failure gallery, STUDY-11b / 13
-src/agentic/      See→Prove→Decide→Act agent, sensor cross-check (STUDY-16), active vision (active,
-                  evidence_model, counterfactual), guarantees, geo, routes, re-survey, person-confirmed loop,
-                  approvals, mission brief, 3D twin, provenance, labels, study, effort, STUDY-12
+src/agentic/      the core loop (core.py: goal -> check the promise -> choose how hard to look -> perceive ->
+                  plan -> ask), the frame agent, applicability (STUDY-19), look harder (STUDY-18), sensor
+                  cross-check (STUDY-16), active vision (active, evidence_model, counterfactual), guarantees,
+                  geo, routes, re-survey, approvals, mission brief, 3D twin, provenance, labels, study, effort
 src/bench/        COOL benchmark (product workload, provenance, comparison, COOL receipt)
 src/dashboard/    FastAPI service (jobs, limits, rate limits, metrics) · MCP server · OGC API · webhooks
 webui/            zero-build studio (+ three.js twin) · embed/depth-embed.js (drop-in panel) · 8 sample frames
