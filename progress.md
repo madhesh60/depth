@@ -5,7 +5,7 @@ This is the living status of the project. Update it at the end of every working 
 what moved, what's blocked, what's next. Newest entries at the top of §4.
 
 **Related:** [`README.md`](README.md) · [`architecture.md`](architecture.md) ·
-[`experiments.md`](experiments.md) · [`TODO.md`](TODO.md)
+[`experiments.md`](experiments.md)
 
 ---
 
@@ -15,14 +15,10 @@ what moved, what's blocked, what's next. Newest entries at the top of §4.
 |---|---|
 | 2026-08-13 | Proposal submission window opened |
 | 2026-08-26 | Build phase begins |
-| **2026-09-18** | **Today — foundation / planning** |
-| 2026-09-21 → 10-02 | **Grant check-in** (30-min Zoom, required to unlock 2nd 50% of grant) |
+| 2026-09-21 → 10-02 | Grant check-in (30-min Zoom, required to unlock 2nd 50% of grant) |
 | 2026-10-26 23:59 PT | **Final submission deadline** |
 | 2026-10-27 → 11-09 | Judging |
 | 2026-11-10 | Winners announced (OpenCV Live!) |
-
-> **~5.5 weeks of build time remain.** The grant check-in is imminent — a concise,
-> credible progress story is needed for it (see §5).
 
 ---
 
@@ -31,49 +27,74 @@ what moved, what's blocked, what's next. Newest entries at the top of §4.
 | Milestone | Status | Notes |
 |---|---|---|
 | Grant awarded ($150) | ✅ Done | Secured. 2nd half unlocked at check-in. |
-| Proposal (AGENT.md) | ✅ Done | Source of record. |
+| Proposal (AGENT.md) | ✅ Done | Proposal of record; the as-built design (`architecture.md`) supersedes it where they differ. |
 | Dataset built (v0, 32,981 imgs) | ✅ Done | 7 sources remapped to 5 classes; split 30444/1263/1274. |
 | Dataset audit | ✅ Done | Issues catalogued in `docs/dataset_report.md`. |
-| Project docs (this set) | ✅ Done | README / architecture / progress / experiments / TODO. |
+| Project docs | ✅ Done | README · architecture · progress · experiments · `docs/` (map: `docs/README.md`). |
 | Dataset fixes (v1) | ✅ Done | Clean split built: 0 leakage, full-frame boxes removed, 1,099 background negatives, 4-class taxonomy locked. `03_yolo_ready_dataset_v1/`. |
-| **Dataset v2 (honest, sonar-only)** | ✅ Done | `build_dataset_v2.py`: 2-class (`ghost_gear`+`wreck_debris`), fixes 3 WINNING_REPORT data bugs (mpulse full-frame mislabel dropped, 1,547 empty crab-pot frames recovered, optical dropped, UATD held out). train 6,291 / val 626 / test 469, leakage 0/0/0, official crab-pot 398-test LOCKED. **EXP-002 trains on this.** |
-| OpenCV 5 (rule 1) | ✅ Done | Env on **5.0.0.93** (was 4.12); requirements split + pinned exactly; 27/27 tests pass; `/api/health` reports it. |
+| Dataset v2 (honest, sonar-only) | ✅ Done | `build_dataset_v2.py`: 2-class (`ghost_gear`+`wreck_debris`), fixes 3 data bugs from the initial review (mpulse full-frame mislabel dropped, 1,547 empty crab-pot frames recovered, optical dropped, UATD held out). train 6,291 / val 626 / test 469, leakage 0/0/0, official crab-pot 398-test LOCKED. |
+| **Dataset v2b** | ✅ Done | `build_dataset_v2b.py`: 2-class, sonar-only, one copy per Roboflow frame; val = held-out recordings Rec10/12/16; test = 214 unique crab-pot frames, plus `test_official398/` (GhostVision head-to-head) and `test_xsonar/` (cross-sonar). **EXP-002 to EXP-005 train on it.** |
+| OpenCV 5 (rule 1) | ✅ Done | Env on **5.0.0.93** (was 4.12); requirements split + pinned exactly; `/api/health` reports it. |
 | Stage 1 classical CV | ✅ Done (reframed twice) | **2026-09-24: in the product path as sonar canonicalisation** (`canonical.py`, STUDY-08: bottom-tracked altitude validated port-vs-starboard 1.6 px; ground range → geotag; ~5 ms/frame). Earlier: **Reframed** (STUDY-01): not a Stage-2 ROI gate (no discriminative power on this sonar) — now the CPU **sonar-preprocessing workload** for the COOL benchmark. `src/cv_pipeline/` + 3-way harness. Local x86: 29 ms/frame, 30.5 FPS. Needs Graviton+COOL run. |
 | Stage 1→2 wiring (cv2.dnn) | ✅ Done | `infer.py` (ONNX via `cv2.dnn`, full_frame + roi_guided) + `ablation_fp.py` + `tune_coverage.py`. ONNX verified loading/forward. |
-| Stage 2 baseline train | ✅ Done | EXP-001 (yolo11s detect, v1, Kaggle T4): test mAP@0.5 **0.822**, P 0.808, R 0.800 — all targets met. |
-| Evaluation + ablation | ✅ Done (EXP-001) | `evaluate.py` (deploy-faithful cv2.dnn): val-tuned thresholds/test-once, per-sensor & per-source tables, bootstrap CIs → `docs/eval_exp001.md` (STUDY-05). Aggregate 0.827 reproduces 0.822; honest sonar `fishing_gear` AP 0.473. GhostVision head-to-head pending EXP-002. |
+| Stage 2 baseline train | ✅ Done | EXP-001 (yolo11s detect, v1, Kaggle T4): test mAP@0.5 0.822, inflated by an optical-only class; sonar crab-pot AP@0.5 **0.473** (STUDY-05). Superseded by EXP-003. |
+| **Deployed detector** | ✅ Done | EXP-003 (YOLO11s, 640 px, v2b, 2 classes; default since 2026-10-06; Release `exp003-v1`): crab-pot AP@0.5 **0.482** (95% CI 0.43–0.55), mAP@0.5 0.319 on v2b test — the proposal's 0.70 is **not met**. Five later runs (EXP-003f, 004, 004g, 005, 005a) did not beat it. |
+| Evaluation + ablation | ✅ Done | `evaluate.py` (deploy-faithful cv2.dnn): val-tuned thresholds/test-once, per-sensor & per-source tables, bootstrap CIs, mAP@0.5:0.95, confusion matrix, PR curves (`docs/eval_exp003_test.md`). GhostVision head-to-head on the official 398-frame split: F1 0.41 vs their reported 0.71–0.73. |
 | Reporting engine | ✅ Done | `src/agentic/{geo,mission}.py`: honest geotag + GeoJSON/GPX/KML/CSV/JSON exports. |
 | Dashboard | ✅ Done | Zero-build static web app (`webui/`), served by FastAPI; hardened (job queue, per-frame model lock, upload limits, shipped samples, vendored Leaflet). See→Prove→Decide→Act stepper, evidence cards (conf→relook), agent trace, Leaflet hazard map + recovery route, downloads, honesty banners. Verified under uvicorn. |
 | AWS deployment | 🟡 Partly run | One stack, `infra/cfn/depth.yaml` via `infra/deploy.sh` (dry run by default): c8g COOL AMI + CloudFront + S3 + alarms. 2026-10-19: everything except CloudFront created (the account needs AWS Support verification first, so `EnableCdn=false` for now). The COOL subscription is still pending, so a rehearsal runs on stock Ubuntu. |
-| **COOL benchmark (Arm vs x86)** | 🟡 Tooling done, EC2 runs pending | Product-workload benchmark (`src/bench/`, `infra/bench_cool.sh`): per stage, threads pinned, $/survey-hour, COOL provenance. Local x86 reference: 238 ms/frame p50, RTF 0.012. |
-| Agentic loop (See→Prove→Decide→Act) | ✅ Done | **Primary Agentic-Vision entry.** All 4 stages + an **adaptive escalation controller** (STUDY-04) + live dashboard. Two calibrated CONFIRMED paths (re-look ⋃ high-confidence → precision **0.737 @ 30% recall**), cross-pass corroboration, 6-tool toolbox, full audit trace, human-gated. `src/agentic/` + `webui/`; 30/30 tests. Remaining is *deployment* (AWS/COOL), not the brain. |
-| Submission package (report + video) | ⬜ Not started | Due 2026-10-26. |
+| **COOL benchmark (Arm vs x86)** | 🟡 Stock EC2 done, COOL pending | Product-workload benchmark (`src/bench/`, `infra/golive.sh`): per stage, threads pinned, $/survey-hour, COOL provenance. 2026-10-20, stock OpenCV 5, 4 threads: c8i.xlarge x86 **157 ms/frame**, c8g.xlarge Graviton4 **197 ms**. The COOL runs wait on the Marketplace subscription (`PHASE=cool ./infra/golive.sh`). |
+| Agentic loop (See→Prove→Decide→Act) | ✅ Done | **Primary Agentic-Vision entry.** Guaranteed tiers (recall promise ≥ 79%, held at 81.1% on test; nothing auto-confirmed), value-of-information agent, sensor cross-check (STUDY-16), opposite-side re-survey passes, person-confirmed loop, MCP / OGC / webhooks. Active vision is built but off by default: its validation failed (STUDY-15). |
+| Human studies | ⬜ Needs people | The timed user study (Study tab) and the blinded false-alarm audit (Audit tab) are built; neither has run with people yet. |
+| Submission package (report + video) | 🟡 In progress | Technical report (`docs/technical_report.md`) and video script (`docs/video_script.md`) drafted; the COOL numbers, the Lucidchart diagram and the recording remain. Due 2026-10-26. |
 
 Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ---
 
-## 3. Current state (2026-09-18)
+## 3. Current state (2026-10-20)
 
-**What exists**
-- Grant secured; proposal finalised (`AGENT.md`).
-- Dataset v0 built and audited: `DATASET/03_yolo_ready_dataset/data.yaml` is the training
-  entry point. Build scripts frozen in `DATASET/archive_scripts/` (idempotent).
-- Pinned dependencies (`requirements.txt`).
-- Full project documentation set created (this commit).
+- **Working end to end:** the studio and the agent on CPU with OpenCV 5 — Stage 1, the EXP-003 detector
+  through `cv2.dnn`, evidence, guaranteed tiers, survey planning and person-approved actions — on the
+  sample frames and on a raw Humminbird recording with real GPS. 225 tests pass (CI on every push);
+  `ruff check .` is clean.
+- **Waiting on AWS:** the Graviton + COOL runs (the Marketplace subscription is with AWS Support) and
+  CloudFront (account verification). The stock EC2 benchmarks and the demo-server load test are done.
+- **Needs people:** the timed user study and the blinded false-alarm audit.
+- **Left for submission:** the final COOL numbers in the report and the README, the Lucidchart diagram,
+  the video.
+- **Environment:** global Python 3.10 (no venv). Runtime pinned in `requirements.txt` (OpenCV 5.0.0.93);
+  tests and lint in `requirements-dev.txt`; training on Kaggle (`requirements-train.txt`). AWS CLI v2,
+  profile `hackathon`, us-east-1.
 
-**What does not exist yet**
-- No `src/`, `infra/`, or `tests/` code — greenfield.
-- Dataset v0 has **known blockers** (see §6) that must be fixed before the first real train.
-- AWS CLI not installed; no cloud resources provisioned; COOL not yet exercised.
-
-**Environment**
-- Global Python 3.10 (no venv). `torch`, `torchvision`, `opencv-python`, `numpy`,
-  `PyYAML`, `Pillow` present. `pip install -r requirements.txt` adds the rest.
+Current numbers, each with its split: README "At a glance" and
+[`docs/technical_report.md`](docs/technical_report.md).
 
 ---
 
 ## 4. Session log
+
+### 2026-10-20 (sweep 66) — repository cleanup: structure, commands, lint
+
+- **Structure:** the working notes moved to `docs/notes/` (the initial review, formerly `WINNING_REPORT.md`; the
+  competition rules; the Claude Code playbook; the Colab baseline; outreach). `TODO.md` (stale since 2026-10-06),
+  the two UI mockups and `.claude/launch.json` left git (`.claude/` is now ignored). 21 broken links repaired;
+  `docs/README.md` now maps every document.
+- **Commands:** every documented `python -m …` command was checked against its parser. Fixed: `study_sensor`'s
+  docstring (it has no `--fresh-only`), CLAUDE.md's notebook name (`exp005_kaggle.ipynb`), and the two STUDY-03/04
+  reproduce lines, now pinned to the commits where `calibrate --frames` existed. Command blocks in the README,
+  CLAUDE.md, the technical report and the Kaggle / release docs: one comment column, long commands split with
+  `\`, at most 110 characters per line.
+- **Lint:** `ruff check .` is clean (was 201 findings). 111 `a; b` lines split (AST-identical, checked per file),
+  unused imports and variables removed, ambiguous `l` names renamed, late `import sys` moved into the import
+  block. `pyproject.toml` holds the ruff configuration (E731 lambdas allowed; E402 allowed in tests);
+  `ruff==0.15.17` is pinned in `requirements-dev.txt`. The Kaggle notebook was regenerated from its generator.
+- **Docs truth:** test count 205 → 225 (README, technical report); README §6 and §7 complete (STUDY-16, lint,
+  `tests/`, `benchmarks/`, `notebooks/`, `DATASET/scripts/`). This file's status (§1–§3) is current as of today;
+  the stale §5–§7 (September talking points, pre-training blockers, EXP-001 metrics) were dropped: the current
+  numbers live in the README and the technical report.
+- **Local only (not in git):** caches deleted; scratch (`_shots/`, `.shots/`, `_work/`, `_to_delete/`,
+  `data_exp001.yaml`, `yolo11s.pt`) sent to the Windows Recycle Bin. Full suite: 225 passed.
 
 ### 2026-10-20 (sweep 65) — code readability pass against the Agentic Vision rubric
 
@@ -862,7 +883,7 @@ Every finding was re-measured before anything changed; all held.
 - Technical report: **proposal targets vs delivered** stated plainly (crab-pot AP 0.473 < 0.70; 3.9 FPS
   < 5, and why survey-hours are the right yardstick: 43 s per hour of sonar); STUDY-13 added; test count
   + fetch step updated.
-- `docs/outreach.md`: two email drafts (quote + a recording with real GPS) and who to send them to —
+- `docs/outreach.md` (now `docs/notes/outreach.md`): two email drafts (quote + a recording with real GPS) and who to send them to —
   for the owner to send; nothing is sent from here.
 
 ### 2026-09-28 (sweep 30) — Reproducibility: model fetch + CI
@@ -1519,7 +1540,7 @@ Start of the NEEDTOIMPROVE review sweep (M-3 + part of I-5/I-6).
   STUDY-03 CONFIRMED precision), calibrated honestly on the test split (STUDY-04). Then AWS/COOL.
 
 ### 2026-09-23 (cont.4) — WINNING_REPORT critical fixes: OpenCV 5 pinned; dataset v2 (honest, sonar-only)
-- **Acted on `docs/WINNING_REPORT.md`** (the full strategic audit). This session cleared the two
+- **Acted on `docs/WINNING_REPORT.md`** (now `docs/notes/initial_review.md`; the full strategic audit). This session cleared the two
   rule-/model-critical blockers it flagged, before spending any more Kaggle hours on the buggy v1.
 - **OpenCV 5 for real (rule 1).** Local env moved off OpenCV 4.12 → **5.0.0.93** (removed the stale
   dual `opencv-python`/`-headless` 4.x install; `cv2.dnn` present; Intel IPP here, KleidiCV is the
@@ -1748,58 +1769,3 @@ Start of the NEEDTOIMPROVE review sweep (M-3 + part of I-5/I-6).
   scan (0), 1,099 background negatives, 4-class taxonomy locked (`rope_line` stays merged).
   Added `visualize_labels.py` (QA renders in `DATASET/exports/qa_*`).
 - **Next:** eyeball QA renders → Stage 1 CV (`src/cv_pipeline/`) → baseline train EXP-001 on v1.
-
----
-
-## 5. Grant check-in talking points (Sep 21 – Oct 2)
-
-Keep it concrete and honest:
-1. **Problem & impact** — ghost-net detection from side-scan sonar; 4–8h manual review → minutes.
-2. **Dataset** — 7 sources → cleaned, leakage-free **v1: ~29k images** (26,533 train incl.
-   1,120 background / 1,204 val / 1,276 test), 4-class, audited with a regenerable report.
-3. **Architecture** — OpenCV 5 pipeline; Stage 1 classical CV is the **COOL benchmark workload**
-   on Graviton (vs x86); YOLO11 does full-frame detection (EXP-001 mAP@0.5 0.822). Classical
-   ROI-gating was tested and retired as a documented negative result (STUDY-01).
-4. **Plan to deadline** — phased execution in `TODO.md`; primary path is Best Use of COOL.
-5. **Evidence of active development** — this documentation set + dataset audit + committed repo.
-
----
-
-## 6. Known blockers (must clear before first real training run)
-
-Re-derived from the verified audit ([`docs/dataset_report.md`](docs/dataset_report.md),
-`python DATASET/scripts/audit_dataset.py`). The earlier polygon/5-class blockers are
-**resolved** — the dataset was reprocessed (polygons→boxes, `rope_line` merged into
-`fishing_gear`, collapsed to 4 classes).
-
-| # | Blocker | Status |
-|---|---|---|
-| B1 | Cross-split leakage | ✅ Resolved — v1 split by source frame; re-audit 0/0/0 |
-| B2 | 1,258 full-frame boxes | ✅ Resolved — dropped in v1 (audit: 0 remain) |
-| B3 | Tiny boxes | ✅ Handled — degenerate dropped; small-plausible kept + flagged for QA |
-| B4 | Class imbalance (`fishing_gear` ≈ 11.7× `pipe_cylinder`) | 🟡 Open — training-time (weights/focal/aug), not a data defect |
-| B5 | Taxonomy decision | ✅ Resolved — **4-class**, `rope_line` merged into `fishing_gear` |
-| B6 | AWS CLI not installed | 🟡 Open — blocks cloud + COOL work |
-
-Details and fixes tracked in [`TODO.md`](TODO.md) Phase 1 & Phase 4.
-
----
-
-## 7. Metrics dashboard (fill as results arrive)
-
-| Metric | Target | Current | Δ |
-|---|---|---|---|
-| mAP@0.5 | ≥ 0.70 | **0.822** (EXP-001) | +0.122 ✅ |
-| mAP@0.5:0.95 | ≥ 0.45 | **0.514** (EXP-001) | +0.064 ✅ |
-| Precision | ≥ 0.80 | **0.808** (EXP-001) | +0.008 ✅ |
-| Recall | ≥ 0.70 | **0.800** (EXP-001) | +0.100 ✅ |
-| `fishing_gear` recall (watch) | ≥ 0.70 | sonar **0.599** @val-tuned 0.15 (STUDY-05, test-once); 0.47@0.25→0.69@0.10 | 🟡 |
-| `fishing_gear` AP@0.5 (sonar) | — | **0.473** [CI 0.42–0.51] (STUDY-05) — the honest product number | 🟡 |
-| Agent CONFIRMED-tier precision | > raw | **0.737** @ 30% recall-share vs 0.60 raw (STUDY-04) | +0.14 ✅ |
-| ~~FP reduction (Stage 1)~~ | ~~≥ 60%~~ | **retired** (STUDY-01: gating costs recall) | — |
-| Latency / frame (Stage 2, T4) | < 300 ms | ~11.5 ms (EXP-001) | ✅ |
-| Throughput (Stage 2, T4) | ≥ 5 FPS | ~87 FPS (EXP-001) | ✅ |
-| COOL: Graviton vs x86 latency | measured | — | — |
-
-_Link each filled row to the `EXP-NNN` that produced it. Note: aggregate targets met, but
-`fishing_gear` (mission-critical) recall is the open gap._
