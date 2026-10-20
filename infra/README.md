@@ -126,6 +126,10 @@ to back + 1 survey, health p95 ≤ 1 s): `python -m src.bench.load_test https://
 
 ## Deploy checklist
 
+Shortcut for the rest of the AWS work: `PHASE=now APPLY=1 ./infra/golive.sh` (benchmarks A + B and the load
+test, no COOL needed), then `PHASE=cool APPLY=1 ./infra/golive.sh` the moment the COOL subscription goes
+through (COOL AMI → verified receipt → benchmarks C + D → load test → `docs/cool_benchmark.md`).
+
 1. `aws login --profile hackathon`; subscribe to the COOL Graviton4 listing in AWS Marketplace.
 2. `ALERT_EMAIL=… ./infra/deploy.sh` → read the change set → `APPLY=1 ALERT_EMAIL=… ./infra/deploy.sh`.
 3. Confirm the SNS email. `python -m src.bench.verify_cool https://<demo>` → VERIFIED.
