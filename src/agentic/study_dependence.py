@@ -49,6 +49,7 @@ import json
 import re
 import sys
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 
@@ -163,7 +164,8 @@ def two_stage(blocks: dict[str, np.ndarray], reps: int = B, seed: int = SEED) ->
 def a1(rows: list[dict], tau: float) -> dict:
     k, n = recall(rows, tau)
     p = k / n
-    out = {"tau": tau, "pots": n, "reached": k, "recall": round(p, 4), "cp_lcb": round(cp_lcb(k, n), 4), "blocks": {}}
+    out: dict[str, Any] = {"tau": tau, "pots": n, "reached": k, "recall": round(p, 4), "cp_lcb": round(cp_lcb(k, n), 4),
+                           "blocks": {}}
     for b in BLOCKS:
         bl = blocks_of(rows, tau, b)
         r = block_bootstrap(bl)
@@ -252,7 +254,7 @@ def report(model: str, res: dict) -> str:
 
 
 # ---------------------------------------------------------------------------------------- main
-def main():
+def main() -> None:
     ap = argparse.ArgumentParser(description="STUDY-21: does the recall promise survive correlated frames?")
     ap.add_argument("--model", default=DEFAULT_MODEL)
     ap.add_argument("--write", action="store_true", help="apply rule R1 to calibration.json (only if it restates)")
@@ -273,10 +275,11 @@ def main():
         lcb = x["blocks"][BLOCKS[-1]]["lcb"]
         stands = lcb >= promise - 1e-9
         restated = promise if stands else float(np.floor(lcb * 100 + 1e-9) / 100)
-        m = {"promise": promise, "a1": x, "r1": "stands" if stands else f"restated to ≥ {_pct(restated)}",
-             "restated_promise": None if stands else restated,
-             "per_recording": {s: per_recording(rows[s], tau, restated) for s in rows},
-             "loro": loro(rows["calibration"])}
+        m: dict[str, Any] = {"promise": promise, "a1": x,
+                             "r1": "stands" if stands else f"restated to ≥ {_pct(restated)}",
+                             "restated_promise": None if stands else restated,
+                             "per_recording": {s: per_recording(rows[s], tau, restated) for s in rows},
+                             "loro": loro(rows["calibration"])}
         res["modes"][name] = m
         below = [f"{r['recording']} {_pct(r['recall'])}" for s in rows for r in m["per_recording"][s]
                  if not r["meets_promise"]]

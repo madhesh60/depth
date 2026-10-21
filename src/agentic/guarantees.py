@@ -83,7 +83,7 @@ def default_grid(lo: float = 0.0, hi: float = 1.0, n: int = 201) -> np.ndarray:
     return np.round(np.linspace(lo, hi, n), 4)
 
 
-def tau_review(pot_scores: Sequence[float], alpha: float = 0.10, delta: float = 0.05,
+def tau_review(pot_scores: "Sequence[float] | np.ndarray", alpha: float = 0.10, delta: float = 0.05,
                grid: Optional[Iterable[float]] = None) -> Optional[float]:
     """Highest threshold that still guarantees miss-rate ≤ α (scan low → high, stop at first failure).
 
@@ -121,13 +121,13 @@ def tau_confirm(cand_scores: Sequence[float], cand_tp: Sequence[bool], target: f
     return best
 
 
-def achievable_recall(pot_scores: Sequence[float], tau: float, delta: float = 0.05) -> float:
+def achievable_recall(pot_scores: "Sequence[float] | np.ndarray", tau: float, delta: float = 0.05) -> float:
     """The recall that CAN be promised at threshold ``tau``: 1 - CP upper bound on the miss rate."""
     s = np.asarray(pot_scores, float)
     return 1.0 - cp_upper(int(((s < tau) | (s <= 0.0)).sum()), len(s), delta)
 
 
-def best_recall_guarantee(pot_scores: Sequence[float], floor: float, delta: float = 0.05,
+def best_recall_guarantee(pot_scores: "Sequence[float] | np.ndarray", floor: float, delta: float = 0.05,
                           step: float = 0.01) -> tuple[float, Optional[float]]:
     """Honest fallback: the smallest α (on a ``step`` grid) whose promise holds at the lowest
     threshold ``floor``, and the highest threshold that still keeps it. Returns (1-α, τ_review)."""

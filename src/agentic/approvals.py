@@ -102,11 +102,12 @@ class ApprovalStore:
         if len(rationale) < 8:
             raise ApprovalError("a rationale is required (why should a person approve this?)")
         targets = [str(t)[:24] for t in (targets or [])][:200]
-        ev = {"type": "request", "id": f"AR-{uuid.uuid4().hex[:8]}", "t": time.time(),
+        rid = f"AR-{uuid.uuid4().hex[:8]}"
+        ev = {"type": "request", "id": rid, "t": time.time(),
               "survey_id": str(survey_id)[:80], "action": action, "targets": targets,
               "rationale": rationale[:2000], "requested_by": str(requested_by)[:60], "channel": str(channel)[:20]}
         self._append(ev)
-        return self.get(ev["id"])
+        return self._current(rid)
 
     def decide(self, rid: str, decision: str, by: str, note: str = "", pin: Optional[str] = None) -> dict:
         if not pin_ok(pin):
@@ -123,7 +124,7 @@ class ApprovalStore:
             raise ApprovalError(f"{rid} is already {cur['status']}")
         self._append({"type": "decision", "id": rid, "t": time.time(), "decision": decision,
                       "by": by[:60], "note": (note or "")[:1000]})
-        return self.get(rid)
+        return self._current(rid)
 
     def withdraw(self, rid: str, reason: str, by: str = "DEPTH agent") -> dict:
         """The requester retracts a PENDING request (e.g. the agent re-planned and the route it asked
@@ -135,7 +136,14 @@ class ApprovalStore:
             raise ApprovalError(f"{rid} is already {cur['status']}")
         self._append({"type": "withdrawn", "id": rid, "t": time.time(), "by": str(by)[:60],
                       "note": (reason or "")[:1000]})
-        return self.get(rid)
+        return self._current(rid)
+
+    def _current(self, rid: str) -> dict:
+        """The state of a request this store has just written (it is always there: the log is append-only)."""
+        r = self.get(rid)
+        if r is None:                                             # pragma: no cover - a write that did not land
+            raise KeyError(rid)
+        return r
 
     # -- read ------------------------------------------------------------------------------------
     def _replay(self) -> dict[str, dict]:

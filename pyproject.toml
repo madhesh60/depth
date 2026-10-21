@@ -18,6 +18,16 @@ extend-select = ["B"]
 # (pyupgrade's UP rules are not adopted: they would rewrite every Optional[...] annotation.)
 ignore = ["E731", "B008", "B023", "B905"]
 
+[tool.mypy]
+# Type-check the agent's decision core (the goal loop, the tiers and their statistics, approvals, the
+# applicability and correlated-frames checks, the analyze queue, the public-mode guard, calibration loading).
+python_version = "3.10"
+ignore_missing_imports = true
+follow_imports = "silent"
+files = ["src/agentic/core.py", "src/agentic/policy.py", "src/agentic/guarantees.py", "src/agentic/approvals.py",
+         "src/agentic/applicability.py", "src/agentic/study_dependence.py", "src/dashboard/detector_queue.py",
+         "src/dashboard/origin_guard.py", "src/detection/calibration.py"]
+
 [tool.ruff.lint.per-file-ignores]
 # Test modules put the repository root on sys.path before importing src.
 "tests/*" = ["E402"]

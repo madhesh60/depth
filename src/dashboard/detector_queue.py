@@ -20,7 +20,7 @@ from typing import Iterator
 class DetectorQueue:
     """Expected seconds of every analyze call in flight (registered with :meth:`call`)."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._lock = threading.Lock()
         self._calls: dict[int, float] = {}
         self._ids = itertools.count()

@@ -130,6 +130,7 @@ python -m uvicorn src.dashboard.app:app --port 8000    # the studio (Analyze/Sur
 pytest -q                                              # 281 tests; coverage 60% of src/ (85% runtime)
 python tests/ui_smoke.py                               # headless Chrome drives every studio mode (0 JS errors)
 python -m ruff check .                                 # lint (config: pyproject.toml)
+python -m mypy                                         # type check the decision core (files: pyproject.toml)
 python -m src.detection.fetch_model                    # detector weights (SHA-256 checked)
 python -m src.dashboard.mcp_server                     # MCP over stdio
 

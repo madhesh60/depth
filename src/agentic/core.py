@@ -34,7 +34,7 @@ from __future__ import annotations
 import time
 from contextlib import nullcontext
 from dataclasses import asdict, dataclass, field
-from typing import Callable, Optional
+from typing import Any, Callable, Optional
 
 from src.detection.calibration import load_calibration
 from .applicability import Reference, frame_stats
@@ -104,25 +104,25 @@ def choose_mode(goal: Goal, modes: list[Mode], n_frames: int,
     the queue (budget mode reviews the likeliest cards first), so it is reported as the share of the
     queue it covers. With no recall asked for, the agent keeps the strongest promise the compute budget
     allows — a missed ghost pot keeps fishing, so recall is what the promise protects."""
-    opts = []
+    opts: list[dict[str, Any]] = []
     for m in modes:
         cards = None if m.cards_per_frame is None else m.cards_per_frame * n_frames
         minutes = None if cards is None else cards * goal.sec_per_card / 60.0
         comp = None if ms_per_pass is None else m.passes * n_frames * ms_per_pass / 1000.0
         meets = goal.recall is None or m.promise + 1e-9 >= goal.recall
         fits = goal.compute_s is None or comp is None or comp <= goal.compute_s
-        why = []
+        why_not: list[str] = []
         if not meets:
-            why.append(f"its promise (>= {m.promise:.0%}) is below the goal (>= {goal.recall:.0%})")
+            why_not.append(f"its promise (>= {m.promise:.0%}) is below the goal (>= {goal.recall:.0%})")
         if not fits:
-            why.append(f"~{comp:.1f} s of compute > the {goal.compute_s:g}-s budget")
+            why_not.append(f"~{comp:.1f} s of compute > the {goal.compute_s:g}-s budget")
         covers = (None if goal.analyst_minutes is None or not minutes else round(min(1.0, goal.analyst_minutes / minutes), 3))
         opts.append({"mode": m.name, "label": m.label, "promise": m.promise, "passes_per_frame": m.passes,
                      "expected_cards": None if cards is None else round(cards, 1),
                      "expected_analyst_min": None if minutes is None else round(minutes, 1),
                      "analyst_budget_covers": covers,
                      "expected_compute_s": None if comp is None else round(comp, 1),
-                     "meets_goal": meets, "fits_budgets": fits, "why_not": why})
+                     "meets_goal": meets, "fits_budgets": fits, "why_not": why_not})
     if not opts:
         return None, {"options": [], "why": "no calibrated mode - no promise: every find goes to a person",
                       "goal_met": False}
@@ -160,7 +160,8 @@ class AgentRun:
     """The core loop's record: one entry per decision, in order (what, why, what it saw, what changed)."""
 
     def __init__(self, goal: Goal):
-        self.goal, self.steps, self.t0 = goal, [], time.perf_counter()
+        self.goal, self.t0 = goal, time.perf_counter()
+        self.steps: list[dict] = []
         self.replans: list[dict] = []
 
     def log(self, act: str, why: str, observed: Optional[dict] = None, decided: Optional[str] = None,

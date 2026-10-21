@@ -300,9 +300,10 @@ Every document, grouped by what it proves: [`docs/README.md`](docs/README.md).
 ## 7. Reproduce
 
 ```bash
-pip install -r requirements-dev.txt                 # runtime + test + lint dependencies
+pip install -r requirements-dev.txt                 # runtime + test + lint + type-check dependencies
 pytest -q                                           # test suite
 python -m ruff check .                              # lint (configuration: pyproject.toml)
+python -m mypy                                      # type check the agent's decision core (files: pyproject.toml)
 python -m src.detection.evaluate                    # deploy-faithful detector evaluation
 python -m src.agentic.calibrate                     # fit + verify the guaranteed tiers
 python -m src.agentic.effort                        # analyst-effort curve
