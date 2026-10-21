@@ -78,6 +78,10 @@ only ask. Requests with unknown hazard or pass IDs are refused.
 4. The agent reads the outcome with `get_approval_status`. Approved requests are work orders for
    downstream consoles; DEPTH itself never dispatches.
 
+A recorded run of exactly this chain on the real server (Streamable HTTP, a scripted client standing in
+for an LLM agent, a person approving with the PIN): [`reports/mcp_session.md`](reports/mcp_session.md) —
+regenerate it with `python -m src.dashboard.mcp_session`.
+
 ## Security
 
 | setting | effect |

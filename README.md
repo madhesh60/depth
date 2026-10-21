@@ -117,11 +117,16 @@ Goal ─ recall to keep · compute budget · analyst minutes · boat minutes
 Per find ─► next OpenCV tool = the cheapest one whose result could CHANGE the action, else stop (STUDY-15)
 ```
 
-**What the agent decides alone, and what it asks.** It decides how hard to look, whether its promise
-applies, which seabed measurement to trust, where pins go, which passes are worth boat time, and when to
-stop. It never dispatches: inspection and recovery routes, re-survey passes and full reviews are
-**requests** that a named person approves (MCP and API clients can only ask; an approver PIN guards the
-decision). Each decision re-plans the route, queue, budget and passes.
+**Autonomy levels — what the agent decides alone, what it asks, what only people do:**
+
+| the agent decides alone | it asks a person | only a person does |
+|---|---|---|
+| how hard to look (goal + budgets), whether its promise applies, which seabed measurement to trust, where pins go, the queue order, which passes are worth boat time, when to stop | inspect · recover · re-survey · full review · public sharing — one request per action, with its rationale | approve or decline (name + approver PIN, with a lockout), confirm or reject a card, mark recovered / not found — each decision re-plans the route, queue, budget and passes |
+
+It never dispatches; MCP and API clients can only ask. A recorded session on the real server shows the
+whole chain — an external agent runs a survey over MCP, reads the evidence, asks; its own attempt to
+approve is refused; a person approves; the agent reads the work order back:
+[`mcp_session.md`](docs/reports/mcp_session.md) (`python -m src.dashboard.mcp_session`).
 
 **Does it work? Every agent decision below was validated before it was switched on** (protocol committed
 before the unseen data was scored):
