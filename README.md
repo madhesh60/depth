@@ -154,35 +154,18 @@ and labelled experimental.
 | **Smart survey planning** | passes ranked by expected **information per boat-minute**, not confidence: the most likely target is worth little and does not drive the plan | Agent tab · `resurvey_rank` |
 | **Human control** | *Agent recommends: Perform opposite-side resurvey RS1 · Reason: uncertain visual evidence · [Approve] [Reject]* — reject and the pass is dropped for good, the boat time re-ranked, its targets moved to the front of the inspection queue | Agent tab · `/api/approvals/{id}/decide` |
 | **Agent Trace** | on every evidence card: can another look change the decision? → evidence → P(pot) → tier → who acts next; with active vision also the tool it chose, the new evidence and any changed decision | Analyze |
-| **Adaptive tool use** · experimental, off | not the same tools every time: a confident, consistent find is accepted after one ~1 ms check with **no re-look**; a borderline one gets the shadow check and, if that could still flip it, a zoom re-look; a find no result could move gets **no tool at all** — every skip is logged with why | `active.next_tool` |
-| **Evidence conflict** · experimental, off | the detector says ACCEPT but the shadow says no (or the box sits in the water column) → *"Evidence conflict detected → another observation"*: the next informative tool, else an opposite-side pass | trace step `conflict` |
-| **Active second look** · experimental, off | the re-look / shadow result changes the action (e.g. ACCEPT → REVIEW) and that changes the queue and the plan | `update_belief` (before → after) |
+| **Active vision** · experimental, off | per find, the next OpenCV tool is the cheapest one whose result could change the action (a confident, consistent find gets no re-look; a borderline one the shadow check, then a zoom re-look); an **evidence conflict** (the detector says accept, the shadow or the water column says no) triggers another observation or an opposite-side pass | `active.next_tool` · trace step `conflict` |
 
-**Does OpenCV's measurement matter? The same survey, detector only vs + Stage 1 + OpenCV evidence** (both arms run the same `cv2.dnn` detections) — the 8 shipped frames, 27 hazards
-(`python -m src.agentic.counterfactual` → [`docs/reports/opencv_counterfactual.md`](docs/reports/opencv_counterfactual.md)):
-
-| downstream | Detector only | + Stage 1 + evidence — default | + Stage 1 + evidence — active vision (experimental) |
-|---|---|---|---|
-| decision (agent action) | detector only (8 accept) | unchanged | **3 accept; 7 of 27 hazards change action** |
-| geolocation | slant range, frame-centre ping | **median pin moves 6.5 m; 17 of 27 leave their own error circle** | same |
-| re-survey route | 6 passes, 15.5 boat-min | 6 passes, 15.4 boat-min (2 regrouped) | **1 pass, 3.3 boat-min, 0 identical** |
-| human approval | 6 pass requests, 0 conflicts | same | **1 pass request, 7 conflicts flagged** |
-| OpenCV tool calls | — | shadow on all 31 | shadow on 23 / 31, zoom re-look on **2** / 31 |
-
-**Is it better? Measured, and the honest answer is "not proven".** Likelihood ratios fit on the
-validation recordings; replayed on every candidate ([`docs/reports/evidence_model_exp003.md`](docs/reports/evidence_model_exp003.md)):
-
-| split | ACCEPT precision (without → with) | real pots left in WATCH | log-loss |
-|---|---|---|---|
-| val (fit) | 64% → 70% | 27 → 10 | 0.459 → 0.449 |
-| test (once) | 67% → 73% | 49 → 36 | **0.637 → 0.648 (worse)** |
-| `test_xsonar` (fresh, another sonar) | **0.86 → 0.848** | **127 → 161** | — |
-
-Both pre-registered gates failed (test calibration; the fresh split — run 1 had a replay bug that
-guessed shadow orientation, fixed and re-run once, still failed; both runs are kept in the report).
-So **active vision is off by default**; the Stage-1 effects above (geolocation, routes) are on and
-validated (STUDY-12). Switch it on in the studio (**Active vision · experimental**) or with
-`?active=1`; every result it produces is labelled experimental.
+**Does OpenCV's measurement matter?** The same survey of the 8 shipped frames (27 hazards), detector only
+vs + Stage 1 + OpenCV evidence, both arms on the same `cv2.dnn` detections: by default Stage 1 moves the median pin
+**6.5 m** and **17 of 27** pins leave their own error circle; with active vision on, **7 of 27** hazards also
+change action and the re-survey plan shrinks from 6 passes (15.5 boat-min) to 1 (3.3)
+([`opencv_counterfactual.md`](docs/reports/opencv_counterfactual.md), `python -m src.agentic.counterfactual`).
+**Is active vision better? Not proven:** both pre-registered gates failed — on test the log-loss got worse
+(0.637 → 0.648), and on another sonar ACCEPT precision fell (0.86 → 0.848) with more real targets left in WATCH
+(127 → 161) ([`evidence_model_exp003.md`](docs/reports/evidence_model_exp003.md); a replay bug in run 1 was fixed
+and the gate re-run once — both runs are kept). So it stays **off by default**, labelled experimental in the studio
+and behind `?active=1`; the Stage-1 effects (geolocation, routes) are on and validated (STUDY-12).
 
 ## 3. Try it (no sonar files needed)
 
