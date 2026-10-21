@@ -39,6 +39,24 @@
     <div class="top-actions">
       <button class="demo-btn" id="demoBtn" title="a guided 60-second walk through the whole loop — any key or click stops it">Guided demo</button>
       <div class="pop-wrap">
+        <button class="sys-btn" data-pop="termsPop" aria-expanded="false" aria-haspopup="dialog" title="what the studio's terms mean">Terms</button>
+        <div class="popover pop-right terms-pop" id="termsPop" role="dialog" aria-label="glossary" hidden>
+          <div class="pop-title">Terms</div>
+          <dl class="terms">
+            <dt>Recall promise</dt><dd>"At least this share of pots reaches a person, with 95% confidence" — fit on held-out recordings, checked once on unseen ones. A pooled rate, not a per-survey guarantee; the Guarantees panel shows the numbers.</dd>
+            <dt>τ_review</dt><dd>The detector-confidence threshold above which a find becomes a review card.</dd>
+            <dt>P(pot)</dt><dd>A card's calibrated chance of being a real pot; it orders the review queue.</dd>
+            <dt>LCB</dt><dd>Lower confidence bound: the true rate is at least this, with 95% confidence.</dd>
+            <dt>Look harder</dt><dd>A second pass over 2×2 tiles (5 forward passes per frame) that keeps a stronger recall promise; the agent chooses it from your goal and the compute budget.</dd>
+            <dt>Promise withdrawn</dt><dd>The recording does not look like the ones the promise was fit on (another sonar), so no promise is made and a person is asked for a full review.</dd>
+            <dt>Value of information</dt><dd>"Could another look change the decision?" If not, the agent does not spend it — and says so in the trace.</dd>
+            <dt>Stage 1</dt><dd>OpenCV sonar geometry: the seabed per ping, slant → ground range, the water column.</dd>
+            <dt>Tier</dt><dd>Review (a person decides) or low-risk (kept for audit, never deleted). Nothing is auto-confirmed with this model.</dd>
+            <dt>STUDY-n</dt><dd>A registered experiment in docs/experiments.md — protocol first, then the data.</dd>
+          </dl>
+        </div>
+      </div>
+      <div class="pop-wrap">
         <button class="sys-btn" id="sysBtn" data-pop="sysPop" aria-expanded="false" aria-haspopup="dialog" title="system status">
           <span class="sys-dot"></span><span id="sysTxt">Starting</span></button>
         <div class="popover pop-right" id="sysPop" role="dialog" aria-label="system status" hidden>

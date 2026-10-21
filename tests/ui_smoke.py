@@ -2,7 +2,7 @@
 ui_smoke.py — the studio in a real headless Chrome: every mode driven, every JS error caught.
 
 Starts the server on a free local port (fresh approvals log), opens the studio in headless Chrome over the
-DevTools protocol and drives it: boot → Analyze a sample → a Survey → the Agent tab → Connect → Study →
+DevTools protocol and drives it: boot → the Terms glossary → Analyze a sample → a Survey → the Agent tab → Connect → Study →
 Audit → the 3D twin → the guided demo. It records every JS exception, console error and failed or 4xx/5xx
 request, and exits 1 if there was any. Needs the model (``python -m src.detection.fetch_model``), Chrome or
 Chromium (``$CHROME`` or on the usual paths) and ``websockets`` (requirements-dev.txt). Not collected by
@@ -33,6 +33,9 @@ CANDIDATES = [os.environ.get("CHROME", ""), r"C:\Program Files\Google\Chrome\App
 STEPS = [
     ("boot", "(async () => { await new Promise(r => setTimeout(r, 2500)); "
              "return {samples: document.querySelectorAll('.sample-card').length}; })()"),
+    ("terms", "(async () => { document.querySelector('[data-pop=\"termsPop\"]').click(); "
+              "await new Promise(r => setTimeout(r, 300)); const p = document.querySelector('#termsPop'); "
+              "const n = p.hidden ? 0 : p.querySelectorAll('dt').length; Pop.closeAll(); return {terms: n}; })()"),
     ("analyze", "(async () => { document.querySelector('.sample-card').click(); await runAnalyze(); "
                 "await new Promise(r => setTimeout(r, 800)); "
                 "return {boxes: document.querySelectorAll('.bx').length, cards: document.querySelectorAll('.ev-card').length}; })()"),
@@ -49,7 +52,7 @@ STEPS = [
     ("demo", "(async () => { document.querySelector('#demoBtn').click(); await new Promise(r => setTimeout(r, 6000)); "
              "const on = Demo.on; Demo.stop(); return {started: on}; })()"),
 ]
-EXPECT = {"boot": lambda v: v["samples"] > 0, "analyze": lambda v: v["cards"] > 0, "survey": lambda v: v["hazards"] > 0,
+EXPECT = {"boot": lambda v: v["samples"] > 0, "terms": lambda v: v["terms"] >= 8, "analyze": lambda v: v["cards"] > 0, "survey": lambda v: v["hazards"] > 0,
           "agent_tab": lambda v: v["clicked"], "connect": lambda v: v["mode"] == "connect",
           "study": lambda v: v["mode"] == "study", "audit": lambda v: v["mode"] == "audit",
           "twin": lambda v: v["canvas"] > 0, "demo": lambda v: v["started"]}

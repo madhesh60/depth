@@ -193,7 +193,7 @@ python -m src.cv_pipeline.humminbird fetch            # optional: a raw recordin
 python -m uvicorn src.dashboard.app:app --port 8000   # open http://localhost:8000
 ```
 
-Press **▶ 60-s demo** in the top bar for a guided walk through everything below, or explore the modes (plus a 3D twin view).
+Press **▶ 60-s demo** in the top bar for a guided walk through everything below, or explore the modes (plus a 3D twin view); **Terms** (top bar) explains the studio's words.
 In **Survey**, the *Goal* selector sets the recall the agent must keep (default: the strongest it can) and
 *Options → Compute budget* gives it a time limit; the **Agent** tab shows how it decided:
 * **Analyze** — pick a sample frame → *Run See → Prove → Decide*: the tracked seabed, verdict-coloured

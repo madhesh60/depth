@@ -164,6 +164,12 @@ button { font-family: inherit; }
 @keyframes pop-in-up { from { opacity: 0; transform: translateY(4px) scale(.98); } }
 .pop-title { font: 500 10px var(--sans); letter-spacing: .14em; text-transform: uppercase; color: var(--txt-3); margin: 2px 0 8px; }
 .pop-title:not(:first-child) { margin-top: 14px; }
+/* the Terms popover: the glossary of the studio's own words */
+.terms-pop { min-width: 300px; max-width: 360px; }
+.terms { margin: 0; max-height: min(60vh, 520px); overflow: auto; }
+.terms dt { font: 500 12px var(--sans); color: var(--txt); margin-top: 10px; }
+.terms dt:first-child { margin-top: 0; }
+.terms dd { margin: 2px 0 0; font: var(--t-12); color: var(--txt-3); }
 .pop-row { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; padding: 6px 0; border-top: 1px solid var(--line); font: var(--t-12); color: var(--txt-3); }
 .pop-row:first-of-type { border-top: 0; }
 .pop-note { font: var(--t-12); color: var(--txt-3); margin-top: 10px; }

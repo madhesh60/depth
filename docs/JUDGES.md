@@ -64,6 +64,9 @@ with the submission, and the studio says so under the PIN field.
 
 ## Glossary
 
+The same terms are one click away in the studio (**Terms**, top bar).
+
+
 | term | meaning |
 |---|---|
 | **recall promise** | "at least R% of pots reach a person (95% confidence)" — fit on held-out recordings, verified once on unseen ones |
