@@ -151,10 +151,11 @@ The survey is run by an agent with a goal, not by a fixed pipeline (`SurveyAgent
    within the compute budget; without one: the strongest promise the compute budget allows. Each mode is
    priced with the measured `cv2.dnn` pass time (seeded by the warm-up, then a moving average). The
    analyst budget orders the queue (budget mode) and is reported as the share of the queue it covers;
-4. **perceive** every frame; if the measured pace would overrun the compute budget, **re-plan**: the
-   standard look for the remaining frames and the earlier ones re-tiered at the standard threshold (the
-   standard promise still holds — tile finds only add candidates, so recall at a fixed threshold cannot
-   fall);
+4. **perceive** every frame; if the measured pace would overrun the compute budget, or the closer tile
+   look fails or overruns its deadline on a frame, **re-plan**: the standard look for the remaining frames
+   and the earlier ones re-tiered at the standard threshold (the standard promise still holds — tile finds
+   only add candidates, so recall at a fixed threshold cannot fall). A frame whose detector call finds the
+   network still busy with an overrun call is retried once the network is free (`retry` step), not skipped;
 5. **plan** (`pipeline.assemble` → `mission`) and **hand off** — the server files one approval request per
    action; each decision re-plans.
 

@@ -105,7 +105,7 @@ Goal ─ recall to keep · compute budget · analyst minutes · boat minutes
  2 decide       how hard to look: standard (≥ 79%, 1 cv2.dnn pass/frame) or look harder (≥ 84%, + 2×2 tiles)
                  = the cheapest mode that keeps the goal, else the strongest the compute budget allows
  3 perceive     every frame: Stage 1 · YOLO11 via cv2.dnn · evidence — and watch the pace:
-                 └ budget would overrun ─► RE-PLAN: standard look for the rest, re-tier the earlier frames
+                 └ budget would overrun, or the closer look fails ─► RE-PLAN: standard look, re-tier
     sense       raw recording: OpenCV seabed track vs depth sounder ─► conflict ─► re-track ─► re-fit the scale
  4 plan         review queue · analyst budget · routes · opposite-side passes ranked by information per boat-minute
  5 hand off     one approval request per action ─► a named person decides ─► every decision RE-PLANS

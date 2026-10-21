@@ -15,10 +15,11 @@ meet it, step by step, logging every option it weighed:
    promise meets the goal and whose cost fits the budgets — or, with no promise asked for, the strongest
    promise the budgets allow. A goal no mode can meet is said so, with the best available;
 3. **perceive** every frame with OpenCV 5 (Stage 1, ``cv2.dnn``, evidence), **watching its compute
-   budget**: if the measured pace says the budget will run out, it re-plans mid-run — it drops to the
-   standard look for the remaining frames and re-tiers the earlier ones at the standard threshold. That
-   keeps the standard promise: the extra tile finds can only add candidates, so recall at a fixed
-   threshold cannot fall;
+   budget and its tools**: if the measured pace says the budget will run out, or the closer look fails or
+   overruns its deadline on a frame, it re-plans mid-run — the standard look for the remaining frames,
+   the earlier ones re-tiered at the standard threshold. That keeps the standard promise: the extra tile
+   finds can only add candidates, so recall at a fixed threshold cannot fall. A frame whose detector call
+   finds the network still busy with an overrun call is retried once the network is free, not skipped;
 4. **plan** for people and the boat: merge repeat sightings, the review queue and budget, the inspection
    and recovery routes, and the opposite-side re-survey passes (``pipeline.assemble`` → ``mission``);
 5. **hand off**: nothing is dispatched; the server files one approval request per action and a named
@@ -40,6 +41,7 @@ from .applicability import Reference, frame_stats
 from .incidents import incident
 from .mission import DEFAULT_SEC_PER_CARD
 from .pipeline import AgenticPipeline, validate_frame
+from .tools import ToolTimeout, default_timeout_s
 from .types import AgentStep, FrameResult, SurveyResult, Verdict
 
 _FLAKY = {"tool_failed", "tool_timeout", "invalid_geometry", "no_detection"}   # drills: first frame only
@@ -192,7 +194,7 @@ def retier(fr: FrameResult, tiers) -> int:
             changed += 1
         c.trace.append(AgentStep(
             tool="replan", latency_ms=0.0, conf_before=round(c.conf, 4), status="done",
-            rationale=(f"the run fell back to the standard promise (compute budget) -> re-tiered at tau_review "
+            rationale=(f"the run fell back to the standard promise -> re-tiered at tau_review "
                        f"{tiers.tau_review:.3f}: {c.verdict.value} -> {v.value}"),
             detail={"from": c.verdict.value, "to": v.value, "tau_review": tiers.tau_review}))
         c.verdict, c.evidence.p_pot = v, p
@@ -208,6 +210,7 @@ class SurveyAgent:
         self.pipe = pipeline
         self.modes = calibrated_modes() if modes is None else modes
         self._check_on = check_applicability
+        self.retry_wait_s = max(30.0, 2 * default_timeout_s())
         self.reference = (reference or Reference.load()) if check_applicability else None
         self._applicability: Optional[dict] = None
 
@@ -270,10 +273,15 @@ class SurveyAgent:
                     progress_cb("frame_done", {"frame_id": fid, "counts": {}})
                 continue
             fr_faults = faults if k == 0 else faults - _FLAKY
+            run_one = lambda a: self._run_frame(a, im, fid, track, nadir, fr_faults, frame_lock)
             try:
-                with (frame_lock or nullcontext()):
-                    fr = self.pipe.run_frame(im, frame_id=fid, fix=track.get(fid) if track else None, nadir=nadir,
-                                             faults=fr_faults, agent=agent)
+                try:
+                    fr = run_one(agent)
+                except ToolTimeout as e:                    # the network is still busy with an overrun call
+                    free = agent.tools.wait_idle(self.retry_wait_s)
+                    run.log("retry", f"{fid}: {e} -> waited for the detector ({'free again' if free else 'still busy'}) "
+                            "and ran the frame again", observed={"frame": fid, "detector_free": free})
+                    fr = run_one(agent)
             except Exception as e:                          # one bad frame never sinks the survey
                 survey_incidents.append(incident("tool_failed", f"{fid}: processing failed ({type(e).__name__}: "
                                                  f"{str(e)[:120]}) - frame skipped", frame_id=fid))
@@ -284,6 +292,18 @@ class SurveyAgent:
             if progress_cb:
                 progress_cb("frame_done", {"frame_id": fid, "counts": fr.counts})
             left = sum(1 for f, _ in frames[k + 1:] if f not in bad)
+            if fr.perception.get("fallback") and mode is not None and mode.passes > 1 and downgraded_at is None:
+                std = next((m for m in self.modes if m.name == "standard"), None)
+                downgraded_at = fid
+                why = next((s.get("rationale", "") for s in reversed(fr.perception.get("steps") or [])
+                            if s.get("status") == "failed"), "")
+                run.log("replan", f"the closer look failed on {fid} ({why[:140]}) -> this frame does not carry the "
+                        f"look-harder promise, so the survey keeps the standard promise"
+                        + (f" (>= {std.promise:.0%})" if std else "") + ": standard look for the remaining "
+                        f"{left} frame(s), earlier frames re-tiered", observed={"frame": fid},
+                        decided="downgrade to the standard look")
+                run.replans.append({"at": fid, "why": "closer look failed", "from": mode.name, "to": "standard"})
+                mode, agent = std, self.pipe.agent_for("standard")
             if goal.compute_s and mode is not None and mode.passes > 1 and left and downgraded_at is None:
                 spent = time.perf_counter() - t_run
                 projected = spent + left * spent / len(results)
@@ -333,6 +353,11 @@ class SurveyAgent:
         survey.agent_run = run.to_dict(mode, stop, {"downgraded_at": downgraded_at,
                                                     "promise_applies": applies, "applicability": self._applicability})
         return survey
+
+    def _run_frame(self, agent, im, fid: str, track, nadir, faults: set, frame_lock) -> FrameResult:
+        with (frame_lock or nullcontext()):
+            return self.pipe.run_frame(im, frame_id=fid, fix=track.get(fid) if track else None, nadir=nadir,
+                                       faults=faults, agent=agent)
 
     def _check_promise(self, run: AgentRun, frames, bad: dict, survey_incidents: list) -> bool:
         """Does the calibrated promise apply to these frames? (STUDY-19) Logs the check and, on a failure,

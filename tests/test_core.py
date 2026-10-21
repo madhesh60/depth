@@ -15,6 +15,7 @@ from src.agentic.agent import _no_proof
 from src.agentic.core import Goal, Mode, SurveyAgent, calibrated_modes, choose_mode, retier
 from src.agentic.pipeline import AgenticPipeline
 from src.agentic.policy import GuaranteedTiers
+from src.agentic.tools import ToolTimeout
 from src.agentic.types import Candidate, Evidence, FrameResult, RelookResult, Verdict
 from src.detection.calibration import load_calibration
 
@@ -91,19 +92,30 @@ def test_retier_moves_a_find_below_the_standard_threshold_to_low_risk():
     assert fr.candidates[0].trace[-1].tool == "replan" and fr.perception["retiered_to"] == "standard"
 
 
+class _FakeTools:
+    def __init__(self):
+        self.waited = 0
+
+    def wait_idle(self, timeout_s):
+        self.waited += 1
+        return True
+
+
 class _FakeAgent:
     def __init__(self, mode: str):
         self.cfg = type("Cfg", (), {"tiers": GuaranteedTiers.from_calibration(load_calibration(), mode),
                                     "perception_mode": mode})()
+        self.tools = _FakeTools()
 
 
 class _FakePipe(AgenticPipeline):
     """The pipeline's planning half, with a detector stub: every frame yields one find just above the
     look-harder threshold, after a fixed delay (so the compute budget is predictable)."""
 
-    def __init__(self, delay_s: float = 0.02):
+    def __init__(self, delay_s: float = 0.02, busy_once: tuple = (), tile_fails: tuple = ()):
         self._agents, self._ms_pass, self.m_per_px, self.delay = {}, None, 0.05, delay_s
         self.modes_run: list[str] = []
+        self.busy_once, self.tile_fails = set(busy_once), set(tile_fails)
 
     def agent_for(self, mode):
         return self._agents.setdefault(mode, _FakeAgent(mode))
@@ -114,12 +126,18 @@ class _FakePipe(AgenticPipeline):
 
     def run_frame(self, frame, frame_id="f", fix=None, nadir=None, progress_cb=None, faults=None, agent=None):
         time.sleep(self.delay)
+        if frame_id in self.busy_once:                      # the network is still busy with an overrun call
+            self.busy_once.discard(frame_id)
+            raise ToolTimeout("detect not started: the detector is still busy with a call that timed out")
         mode = agent.cfg.perception_mode
         self.modes_run.append(mode)
         t = agent.cfg.tiers
         conf = t.tau_review + 0.001
         fr = FrameResult(frame_id, 64, 64, [_cand(conf, Verdict.REVIEW, t.guaranteed_class)])
         fr.perception = {"mode": mode, "passes": 4 if mode != "standard" else 0}
+        if mode != "standard" and frame_id in self.tile_fails:
+            fr.perception.update(passes=0, fallback="first look only", steps=[
+                {"tool": "look_harder", "status": "failed", "rationale": "look_harder failed: ToolTimeout"}])
         return fr
 
 
@@ -161,3 +179,22 @@ def test_unusable_frames_are_skipped_and_reported():
     codes = [i["code"] for i in s.mission.incidents]
     assert codes.count("invalid_frame") == 1 and codes.count("corrupt_frame") == 1
     assert len(s.frames) == 2
+
+
+def test_a_busy_detector_is_waited_for_and_the_frame_retried_not_skipped():
+    pipe = _FakePipe(busy_once=("f1",))
+    s = SurveyAgent(pipe, check_applicability=False).run(_frames(3), goal=Goal(recall=0.79))
+    assert [f.frame_id for f in s.frames] == ["f0", "f1", "f2"]          # nothing skipped
+    assert pipe.agent_for("standard").tools.waited == 1
+    assert any(st["act"] == "retry" and st["observed"]["frame"] == "f1" for st in s.agent_run["steps"])
+    assert not any(i["code"] == "tool_failed" for i in s.mission.incidents)
+
+
+def test_a_failed_closer_look_downgrades_the_promise_honestly():
+    pipe = _FakePipe(tile_fails=("f1",))
+    s = SurveyAgent(pipe, check_applicability=False).run(_frames(4), goal=Goal())
+    run = s.agent_run
+    assert pipe.modes_run == ["look_harder", "look_harder", "standard", "standard"]
+    assert run["downgraded_at"] == "f1" and run["replans"][0]["why"] == "closer look failed"
+    assert s.mission.guarantees["recall_promise"] == pytest.approx(0.79)   # not the look-harder 84%
+    assert all(c.verdict is Verdict.LOW_RISK for f in s.frames[:2] for c in f.candidates)   # re-tiered

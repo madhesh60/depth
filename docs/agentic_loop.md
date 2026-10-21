@@ -19,7 +19,8 @@ moves. Every failure is caught, contained and told to that person. This page is 
 | `check_promise` | OpenCV statistics of every frame vs the calibration recordings → is the recall promise valid here? (STUDY-19) | **no** → promise withdrawn, `promise_not_applicable` incident, a **full review** request to a person |
 | `choose_mode` | standard look (≥ 79%, 1 pass) or look harder (≥ 84%, + 2×2 tiles, STUDY-18): the cheapest that keeps the goal, else the strongest the compute budget allows — every option is listed with its promise, cards and compute | the goal, the compute budget, the measured `cv2.dnn` pass time |
 | `perceive` | every frame through the frame agent below | — |
-| `replan` + `retier` | the measured pace would overrun the compute budget → standard look for the rest, earlier frames re-tiered (the standard promise still holds) | the pace |
+| `replan` + `retier` | the measured pace would overrun the compute budget, or the closer look failed on a frame → standard look for the rest, earlier frames re-tiered (the standard promise still holds) | the pace · a tool failure |
+| `retry` | a frame's detector call found the network still busy with an overrun call → wait for it, run the frame again (not skipped) | a tool timeout |
 | `plan` | hazards → queue, budget, routes, passes; then one approval request per action | a person's decision → re-plan |
 
 `/api/analyze` makes the same mode choice against an interactive budget (2 s, `DEPTH_INTERACTIVE_S`) and

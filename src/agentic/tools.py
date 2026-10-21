@@ -79,6 +79,15 @@ class Toolbox:
             raise box["e"]
         return box["v"]
 
+    def wait_idle(self, timeout_s: float) -> bool:
+        """Wait (at most ``timeout_s``) for timed-out calls still running on the detector to finish.
+        True when the detector is free again — the agent then retries the frame instead of skipping it."""
+        end = time.perf_counter() + max(0.0, timeout_s)
+        for th in list(self._hung):
+            th.join(max(0.0, end - time.perf_counter()))
+        self._hung = [t for t in self._hung if t.is_alive()]
+        return not self._hung
+
     def simulate_hang(self, tool: str, timeout_s: float = 0.3) -> None:
         """Failure drill: a tool that never answers, under a short deadline -> :class:`ToolTimeout`."""
         stop = threading.Event()
