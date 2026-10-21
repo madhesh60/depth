@@ -163,6 +163,53 @@ def parity(ref: dict, other: dict, iou_min: float = PARITY["iou"], dscore_max: f
             "same_frames": same_frames, "first_problem": worst}
 
 
+def cool_effect(runs: list[dict]) -> list[str]:
+    """Where COOL acts (the audit's strict note): Graviton stock (B) → Graviton COOL (C) per workload and per
+    OpenCV op, the share of the stock product frame that is the ``cv2.dnn`` forward, and a headline chosen by
+    the registered claim rule — the workload with the largest speed-up whose repeat ranges separate. COOL can
+    only move the image ops unless its build also speeds up the forward; the section says which happened."""
+    by = {(r["label"], r["workload"]): r for r in runs}
+    rows, best = [], None
+    for wl in ("cv", "product", "detect", "survey"):
+        b, c = by.get(("graviton_stock", wl)), by.get(("graviton_cool", wl))
+        if not (b and c):
+            continue
+        if wl == "survey":
+            x, y = b["survey"]["real_time_factor_median"], c["survey"]["real_time_factor_median"]
+        else:
+            x, y = b["stages_ms"]["total"]["p50"], c["stages_ms"]["total"]["p50"]
+        ratio, sep = (x / y if y else None), separation(b, c)
+        rows.append(f"| `{wl}` | {x:.4g} | {y:.4g} | {ratio:.2f}× | {sep} |" if ratio else f"| `{wl}` | {x} | {y} | — | {sep} |")
+        if ratio and sep == "repeat ranges separate" and (best is None or ratio > best[1]):
+            best = (wl, ratio)
+    if not rows:
+        return []
+    out = ["", "## Where COOL acts — Graviton stock (B) → Graviton COOL (C), identical hardware", "",
+           "| workload | stock (ms p50, or real-time factor) | COOL | speed-up | claim rule |", "|---|--:|--:|--:|---|"] + rows
+    bp, cp = by.get(("graviton_stock", "product")), by.get(("graviton_cool", "product"))
+    if bp and cp and bp.get("ops_ms") and cp.get("ops_ms"):
+        ob, oc = bp["ops_ms"], cp["ops_ms"]
+        out += ["", "Per OpenCV op of the product frame (mean ms):", "", "| op | stock | COOL | speed-up |", "|---|--:|--:|--:|"]
+        for op in OPS:
+            if op in ob and op in oc and oc[op]["mean"]:
+                out.append(f"| `{op}` | {ob[op]['mean']:.1f} | {oc[op]['mean']:.1f} | {ob[op]['mean'] / oc[op]['mean']:.2f}× |")
+        tot = bp["stages_ms"]["total"]["mean"]
+        fwd_b, fwd_c = ob.get("dnn_forward", {}).get("mean"), oc.get("dnn_forward", {}).get("mean")
+        if fwd_b and fwd_c and tot:
+            share, fr = fwd_b / tot, fwd_b / fwd_c
+            out += ["", f"The `cv2.dnn` forward is **{share:.0%}** of the stock product frame; COOL changed it "
+                        f"**{fr:.2f}×**. " + ("COOL's build speeds up the network too, so the product frame moves with it."
+                                              if fr >= 1.05 else
+                                              f"The forward is unchanged, so on the product frame COOL can move at most the "
+                                              f"other {1 - share:.0%} — the `cv` workload (image ops alone) is where its "
+                                              "effect shows.")]
+    out += ["", ("**Lead with `" + best[0] + f"`**: COOL runs it **{best[1]:.2f}×** faster on identical Graviton, and "
+                 "the repeat ranges separate (the registered claim rule)." if best else
+                 "**No workload shows a separated COOL speed-up** — reported as within noise (the registered claim "
+                 "rule), not as a gain.")]
+    return out
+
+
 def _parity_rows(par: dict[str, dict]) -> list[str]:
     rows = []
     for ref, others in (("graviton_stock", ("graviton_cool",)), ("baseline_x86", ("graviton_stock", "graviton_cool"))):
@@ -256,6 +303,7 @@ def report(runs: list[dict], par: dict[str, dict] | None = None, d: Path | None 
             ca, cc = (a["cost"].get("survey_hour") or {}).get("usd"), (c["cost"].get("survey_hour") or {}).get("usd")
             cost = f" · {ca / cc:.2f}× cheaper per survey-hour" if ca and cc else ""
             cmp.append(f"| {wl} | **x86 → Graviton + COOL** (A → C) | {_ratio(a, c)} faster p50{cost} | {separation(a, c)} |")
+    L += cool_effect(runs)
     if cmp:
         L += ["", "## Comparisons", "",
               "A ratio > 1 means the second machine is faster. Registered claim rule (STUDY-17): a speed-up is "

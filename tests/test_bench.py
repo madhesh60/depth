@@ -126,3 +126,26 @@ def _run_all():
 
 if __name__ == "__main__":
     _run_all()
+
+
+def _prod(label, fwd, other, reps, cool):
+    ops = {"decode": {"mean": other / 2, "p50": other / 2, "p95": other / 2},
+           "stage1": {"mean": other / 2, "p50": other / 2, "p95": other / 2},
+           "dnn_forward": {"mean": fwd, "p50": fwd, "p95": fwd}}
+    r = _run(label, fwd + other, cool, 0.001)
+    r["ops_ms"] = ops
+    r["stages_ms"]["total"].update(p50=fwd + other, mean=fwd + other)
+    r["repeats"] = [{"total_ms": {"p50": v}} for v in reps]
+    return r
+
+
+def test_cool_effect_names_where_cool_acts_and_leads_with_the_separated_workload():
+    stock = _prod("graviton_stock", 190.0, 10.0, [199, 200, 201], False)
+    cool = _prod("graviton_cool", 190.0, 5.0, [194, 195, 196], True)          # only the image ops got faster
+    cv_b = {**_run("graviton_stock", 10, False, 0.0), "workload": "cv", "repeats": [{"total_ms": {"p50": v}} for v in (9.9, 10, 10.1)]}
+    cv_c = {**_run("graviton_cool", 5, True, 0.0), "workload": "cv", "repeats": [{"total_ms": {"p50": v}} for v in (4.9, 5, 5.1)]}
+    md = "\n".join(compare.cool_effect([stock, cool, cv_b, cv_c]))
+    assert "## Where COOL acts" in md and "| `dnn_forward` | 190.0 | 190.0 | 1.00× |" in md
+    assert "**95%** of the stock product frame" in md and "COOL changed it **1.00×**" in md
+    assert "Lead with `cv`" in md and "2.00×" in md                       # the separated, larger effect
+    assert compare.cool_effect([stock]) == []                            # nothing to say without both runs
