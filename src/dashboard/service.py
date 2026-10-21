@@ -207,7 +207,7 @@ def _cache_upload(data: bytes, img: np.ndarray) -> str:
     return sha
 
 
-_UPLOAD_SHA: dict[str, str] = {}                # frame_id → sha for the most recent uploads
+_UPLOAD_SHA: "OrderedDict[str, str]" = OrderedDict()   # frame_id → sha of the most recent uploads (bounded)
 
 
 def _decode_upload(f: UploadFile) -> tuple[str, np.ndarray]:
@@ -225,6 +225,9 @@ def _decode_upload(f: UploadFile) -> tuple[str, np.ndarray]:
         raise HTTPException(400, f"{f.filename}: could not decode image")
     stem = Path(f.filename or "upload").stem
     _UPLOAD_SHA[stem] = _cache_upload(data, img)
+    _UPLOAD_SHA.move_to_end(stem)
+    while len(_UPLOAD_SHA) > 4 * MAX_UPLOAD_CACHE:          # a long-running public server never grows it
+        _UPLOAD_SHA.popitem(last=False)
     return stem, img
 
 
