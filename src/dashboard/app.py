@@ -602,6 +602,8 @@ def health():
         "limits": {"max_upload_mb": MAX_UPLOAD_MB, "max_frames": MAX_FRAMES, "max_sync_frames": MAX_SYNC_FRAMES},
         "recording": {"available": RECORDING_DAT.exists(), "name": RECORDING_DAT.stem},
         "approver_pin_required": pin_required(),
+        # where a person finds the PIN, e.g. "judges: the PIN is in the submission form" (never the PIN itself)
+        "approver_pin_hint": os.environ.get("DEPTH_APPROVER_HINT", "")[:120] or None,
         "modes": [m.to_dict() for m in calibrated_modes(cal)],
         "ms_per_pass": _PIPELINE.ms_per_pass() if _PIPELINE is not None else None,
         "interactive_s": INTERACTIVE_S,

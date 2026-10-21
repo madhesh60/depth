@@ -89,6 +89,7 @@ regenerate it with `python -m src.dashboard.mcp_session`.
 | `DEPTH_MCP_TOKEN` | bearer token required on `/mcp` (401 otherwise). The AWS setup generates one into root-only `/etc/depth/mcp.env`. |
 | `DEPTH_MCP_ALLOWED_HOSTS` | extra Host names for DNS-rebinding protection. Localhost is allowed by default; other hosts get 421. `*` disables the check **only if a token is set**. |
 | `DEPTH_APPROVER_PIN` | deciding a request needs the PIN, with a wrong-PIN lockout per client (`DEPTH_PIN_MAX_FAILS` 5, `DEPTH_PIN_LOCK_S` 900). The AWS setup generates one into root-only `/etc/depth/approver.env` (`DEPTH_APPROVALS_OPEN=1` opens approvals on purpose instead). |
+| `DEPTH_APPROVER_HINT` | where a person finds the PIN, shown under the studio's PIN field (never the PIN itself) |
 | public mode | behind the proxy (`DEPTH_TRUST_PROXY=1`), with an origin secret, or `DEPTH_PUBLIC=1`: the server refuses to start without `DEPTH_MCP_TOKEN`, `DEPTH_ADMIN_TOKEN` and an approver PIN (or `DEPTH_APPROVALS_OPEN=1`). `DEPTH_PUBLIC=0` overrides for a local proxy test. |
 | `DEPTH_MCP_MAX_FRAMES` | frames per `run_survey` over MCP (default 24; use the jobs API for more) |
 

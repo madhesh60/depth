@@ -337,7 +337,12 @@ async function loadHealth() {
     const h = await fetch(`${API}/api/health`).then(r => r.json());
     const cv = $("#pillCv"), md = $("#pillModel");
     if (h.recording && h.recording.available && $("#gpsRecording")) $("#gpsRecording").hidden = false;
-    if ($("#apprPin")) { $("#apprPin").hidden = !h.approver_pin_required; $("#apprOpen").hidden = !!h.approver_pin_required; }
+    if ($("#apprPin")) {
+      $("#apprPin").hidden = !h.approver_pin_required; $("#apprOpen").hidden = !!h.approver_pin_required;
+      const hint = $("#apprHint");                    // where a person finds the PIN (never the PIN itself)
+      if (hint) { hint.textContent = h.approver_pin_hint || ""; hint.hidden = !(h.approver_pin_required && h.approver_pin_hint); }
+      if (h.approver_pin_hint) $("#apprPin").title = h.approver_pin_hint;
+    }
     const gr = $("#goalRecall");
     if (gr && h.modes && gr.options.length === 1) h.modes.forEach(m => gr.add(new Option(
       `≥ ${pctS(m.promise)} · ${m.label} (${m.passes} pass${m.passes > 1 ? "es" : ""} / frame)`, String(m.promise))));

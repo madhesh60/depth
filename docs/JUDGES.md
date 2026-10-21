@@ -25,7 +25,9 @@ Then three clicks:
 3. **Survey** → *Raw recording (real GPS)* → **Agent** tab — the core loop: the promise check (withdrawn on
    this river recording, with a full-review request), the seabed cross-check, the plan, the approval inbox.
 
-A public URL is **not live yet**: CloudFront waits on AWS account verification (see "Not done" below).
+A public URL is **not live yet**: CloudFront waits on AWS account verification (see "Not done" below). On the
+deployed server, deciding needs the **approver PIN** (agents and API clients can only ask); judges receive it
+with the submission, and the studio says so under the PIN field.
 
 ## The numbers (every one names its split)
 
@@ -35,6 +37,7 @@ A public URL is **not live yet**: CloudFront waits on AWS account verification (
 | Recall promise, looking harder (2×2 tile pass) | **≥ 84%**; held on unseen test at **86.0%** (lower bound 82.0%) | [`look_harder.md`](reports/look_harder.md) |
 | The promise survives correlated frames? | standard: block-bootstrap bound 78.2% → restated **79% → 78%**; look harder 84.3% → stands | [`dependence.md`](reports/dependence.md) (STUDY-21) |
 | …per recording (a promise is a pooled rate) | standard ≥ 78% on 5 of 6 recordings (Rec9: 74.7%) | same |
+| The same calibration code, two detectors | EXP-001 (4-class, v1): ≥ 65%, held at 86.2% on its own unseen test · EXP-003: ≥ 78%, held at 81.1% | [`calibration_exp001.md`](calibration_exp001.md) · [`calibration_exp003.md`](calibration_exp003.md) |
 | The agent knows when its promise does not apply | another sonar: withdrawn in **22 of 22** surveys (one look keeps 23.9% of pots there) | [`applicability.md`](reports/applicability.md) (STUDY-19) |
 | Crab-pot detector AP@0.5 | **0.482** (95% CI 0.43–0.55) — mAP@0.5 0.319 **misses the 0.70 target** | [`eval_exp003_test.md`](reports/eval_exp003_test.md) |
 | Against GhostVision (same split) | F1 **0.41** vs their reported 0.71–0.73 — **DEPTH's detector is weaker** | [`eval_exp003_test_official398.md`](reports/eval_exp003_test_official398.md) |

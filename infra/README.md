@@ -107,7 +107,10 @@ so a busy server gets the standard look. Re-run the load test after the next dep
 
 The server refuses to start in public mode (behind the proxy) without `DEPTH_MCP_TOKEN`,
 `DEPTH_ADMIN_TOKEN` and `DEPTH_APPROVER_PIN` (or `DEPTH_APPROVALS_OPEN=1`); `setup_cool_instance.sh`
-generates all three, so a normal deploy is unaffected.
+generates all three, so a normal deploy is unaffected. It also writes `DEPTH_APPROVER_HINT` (where judges find the PIN — shown
+under the studio's PIN field, never the PIN). On an instance set up before 2026-10-21, add it by hand:
+`echo 'DEPTH_APPROVER_HINT=Judges: the approver PIN is in the submission form.' | sudo tee -a /etc/depth/approver.env`
+then `sudo systemctl restart depth` (over SSM).
 
 ## Security and responsible operation
 

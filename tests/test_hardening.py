@@ -100,3 +100,13 @@ def test_the_api_locks_out_after_wrong_pins(monkeypatch):
     assert [c.post("/api/approvals/AR-none/decide", json=body).status_code for _ in range(2)] == [403, 403]
     r = c.post("/api/approvals/AR-none/decide", json={**body, "pin": "246810"})
     assert r.status_code == 403 and "locked" in r.json()["detail"]
+
+
+def test_health_names_where_the_pin_is_never_the_pin(monkeypatch):
+    from fastapi.testclient import TestClient
+    import src.dashboard.app as app_mod
+    monkeypatch.setenv("DEPTH_APPROVER_PIN", "135790")
+    monkeypatch.setenv("DEPTH_APPROVER_HINT", "Judges: the approver PIN is in the submission form.")
+    h = TestClient(app_mod.app).get("/api/health").json()
+    assert h["approver_pin_required"] is True and h["approver_pin_hint"].startswith("Judges")
+    assert "135790" not in str(h)

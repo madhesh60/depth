@@ -96,7 +96,10 @@ if [ ! -s /etc/depth/approver.env ]; then
   if [ "${DEPTH_APPROVALS_OPEN:-0}" = "1" ]; then
     ( umask 077; printf 'DEPTH_APPROVALS_OPEN=1\n' > /etc/depth/approver.env )
   else
-    ( umask 077; printf 'DEPTH_APPROVER_PIN=%s\n' "$(od -An -N4 -tu4 /dev/urandom | tr -d ' \n' | tail -c 6)" > /etc/depth/approver.env )
+    # the hint tells a person where to find the PIN (the studio shows it under the PIN field), never the PIN
+    ( umask 077; printf 'DEPTH_APPROVER_PIN=%s\nDEPTH_APPROVER_HINT=%s\n' \
+        "$(od -An -N4 -tu4 /dev/urandom | tr -d ' \n' | tail -c 6)" \
+        "${DEPTH_APPROVER_HINT:-Judges: the approver PIN is in the submission form.}" > /etc/depth/approver.env )
   fi
 fi
 [ -f /etc/depth/approver.env ] && chmod 600 /etc/depth/approver.env
