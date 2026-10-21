@@ -19,6 +19,14 @@ flowchart LR
     CF[CloudFront HTTPS<br/>X-Origin-Verify header<br/><i>pending account verification</i>]
     subgraph EC2[EC2 c8g.large Graviton4 · COOL AMI · Elastic IP · systemd]
       direction TB
+      subgraph LOOP[Core loop · every survey · core.py]
+        direction LR
+        G[Goal: recall · compute ·<br/>analyst · boat time] --> CK{Promise applies?<br/>OpenCV statistics vs<br/>the calibration recordings}
+        CK -- no --> FR[Withdraw the promise · cheapest look<br/>full-review request]
+        CK -- yes --> MODE[Choose the look<br/>standard ≥78% · look harder ≥84%]
+        MODE --> PER[Perceive every frame<br/>overrun → re-plan]
+        PER --> ASK[Plan · one approval<br/>request per action]
+      end
       S0[Sensor cross-check<br/>seabed track vs depth sounder]
       S1[Stage 1 canonicalise<br/>bottom track · slant→ground]
       S2[See: YOLO11 ONNX<br/>cv2.dnn · OpenCV 5 /opt/cool]
@@ -37,7 +45,7 @@ flowchart LR
 
   subgraph HUM[Human loop]
     STU[Studio: Analyze · Survey · Study · Audit]
-    PER[Named person ✓ ✕ recovered<br/>→ agent re-plans]
+    PPL[Named person ✓ ✕ recovered<br/>→ agent re-plans]
   end
 
   subgraph OUT[Connect]
@@ -56,7 +64,8 @@ flowchart LR
   SSM --> EC2
   SCH --> EC2
   S5 -.-> BED
-  S5 --> STU --> PER --> S5
+  PER --> S0
+  ASK --> STU --> PPL --> S5
   S5 --> MCP & OGC & WH & EMB & EXP
 ```
 
