@@ -44,8 +44,11 @@ async function loadHealth() {
       if (h.approver_pin_hint) $("#apprPin").title = h.approver_pin_hint;
     }
     const gr = $("#goalRecall");
-    if (gr && h.modes && gr.options.length === 1) h.modes.forEach(m => gr.add(new Option(
-      `≥ ${pctS(m.promise)} · ${m.label} (${m.passes} pass${m.passes > 1 ? "es" : ""} / frame)`, String(m.promise))));
+    if (gr && h.modes && gr.options.length === 1) {     // short options fit a narrow rail; the cost is in the tooltip
+      h.modes.forEach(m => gr.add(new Option(`≥ ${pctS(m.promise)} · ${m.label}`, String(m.promise))));
+      gr.title = "Agent decides = the strongest promise the modes and the compute budget allow. " + h.modes.map(m =>
+        `${m.label}: ≥ ${pctS(m.promise)}, ${m.passes} detector pass${m.passes > 1 ? "es" : ""} per frame`).join(" · ");
+    }
     cv.textContent = `OpenCV ${h.opencv}`;
     cv.className = "pill " + (String(h.opencv).startsWith("5") ? "pill-ok" : "pill");
     md.textContent = h.model_loaded ? "Ready" : h.model_error ? "Error" : "Warming up";

@@ -95,9 +95,7 @@ const Tabs = {
     const cur = Math.min(this.active[mode] ?? 0, tabbed.length - 1);
     bar.innerHTML = tabbed.map((p, i) => `<button type="button" role="tab" class="tab${i === cur ? " is-active" : ""}" aria-selected="${i === cur}" data-i="${i}">${escapeHtml(p.querySelector("[data-tab]").dataset.tab)}</button>`).join("");
     tabbed.forEach((p, i) => p.classList.toggle("tab-off", i !== cur));
-    ins.classList.add("tabbed");
-    const on = bar.querySelector(".tab.is-active");            // a long strip scrolls; keep the open tab in view
-    if (on) bar.scrollLeft = Math.max(0, on.offsetLeft - (bar.clientWidth - on.offsetWidth) / 2);
+    ins.classList.add("tabbed");                                 // a long strip wraps: every tab label stays visible
     bar.onclick = e => { const b = e.target.closest(".tab"); if (!b) return; this.active[mode] = +b.dataset.i; this.render(); ins.scrollTop = 0; };
   },
   go(label) {                                          // open a tab by its label ("Approvals", "Log" ...)
