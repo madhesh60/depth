@@ -17,7 +17,7 @@ moves. Every failure is caught, contained and told to that person. This page is 
 | `inspect_data` | counts usable frames; corrupt / blank ones are skipped and reported | the frames |
 | `measure_geometry` | raw recordings: the seabed cross-check (§0 below) already resolved per chunk | the sensors |
 | `check_promise` | OpenCV statistics of every frame vs the calibration recordings → is the recall promise valid here? (STUDY-19) | **no** → promise withdrawn, `promise_not_applicable` incident, a **full review** request to a person |
-| `choose_mode` | standard look (≥ 79%, 1 pass) or look harder (≥ 84%, + 2×2 tiles, STUDY-18): the cheapest that keeps the goal, else the strongest the compute budget allows — every option is listed with its promise, cards and compute | the goal, the compute budget, the measured `cv2.dnn` pass time |
+| `choose_mode` | standard look (≥ 78%, 1 pass) or look harder (≥ 84%, + 2×2 tiles, STUDY-18): the cheapest that keeps the goal, else the strongest the compute budget allows — every option is listed with its promise, cards and compute | the goal, the compute budget, the measured `cv2.dnn` pass time |
 | `perceive` | every frame through the frame agent below | — |
 | `replan` + `retier` | the measured pace would overrun the compute budget, or the closer look failed on a frame → standard look for the rest, earlier frames re-tiered (the standard promise still holds) | the pace · a tool failure |
 | `retry` | a frame's detector call found the network still busy with an overrun call → wait for it, run the frame again (not skipped) | a tool timeout |

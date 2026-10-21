@@ -73,7 +73,8 @@ only ask. Requests with unknown hazard or pass IDs are refused.
 2. It appears in the studio's **Approvals** panel (Survey mode), showing who asked, through which
    channel, and why.
 3. A named person approves or declines it. With `DEPTH_APPROVER_PIN` set, deciding also needs the PIN,
-   so a client holding the MCP/API token still cannot approve its own request.
+   so a client holding the MCP/API token still cannot approve its own request; five wrong PINs from one
+   address lock it out for 15 minutes.
 4. The agent reads the outcome with `get_approval_status`. Approved requests are work orders for
    downstream consoles; DEPTH itself never dispatches.
 
@@ -83,7 +84,8 @@ only ask. Requests with unknown hazard or pass IDs are refused.
 |---|---|
 | `DEPTH_MCP_TOKEN` | bearer token required on `/mcp` (401 otherwise). The AWS setup generates one into root-only `/etc/depth/mcp.env`. |
 | `DEPTH_MCP_ALLOWED_HOSTS` | extra Host names for DNS-rebinding protection. Localhost is allowed by default; other hosts get 421. `*` disables the check **only if a token is set**. |
-| `DEPTH_APPROVER_PIN` | deciding a request needs the PIN. The AWS setup generates one into root-only `/etc/depth/approver.env` (`DEPTH_APPROVALS_OPEN=1` skips it). |
+| `DEPTH_APPROVER_PIN` | deciding a request needs the PIN, with a wrong-PIN lockout per client (`DEPTH_PIN_MAX_FAILS` 5, `DEPTH_PIN_LOCK_S` 900). The AWS setup generates one into root-only `/etc/depth/approver.env` (`DEPTH_APPROVALS_OPEN=1` opens approvals on purpose instead). |
+| public mode | behind the proxy (`DEPTH_TRUST_PROXY=1`), with an origin secret, or `DEPTH_PUBLIC=1`: the server refuses to start without `DEPTH_MCP_TOKEN`, `DEPTH_ADMIN_TOKEN` and an approver PIN (or `DEPTH_APPROVALS_OPEN=1`). `DEPTH_PUBLIC=0` overrides for a local proxy test. |
 | `DEPTH_MCP_MAX_FRAMES` | frames per `run_survey` over MCP (default 24; use the jobs API for more) |
 
 The decision log (`trace`) is never exported with `public=true`. Coordinates from the synthetic demo

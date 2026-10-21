@@ -24,7 +24,7 @@ flowchart TD
   G["GOAL<br/>recall to keep · compute s · analyst min · boat min"] --> I["inspect frames<br/>corrupt / blank skipped + reported"]
   I --> A{"does the promise apply here?<br/>OpenCV statistics vs the calibration recordings<br/>(conformal, STUDY-19)"}
   A -->|"no"| W["withdraw the promise · cheapest look<br/>incident + FULL REVIEW request to a person"]
-  A -->|"yes"| M{"how hard to look?<br/>standard ≥ 79% (1 pass) · look harder ≥ 84% (5 passes)<br/>cheapest that keeps the goal, else strongest the compute budget allows"}
+  A -->|"yes"| M{"how hard to look?<br/>standard ≥ 78% (1 pass) · look harder ≥ 84% (5 passes)<br/>cheapest that keeps the goal, else strongest the compute budget allows"}
   M --> P["perceive every frame<br/>Stage 1 · cv2.dnn (+ 2×2 tiles) · evidence"]
   W --> P
   P --> B{"measured pace over<br/>the compute budget?"}
@@ -39,14 +39,14 @@ flowchart TD
 
 | the agent decides alone | it asks a person | evidence it works |
 |---|---|---|
-| how hard to look (perception mode) | — | look harder: promise 79% → **84%**, held on unseen test at **86.0%** (lower bound 82.0%) — STUDY-18 |
+| how hard to look (perception mode) | — | look harder: promise 78% → **84%**, held on unseen test at **86.0%** (lower bound 82.0%) — STUDY-18 (one look restated 79% → 78% by STUDY-21) |
 | whether its promise applies to this recording | a **full review** when it does not | another sonar: withdrawn in **22 of 22** surveys (one look keeps 23.9% of its pots there); kept for all 3 test recordings — STUDY-19 |
 | which seabed measurement to trust, per chunk | — | fresh 1-h recording: 280 of 280 chunks resolved, 3 of 3 gross tracker failures corrected — STUDY-16 |
 | where pins go and which passes are worth boat time | inspection / recovery routes, each re-survey pass | without Stage 1, 151 of 222 pins leave their own error circle — STUDY-12 |
 | when to stop (budget, nothing left to change) | — | every skip is logged with its reason |
 
 The same goal gives different runs on different data and machines: no recall asked → look harder;
-"≥ 79%" → the cheaper single look; a tight compute budget → the mode is priced with the measured pass
+"≥ 78%" → the cheaper single look; a tight compute budget → the mode is priced with the measured pass
 time, and the run drops to one look mid-way if the pace would overrun; a raw river recording → no
 promise, a full-review request. Every step is in `agent_run` (Agent tab, API, MCP `run_survey`).
 
@@ -174,7 +174,7 @@ validation recordings Rec10 / 12 / 16 (**163 unique frames**, 186 pots) and veri
 
 | Promise (95% confidence) | Requested | What EXP-003 (deployed) can support | Verified on test |
 |---|---|---|---|
-| **Recall** — pots that reach a human (CONFIRMED+REVIEW) | ≥ 90% | **≥ 79%** — 90% is impossible: the detector's recall ceiling on the calibration recordings is 0.85 (EXP-001: ≥ 65%) | **held** — 81.1% (the test's own lower bound 76.7%) |
+| **Recall** — pots that reach a human (CONFIRMED+REVIEW) | ≥ 90% | **≥ 78%** (79% by Clopper-Pearson alone; restated for correlated frames, STUDY-21) — 90% is impossible: the detector's recall ceiling on the calibration recordings is 0.85 (EXP-001: ≥ 65%) | **held** — 81.1% (the test's own lower bound 76.7%) |
 | **Precision** — CONFIRMED finds that are real | ≥ 85% | **none** — the best any threshold supports is 56.5% | — (nothing auto-confirmed) |
 
 So with EXP-003 **every find goes to a human**, in P(pot) order. That is the honest consequence of the
@@ -283,7 +283,7 @@ and every survey exports its decision log (`mission.trace.jsonl`).
 |---|---:|---|
 | Substantive OpenCV 5 + agent | 30% | the agent's tools *are* OpenCV ops: Stage-1 bottom tracking, `cv2.remap` slant→ground, luminance; `cv2.dnn` detect; re-look + CLAHE; thin-line shadow; water-column check; sensor cross-check re-runs the OpenCV tracker on a conflict. **Proof OpenCV matters:** with Stage 1 removed, 151 of 222 pins leave their error circle (`docs/reports/causal_trace.md`) |
 | Orchestration & autonomy | 25% | **the core loop** (§0): an operator goal; the agent checks its promise applies, chooses its perception mode, watches its compute budget and re-plans mid-run, then plans and asks; value-of-information tool use; compute, analyst **and boat** budgets; **sensor cross-check** decides per chunk which sensor to trust, re-tracks and re-fits the range scale with no person (STUDY-16, on by default); stitching; repeat-sighting merge; routes; opposite-side re-survey planning (§3, §6) |
-| Task effectiveness | 20% | recall promises that **held on unseen test** (≥ 84% looking harder, held at 86.0%; ≥ 79% with one look, held at 81.1%); the promise withdrawn where it would fail silently (another sonar: 22 of 22); honest "no auto-confirm"; cross-check validated on a fresh 1-h recording (2 of 3 pre-registered checks passed; the failure is reported); effort study built, not yet run with people (§4, §6) |
+| Task effectiveness | 20% | recall promises that **held on unseen test** (≥ 84% looking harder, held at 86.0%; ≥ 78% with one look, held at 81.1%; checked for correlated frames, STUDY-21); the promise withdrawn where it would fail silently (another sonar: 22 of 22); honest "no auto-confirm"; cross-check validated on a fresh 1-h recording (2 of 3 pre-registered checks passed; the failure is reported); effort study built, not yet run with people (§4, §6) |
 | Failure handling & human control | 15% | a failed tool never raises: the agent falls back to the detector score and sends the find to a person; failure drills you can run (`?simulate=tool_failed`, `tool_timeout`, `no_detection`); bounded LOW-RISK tier; budgeted REVIEW queue; **person-confirmed loop** re-plans routes from a named person's ✓ / ✕ / recovered; MCP agents can only *ask* (`approvals.py`); missed-pot labels; blinded audit (§5, §6) |
 | User experience | 10% | calm glass studio with five modes (Analyze · Survey · Study · Audit · Connect) and a guided 60-s demo: guarantee badges, evidence cards with the full trace, seabed overlay, map + routes + re-survey passes, person-confirmed recovery route, 3D twin, live effort curve, downloads |
 

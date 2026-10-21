@@ -75,5 +75,10 @@ the [dataset card](dataset_card.md). Respect each source's attribution and share
   `/mcp`, an admin token for webhook management (both generated root-only by the setup script), and
   webhook targets checked against private / link-local addresses. The AWS setup also generates an
   **approver PIN** (root-only `/etc/depth/approver.env`), so only people holding it can decide; the
-  judges receive it privately with the submission. `DEPTH_APPROVALS_OPEN=1` skips the PIN, and the
-  studio then says that approvals are open to anyone.
+  judges receive it privately with the submission. Five wrong PINs within 15 minutes lock that client out
+  for 15 minutes, even with the right PIN (`DEPTH_PIN_MAX_FAILS`, `DEPTH_PIN_LOCK_S`; 2026-10-21).
+  `DEPTH_APPROVALS_OPEN=1` opens approvals on purpose instead, and the studio then says that approvals are
+  open to anyone.
+- **No open door by default (2026-10-21):** locally every token is optional and its feature open; a server
+  in public mode (behind the proxy, an origin secret set, or `DEPTH_PUBLIC=1`) **refuses to start** without
+  `DEPTH_MCP_TOKEN`, `DEPTH_ADMIN_TOKEN` and `DEPTH_APPROVER_PIN` (or the explicit `DEPTH_APPROVALS_OPEN=1`).

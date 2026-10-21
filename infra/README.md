@@ -101,6 +101,13 @@ Every machine runs the same commit, frames, model and recordings (all SHA-256 pi
 
 Load test (pass mark fixed in the code before any run — 0 errors, analyze p95 ≤ 3 s with 4 clients back
 to back + 1 survey, health p95 ≤ 1 s): `python -m src.bench.load_test https://<demo> --label c8g_large`.
+The 2026-10-20 pass (p95 2.0 s) ran **before** the look-harder mode became the analyze default (5 forward
+passes on an idle server); analyze now takes the compute already queued for the network off its 2-s budget,
+so a busy server gets the standard look. Re-run the load test after the next deploy.
+
+The server refuses to start in public mode (behind the proxy) without `DEPTH_MCP_TOKEN`,
+`DEPTH_ADMIN_TOKEN` and `DEPTH_APPROVER_PIN` (or `DEPTH_APPROVALS_OPEN=1`); `setup_cool_instance.sh`
+generates all three, so a normal deploy is unaffected.
 
 ## Security and responsible operation
 

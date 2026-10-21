@@ -43,7 +43,7 @@ dashed violet = optional. Text version:_
   goal (recall · compute · analyst · boat minutes) ─► inspect frames ─► does the promise apply here?
          (OpenCV statistics vs the calibration recordings, conformal)                 src/agentic/applicability.py
          no ─► promise withdrawn · cheapest look · full-review request to a person
-         yes ─► choose the perception mode (standard ≥ 79% · look harder ≥ 84%)        models/<MODEL>/calibration.json
+         yes ─► choose the perception mode (standard ≥ 78% · look harder ≥ 84%)        models/<MODEL>/calibration.json
          ─► perceive every frame (below), watching the pace ─► overrun ─► re-plan: standard look, re-tier
          ─► plan (SURVEY below) ─► one approval request per action ─► a person decides ─► re-plan
  RUNTIME (per frame, CPU, OpenCV 5)                                                  models/<MODEL>/calibration.json
@@ -171,8 +171,10 @@ uses the same choice against an interactive compute budget (`DEPTH_INTERACTIVE_S
 * **P(pot)** bins for queue order and budget forecasts; seven scoring policies compared at the same
   promise, a re-look policy is adopted only with a significant paired-bootstrap gain.
 
-EXP-003 (deployed): **≥ 79% of pots reach a human, held on test (81.1%, LCB 76.7%)**; 90% not
-achievable (recall ceiling 0.85 on the calibration recordings). The **look-harder** mode (STUDY-18:
+EXP-003 (deployed): **≥ 78% of pots reach a human, held on test (81.1%, LCB 76.7%)**; 90% not
+achievable (recall ceiling 0.85 on the calibration recordings). Clopper-Pearson alone supports 79%; the
+promise must also survive correlated frames — a block bootstrap over runs of 8 ping indices within each
+recording (STUDY-21, rule R1, applied by `calibrate.py`) gives 78.2%, so it was restated to 78%. The **look-harder** mode (STUDY-18:
 full frame + 2×2 tiles, the scale EXP-003 trained on) raises the ceiling to 0.89 and keeps **≥ 84%,
 held on test (86.0%, LCB 82.0%)** at 3.86 vs 2.68 cards per test frame
 ([`look_harder.md`](reports/look_harder.md)).
@@ -409,7 +411,7 @@ DATASET/scripts/  audit_dataset · build_dataset_v1/v2/v2b · build_tiles · vis
 
 ## 13. Known limits (stated in the product)
 
-* Recall ceiling: EXP-003 reaches 0.85 on the calibration recordings with one look (promise 79%) and 0.89
+* Recall ceiling: EXP-003 reaches 0.85 on the calibration recordings with one look (promise 78%) and 0.89
   when the agent looks harder (promise 84%) — not 90%. Five later runs did not beat it; the limit is data
   (3 validation recordings, label noise), not the recipe.
 * The applicability check is coarse: it catches another sonar or rendering, not subtle drift within one

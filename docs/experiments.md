@@ -115,6 +115,24 @@ Promote each into the log below with full results as it runs.
 
 ## Experiment log
 
+### STUDY-22 — Data dropouts in a raw recording, per ping (DONE — on for raw recordings)
+
+- **Why.** The problem statement names "data dropouts caused by underwater vehicle motion (heave, pitch,
+  and roll)"; the code handled none (judge audit). Humminbird pings carry no attitude, so pitch and roll
+  cannot be measured here; dropouts can — from the recording itself.
+- **Method** (`humminbird.chunk_dropouts`): a ping is a dropout if the time since the previous ping is
+  > 3× the channel's median interval (missing pings), or its mean intensity is < 25% of the median of its
+  51 neighbours or of the whole channel, or it holds almost no non-zero samples (not imaged). The
+  thresholds are **design assumptions, not fitted** (no labelled dropouts exist).
+- **Checks:** injected dropouts on Rayleigh speckle (`tests/test_dropouts.py`): blank and weak pings, a
+  4-interval time gap and a fully dark chunk are all found, clean speckle (5 seeds) gives 0 flags. Real
+  recordings: Test-Small-DS **0 of 6,906** pings; Test-Large-DS **2 of 140,032** (one 0.2-s recording gap,
+  at the same ping on both sides) — no false dark flags.
+- **Shipped:** per frame and per recording in `frames_and_track`; the core loop logs `check_dropouts`, files
+  a `data_dropout` incident per affected frame (the promise covers imaged seabed only; re-survey the stretch)
+  and notes every find that touches one. Heave is followed by Stage 1's per-ping bottom track (±8 rows);
+  pitch and roll are stated as not corrected. Report line: [`raw_recording.md`](reports/raw_recording.md).
+
 ### STUDY-21 — Does the recall promise survive correlated frames? (DONE — standard promise restated 79% → 78%; look harder stands)
 
 - **Result (A1, calibration split, 186 pots):** standard look at τ 0.06 — CP bound 79.4%, block bootstrap
@@ -224,8 +242,10 @@ Promote each into the log below with full results as it runs.
   look harder **0.860 (lower bound 0.820) ≥ 84% — held** (**G1, G2 PASS**). Cards / frame 2.68 → 3.86.
 - **Decision:** shipped as `modes.look_harder` in `calibration.json`. The core loop (`core.py`) chooses it
   from the operator's goal and compute budget: with no recall asked for it keeps the strongest promise the
-  compute budget allows; asked for ≥ 79% it takes the cheaper standard look. Cost: 4 extra passes per
-  frame (2.7 s per frame on the development laptop while throttled; EC2 numbers to follow).
+  compute budget allows; asked for ≥ 78% (79% before STUDY-21) it takes the cheaper standard look. Cost: 4
+  extra passes per frame — measured 2026-10-21 on the laptop with the two modes interleaved: 406 → 2,110 ms
+  p50 per frame, 4.7–5.9× per repeat (`benchmarks/laptop_x86_modes*`); EC2 numbers to follow. The frame
+  agent did not time the tile pass in any stage until that day (fixed: a `look_harder` stage).
   Report: [`docs/reports/look_harder.md`](reports/look_harder.md) · `python -m src.agentic.study_look_harder --verify`.
 
 ### STUDY-17 — COOL on Graviton4 vs stock OpenCV vs x86: the product workload (REGISTERED 2026-10-19, not yet run)
@@ -466,6 +486,15 @@ card review under ~8 s and/or imperfect manual recall — both are exactly what 
 DEPTH's order equals confidence order for EXP-001 (STUDY-07); its measurable extras are the promise
 (when to stop) and a forecast that held (slightly conservative). Status: **study pending** (needs
 3+ people). A higher recall ceiling (EXP-002) moves the promise and the card count.
+
+**Update 2026-10-21 (EXP-003, promise 78%).** At the promise on the verification split: DEPTH 62.7 vs
+manual 55.7 min (470 cards; break-even card time 7.11 s) — DEPTH is **slower** at the assumed timings.
+The forecast was **biased low by 22%** (161.4 vs 206 real pots) and the report now says so. Two new rows:
+**survey mix** — on the calibration split the queue raises 2.05 cards per empty frame and 4.03 per pot
+frame, so DEPTH (every card) beats manual review (every frame) only when fewer than **23%** of frames hold
+a pot (46 vs 56 min per survey-hour on empty seabed); **real water** — the 1-h Solix recording through
+the Survey tab's own path gives **54 cards per hour** (another sonar: the promise is withdrawn there, so
+it is a card load, not a recall-backed saving). `python -m src.agentic.effort --real-water`.
 
 ### EXP-005 / EXP-005a — cleaned data + stronger brightness/scale jitter, two seeds — DONE (NEGATIVE)
 

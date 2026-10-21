@@ -2,7 +2,8 @@
 
 **Team Syndicate · OpenCV AI Competition 2026**
 This is the living status of the project. Update it at the end of every working session:
-what moved, what's blocked, what's next. Newest entries at the top of §4.
+what moved, what's blocked, what's next. Newest entries at the top of §4. **Judges: this is the working
+log — start at [`JUDGES.md`](JUDGES.md) (one page) or the [README](../README.md).**
 
 **Related:** [`README.md`](../README.md) · [`architecture.md`](architecture.md) ·
 [`experiments.md`](experiments.md)
@@ -52,14 +53,15 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ---
 
-## 3. Current state (2026-10-20)
+## 3. Current state (2026-10-21)
 
 - **Working end to end:** the studio and the agent on CPU with OpenCV 5 — the goal-driven core loop
   (`core.py`: check the promise applies → choose how hard to look → perceive with a compute-budget watch →
-  plan → ask), Stage 1, the EXP-003 detector through `cv2.dnn`, evidence, guaranteed tiers (≥ 79% one
-  look, ≥ 84% looking harder), survey planning and person-approved actions — on the sample frames and on
-  a raw Humminbird recording with real GPS. `ruff check .` is clean; the full suite needs a re-run after
-  sweep 68 (the last full run was stopped by low system memory, see below).
+  plan → ask), Stage 1, the EXP-003 detector through `cv2.dnn` (new engine, recorded), evidence, calibrated
+  tiers (≥ 78% one look, ≥ 84% looking harder — both checked for correlated frames), survey planning and
+  person-approved actions — on the sample frames and on a raw Humminbird recording with real GPS and a
+  per-ping dropout mask. `ruff check .` (with bugbear) is clean; the full suite passes (278, 2026-10-21;
+  coverage 61% of `src/`, 86% of the runtime modules).
 - **Waiting on AWS:** the Graviton + COOL runs (the Marketplace subscription is with AWS Support) and
   CloudFront (account verification). The stock EC2 benchmarks and the demo-server load test are done.
 - **Needs people:** the timed user study and the blinded false-alarm audit.
@@ -75,6 +77,34 @@ Current numbers, each with its split: README "At a glance" and
 ---
 
 ## 4. Session log
+
+### 2026-10-21 (sweep 69) — the judge audit, fixed where code and data could fix it
+
+Every item of the local `JUDGE_AUDIT.md` was checked against the repo first; the ones that held were fixed:
+
+- **STUDY-20 — OpenCV 5 engines:** `ENGINE_AUTO` loads the **new** engine (bit-identical outputs); the
+  product now loads it explicitly and records it (`/api/health`, provenance, benchmarks). Same answers as
+  the classic engine (634 of 634 detections, 0 tier flips); speed on the laptop: within noise — no claim.
+  `bench_cool.sh` runs the study on every EC2 machine.
+- **STUDY-21 — correlated frames** (protocol committed first, `0819d50`): block bootstrap within
+  recordings → the one-look promise **restated 79% → 78%**; looking harder 84% stands; per recording 5 of
+  6 (Rec9 74.7%). `calibrate.py` applies the rule itself, and its defaults now follow `--model` (the
+  documented command would have recalibrated EXP-003 on EXP-001's v1 split).
+- **STUDY-22 — data dropouts** per ping on raw recordings (time gaps, dark pings) → `data_dropout` incidents
+  and notes; 0 / 2 dropped pings on the two real recordings; pitch and roll stated as not corrected.
+- **Effort, honestly:** the forecast's −22% bias is named; survey mix (DEPTH faster only when < 23% of
+  frames hold a pot, at assumed timings); the 1-h real recording gives 54 cards per hour.
+- **Found on the way (not in the audit):** the look-harder tile pass was in no timing stage (fixed); the
+  c8g.large load test predates the look-harder default — analyze now prices its look against the server
+  queue; the benchmark's survey workload docstring overclaimed; `guarantees.py` claimed a bootstrap that did
+  not exist.
+- **Code:** `TriageAgent` (was `ReLookAgent`); the test-tuned legacy ladder left the product (an
+  uncalibrated model sends every find to a person); wrong-PIN lockout; a public server refuses to start
+  without its tokens; analyze responses 34% lighter + gzip; ruff with bugbear; 16 exception chains.
+- **Docs:** `docs/JUDGES.md` (one page + glossary), README limits section, every 79% → 78% with the reason,
+  video script with an "if COOL has not run" line, technical report, model card.
+- **Tests:** 278 passed (two halves, low memory), 0 failed. **Not done here (needs the owner or people):**
+  COOL, a public URL, the load-test re-run, the timed study, the blinded audit, the video, Lucidchart.
 
 ### 2026-10-20 (sweep 68) — the agent at the core: a goal-driven loop, a stronger promise, and knowing when it does not apply
 

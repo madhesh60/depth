@@ -6,7 +6,7 @@ in with ONE command.
 History:
 
 - EXP-002 was underfit ([`exp002_diagnosis.md`](reports/exp002_diagnosis.md)).
-- EXP-003 fixed that and raised the recall promise from 65% to 79%
+- EXP-003 fixed that and raised the recall promise from 65% to 79% (78% once correlated frames are accounted for, STUDY-21)
   ([`exp003_diagnosis.md`](reports/exp003_diagnosis.md)).
 - EXP-004's data cleanup helped wrecks but not pots ([`exp004_diagnosis.md`](reports/exp004_diagnosis.md)).
 - EXP-005's stronger brightness/scale jitter made pots **worse** on both seeds (Δ −0.10 / −0.07). The
@@ -146,7 +146,7 @@ DEPTH_MODEL=EXP-005 python -m uvicorn src.dashboard.app:app --port 8000
 ## Success criteria
 
 - recall ceiling at the detector floor on the calibration recordings: **0.72 → ≥ 0.85**
-  (EXP-003: 0.85 on val; promise ≥ 79%, held on test at 81%)
+  (EXP-003: 0.85 on val; promise ≥ 78%, held on test at 81%)
 - crab-pot AP@0.5 on the v2b unique-frame test: **≥ 0.60**
 - official 398-frame split F1 within 0.05 of GhostVision (0.71–0.73)
 - recall promise ≥ 90% (95% confidence), held on test

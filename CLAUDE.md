@@ -47,7 +47,7 @@ fishing gear and wreck debris.
 **The core loop** (`src/agentic/core.py`, `SurveyAgent`) runs every survey toward the operator's goal
 (recall to keep; compute, analyst and boat minutes): inspect frames → **check the promise applies**
 (`applicability.py`, STUDY-19; withdrawn → no promise, cheapest look, `full_review` request) →
-**choose the perception mode** (`standard` ≥ 79% or `look_harder` ≥ 84% from `calibration.json`
+**choose the perception mode** (`standard` ≥ 78% or `look_harder` ≥ 84% from `calibration.json`
 `modes`, STUDY-18) → perceive (re-plan to `standard` if the measured pace would overrun the compute
 budget) → plan → one approval request per action. Every step is logged in `agent_run`.
 
@@ -62,8 +62,9 @@ budget) → plan → one approval request per action. Every step is logged in `a
 2. **See** — YOLO11 ONNX via `cv2.dnn` (`src/detection/infer.py`), class-aware NMS.
 3. **Prove** — shadow, relative height, water-column check. This is evidence, never a silent gate.
 4. **Decide** — guaranteed tiers fit on held-out recordings (`src/agentic/calibrate.py`). EXP-003
-   promises ≥ 79% of pots reach a human with one look (81% on test) and ≥ 84% when the agent looks
-   harder (86% on test, `study_look_harder.py`). There is no precision promise, so nothing is
+   promises ≥ 78% of pots reach a human with one look (81% on test; Clopper-Pearson alone gave 79%, restated
+   for correlated frames by STUDY-21 — `study_dependence.py`, applied by `calibrate.py` itself) and ≥ 84% when
+   the agent looks harder (86% on test, `study_look_harder.py`). There is no precision promise, so nothing is
    auto-confirmed. **Active vision** (`active.py`, `evidence_model.py`, STUDY-15) failed both gates,
    so it is **off by default** (studio experimental switch / `?active=1`).
 5. **Act** — geotags, chunk stitching, repeat-sighting merge, routes, re-survey passes,
@@ -126,7 +127,7 @@ budget) → plan → one approval request per action. Every step is logged in `a
 ```bash
 # Run and check
 python -m uvicorn src.dashboard.app:app --port 8000    # the studio (Analyze/Survey/Study/Audit)
-pytest -q                                              # 225 tests (~2 min to collect)
+pytest -q                                              # 278 tests; coverage 61% of src/ (86% runtime)
 python -m ruff check .                                 # lint (config: pyproject.toml)
 python -m src.detection.fetch_model                    # detector weights (SHA-256 checked)
 python -m src.dashboard.mcp_server                     # MCP over stdio
@@ -148,6 +149,8 @@ python -m src.agentic.evidence_model                   # STUDY-15
 python -m src.agentic.study_sensor                     # STUDY-16
 python -m src.agentic.study_look_harder --verify       # STUDY-18 (calibration -> test once)
 python -m src.agentic.study_applicability --verify     # STUDY-19 (fit -> verify once)
+python -m src.bench.dnn_engine --label <host>          # STUDY-20: classic vs new cv2.dnn engine
+python -m src.agentic.study_dependence                 # STUDY-21 (block bootstrap; --write applies R1)
 python -m src.agentic.counterfactual                   # detector only vs + Stage 1 + evidence
 
 # New Kaggle model: validate per source (never test), then plug it in

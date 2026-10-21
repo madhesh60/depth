@@ -49,14 +49,15 @@ is; the remaining problems are in the data (off-domain wreck screenshots, loose 
 training recipe ([`exp003_diagnosis.md`](reports/exp003_diagnosis.md) §3).
 
 **Agent tiers (`docs/calibration_exp003.md`):** fit on the held-out validation recordings (163 unique
-frames, 186 pots), verified once on unseen test (199 unique frames, 264 pots). Promise: **≥ 79% of pots
-reach a human (95% confidence) — held on test at 81.1% (lower bound 76.7%)**. The requested 90% is not
+frames, 186 pots), verified once on unseen test (199 unique frames, 264 pots). Promise: **≥ 78% of pots
+reach a human (95% confidence) — held on test at 81.1% (lower bound 76.7%)** (Clopper-Pearson alone: 79%;
+restated so it survives correlated frames, STUDY-21 — a pooled rate: one of six recordings reached 74.7%). The requested 90% is not
 achievable (recall ceiling 0.85), and no ≥ 85% precision promise is supportable (best 0.565), so nothing
 is auto-confirmed: every find goes to a person, in P(pot) order. Re-look policies did not beat plain
 detector confidence on the calibration recordings, so the agent does not spend them. The acoustic
 shadow is evidence and relative height, never a gate.
 
-Compared with EXP-001 on each model's own unseen data: recall promise ≥ 65% → **≥ 79%**, review cards
+Compared with EXP-001 on each model's own unseen data: recall promise ≥ 65% → **≥ 78%**, review cards
 per frame 3.2 → 2.7 (test), ranking AUC 0.74 → 0.80 (val). There is no same-frames head-to-head: EXP-001
 is not leakage-free on v2b test.
 

@@ -8,6 +8,7 @@ Every number in these documents names its split and the command that regenerates
 
 | read | for |
 |---|---|
+| [`JUDGES.md`](JUDGES.md) | one page: what DEPTH is, three clicks to try it, the numbers that matter, what is not done, a glossary |
 | [`technical_report.md`](technical_report.md) | the whole system, its evaluation and its limits, in one document |
 | [`agentic_vision.md`](agentic_vision.md) | the Agentic Vision entry: how perception changes the agent's next action |
 | [`agentic_loop.md`](agentic_loop.md) | the loop step by step: SEE → PROVE → DECIDE → ACT, with a person in charge |
@@ -20,7 +21,9 @@ Every number in these documents names its split and the command that regenerates
 
 | claim | report |
 |---|---|
-| ≥ 79% of pots reach a person (95% confidence), held at 81.1% on unseen test | [`calibration_exp003.md`](calibration_exp003.md) *(generated)* |
+| ≥ 78% of pots reach a person (95% confidence), held at 81.1% on unseen test | [`calibration_exp003.md`](calibration_exp003.md) *(generated)* |
+| the promise survives correlated frames: restated 79% → 78% by a block bootstrap; per recording 5 of 6 (STUDY-21) | [`dependence.md`](reports/dependence.md) *(generated)* |
+| OpenCV 5's new DNN engine loads by default and gives the same answers as the classic one (STUDY-20) | [`dnn_engine.md`](reports/dnn_engine.md) *(generated)* |
 | ≥ 84% when the agent looks harder (2×2 tile pass), held at 86.0% on unseen test (STUDY-18) | [`look_harder.md`](reports/look_harder.md) *(generated)* |
 | the agent withdraws its promise where it does not apply: another sonar flagged in 22 of 22 surveys (STUDY-19) | [`applicability.md`](reports/applicability.md) *(generated)* |
 | detector: crab-pot AP@0.5 0.482, mAP@0.5:0.95 0.106; confusion matrix + PR curve | [`eval_exp003_test.md`](reports/eval_exp003_test.md) · [`…_official398`](reports/eval_exp003_test_official398.md) · [`…_xsonar`](reports/eval_exp003_test_xsonar.md) *(generated)* |

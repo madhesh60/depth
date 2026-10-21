@@ -18,7 +18,7 @@
 
 | | value | split |
 |---|--:|---|
-| recall promise: share of pots that reach a human (95% confidence) | **≥ 79%** | fit on validation (Rec10/12/16) |
+| recall promise: share of pots that reach a human (95% confidence) | **≥ 78%** (79% at release; restated 2026-10-21 for correlated frames, STUDY-21) | fit on validation (Rec10/12/16) |
 | the promise on unseen data | **held: 81.1%** (lower bound 76.7%) | v2b test, 264 pots, scored once |
 | ghost gear AP@0.5 (95% CI) | 0.482 (0.43–0.55) | v2b test, 285 pots |
 | wreck debris AP@0.5 | 0.156 (weak: see [`exp005_diagnosis.md`](reports/exp005_diagnosis.md)) | v2b test, 70 boxes |

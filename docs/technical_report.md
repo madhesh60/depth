@@ -4,7 +4,7 @@
 OpenCV AI Competition 2026 · Team Syndicate (solo — Madhesh) · Tracks: **Agentic Vision**, **Best Use
 of COOL** · Code: <https://github.com/madhesh60/depth> (AGPL-3.0)
 
-> Status of 2026-10-12, deployed detector EXP-003. Every number names its split and links the script-generated report it comes
+> Status of 2026-10-21, deployed detector EXP-003. Every number names its split and links the script-generated report it comes
 > from. Items marked **⏳ pending** are measurements that have not been taken yet; they are left
 > empty rather than estimated.
 
@@ -21,13 +21,15 @@ Graviton + COOL**.
 
 | claim | evidence |
 |---|---|
-| **≥ 84% of pots reach a human when the agent looks harder** (95% confidence; ≥ 79% with one look), fit on held-out recordings and verified once on unseen test: **86.0% (LCB 82.0%)**, and 81.1% (LCB 76.7%) with one look — EXP-003, the deployed detector | [`look_harder.md`](reports/look_harder.md) · [`calibration_exp003.md`](calibration_exp003.md) |
+| **≥ 84% of pots reach a human when the agent looks harder** (95% confidence; ≥ 78% with one look), fit on held-out recordings and verified once on unseen test: **86.0% (LCB 82.0%)**, and 81.1% (LCB 76.7%) with one look — EXP-003, the deployed detector | [`look_harder.md`](reports/look_harder.md) · [`calibration_exp003.md`](calibration_exp003.md) |
+| **The promises survive correlated frames**: a block bootstrap within recordings supports 78.2% for one look — so Clopper-Pearson's 79% was restated to 78% — and 84.3% looking harder (stands). A pooled rate: per recording, one look held on 5 of 6 | [`dependence.md`](reports/dependence.md) (STUDY-21) |
 | **The agent withdraws its promise where it does not apply**: on another sonar in 22 of 22 surveys (one look keeps 23.9% of the pots there), never on the 3 test recordings | [`applicability.md`](reports/applicability.md) |
-| **A goal-driven core loop** chooses how hard to look from the operator's goal and compute budget, and re-plans mid-run on its measured pace | [`core.py`](../src/agentic/core.py) · §2 |
+| **A goal-driven core loop** chooses how hard to look from the operator's goal and compute budget, and re-plans mid-run on its measured pace or a failed closer look; a single analyze call prices its look against the server's queue | [`core.py`](../src/agentic/core.py) · §2 |
+| **OpenCV 5's new DNN engine** is the one that loads, recorded in every result's provenance; it gives the same answers as the classic engine (634 of 634 detections, 0 tier flips) | [`dnn_engine.md`](reports/dnn_engine.md) (STUDY-20) |
 | Stage 1 measures the sonar's altitude without labels; port and starboard agree to **1.6 px** (random pairs 5.3 px) | [`stage1_canonical.md`](reports/stage1_canonical.md) |
 | OpenCV output changes the agent's actions: without Stage 1, **151 of 222** pins leave their own error circle and 4 of 40 re-survey passes regroup (EXP-003, v2b test); the shadow changes no decision (evidence only) | [`causal_trace.md`](reports/causal_trace.md) |
-| Break-even analyst time: DEPTH meets the promise faster than manual review if a card takes **< 6.88 s** (timings assumed until the study runs) | [`effort_curve.md`](reports/effort_curve.md) |
-| Full product path **252 ms/frame p50** on a laptop CPU; one survey-hour of sonar in **51 s** | [`cool_benchmark.md`](reports/cool_benchmark.md) |
+| Analyst effort, honestly: at assumed timings DEPTH is **slower** than manual review on the pot-dense test (62.7 vs 55.7 min; break-even card time 7.11 s) and faster only when fewer than 23% of frames hold a pot | [`effort_curve.md`](reports/effort_curve.md) |
+| Product frame, standard look: **157 ms** (x86) / **197 ms** (Graviton4), 4 vCPU, stock OpenCV 5; looking harder costs ≈ 5× | [`cool_benchmark.md`](reports/cool_benchmark.md) |
 | A **raw sonar recording with real GPS** is read directly and checked against physics (GPS speed vs the speed field r = 0.95; course vs heading 2.4°), with a **measured range scale** (2.03 cm/sample ± 10.2% after the agent cross-checks its seabed track against the depth sounder) → pins and heights in real metres | [`raw_recording.md`](reports/raw_recording.md) |
 | A person's decision makes the agent **re-plan** the recovery route, queue, budget and passes; an impact ledger measures the reviewed precision | [`agentic_vision.md`](agentic_vision.md) |
 
@@ -67,10 +69,12 @@ this take, and where exactly do I send the boat?"
 recall to keep; compute, analyst and boat minutes). The agent (1) inspects the frames, (2) checks that
 its promise applies — eight OpenCV statistics per frame, conformal p-values against the calibration
 recordings; if not, it withdraws the promise and asks a person for a full review (STUDY-19), (3) chooses
-how hard to look — the standard full-frame look (≥ 79%) or the look-harder mode with a 2×2 tile pass
+how hard to look — the standard full-frame look (≥ 78%) or the look-harder mode with a 2×2 tile pass
 (≥ 84%, STUDY-18), priced with its measured `cv2.dnn` pass time, (4) perceives every frame through the
-stages below, re-planning to the standard look if the pace would overrun the compute budget, and (5) plans
-and asks. Every decision, with the options weighed, is logged in `agent_run`.
+stages below, re-planning to the standard look if the pace would overrun the compute budget or the closer
+look fails on a frame, and (5) plans and asks. On a raw recording it also logs the per-ping data dropouts
+it found (pings after a time gap, or not imaged) and flags every find that touches one. Every decision,
+with the options weighed, is logged in `agent_run`.
 
 The **runtime** processes each frame through five stages, all OpenCV 5 on CPU:
 
@@ -129,7 +133,7 @@ validation recordings and verifies on test. Training runs on Kaggle; the runtime
 | stage | OpenCV 5 operations | what the result changes |
 |---|---|---|
 | Stage 1 | `cvtColor`, `medianBlur` / `blur` + per-ping reductions for the bottom track, `remap` (slant → ground), `resize` | geotags, error radii, relative heights, water-column flags, re-survey geometry (§4.3) |
-| See | `dnn.readNetFromONNX`, `blobFromImage`, `dnn.NMSBoxesBatched` | candidates, tiers, P(pot), the queue |
+| See | `dnn.readNetFromONNX` on OpenCV 5's **new engine** (loaded explicitly, recorded in provenance; STUDY-20), `blobFromImage`, `dnn.NMSBoxesBatched` | candidates, tiers, P(pot), the queue |
 | Prove | crops + upscales for the re-look, `createCLAHE`, thin-line shadow statistics on the canonical view | card evidence; the re-look is spent only where it can change a tier or queue position |
 | Act | (plain geometry on Stage-1 output: ground range → metres → lat/lon — not an OpenCV call) | routes, passes, exports |
 | Training data | `seamlessClone` for sonar-aware copy-paste (`build_tiles.py --paste`) | EXP-002 training set |
@@ -169,7 +173,8 @@ Tiers are fit on the **calibration split** (held-out recordings Rec10 / 12 / 16:
 186 pots) with Clopper–Pearson / Learn-Then-Test and **verified once** on the verification split (Rec8 /
 9 / 14: 199 unique frames, 264 pots) ([`calibration_exp003.md`](calibration_exp003.md)):
 
-- **Recall promise ≥ 79%** with one look (95% confidence; the requested 90% is above the detector's 0.85 ceiling). Verified: **81.1%, lower confidence bound 76.7% — held.** EXP-001's promise was ≥ 65%.
+- **Recall promise ≥ 78%** with one look (95% confidence; the requested 90% is above the detector's 0.85 ceiling). Verified: **81.1%, lower confidence bound 76.7% — held.** EXP-001's promise was ≥ 65%.
+- **The promise survives correlated frames** (STUDY-21, [`dependence.md`](reports/dependence.md); protocol committed before any number was computed). Clopper-Pearson treats every pot as independent, but port and starboard frames of the same pings and consecutive frames of a recording are not. A block bootstrap — runs of 8 ping indices, resampled within each recording — gives a 95% bound of **78.2%** for one look (design effect 1.86; CP alone 79.4%), so the registered rule restated the promise from 79% to **78%**; looking harder gives 84.3%, so ≥ 84% stands. `calibrate.py` now applies the rule itself. The promise is a **pooled rate**: per recording, one look met 78% on 5 of 6 recordings (test Rec9, the largest, 74.7%), and leave-one-recording-out refits held on 3 of 3.
 - **Recall promise ≥ 84% when the agent looks harder** (STUDY-18, [`look_harder.md`](reports/look_harder.md)): the full frame + a 2×2 tile pass at the scale EXP-003 trained on raises the ceiling to 0.892 (paired bootstrap +0.043, 95% CI +0.016..+0.076). Verified once: **86.0%, lower bound 82.0% — held**; cards per test frame 2.68 → 3.86; 4 more forward passes per frame. Protocol committed before the test split was scored.
 - **The promise is checked before it is kept** (STUDY-19, [`applicability.md`](reports/applicability.md)): another sonar (`test_xsonar`) is flagged in 22 of 22 surveys, where one look keeps only 23.9% of the pots; the 3 test recordings and the demo frames keep it. The raw river recordings are flagged too, so they run without a promise and with a full-review request.
 - **No precision promise is supportable** (best achievable 0.565 against the 0.85 target), so nothing is auto-confirmed and every find goes to a human. DEPTH says what it *cannot* promise.
@@ -205,10 +210,22 @@ The effort curve ([`effort_curve.md`](reports/effort_curve.md)) compares three r
 - **a confidence-sorted list**;
 - **DEPTH's cards.**
 
-It reports the **break-even card time: 6.88 s** (EXP-003, verification split, 20 s per frame assumed
+It reports the **break-even card time: 7.11 s** (EXP-003, verification split, 20 s per frame assumed
 for manual review). DEPTH beats manual review at the recall promise whenever a card takes less than
-this. At the assumed 8 s per card it does not: the DEPTH queue takes 65.5 analyst minutes for the 199
-frames, manual review 56.3.
+this. At the assumed 8 s per card it does not: the DEPTH queue takes 62.7 analyst minutes for the 199
+frames, manual review 55.7.
+
+- **Survey mix.** The test split is pot-dense (159 of 199 frames). On the calibration split the queue
+  raises 2.05 cards per empty frame and 4.03 per frame with a pot, so at the same timings DEPTH (every
+  card, ≥ 78% of pots) is faster than manual review (every frame) only when fewer than **23%** of frames
+  hold a pot — 46 vs 56 minutes per survey-hour on empty seabed. The saving is small because the
+  detector still raises about two cards per empty frame.
+- **Real water.** The 1-h Solix recording, run through the Survey tab's own path, gives **54 review cards
+  per hour** (7.2 analyst minutes at 8 s per card, against 93 minutes of manual scrolling at 280 frames
+  per hour). It is another sonar, so the agent withdraws its promise there and asks for a full review —
+  this is the card load, not a recall-backed saving.
+- **The forecast is biased low.** At the promise point the calibrated P(pot) forecast 161.4 real pots;
+  206 were real (−22%). P(pot) is fit on the calibration recordings; budget mode's forecast is an estimate.
 
 - **⏳ pending:** the timed, counterbalanced study built into the app (Study tab, [`user_study.md`](user_study.md)) will replace the assumed 8 s/card with a measurement.
 - **⏳ pending:** the blinded false-alarm audit (Audit tab) will measure how many "false alarms" are unlabelled real objects. Catch trials check the auditors themselves.
@@ -246,8 +263,10 @@ known crab pots.
 | full product path, 1 thread (EXP-001) | laptop x86 | 523 ms | 1.9 | 89 s |
 | full product path, 4 threads (EC2, 2026-10-20) | c8i.xlarge x86, stock OpenCV 5 | 157 ms | 6.4 | 26.5 s · $0.0014 |
 | full product path, 4 threads (EC2, 2026-10-20) | c8g.xlarge Graviton4, stock OpenCV 5 | 197 ms | 5.1 | 33.3 s · $0.0015 |
+| standard vs **look harder** (5 passes), interleaved, 2026-10-21 | laptop x86, stock OpenCV 5, 8 threads | 406 → 2,110 ms | 2.5 → 0.47 | ≈ 5× |
+| `cv2.dnn` forward, classic vs new engine (STUDY-20) | laptop x86, 8 threads / 1 thread | 411 vs 374 ms / 765 vs 886 ms | — | within noise — no claim |
 | real 1-h recording end to end (EC2) | c8i.xlarge x86 / c8g.xlarge Graviton4, stock | — | — | RTF 0.0135 / 0.0171 |
-| load test, 4 clients + 1 survey, 120 s | c8g.large demo server (stock, rehearsal) | p95 2.0 s (mark 3 s) | 291/291 ok | **passed** |
+| load test, 4 clients + 1 survey, 120 s | c8g.large demo server (stock, rehearsal) | p95 2.0 s (mark 3 s) | 291/291 ok | **passed — before the look-harder mode existed; re-run pending** |
 | **⏳ pending:** Graviton **COOL** (c8g.xlarge + c8g.large) | Marketplace subscription waiting on AWS | — | — | — |
 
 **Proposal targets vs delivered.** Stated plainly, because judges compare the two:
@@ -255,9 +274,9 @@ known crab pots.
 | proposal target | delivered | reading |
 |---|---|---|
 | mAP@0.5 ≥ 0.70 | **0.319** (both classes); **crab pots 0.482** (v2b test) | **not met.** Six clean training runs did not close it; the diagnosis points at the data. The recall promise below makes the shortfall safe to use: every pot the promise covers reaches a person. |
-| < 300 ms per frame | 157 ms (x86) / 197 ms (Graviton stock) p50 on EC2, 4 threads; laptop 252 / 530 ms | **met on EC2** at p50 and p95. Graviton COOL pending. |
+| < 300 ms per frame | 157 ms (x86) / 197 ms (Graviton stock) p50 on EC2, 4 threads; laptop 252 / 530 ms | **met on EC2** at p50 and p95 in the standard look. Looking harder (5 passes, chosen only when the goal and budgets allow) is ≈ 5× and does not meet it — by design. Graviton COOL pending. |
 | ≥ 5 FPS | 6.4 FPS (x86) / 5.1 FPS (Graviton stock) on EC2; 3.3 on the laptop | met on EC2. It is also the wrong yardstick for side-scan: one frame per ~21 s of sonar arrives from the boat. What matters is survey-hours processed: **51 s of compute per hour of sonar (70× faster than real time)**. |
-| (not in the proposal) | ≥ 79% of pots reach a person, verified on unseen data (81%) | added: a promise instead of an average |
+| (not in the proposal) | ≥ 78% of pots reach a person (≥ 84% looking harder), verified on unseen data (81% / 86%), checked for correlated frames | added: a promise instead of an average |
 
 The 3-way benchmark ([`infra/README.md`](../infra/README.md)) uses the same code, the same frames and
 the same model (all sha256-pinned), with threads pinned per run. A run counts as COOL only if
@@ -286,9 +305,14 @@ One CloudFormation stack (`infra/cfn/depth.yaml`):
 
 `infra/deploy.sh` is a dry run by default (it prints the change set); `infra/teardown.sh` removes everything.
 
-**Optional:** Amazon Bedrock (Claude) rewrites the mission brief. It writes, never decides: its text is
-shown only if every number and ID traces back to the survey, otherwise the template is served
-(`src/agentic/brief.py`).
+**Optional, not deployed:** Amazon Bedrock (Claude) can rewrite the mission brief. It writes, never decides:
+its text is shown only if every number and ID traces back to the survey, otherwise the template is served
+(`src/agentic/brief.py`). The demo server does not install `anthropic[bedrock]` and its role has no Bedrock
+grant, so the demo serves the template; no grounding pass-rate has been measured.
+
+**Hardening of the public server:** a wrong-PIN lockout per client (5 tries per 15 min) on every decision,
+and a server in public mode refuses to start without its MCP token, admin token and approver PIN (or an
+explicit `DEPTH_APPROVALS_OPEN=1`).
 
 **Scaling path (described, not built):** survey jobs → SQS → an Auto Scaling group of the same COOL AMI
 on Spot → S3.
@@ -300,13 +324,15 @@ on Spot → S3.
 ## 6. Limitations (stated in the product, not hidden)
 
 - **Scope.** One region's crab pots and one sonar family. On another sonar (`test_xsonar`) AP@0.5 is 0.34 and the val-tuned threshold does not transfer (recall 0.11): a new sonar needs re-calibration. The agent now detects that case and withdraws its promise (STUDY-19); the check is coarse — it catches another sonar or rendering, not subtle drift within one.
-- **Detector.** Crab-pot AP@0.5 0.48 and F1 0.41 on the official split, against GhostVision's 0.71–0.73. EXP-003 raised the recall ceiling from 0.72 to 0.85 and the promise from ≥ 65% to ≥ 79%. EXP-004 / 005 (cleaner data) did not beat it ([`exp005_diagnosis.md`](reports/exp005_diagnosis.md)). EXP-002 failed as underfit (`optimizer=auto` built AdamW 0.00167; [`exp002_diagnosis.md`](reports/exp002_diagnosis.md)).
+- **Detector.** Crab-pot AP@0.5 0.48 and F1 0.41 on the official split, against GhostVision's 0.71–0.73. EXP-003 raised the recall ceiling from 0.72 to 0.85 and the promise from ≥ 65% to ≥ 78%. EXP-004 / 005 (cleaner data) did not beat it ([`exp005_diagnosis.md`](reports/exp005_diagnosis.md)). EXP-002 failed as underfit (`optimizer=auto` built AdamW 0.00167; [`exp002_diagnosis.md`](reports/exp002_diagnosis.md)).
 - **Wreck debris** is weak (AP 0.16): most training wrecks are off-domain fish-finder screenshots.
-- **Calibration.** Calibration uses three recordings whose frames are correlated. That is why the promise is verified on a separate split.
+- **Calibration.** Calibration uses three recordings whose frames are correlated. The promise is checked for that (STUDY-21) and verified on a separate split, but it remains a pooled rate: one test recording reached 74.7% against the 78% promise.
+- **Vehicle motion.** Heave is followed by Stage 1's per-ping bottom track (within ±8 rows of the frame's seabed), so slant → ground uses each ping's own altitude. Pitch and roll are **not corrected**: the sonar's ping header carries no attitude. Data dropouts are flagged per ping (0 of 6,906 and 2 of 140,032 pings on the two real recordings), not repaired.
+- **Output.** Boxes, not pixel masks — the brief allows either; the proposal's YOLO-seg was not built because the crab-pot labels are boxes.
 - **Labels.** Labels are incomplete, so precision is a lower estimate (the audit will quantify this).
 - **GPS.** The public crab-pot frames carry no GPS, so their demo track is synthetic and labelled as such everywhere, including the counterfactual's metres. The raw-recording path has **real** per-ping GPS and a measured range scale, but that recording is a river with no known pots: it measures false alarms, not recall.
 - **Heights.** On crab-pot frames heights are relative (h/H). On raw recordings they are in metres from the sonar's measured depth. The range scale there is measured: the tracker alone made 5 false picks among the 11 first-estimate chunks, the agent's cross-check against the depth sounder resolves them (STUDY-16, [`sensor_check.md`](reports/sensor_check.md)), and the remaining uncertainty (± 10.2%) is carried into every error radius.
-- **Effort.** Analyst seconds per card are assumed until the study measures them.
+- **Effort.** Analyst seconds per card are assumed until the study measures them; at the assumed timings DEPTH saves time only on mostly empty seabed (§4.4).
 
 ## 7. Responsible use
 
@@ -347,6 +373,8 @@ python -m src.detection.evaluate                      # deploy-faithful eval (+ 
 python -m src.detection.study_scale_tta               # STUDY-13
 python -m src.agentic.study_look_harder --verify      # STUDY-18: look harder (calibration -> test once)
 python -m src.agentic.study_applicability --verify    # STUDY-19: does the promise apply here?
+python -m src.bench.dnn_engine --label <host>         # STUDY-20: OpenCV 5's two DNN engines
+python -m src.agentic.study_dependence                # STUDY-21: does the promise survive correlated frames?
 python -m src.bench.product_bench --label <host>      # benchmark this machine
 
 # STUDY-12: the counterfactual trace on up to 80 v2b test frames
@@ -360,4 +388,6 @@ python -m src.cv_pipeline.humminbird report
 
 Checked on a fresh clone (2026-10-12): `fetch_model` installed the published weights with a matching
 hash, and the suite passed (202 passed, 3 skipped: the optional raw recording and the unpublished
-EXP-001 weights). The datasets are git-ignored; their builders are in `DATASET/scripts/`.
+EXP-001 weights). On 2026-10-21, with the local data present: **278 passed**, line coverage 61% of
+`src/` (86% of the runtime modules; the offline study and training scripts are run as commands, and their
+outputs are the reports). The datasets are git-ignored; their builders are in `DATASET/scripts/`.
