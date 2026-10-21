@@ -25,7 +25,7 @@
     "tau_review": 0.06,
     "tau_confirm": null,
     "guarantees": {
-      "recall_promise": 0.79,
+      "recall_promise": 0.78,
       "requested_recall_achievable": false,
       "precision_promise": null,
       "best_precision_promise_achievable": 0.565,
@@ -36,7 +36,9 @@
         "confirmed_precision": null,
         "precision_promise_held": null
       },
-      "report": "docs/calibration_exp003.md"
+      "report": "docs/calibration_exp003.md",
+      "recall_promise_cp": 0.79,
+      "recall_promise_basis": "STUDY-21 block bootstrap (b = 8): docs/reports/dependence.md"
     },
     "guaranteed_class": "ghost_gear",
     "non_hazard_classes": [],
@@ -89,7 +91,7 @@
   "fit": {
     "split": "`DATASET/03_yolo_ready_dataset_v2b/val` *wcp_ss_*.jpg \u2014 163 unique frames, recordings ['Rec10', 'Rec12', 'Rec16']",
     "frames": 163,
-    "created": "2026-10-02",
+    "created": "2026-10-21",
     "pots": 186,
     "verified_on": "`DATASET/03_yolo_ready_dataset_v2b/test` *wcp_ss_*.jpg \u2014 199 unique frames, recordings ['Rec14', 'Rec8', 'Rec9']",
     "note": "fitted by `python -m src.agentic.calibrate` (calibration split only; test scored once)"

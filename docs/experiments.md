@@ -115,7 +115,25 @@ Promote each into the log below with full results as it runs.
 
 ## Experiment log
 
-### STUDY-21 — Does the recall promise survive correlated frames? (REGISTERED 2026-10-21, not yet run)
+### STUDY-21 — Does the recall promise survive correlated frames? (DONE — standard promise restated 79% → 78%; look harder stands)
+
+- **Result (A1, calibration split, 186 pots):** standard look at τ 0.06 — CP bound 79.4%, block bootstrap
+  b = 1 / 4 / 8: 79.2% / 78.5% / **78.2%** (design effect 1.86, ~100 effective pots) → **R1 restates the
+  promise to ≥ 78%**. Look harder at τ 0.055 — CP 84.2%, b = 8 **84.3%** (design effect 1.32) → **≥ 84%
+  stands**. Two-stage (recordings too, sensitivity only): 78.0% and 81.8%.
+- **A2 (recordings):** at the promise in force, the standard look meets ≥ 78% on 5 of 6 recordings — test
+  **Rec9 74.7%** (162 pots) does not; look harder meets ≥ 84% on 4 of 6 (Rec12 83.7%, Rec9 81.5% do not).
+  Leave-one-recording-out refits held on 3 of 3 (standard) and 2 of 3 (look harder: refit on Rec10 + Rec16
+  promised 88%, Rec12 gave 83.7%). So the promise is a pooled rate; one survey can fall below it.
+- **Applied:** `calibration.json` `recall_promise` 0.78 (`recall_promise_cp` 0.79 kept); `calibrate.py` and
+  `study_look_harder.py` now apply R1 themselves, so a re-run cannot quietly restore the Clopper-Pearson
+  value. The re-runs recomputed the identical verification from the cached predictions; nothing was
+  re-tuned. Test result against the restated promise: 81.1% ≥ 78% — held. Found on the way:
+  `calibrate.py`'s defaults still pointed at EXP-001's v1 split and class; the documented command would have
+  recalibrated EXP-003 on the wrong data — the defaults now follow `--model`.
+  Report: [`docs/reports/dependence.md`](reports/dependence.md) · `python -m src.agentic.study_dependence`.
+
+**Registration (committed before any number above was computed, `0819d50`):**
 
 - **Why.** The Clopper-Pearson bound behind "≥ 79% (95% confidence)" treats every pot as independent.
   Port and starboard frames of the same pings, consecutive frames of a recording and one sonar set-up are

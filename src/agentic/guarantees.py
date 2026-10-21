@@ -17,8 +17,9 @@ Honesty built in: if a promise is not achievable with the model, the fitter retu
 which is exactly the scientific argument for EXP-002.
 
 Caveat stated openly: frames from one recording are correlated, so the i.i.d. assumption behind the
-bound is optimistic; ``calibrate.py`` therefore also reports a recording/frame-group bootstrap and a
-verification on a *separate* test split.
+bound is optimistic; ``calibrate.py`` therefore also applies a block bootstrap over ping-index blocks
+within recordings (STUDY-21, rule R1: a promise the bootstrap cannot support is restated to its bound) and
+verifies on a *separate* test split.
 
 Pure Python (``math.lgamma``) — no SciPy at runtime.
 """

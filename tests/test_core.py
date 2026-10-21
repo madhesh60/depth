@@ -19,6 +19,8 @@ from src.agentic.tools import ToolTimeout
 from src.agentic.types import Candidate, Evidence, FrameResult, RelookResult, Verdict
 from src.detection.calibration import load_calibration
 
+STD_PROMISE = float(load_calibration().guarantees["recall_promise"])   # the standard look's promise
+
 STD = Mode("standard", "standard look", 0.79, 0.06, 3.5, 1)
 LH = Mode("look_harder", "look harder", 0.84, 0.055, 4.9, 5)
 
@@ -168,12 +170,12 @@ def test_the_agent_replans_mid_run_when_the_compute_budget_runs_out():
     assert "replan" in acts and "retier" in acts
     # the look-harder frame's find sat just above the look-harder threshold: re-tiered to LOW-RISK
     assert s.frames[0].candidates[0].verdict is Verdict.LOW_RISK
-    assert s.mission.guarantees["recall_promise"] == pytest.approx(0.79)
+    assert s.mission.guarantees["recall_promise"] == pytest.approx(STD_PROMISE)
 
 
 def test_unusable_frames_are_skipped_and_reported():
     frames = _frames(2) + [("blank", np.zeros((64, 64, 3), np.uint8)), ("broken", None)]
-    s = SurveyAgent(_FakePipe(), check_applicability=False).run(frames, goal=Goal(recall=0.79))
+    s = SurveyAgent(_FakePipe(), check_applicability=False).run(frames, goal=Goal(recall=STD_PROMISE))
     first = s.agent_run["steps"][0]
     assert first["act"] == "inspect_data" and set(first["observed"]["skipped"]) == {"blank", "broken"}
     codes = [i["code"] for i in s.mission.incidents]
@@ -183,7 +185,7 @@ def test_unusable_frames_are_skipped_and_reported():
 
 def test_a_busy_detector_is_waited_for_and_the_frame_retried_not_skipped():
     pipe = _FakePipe(busy_once=("f1",))
-    s = SurveyAgent(pipe, check_applicability=False).run(_frames(3), goal=Goal(recall=0.79))
+    s = SurveyAgent(pipe, check_applicability=False).run(_frames(3), goal=Goal(recall=STD_PROMISE))
     assert [f.frame_id for f in s.frames] == ["f0", "f1", "f2"]          # nothing skipped
     assert pipe.agent_for("standard").tools.waited == 1
     assert any(st["act"] == "retry" and st["observed"]["frame"] == "f1" for st in s.agent_run["steps"])
@@ -196,5 +198,5 @@ def test_a_failed_closer_look_downgrades_the_promise_honestly():
     run = s.agent_run
     assert pipe.modes_run == ["look_harder", "look_harder", "standard", "standard"]
     assert run["downgraded_at"] == "f1" and run["replans"][0]["why"] == "closer look failed"
-    assert s.mission.guarantees["recall_promise"] == pytest.approx(0.79)   # not the look-harder 84%
+    assert s.mission.guarantees["recall_promise"] == pytest.approx(STD_PROMISE)   # not the look-harder 84%
     assert all(c.verdict is Verdict.LOW_RISK for f in s.frames[:2] for c in f.candidates)   # re-tiered

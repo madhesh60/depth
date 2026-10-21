@@ -2059,7 +2059,7 @@ const Demo = {
       await say(1, "<b>DEPTH</b> turns side-scan sonar into a human-approved cleanup plan. One frame first: <b>Stage 1</b> (OpenCV) tracks the seabed — the dashed line — the sonar's altitude, measured per ping.", 600);
       const card = $('.sample-card[data-id="sample-01"]') || $(".sample-card"); if (card) card.click();
       setActive(false); await runAnalyze(); await wait(3000);
-      await say(2, `Every find gets <b>evidence</b> and a <b>calibrated tier</b>: ≥ ${Math.round((g.recall_promise || 0.79) * 100)}% of pots reach a person — a promise fit on held-out recordings and <b>held on unseen test</b> (${Math.round(((g.verified_on_test || {}).recall || 0.811) * 1000) / 10}%).`, 6000);
+      await say(2, `Every find gets <b>evidence</b> and a <b>calibrated tier</b>: ${g.recall_promise ? `≥ ${Math.round(g.recall_promise * 100)}%` : "a calibrated share"} of pots reach a person — a promise fit on held-out recordings and <b>held on unseen test</b>${(g.verified_on_test || {}).recall ? ` (${Math.round(g.verified_on_test.recall * 1000) / 10}%)` : ""}.`, 6000);
       cancelTour(); toastHide();
       setActive(true); await runAnalyze(); state._tourOptOut = true; cancelTour(); await wait(400);
       const cs = state._analyze.candidates || [];
