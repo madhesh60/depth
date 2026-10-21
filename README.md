@@ -17,31 +17,29 @@ verified once on unseen ones; every human decision becomes a training label. It 
 **Competition:** OpenCV AI Competition 2026 (AWS · OpenCV Foundation) · **Team:** Syndicate (solo —
 Madhesh) · **Targets:** Agentic Vision · Best Use of COOL · **License:** AGPL-3.0
 
-![DEPTH architecture: OpenCV 5 agent (Stage 1 → See → Prove → Decide → Act) on EC2 Graviton + COOL, with the human loop, exports and AWS services](docs/img/architecture.svg)
+![DEPTH architecture: the core loop (goal → inspect → check the promise applies → choose how hard to look → perceive → plan and ask) over the OpenCV 5 stages (Stage 1 → See → Prove → Decide → Act) on EC2 Graviton + COOL, with people deciding, the outputs and the AWS services](docs/img/architecture.svg)
+
+**For judges:** the one-page guide (every number with its split, three clicks, a glossary) is
+[`docs/JUDGES.md`](docs/JUDGES.md).
+<!-- Put the live-demo URL and the video link on this line once they exist. -->
 
 ### At a glance
 
 | | number | measured on |
-|---|--:|---|
-| **Recall promise** — pots that reach a person (95% confidence) | **≥ 84%** when the agent looks harder, held at **86.0%** · **≥ 78%** with one look, held at 81.1% | fit on held-out recordings, verified once on 199 unseen frames / 264 pots (the test frames that carry a recording ID: Rec8/9/14) — STUDY-18 |
-| …and it survives correlated frames | block bootstrap: one look 78.2% → restated **79% → 78%**; looking harder 84.3% → stands. A pooled rate: per recording, one look held on **5 of 6** (Rec9: 74.7%) | STUDY-21, calibration split + per recording |
-| **The agent knows when its promise does not apply** | another sonar: promise withdrawn in **22 of 22** surveys, where one look keeps only **23.9%** of pots · kept for all 3 test recordings | STUDY-19, verified once |
-| Crab-pot detector, AP@0.5 · AP@0.5:0.95 | **0.482** (95% CI 0.43–0.55) · 0.165 | v2b test, all 214 unique crab-pot frames / 285 pots |
-| OpenCV's seabed measurement moves the boat | **151 of 222** pins leave their own error circle without it | STUDY-12, v2b test |
-| Stage-1 altitude, port vs starboard (no labels needed) | agree to **1.6 px** (random pairs 5.3 px) | STUDY-08 |
-| Product frame, standard look | **157 ms** x86 · **197 ms** Graviton4 · looking harder ≈ **5×** that | EC2 4 vCPU, stock OpenCV 5 (COOL pending) · laptop, interleaved |
-| OpenCV 5's new DNN engine (the one that loads) | **634 of 634** detections identical to the classic engine, 0 tier flips | STUDY-20, calibration split |
-| On one CPU core (on-board budget) | **599 ms/frame, 240 MB** → one survey-hour (280 frames) in ~168 s: **~21× faster than the sonar records** | EC2 Graviton4, 1 thread, measured frame × measured frames/hour |
-| Raw sonar recording, real GPS | range scale **2.03 cm/sample ± 10.2%**, measured | Colorado River, Humminbird |
-| Tests | **281** passed, CI on every push (line coverage 60% of `src/`: **85% of the runtime modules**, 26% of the offline study scripts, whose outputs are the reports); a headless-Chrome UI smoke test drives every mode with 0 JS errors (`python tests/ui_smoke.py`); a few tests need optional data and skip without it | `pytest -q` · 2026-10-21 |
+|---|---|---|
+| **Pots that reach a person** (95% confidence) | **≥ 84%** looking harder (held: 86.0%) · **≥ 78%** one look (held: 81.1%) | fit on held-out recordings, verified once on unseen test; checked for correlated frames |
+| **Knows when its promise does not apply** | withdrawn in **22 of 22** surveys on another sonar | STUDY-19, verified once |
+| **OpenCV's output moves the boat** | without Stage 1, **151 of 222** pins leave their own error circle | STUDY-12, v2b test |
+| **Crab-pot detector**, AP@0.5 | **0.482** (95% CI 0.43–0.55): the 0.70 target is **not met** | v2b test, 214 unique frames |
+| **The promises wrap any detector** | the same calibration code: EXP-001 **≥ 63%**, EXP-003 **≥ 78%**, each verified on its own unseen test | [`calibration_exp001.md`](docs/calibration_exp001.md) · [`calibration_exp003.md`](docs/calibration_exp003.md) |
+| **Speed per frame**, standard look | **157 ms** x86 · **197 ms** Graviton4; looking harder (the default) costs **≈ 5×** | EC2 4 vCPU, stock OpenCV 5 (COOL pending) |
+| **Checks** | **284** tests · ruff · mypy · a headless-Chrome UI test, all in CI | 2026-10-21 |
 
-**Not yet measured, and said so:** Graviton + COOL timings (stock Graviton and x86 were measured on EC2 on
-2026-10-20, §4; the COOL runs wait on the Marketplace subscription), the look-harder mode on EC2 and a load
-test with it, analyst minutes saved (the timed study needs people), audited false-alarm precision (the blinded
-audit needs people). The detector misses the proposal's 0.70 mAP target; §4 says by how much and why, and §5
-lists every limit. **One-page judge guide (numbers, three clicks, glossary): [`docs/JUDGES.md`](docs/JUDGES.md).**
+**Not yet measured, and said so:** Graviton + COOL timings (the Marketplace subscription is pending), the
+look-harder mode on EC2, analyst minutes saved and audited false-alarm precision (both need people). The
+detector misses the proposal's 0.70 mAP target; §4 says by how much and why, and §5 lists every limit.
 
-**For judges — five minutes from a clean clone:**
+**Five minutes from a clean clone:**
 
 ```bash
 git clone https://github.com/madhesh60/depth.git
@@ -56,12 +54,12 @@ python -m uvicorn src.dashboard.app:app --port 8000   # open http://localhost:80
 
 | criterion | where DEPTH shows it |
 |---|---|
-| **Technical execution** — OpenCV 5 doing real work | Stage 1 (bottom track with `cv2.Sobel` / `cv2.blur`, slant→ground `cv2.remap`), YOLO11 through `cv2.dnn` on OpenCV 5's new engine (recorded in every result's provenance; same answers as the classic engine — [`dnn_engine.md`](docs/reports/dnn_engine.md)), shadow + re-look evidence, a per-ping data-dropout mask on raw recordings; deploy-faithful evaluation with CIs, mAP@0.5:0.95, confusion matrix, PR curves ([`eval_exp003_test.md`](docs/reports/eval_exp003_test.md)); the promise checked for correlated frames ([`dependence.md`](docs/reports/dependence.md)); deadlines + fallbacks on every tool |
-| **Agentic Vision** — perception changes the next action | **the core loop** ([`core.py`](src/agentic/core.py), §2) works toward the operator's goal: OpenCV statistics decide whether its promise applies (withdrawn on another sonar in 22 of 22 surveys, with a full-review request — [`applicability.md`](docs/reports/applicability.md)); it chooses how hard to look (the 2×2 tile look lifts the promise from 78% to 84%, held at 86.0% — [`look_harder.md`](docs/reports/look_harder.md)); it re-plans mid-run when its measured pace would overrun the compute budget or the closer look fails, and an analyze call prices its look against the server's queue. Also on by default and measured: OpenCV's seabed measurement decides where the pins go (without it 151 of 222 leave their own error circle and 4 of 40 re-survey passes regroup — [`causal_trace.md`](docs/reports/causal_trace.md)); the agent cross-checks that seabed against the depth sounder and re-tracks on a conflict ([`sensor_check.md`](docs/reports/sensor_check.md)); opposite-side passes ranked by information per boat-minute; a person's decline re-plans, an approval issues a work order (§2). Per-frame active vision is built and tested but failed its own validation, so it is off by default ([`evidence_model_exp003.md`](docs/reports/evidence_model_exp003.md)) |
-| **Innovation** | statistical promises on an imperfect detector ([`calibration_exp003.md`](docs/calibration_exp003.md)) that are also checked for correlated frames and restated when they fall short ([`dependence.md`](docs/reports/dependence.md)), a goal-driven choice of how hard to look (two calibrated perception modes), and a conformal check that withdraws the promise where it does not apply; the agent cross-checks its own seabed track against the depth sounder ([`sensor_check.md`](docs/reports/sensor_check.md)); shadow-flip prediction for second looks |
-| **Real-world impact** | raw Humminbird recordings with real GPS, routes, budgets, GPX/KML/GeoJSON, OGC API, webhooks, MCP; analyst effort measured honestly: at assumed timings DEPTH beats manual review only when fewer than 23% of frames hold a pot ([`effort_curve.md`](docs/reports/effort_curve.md)); a severity hook for the review queue (suspended or tall finds weighted up; an operator policy, not yet exercised: no find in the demo data has a measured risk factor) |
-| **UX** | zero-build studio: guided demo, evidence cards with the full agent trace, 3D twin, approvals inbox, failure drills (`?drills`) |
-| **Responsible cloud delivery** | Graviton + COOL deploy, dry-run by default, budgets first, provenance on every result ([`infra/README.md`](infra/README.md)); approver PIN with a wrong-PIN lockout; a public server refuses to start without its tokens; protected wrecks generalised in public exports ([`responsible_use.md`](docs/responsible_use.md)) |
+| **Technical execution** | OpenCV 5 does the work: Stage 1 (`cv2.Sobel`, `cv2.blur`, `cv2.remap`), YOLO11 through `cv2.dnn` on the new engine, shadow evidence, dropout masks. The evaluation is deploy-faithful, with CIs ([`eval_exp003_test.md`](docs/reports/eval_exp003_test.md)) |
+| **Agentic Vision** | the core loop ([`core.py`](src/agentic/core.py), §2) checks that its promise applies, chooses how hard to look, re-plans on its own measurements, and asks a person before acting |
+| **Innovation** | statistical promises on an imperfect detector, checked for correlated frames and withdrawn where they do not apply ([`calibration_exp003.md`](docs/calibration_exp003.md), [`dependence.md`](docs/reports/dependence.md), [`applicability.md`](docs/reports/applicability.md)) |
+| **Real-world impact** | raw Humminbird recordings with real GPS; GPX / KML / GeoJSON, OGC API, webhooks, MCP; analyst effort reported honestly ([`effort_curve.md`](docs/reports/effort_curve.md)) |
+| **UX** | zero-build studio: 60-s guided demo, evidence cards with the agent's trace, approvals inbox, 3D twin, failure drills (`?drills`) |
+| **Responsible cloud delivery** | one stack, dry-run by default, budget alerts and a scheduled stop, PIN lockout, no start without tokens, protected wrecks generalised ([`infra/README.md`](infra/README.md), [`responsible_use.md`](docs/responsible_use.md)) |
 
 ---
 
