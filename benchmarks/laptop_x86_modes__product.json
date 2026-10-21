@@ -1,0 +1,204 @@
+{
+  "label": "laptop_x86_modes",
+  "created": "2026-10-21T13:22:05",
+  "fingerprint": {
+    "opencv": {
+      "version": "5.0.0",
+      "cv2_file": "C:\\Users\\RAJ\\AppData\\Local\\Programs\\Python\\Python310\\lib\\site-packages\\cv2\\__init__.py",
+      "is_cool_path": false,
+      "threads": 8,
+      "build_flags": {
+        "KleidiCV": false,
+        "NEON": false,
+        "IPP": true,
+        "TBB": false,
+        "OpenMP": false
+      }
+    },
+    "host": {
+      "machine": "AMD64",
+      "system": "Windows",
+      "python": "3.10.11",
+      "vcpus": 8,
+      "cpu_model": "Intel64 Family 6 Model 140 Stepping 1, GenuineIntel"
+    },
+    "ec2": {},
+    "cool": {},
+    "git_commit": "0819d50",
+    "model_sha256": "71339e99ad2b4b29f8d516967ce02e1fb5895434bf6f483cb517efe6750ba2f2",
+    "calibration_sha256": "95c75cf64befa4f61f939dd7953744c8c48329892436f86f00833e5628b6c5cc"
+  },
+  "runtime": {
+    "threads": 8,
+    "engine": "new",
+    "engine_requested": "auto",
+    "engine_fallback": null
+  },
+  "workload": "product",
+  "config": {
+    "n": 16,
+    "repeats": 3,
+    "warmup": 5,
+    "threads_requested": 0,
+    "frames_dir": "webui/samples",
+    "unique_frames": 8,
+    "input_manifest_sha256": "25376f6e21f70bb04798ac04da927e48544d3889f2672f8e0ce6045e141f8264",
+    "perception_mode": "standard"
+  },
+  "stages_ms": {
+    "decode": {
+      "p50": 9.65,
+      "p95": 11.85,
+      "mean": 9.17
+    },
+    "stage1": {
+      "p50": 10.23,
+      "p95": 14.9,
+      "mean": 10.35
+    },
+    "see": {
+      "p50": 349.71,
+      "p95": 486.75,
+      "mean": 365.7
+    },
+    "look_harder": {
+      "p50": 0.26,
+      "p95": 0.43,
+      "mean": 0.29
+    },
+    "prove_decide": {
+      "p50": 22.54,
+      "p95": 44.34,
+      "mean": 22.97
+    },
+    "render": {
+      "p50": 7.84,
+      "p95": 10.2,
+      "mean": 7.63
+    },
+    "dnn_pre": {
+      "p50": 12.4,
+      "p95": 15.5,
+      "mean": 12.61
+    },
+    "dnn_forward": {
+      "p50": 333.17,
+      "p95": 470.01,
+      "mean": 349.78
+    },
+    "dnn_post": {
+      "p50": 1.28,
+      "p95": 2.1,
+      "mean": 1.29
+    },
+    "evidence": {
+      "p50": 24.91,
+      "p95": 46.88,
+      "mean": 25.27
+    },
+    "total": {
+      "p50": 405.66,
+      "p95": 526.37,
+      "mean": 416.09
+    }
+  },
+  "ops_ms": {
+    "decode": {
+      "p50": 9.65,
+      "p95": 11.85,
+      "mean": 9.17
+    },
+    "stage1": {
+      "p50": 10.23,
+      "p95": 14.9,
+      "mean": 10.35
+    },
+    "dnn_pre": {
+      "p50": 12.4,
+      "p95": 15.5,
+      "mean": 12.61
+    },
+    "dnn_forward": {
+      "p50": 333.17,
+      "p95": 470.01,
+      "mean": 349.78
+    },
+    "dnn_post": {
+      "p50": 1.28,
+      "p95": 2.1,
+      "mean": 1.29
+    },
+    "evidence": {
+      "p50": 24.91,
+      "p95": 46.88,
+      "mean": 25.27
+    },
+    "render": {
+      "p50": 7.84,
+      "p95": 10.2,
+      "mean": 7.63
+    }
+  },
+  "forwards_per_frame": 1.0,
+  "repeats": [
+    {
+      "repeat": 1,
+      "wall_s": 7.42,
+      "fps": 2.16,
+      "cpu_util": 0.622,
+      "peak_rss_mb": 186.1,
+      "total_ms": {
+        "p50": 418.72,
+        "p95": 602.15,
+        "mean": 462.5
+      }
+    },
+    {
+      "repeat": 2,
+      "wall_s": 6.31,
+      "fps": 2.54,
+      "cpu_util": 0.684,
+      "peak_rss_mb": 187.8,
+      "total_ms": {
+        "p50": 390.12,
+        "p95": 415.48,
+        "mean": 392.87
+      }
+    },
+    {
+      "repeat": 3,
+      "wall_s": 6.3,
+      "fps": 2.54,
+      "cpu_util": 0.683,
+      "peak_rss_mb": 187.8,
+      "total_ms": {
+        "p50": 396.98,
+        "p95": 423.67,
+        "mean": 392.91
+      }
+    }
+  ],
+  "throughput_fps": 2.54,
+  "throughput_fps_range": [
+    2.16,
+    2.54
+  ],
+  "cpu_util": 0.683,
+  "peak_rss_mb": 186.1,
+  "cost": {
+    "price_hour_usd": 0.0,
+    "price_source": "",
+    "usd_per_1k_frames": null,
+    "survey_hour": {
+      "frames": 168.8,
+      "compute_s": 70.22,
+      "real_time_factor": 0.0195,
+      "usd": null
+    },
+    "assumptions": {
+      "ping_rate_hz": 15.0,
+      "pings_per_frame": 640,
+      "channels": 2
+    }
+  }
+}

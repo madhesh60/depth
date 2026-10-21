@@ -3,7 +3,7 @@ product_bench.py — benchmark the workload DEPTH actually runs: per stage AND p
 provenance, CPU use, peak memory, interleaved repeats and an output-parity record (review M-5).
 
 Workloads
-    product  exactly what ``/api/analyze`` runs per frame: decode (``cv2.imdecode``) → stage1
+    product  what ``/api/analyze`` runs per frame in the standard look (1 forward pass): decode (``cv2.imdecode``) → stage1
              (canonicalise: luminance · orientation · bottom track · detector input) → see (letterbox +
              blob → ``cv2.dnn`` forward → decode + class-aware NMS) → prove+decide (evidence, re-looks,
              tiers) → render (overlay + ``cv2.imencode``). Reported as the product stages AND as an op
@@ -12,11 +12,15 @@ Workloads
     cv       the product path's OpenCV image ops alone, no network: decode → stage1 → letterbox + blob →
              render. (The slant→ground ``remap`` is NOT here: it runs only in the 3D twin, not in analyze.)
     survey   a REAL raw sonar recording end to end — Humminbird read → sonogram chunks → seabed
-             cross-check → the agent on every chunk → mission plan. Gives the MEASURED real-time factor
+             cross-check → the frame agent on every chunk → mission plan (``pipeline.run_survey``: the core
+             loop's promise check and mode choice are not timed; on the river recordings that loop withdraws
+             the promise and takes the standard look, so the per-frame work is the same). Gives the MEASURED real-time factor
              (compute seconds per second of sonar) and $ per survey-hour = real-time factor × $/h.
              Default recording: PINGMapper's 1-h Solix file when fetched (``humminbird fetch --large``),
              else the 150-s sample.
     detect   decode + network only.
+    product_lh  ``product`` in the look-harder mode (+ the 2×2 tile pass: 5 forward passes) — what an idle server's
+             ``/api/analyze`` picks when its 2-s interactive budget allows. Written as ``<label>_lh__product.json``.
 
 ``--repeats R`` interleaves the workloads in ONE process (product, cv, survey, product, cv, survey, …) so
 drift — thermal, noisy neighbours — lands evenly on all of them; each JSON keeps every repeat plus the
@@ -93,12 +97,12 @@ class Workload:
     """``run(frame_id, bytes)`` → per-frame ms by stage (+ the op split for ``product``)."""
 
     def __init__(self, kind: str, pipe=None):
-        self.kind = kind
+        self.kind, self.mode = ("product", "look_harder") if kind == "product_lh" else (kind, "standard")
         from src.cv_pipeline.canonical import Canonicaliser
         self.stage1 = Canonicaliser()
         self.pipe = pipe
         self.last = None
-        if kind in ("product", "detect") and self.pipe is None:
+        if self.kind in ("product", "detect") and self.pipe is None:
             from src.agentic.pipeline import AgenticPipeline
             self.pipe = AgenticPipeline()
             self.pipe.agent.perceptor.warmup()
@@ -114,17 +118,20 @@ class Workload:
             det = self.pipe.agent.perceptor.detector
             for k in det.prof:
                 det.prof[k] = 0
-            res = self.pipe.run_frame(img, frame_id=frame_id)       # what /api/analyze calls
+            res = self.pipe.run_frame(img, frame_id=frame_id,       # what /api/analyze calls, in one mode
+                                      agent=self.pipe.agent_for(self.mode))
             self.last = res
             t["stage1"] = res.stage_ms["stage1"]
             t["see"] = res.stage_ms["see"]
+            t["look_harder"] = res.stage_ms.get("look_harder", 0.0)    # the tile pass (look-harder mode)
             t["prove_decide"] = res.stage_ms["prove_decide"]
             t0 = time.perf_counter()
             cv2.imencode(".jpg", render(img, res), [cv2.IMWRITE_JPEG_QUALITY, 85])
             t["render"] = (time.perf_counter() - t0) * 1000
             p = dict(det.prof)
             t["dnn_pre"], t["dnn_forward"], t["dnn_post"] = p["pre_ms"], p["forward_ms"], p["post_ms"]
-            t["evidence"] = max(0.0, t["see"] + t["prove_decide"] - p["pre_ms"] - p["forward_ms"] - p["post_ms"])
+            t["evidence"] = max(0.0, t["see"] + t["look_harder"] + t["prove_decide"]
+                                - p["pre_ms"] - p["forward_ms"] - p["post_ms"])
             t["forwards"] = float(p["forwards"])
         elif self.kind == "detect":
             t0 = time.perf_counter()
@@ -147,14 +154,14 @@ class Workload:
             cv2.imencode(".jpg", vis, [cv2.IMWRITE_JPEG_QUALITY, 85])
             t["render"] = (time.perf_counter() - t0) * 1000
         t["total"] = sum(v for k, v in t.items()
-                         if k in ("decode", "stage1", "see", "prove_decide", "render", "dnn_pre"))
+                         if k in ("decode", "stage1", "see", "look_harder", "prove_decide", "render", "dnn_pre"))
         if self.kind == "product":                       # dnn_pre is inside see: do not count it twice
             t["total"] -= t["dnn_pre"]
         return t
 
 
 class SurveyWorkload:
-    """A whole raw recording, as the Survey tab's 'Raw recording' source runs it."""
+    """A whole raw recording through the frame agent and the mission plan (see the module docstring)."""
 
     def __init__(self, dat: Path, pipe):
         from src.cv_pipeline.humminbird import read_recording, validate
@@ -212,8 +219,8 @@ def main():
     ap.add_argument("--n", type=int, default=120, help="timed frames per repeat (the set is cycled)")
     ap.add_argument("--warmup", type=int, default=5)
     ap.add_argument("--workloads", default="product",
-                    help="comma list of product,cv,survey,detect (interleaved per repeat)")
-    ap.add_argument("--workload", choices=["product", "cv", "detect", "survey"], help="(single; legacy)")
+                    help="comma list of product,product_lh,cv,survey,detect (interleaved per repeat)")
+    ap.add_argument("--workload", choices=["product", "product_lh", "cv", "detect", "survey"], help="(single; legacy)")
     ap.add_argument("--repeats", type=int, default=1)
     ap.add_argument("--threads", type=int, default=int(os.environ.get("DEPTH_THREADS", "0") or 0),
                     help="cv2.setNumThreads (0 = OpenCV default = all cores)")
@@ -240,7 +247,7 @@ def main():
     if not frames and set(kinds) - {"survey"}:
         raise SystemExit(f"no frames in {a.frames}")
     pipe = None
-    if set(kinds) & {"product", "detect", "survey"}:
+    if set(kinds) & {"product", "product_lh", "detect", "survey"}:
         from src.agentic.pipeline import AgenticPipeline
         pipe = AgenticPipeline()
         pipe.agent.perceptor.warmup()
@@ -311,12 +318,13 @@ def main():
             stages = {m: _stats(v) for m, v in pooled[k].items() if m != "forwards"}
             mean_ms = stages["total"]["mean"]
             fps = [x["fps"] for x in R]
-            out = {**common, "workload": k,
+            out = {**common, "workload": wls[k].kind, **({"label": a.label + "_lh"} if k == "product_lh" else {}),
                    "config": {"n": a.n, "repeats": a.repeats, "warmup": a.warmup, "threads_requested": a.threads,
                               "frames_dir": _rel(a.frames), "unique_frames": len(frames),
-                              "input_manifest_sha256": manifest},
+                              "input_manifest_sha256": manifest,
+                              "perception_mode": wls[k].mode if wls[k].kind == "product" else None},
                    "stages_ms": stages,
-                   "ops_ms": {m: stages[m] for m in OPS if m in stages} if k == "product" else None,
+                   "ops_ms": {m: stages[m] for m in OPS if m in stages} if wls[k].kind == "product" else None,
                    "forwards_per_frame": round(float(np.mean(pooled[k]["forwards"])), 2) if "forwards" in pooled[k] else None,
                    "repeats": R,
                    "throughput_fps": round(float(np.median(fps)), 2),
@@ -328,7 +336,7 @@ def main():
                             "survey_hour": survey_hour(mean_ms, a.price_hour, a.ping_rate_hz, a.pings_per_frame, a.channels),
                             "assumptions": {"ping_rate_hz": a.ping_rate_hz, "pings_per_frame": a.pings_per_frame,
                                             "channels": a.channels}}}
-        fp = od / f"{a.label}__{k}.json"
+        fp = od / f"{out['label']}__{out['workload']}.json"
         fp.write_text(json.dumps(out, indent=2))
         _print(out, fp)
     from . import cool_attest

@@ -798,7 +798,8 @@ function renderAnalyze(d) {
     + ` · seabed ${s1.measured ? `tracked @ ${s1.altitude_px} px` : "not measured"} · ${d.candidates.length} candidate(s)`;
   $("#verdictCounts").innerHTML = VERDICTS.map(v => `<span class="vc vc-${v}"><span class="n">${d.counts[v] || 0}</span>${VLABEL[v] || human(v)}</span>`).join("");
   const sm = d.stage_ms || {};
-  $("#latency").textContent = `⏱ ${d.wall_ms}ms · stage1 ${fmt(sm.stage1)} · see ${fmt(sm.see)} · prove+decide ${fmt(sm.prove_decide)}`;
+  $("#latency").textContent = `⏱ ${d.wall_ms}ms · stage1 ${fmt(sm.stage1)} · see ${fmt(sm.see)}`
+    + (sm.look_harder > 1 ? ` · look harder ${fmt(sm.look_harder)}` : "") + ` · prove+decide ${fmt(sm.prove_decide)}`;
   const dl = $("#dockLatency"); if (dl) dl.textContent = `wall ${d.wall_ms}ms`;
 
   state._boxes = d.candidates.map((c, i) => ({ id: i, bbox: c.bbox, verdict: c.verdict, conf: c.conf, cand: c }));
@@ -875,7 +876,9 @@ function streamLog(d, ordered) {
     { stage: true, tool: "STAGE 1", msg: `canonicalise → ${s1.palette || "gray"} palette · nadir ${o.nadir || d.nadir} (${o.source || "?"})`
         + ` · ${s1.measured ? `seabed tracked at ${s1.altitude_px} px slant (${Math.round((s1.track_conf || 0) * 100)}% of pings)` : "seabed not measured (no water-column step / unknown orientation)"}`
         + ` · detector input ${s1.detector_input || "raw"}`, t: fmt(sm.stage1) + "ms" },
-    { stage: true, tool: "SEE", msg: `perceive → ${d.candidates.length} candidate(s)`, t: fmt(sm.see) + "ms" }];
+    { stage: true, tool: "SEE", msg: `perceive → ${d.candidates.length} candidate(s)`
+        + (sm.look_harder > 1 ? ` (incl. the 2×2 tile look, ${fmt(sm.look_harder)}ms)` : ""),
+      t: fmt((sm.see || 0) + (sm.look_harder || 0)) + "ms" }];
   ordered.forEach(b => {
     const c = b.cand;
     entries.push({ stage: true, tool: `cand #${b.id}`, msg: `${c.cls_name} · det ${c.conf.toFixed(2)}`, t: "" });

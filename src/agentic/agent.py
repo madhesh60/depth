@@ -146,8 +146,10 @@ class ReLookAgent:
 
         t0 = time.perf_counter()
         dets, see_step = self.tools.detect(det_in)
-        see_ms = (time.perf_counter() - t0) * 1000
+        see_ms = (time.perf_counter() - t0) * 1000                # the first look: one pass (the pace the agent prices)
+        t0 = time.perf_counter()
         dets, sources, perception = self._look_harder(det_in, dets, see_step)
+        look_ms = (time.perf_counter() - t0) * 1000               # the closer tile look (4 passes; ~0 when skipped)
         if "no_detection" in self._faults:                  # failure drill: an empty frame (after every look)
             dets, sources = [], []
         if progress_cb:
@@ -177,7 +179,7 @@ class ReLookAgent:
         s1["detector_input"] = self.detector_input
         return FrameResult(
             frame_id=frame_id, width=W, height=H, candidates=candidates,
-            stage_ms={"stage1": stage1_ms, "see": see_ms, "prove_decide": prove_decide_ms,
+            stage_ms={"stage1": stage1_ms, "see": see_ms, "look_harder": look_ms, "prove_decide": prove_decide_ms,
                       "inferences": float(n_inf)},
             nadir=orient.label, orientation=orient.to_dict(), stage1=s1,
             incidents=_frame_incidents(frame_id, candidates, cf, self._faults) + ([incident(

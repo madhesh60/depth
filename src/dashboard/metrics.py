@@ -23,7 +23,7 @@ import numpy as np
 
 log = logging.getLogger("depth.metrics")
 _JSON = os.environ.get("DEPTH_LOG_JSON", "0") == "1"
-STAGES = ("stage1", "see", "prove_decide", "wall")
+STAGES = ("stage1", "see", "look_harder", "prove_decide", "wall")
 
 
 class Metrics:
@@ -36,7 +36,7 @@ class Metrics:
 
     def record(self, kind: str, frame_id: str, stage_ms: dict, wall_ms: Optional[float] = None,
                counts: Optional[dict] = None) -> None:
-        row = {k: float(stage_ms[k]) for k in ("stage1", "see", "prove_decide") if k in stage_ms}
+        row = {k: float(stage_ms[k]) for k in ("stage1", "see", "look_harder", "prove_decide") if k in stage_ms}
         if wall_ms is not None:
             row["wall"] = float(wall_ms)
         with self._lock:

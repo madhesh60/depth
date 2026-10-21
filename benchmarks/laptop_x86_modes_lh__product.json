@@ -1,0 +1,204 @@
+{
+  "label": "laptop_x86_modes_lh",
+  "created": "2026-10-21T13:22:05",
+  "fingerprint": {
+    "opencv": {
+      "version": "5.0.0",
+      "cv2_file": "C:\\Users\\RAJ\\AppData\\Local\\Programs\\Python\\Python310\\lib\\site-packages\\cv2\\__init__.py",
+      "is_cool_path": false,
+      "threads": 8,
+      "build_flags": {
+        "KleidiCV": false,
+        "NEON": false,
+        "IPP": true,
+        "TBB": false,
+        "OpenMP": false
+      }
+    },
+    "host": {
+      "machine": "AMD64",
+      "system": "Windows",
+      "python": "3.10.11",
+      "vcpus": 8,
+      "cpu_model": "Intel64 Family 6 Model 140 Stepping 1, GenuineIntel"
+    },
+    "ec2": {},
+    "cool": {},
+    "git_commit": "0819d50",
+    "model_sha256": "71339e99ad2b4b29f8d516967ce02e1fb5895434bf6f483cb517efe6750ba2f2",
+    "calibration_sha256": "95c75cf64befa4f61f939dd7953744c8c48329892436f86f00833e5628b6c5cc"
+  },
+  "runtime": {
+    "threads": 8,
+    "engine": "new",
+    "engine_requested": "auto",
+    "engine_fallback": null
+  },
+  "workload": "product",
+  "config": {
+    "n": 16,
+    "repeats": 3,
+    "warmup": 5,
+    "threads_requested": 0,
+    "frames_dir": "webui/samples",
+    "unique_frames": 8,
+    "input_manifest_sha256": "25376f6e21f70bb04798ac04da927e48544d3889f2672f8e0ce6045e141f8264",
+    "perception_mode": "look_harder"
+  },
+  "stages_ms": {
+    "decode": {
+      "p50": 8.38,
+      "p95": 11.35,
+      "mean": 8.24
+    },
+    "stage1": {
+      "p50": 9.39,
+      "p95": 12.19,
+      "mean": 9.45
+    },
+    "see": {
+      "p50": 370.82,
+      "p95": 591.45,
+      "mean": 402.76
+    },
+    "look_harder": {
+      "p50": 1632.16,
+      "p95": 2839.11,
+      "mean": 1771.54
+    },
+    "prove_decide": {
+      "p50": 36.93,
+      "p95": 69.51,
+      "mean": 35.91
+    },
+    "render": {
+      "p50": 7.66,
+      "p95": 10.71,
+      "mean": 7.49
+    },
+    "dnn_pre": {
+      "p50": 66.37,
+      "p95": 95.9,
+      "mean": 70.83
+    },
+    "dnn_forward": {
+      "p50": 1951.38,
+      "p95": 3138.76,
+      "mean": 2087.58
+    },
+    "dnn_post": {
+      "p50": 5.92,
+      "p95": 8.16,
+      "mean": 6.12
+    },
+    "evidence": {
+      "p50": 48.07,
+      "p95": 80.27,
+      "mean": 45.69
+    },
+    "total": {
+      "p50": 2109.65,
+      "p95": 3366.18,
+      "mean": 2235.4
+    }
+  },
+  "ops_ms": {
+    "decode": {
+      "p50": 8.38,
+      "p95": 11.35,
+      "mean": 8.24
+    },
+    "stage1": {
+      "p50": 9.39,
+      "p95": 12.19,
+      "mean": 9.45
+    },
+    "dnn_pre": {
+      "p50": 66.37,
+      "p95": 95.9,
+      "mean": 70.83
+    },
+    "dnn_forward": {
+      "p50": 1951.38,
+      "p95": 3138.76,
+      "mean": 2087.58
+    },
+    "dnn_post": {
+      "p50": 5.92,
+      "p95": 8.16,
+      "mean": 6.12
+    },
+    "evidence": {
+      "p50": 48.07,
+      "p95": 80.27,
+      "mean": 45.69
+    },
+    "render": {
+      "p50": 7.66,
+      "p95": 10.71,
+      "mean": 7.49
+    }
+  },
+  "forwards_per_frame": 5.0,
+  "repeats": [
+    {
+      "repeat": 1,
+      "wall_s": 34.38,
+      "fps": 0.47,
+      "cpu_util": 0.666,
+      "peak_rss_mb": 187.8,
+      "total_ms": {
+        "p50": 1973.1,
+        "p95": 2861.73,
+        "mean": 2147.47
+      }
+    },
+    {
+      "repeat": 2,
+      "wall_s": 39.66,
+      "fps": 0.4,
+      "cpu_util": 0.586,
+      "peak_rss_mb": 187.8,
+      "total_ms": {
+        "p50": 2312.24,
+        "p95": 3852.95,
+        "mean": 2477.57
+      }
+    },
+    {
+      "repeat": 3,
+      "wall_s": 33.32,
+      "fps": 0.48,
+      "cpu_util": 0.678,
+      "peak_rss_mb": 187.8,
+      "total_ms": {
+        "p50": 2005.15,
+        "p95": 2588.82,
+        "mean": 2081.15
+      }
+    }
+  ],
+  "throughput_fps": 0.47,
+  "throughput_fps_range": [
+    0.4,
+    0.48
+  ],
+  "cpu_util": 0.666,
+  "peak_rss_mb": 187.8,
+  "cost": {
+    "price_hour_usd": 0.0,
+    "price_source": "",
+    "usd_per_1k_frames": null,
+    "survey_hour": {
+      "frames": 168.8,
+      "compute_s": 377.22,
+      "real_time_factor": 0.10478,
+      "usd": null
+    },
+    "assumptions": {
+      "ping_rate_hz": 15.0,
+      "pings_per_frame": 640,
+      "channels": 2
+    }
+  }
+}
