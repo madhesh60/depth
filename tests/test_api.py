@@ -92,11 +92,11 @@ def test_analyze_and_report_path():
         print("  skip  test_analyze_and_report_path (model/samples absent)")
         return
     sid = samples_mod.list_samples()[0]["id"]
-    a = client.post(f"/api/analyze?sample={sid}")
+    a = client.post(f"/api/analyze?sample={sid}&compute_s=60")      # a pinned mode: the two calls compare
     assert a.status_code == 200
     body = a.json()
     assert "counts" in body and body["frame_png"].startswith("data:image") and "overlay_png" not in body   # lean default
-    full = client.post(f"/api/analyze?sample={sid}&images=full")
+    full = client.post(f"/api/analyze?sample={sid}&compute_s=60&images=full")
     assert full.json()["overlay_png"].startswith("data:image") and len(full.content) > len(a.content)
     for c in body["candidates"]:
         assert c["verdict"] in ("confirmed", "review", "low_risk")

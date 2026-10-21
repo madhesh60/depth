@@ -231,11 +231,13 @@ def client():
 def test_api_default_off_and_experimental_on(client):
     from src.dashboard import samples as samples_mod
     sid = samples_mod.list_samples()[0]["id"]
-    off = client.post(f"/api/analyze?sample={sid}").json()
+    # an explicit compute budget pins the perception mode, so the two calls differ only in active vision
+    # (the default answer budget adapts to the measured pace and the rest of an answer)
+    off = client.post(f"/api/analyze?sample={sid}&compute_s=60").json()
     assert off["active"]["mode"] in ("off", "unavailable", "validated")
     if off["active"]["mode"] == "unavailable":
         pytest.skip("no evidence model for this detector")
-    on = client.post(f"/api/analyze?sample={sid}&active=1").json()
+    on = client.post(f"/api/analyze?sample={sid}&compute_s=60&active=1").json()
     assert on["active"]["mode"] in ("experimental", "validated")
     assert all(c["evidence"]["action"] for c in on["candidates"] if c["cls_name"] == "ghost_gear")
     assert [c["verdict"] for c in on["candidates"]] == [c["verdict"] for c in off["candidates"]]   # tiers unchanged
