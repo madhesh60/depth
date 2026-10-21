@@ -28,7 +28,7 @@ from typing import Callable, Optional
 import cv2
 import numpy as np
 
-from .agent import AgentConfig, ReLookAgent, render
+from .agent import AgentConfig, TriageAgent, render
 from .geo import PingFix, geotag, synthetic_track, DEFAULT_M_PER_PX
 from .incidents import incident
 from .mission import export, plan_mission, DEFAULT_SEC_PER_CARD
@@ -81,19 +81,19 @@ def _flag_dropouts(result: FrameResult, fix: PingFix) -> None:
 
 
 class AgenticPipeline:
-    def __init__(self, agent: Optional[ReLookAgent] = None, m_per_px: float = DEFAULT_M_PER_PX):
-        self.agent = agent or ReLookAgent()
+    def __init__(self, agent: Optional[TriageAgent] = None, m_per_px: float = DEFAULT_M_PER_PX):
+        self.agent = agent or TriageAgent()
         self.m_per_px = m_per_px
-        self._agents: dict[str, ReLookAgent] = {}
+        self._agents: dict[str, TriageAgent] = {}
         self._ms_pass: Optional[float] = None               # measured cv2.dnn pass, moving average
 
-    def agent_for(self, mode: str) -> ReLookAgent:
+    def agent_for(self, mode: str) -> TriageAgent:
         """The frame agent for a perception mode (``core.py`` chooses it). All of them share the one
         loaded detector; each carries the tiers calibrated for its mode."""
         if mode == getattr(self.agent.cfg, "perception_mode", "standard"):
             return self.agent
         if mode not in self._agents:
-            self._agents[mode] = ReLookAgent(perceptor=self.agent.perceptor, shadow_prover=self.agent.shadow,
+            self._agents[mode] = TriageAgent(perceptor=self.agent.perceptor, shadow_prover=self.agent.shadow,
                                              cfg=AgentConfig.from_calibration(mode))
         return self._agents[mode]
 
@@ -107,11 +107,12 @@ class AgenticPipeline:
         what the agent prices its perception modes with."""
         return None if self._ms_pass is None else round(self._ms_pass, 1)
 
-    def guarantees(self, agent: Optional[ReLookAgent] = None) -> dict:
+    def guarantees(self, agent: Optional[TriageAgent] = None) -> dict:
         """The promises this run's tiers carry (shown on every report + in the UI)."""
         t = getattr((agent or self.agent).cfg, "tiers", None)
         if t is None:
-            return {"mode": "legacy", "note": "no calibrated guarantee (thresholds are the legacy rules)"}
+            return {"mode": "uncalibrated", "note": "no calibrated promise for this model - every find goes to a "
+                                                    "person (python -m src.agentic.calibrate)"}
         g = dict(t.guarantees)
         g.update({"mode": "calibrated", "tau_review": t.tau_review, "tau_confirm": t.tau_confirm,
                   "policy": t.policy})
@@ -121,7 +122,7 @@ class AgenticPipeline:
     def run_frame(self, frame: np.ndarray, frame_id: str = "frame",
                   fix: Optional[PingFix] = None, nadir: Optional[str] = None,
                   progress_cb: Optional[Callable[[str, dict], None]] = None,
-                  faults: Optional[set] = None, agent: Optional[ReLookAgent] = None) -> FrameResult:
+                  faults: Optional[set] = None, agent: Optional[TriageAgent] = None) -> FrameResult:
         faults = set(faults or ())
         # a real recording's sonar depth is a MEASURED altitude in metres -> heights in metres
         alt_m = fix.depth_m if (fix is not None and not fix.synthetic and fix.depth_m) else None

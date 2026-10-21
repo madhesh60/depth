@@ -20,7 +20,7 @@ needs_model = pytest.mark.skipif(not DEFAULT_ONNX.exists(), reason="model weight
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from src.detection.infer import Detection
-from src.agentic.agent import ReLookAgent, AgentConfig
+from src.agentic.agent import TriageAgent, AgentConfig
 from src.agentic.pipeline import AgenticPipeline, validate_frame
 from src.agentic.geo import synthetic_track
 from src.agentic.mission import apply_human
@@ -69,7 +69,7 @@ def _frame():
 
 
 def _agent(stub, **cfg):
-    return ReLookAgent(perceptor=stub, shadow_prover=ShadowProver(ShadowConfig(nadir="top")),
+    return TriageAgent(perceptor=stub, shadow_prover=ShadowProver(ShadowConfig(nadir="top")),
                        cfg=AgentConfig(tiers=_tiers(), **cfg))
 
 

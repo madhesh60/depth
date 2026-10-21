@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from src.agentic.agent import AgentConfig, ReLookAgent
+from src.agentic.agent import AgentConfig, TriageAgent
 from src.agentic.perception import merge_candidates, tile_windows
 from src.agentic.policy import GuaranteedTiers
 from src.agentic.shadow import ShadowConfig, ShadowProver
@@ -71,7 +71,7 @@ def _agent(stub, look_harder: bool):
                             guarantees={"recall_promise": 0.84})
     cfg = AgentConfig(tiers=tiers, perception_mode="look_harder" if look_harder else "standard",
                       look_harder={"tile_frac": 0.6, "merge_iou": 0.5} if look_harder else None)
-    return ReLookAgent(perceptor=stub, shadow_prover=ShadowProver(ShadowConfig(nadir="top")), cfg=cfg)
+    return TriageAgent(perceptor=stub, shadow_prover=ShadowProver(ShadowConfig(nadir="top")), cfg=cfg)
 
 
 def _frame():

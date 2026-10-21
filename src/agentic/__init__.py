@@ -1,24 +1,22 @@
 """
-src.agentic — the See → Prove → Decide → Act loop for marine-debris sonar.
+src.agentic — the DEPTH agent: a goal, OpenCV tools, and a loop that re-plans on what it observes.
 
-A trustworthy agentic layer on top of the EXP-001 YOLO detector:
+* **The core loop** (``core.SurveyAgent``) runs every survey toward the operator's goal: inspect the
+  frames → check that the calibrated promise applies to this recording (``applicability``, STUDY-19) →
+  choose how hard to look (``standard`` or ``look_harder``, STUDY-18) → perceive every frame, re-planning
+  if the compute budget would overrun or the closer look fails → plan for people and the boat →
+  one approval request per action (``approvals``).
+* **The frame agent** (``agent.TriageAgent``) runs See → Prove → Decide on one frame:
+  Stage-1 geometry (``src.cv_pipeline.canonical``), the detector over ``cv2.dnn``
+  (``perception.Perceptor``), physical evidence (water column, acoustic shadow and height —
+  ``shadow.ShadowProver``), then the calibrated tiers (``policy.GuaranteedTiers``): a recall promise fit
+  on held-out recordings, verified once on unseen ones (``calibrate``, ``guarantees``), and checked for
+  correlated frames (``study_dependence``, STUDY-21). Every candidate carries a full tool-call trace.
+* **Act** — geotags, chunk stitching, repeat-sighting merge, routes and opposite-side re-survey passes
+  (``geo``, ``stitch``, ``resurvey``, ``mission``); nothing is dispatched without a named person.
 
-* **See**    — detect candidates full-frame (``perception.Perceptor`` over ``cv2.dnn``).
-* **Prove**  — gather *physical* evidence per candidate (``evidence.EvidenceGatherer``):
-               re-look persistence (zoom in and re-detect — the workhorse discriminator),
-               the acoustic **shadow** where it genuinely exists (``shadow.ShadowProver``),
-               echo strength, and a shadow-derived height estimate.
-* **Decide** — a deterministic, logged, human-gated triage agent (``agent.ReLookAgent``)
-               sorts each candidate into CONFIRMED / REVIEW / REJECTED and records a full
-               tool-call trace.
-* **Act**    — turn CONFIRMED objects into a human-approved cleanup route + geotagged reports
-               (``mission`` / ``geo``).
-
-Design note (honesty first): on this side-scan crab-pot data the acoustic shadow is only
-measurable on a minority of larger/high-relief objects and does **not** separate the detector's
-true positives from its false positives (STUDY-03/04: its CLEAR-rate is ~14.5% on both TP and FP).
-The discriminators that *do* work are re-look persistence and high detector confidence — the two
-independently-calibrated CONFIRMED paths whose union lifts precision from ~0.60 (raw) to ~0.74 at
-~30% recall. The shadow is therefore used as **evidence shown where present** (plus a height
-estimate), never as a silent gate — and no candidate is ever discarded without a human seeing it.
+Honesty first: on this sonar the acoustic shadow barely separates true from false finds (AUC 0.563) and a
+zoomed re-look did not beat plain confidence (STUDY-07), so both are evidence shown to a person, never a
+silent gate. EXP-003 supports no precision promise, so nothing is auto-confirmed; no candidate is
+discarded without a person being able to see it.
 """

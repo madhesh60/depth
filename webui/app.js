@@ -180,7 +180,7 @@ function agentRunBlock(run) {
     g.boat_minutes != null ? `boat ${g.boat_minutes} min` : ""].filter(Boolean);
   const steps = run.steps.map(s => ({ tool: s.act, status: s.status,
     rationale: s.why + (s.decided ? " -> " + s.decided : "") }));
-  return `<div class="cfx run-x"><div class="gate-h">How the agent decided<span>${escapeHtml(m.label || "legacy rules")}${m.promise != null ? ` · promise ≥ ${pctS(m.promise)}` : ""}${(run.replans || []).length ? " · re-planned mid-run" : ""}</span></div>
+  return `<div class="cfx run-x"><div class="gate-h">How the agent decided<span>${escapeHtml(m.label || "uncalibrated")}${m.promise != null ? ` · promise ≥ ${pctS(m.promise)}` : ""}${(run.replans || []).length ? " · re-planned mid-run" : ""}</span></div>
     <div class="mb-tags">${goal.map(t => `<span class="mb-tag">${escapeHtml(t)}</span>`).join("")}</div>
     ${ch.length ? `<table><thead><tr><th>Perception mode</th><th>Promise</th><th>Passes / frame</th><th>Cards (est.)</th><th>Compute (est.)</th><th></th></tr></thead><tbody>${ch.map(o =>
       `<tr class="${o.chosen ? "chg" : ""}"><th>${escapeHtml(o.label)}</th><td>≥ ${pctS(o.promise)}</td><td>${o.passes_per_frame}</td>`
@@ -385,8 +385,8 @@ function renderGuarantees(c) {
   const panel = $("#guarPanel"), meta = $("#guarMeta"), gate = $("#regGate"), tiers = $("#regTiers");
   if (!panel) return;
   if (!c || c.tau_review == null) {
-    panel.innerHTML = `<p class="panel-note">No calibrated guarantee loaded — tiers use the legacy rules.</p>`;
-    if (tiers) tiers.textContent = "legacy rules"; if (gate) gate.textContent = "0.10";
+    panel.innerHTML = `<p class="panel-note">No calibrated promise for this model — every find goes to a person (python -m src.agentic.calibrate).</p>`;
+    if (tiers) tiers.textContent = "uncalibrated"; if (gate) gate.textContent = "—";
     return;
   }
   const g = c.guarantees || {}, v = g.verified_on_test || {};
@@ -904,8 +904,8 @@ function tierPromise(c) {
   return `Low-risk tier holds at most ${Math.round((1 - (g.recall_promise || 0)) * 100)}% of pots; kept for audit, never deleted`;
 }
 function verdictReason(c) {
-  const d = decideDetail(c), p = (c.evidence || {}).p_pot;
-  if (c.verdict === "confirmed") return d.mode !== "legacy" ? "Above the confirm threshold: carries the precision promise" : "Legacy rule";
+  const p = (c.evidence || {}).p_pot;
+  if (c.verdict === "confirmed") return "Above the confirm threshold: carries the precision promise";
   if (c.verdict === "review") return `Human review${p != null ? ` · P(pot) ~${Math.round(p * 100)}%` : ""}, ordered in the queue`;
   return "Low risk: below the review threshold, kept for audit, not surfaced";
 }

@@ -369,7 +369,7 @@ Weights: `python -m src.detection.fetch_model` (GitHub Release `exp003-v1`, SHA-
 0. `src/agentic/core.py` → `SurveyAgent.run` — the core loop: goal → check the promise applies
    (`applicability.py`) → `choose_mode` → perceive with a compute-budget watch → plan → hand off.
 1. `src/cv_pipeline/canonical.py` — Stage 1: palette → luminance, orientation, bottom track, slant → ground.
-2. `src/agentic/agent.py` → `ReLookAgent.run_frame` — the frame agent (`_look_harder` is the tile pass of
+2. `src/agentic/agent.py` → `TriageAgent.run_frame` — the frame agent (`_look_harder` is the tile pass of
    the look-harder mode). `_decide_calibrated` is the loop in four
    named steps: `_voi_pass` (can more looking change the tier?) → `_budget` (the stop rule) →
    `_relook_band` → `_physical_evidence` + `_decide_one` (belief → tier → handoff to a person).

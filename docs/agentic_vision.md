@@ -137,7 +137,7 @@ traces back to the survey (§5).
 
 ## 3. Autonomy — a stated objective and value-of-information tool use
 
-`agent.ReLookAgent._decide_calibrated` asks, for every candidate, *"can more looking change this
+`agent.TriageAgent._decide_calibrated` asks, for every candidate, *"can more looking change this
 outcome?"* (`policy.GuaranteedTiers.needs_relook`):
 
 ```

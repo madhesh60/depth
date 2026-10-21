@@ -208,7 +208,7 @@ def main():
     rp_new, rp_old = gtee.get("recall_promise"), ogt.get("recall_promise")
     if cal_rc not in (None, 0):
         warn.append(f"**CALIBRATION FAILED (exit {cal_rc})** - see `runs/{name}/onboard.log`; the agent would run "
-                    f"this model on the legacy rules (no calibrated promise). Do not switch the demo.")
+                    f"this model uncalibrated (no promise: every find goes to a person). Do not switch the demo.")
     elif not a.skip_calibrate and (rp_new is None or rp_new < 0.3):
         warn.append(f"**Recall promise too weak ({rp_new})** - the detector does not reach enough pots on the "
                     f"calibration recordings. Do not switch the demo.")

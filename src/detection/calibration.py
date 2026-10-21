@@ -54,8 +54,8 @@ DEFAULTS: dict[str, Any] = {
         "input": "raw",            # Stage-1 detector input: raw | gray | gain (STUDY-08)
     },
     "tiers": {
-        "method": "legacy-rules",
-        "score": "max(det_conf, relook_conf)",
+        "method": "uncalibrated",
+        "score": "conf",
         "tau_review": None,
         "tau_confirm": None,
         "guarantees": {},

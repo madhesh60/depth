@@ -25,8 +25,11 @@ fallback) → ``update_belief`` (P(pot) before → after the evidence) → ``dec
 the detector's own score, which can only send a find to a person (``incidents.py``). The rule core is
 the sole decision authority (reproducible + safe); an LLM never decides.
 
-**Legacy mode** (no fitted calibration, and the unit tests): the old re-look ladder with the
-thresholds in ``policy.TriageConfig`` (tuned on test — superseded by the calibrated tiers).
+**No calibration** (a freshly onboarded model before ``calibrate.py`` has run): no promise and no
+threshold, so every find goes to a person as a REVIEW card with its physical evidence — nothing is
+auto-confirmed and nothing is set aside as low-risk. (The old re-look ladder, whose thresholds were
+tuned on the test split, is gone from the product; ``calibrate.py`` still re-scores those rules on
+unseen data for the record — its precision fell from 0.737 to 0.58.)
 
 CLI:  python -m src.agentic.agent <image|dir> --out runs/agent [--limit N]
 """
@@ -49,11 +52,11 @@ from src.detection.infer import Detection
 from .perception import Perceptor
 from .shadow import ShadowProver
 from .tools import Toolbox
-from .evidence import fuse_score, evidence_notes
+from .evidence import evidence_notes
 from . import active
 from .evidence_model import EvidenceModel
 from .incidents import incident
-from .policy import TriageConfig, GuaranteedTiers, decide
+from .policy import GuaranteedTiers
 from .types import AgentStep, Candidate, Evidence, FrameResult, RelookResult, ShadowProof, ShadowQuality, Verdict
 
 REPO = Path(__file__).resolve().parents[2]
@@ -67,11 +70,7 @@ _VERDICT_BGR = {
 
 @dataclass
 class AgentConfig:
-    triage: TriageConfig = field(default_factory=TriageConfig)
-    # legacy ladder: try an enhanced (CLAHE) re-look only when uncertain AND conf is low
-    enhance_when_relook_below: float = 0.40
-    enhance_when_conf_below: float = 0.35
-    # calibrated mode (None ⇒ legacy rules)
+    # the calibrated tiers (None ⇒ uncalibrated: every find goes to a person, no threshold)
     tiers: Optional[GuaranteedTiers] = None
     # compute budget: re-looks per frame (the stop rule); the rest are skipped + recorded
     max_relooks: int = field(default_factory=lambda: int(os.environ.get("DEPTH_MAX_RELOOKS", "16")))
@@ -91,8 +90,9 @@ class AgentConfig:
                    look_harder={"tile_frac": float(m["tile_frac"]), "merge_iou": float(m["merge_iou"])} if m else None)
 
 
-class ReLookAgent:
-    """Runs See → Prove → Decide on a frame, emitting per-candidate tool-call traces."""
+class TriageAgent:
+    """The frame agent: runs See → Prove → Decide on one frame and emits a tool-call trace per candidate
+    (``core.SurveyAgent`` runs it on every frame of a survey)."""
 
     def __init__(self, perceptor: Optional[Perceptor] = None,
                  shadow_prover: Optional[ShadowProver] = None,
@@ -113,7 +113,7 @@ class ReLookAgent:
 
     @property
     def mode(self) -> str:
-        return "calibrated" if self.cfg.tiers is not None else "legacy"
+        return "calibrated" if self.cfg.tiers is not None else "uncalibrated"
 
     def run_frame(self, frame: np.ndarray, frame_id: str = "frame",
                   nadir: str | None = None,
@@ -159,9 +159,7 @@ class ReLookAgent:
         if self.cfg.tiers is not None:
             candidates, n_inf = self._decide_calibrated(det_in, gray, dets, cf, altitude_m)
         else:
-            candidates = [self._decide_legacy(det_in, gray, d, cf) for d in dets]
-            n_inf = 1 + sum(sum(s.tool in ("zoom_relook", "enhance_relook") for s in c.trace)
-                            for c in candidates)
+            candidates, n_inf = self._decide_uncalibrated(gray, dets, cf, altitude_m), 1
         for c, src in zip(candidates, sources):                 # Stage-1 geometry for Act (geotag)
             _attach_geometry(c, cf)
             if src != "full":
@@ -634,66 +632,37 @@ class ReLookAgent:
             why += " (no precision promise is achievable with this model, so nothing is auto-confirmed)"
         return v, why, p
 
-    # ======================================================================= legacy mode
-    def _decide_legacy(self, frame, gray, det: Detection, cf: CanonicalFrame) -> Candidate:
-        """The old adaptive ladder with the test-tuned thresholds (fallback + unit tests)."""
-        cfg = self.cfg
-        nadir = cf.orientation.nadir
-        tri = cfg.triage
-        trace: list[AgentStep] = []
-
-        relook, s = self.tools.zoom_relook(frame, det.bbox, det.cls_name, det.conf)
-        trace.append(s)
-        confident = relook.conf >= tri.confirm_relook or det.conf >= tri.confirm_conf
-
-        proof, s = self.tools.shadow_check(gray, det.bbox, nadir, altitude_px=_altitude_for(cf, det.bbox))
-        trace.append(s)
-        if proof.has_shadow and proof.orientation_known:
-            _, s = self.tools.estimate_height(proof)
-            trace.append(s)
-
-        escalated = False
-        if (not confident and relook.conf < cfg.enhance_when_relook_below
-                and det.conf < cfg.enhance_when_conf_below):
-            relook2, s = self.tools.zoom_relook(frame, det.bbox, det.cls_name, det.conf, enhance=True)
-            trace.append(s)
-            escalated = True
-            if relook2.conf > relook.conf:
-                relook = relook2
-
-        evidence = Evidence(
-            relook=relook, shadow=proof, echo_ratio=proof.echo_ratio,
-            evidence_score=round(fuse_score(det.conf, relook, proof), 3),
-            notes=evidence_notes(det.conf, det.cls_name, relook, proof),
-        )
-        verdict, path = decide(det.conf, evidence, tri)
-        trace.append(AgentStep(
-            tool="decide", rationale=self._why_legacy(verdict, path, det.conf, relook, escalated),
-            latency_ms=0.0, conf_before=round(det.conf, 4), conf_after=round(relook.conf, 4),
-            detail={"verdict": verdict.value, "confirm_path": path,
-                    "evidence_score": evidence.evidence_score, "escalated": escalated, "mode": "legacy"},
-        ))
-        return Candidate(bbox=det.bbox, cls_id=det.cls_id, cls_name=det.cls_name,
-                         conf=det.conf, evidence=evidence, verdict=verdict, trace=trace)
-
-    def _why_legacy(self, verdict: Verdict, path: str, conf: float, relook, escalated: bool) -> str:
-        t = self.cfg.triage
-        if verdict is Verdict.CONFIRMED:
-            if path == "high_confidence":
-                return (f"detector already highly confident ({conf:.2f} >= {t.confirm_conf:.2f}) -> "
-                        f"auto-confirmed; escalation skipped (legacy rule)")
-            if path == "both":
-                return (f"detector confident ({conf:.2f}) and re-look persisted ({relook.conf:.2f}) -> "
-                        f"confirmed on two signals (legacy rule)")
-            return (f"re-look persisted ({relook.conf:.2f} >= {t.confirm_relook:.2f}) -> confirmed (legacy rule)"
-                    + (" after an enhanced try-harder pass" if escalated else ""))
-        if verdict is Verdict.LOW_RISK:
-            return (f"low confidence ({conf:.2f}) and no re-look ({relook.conf:.2f})"
-                    + (" even after enhancement" if escalated else "")
-                    + " -> LOW-RISK, kept for audit (not deleted)")
-        return (f"uncertain (conf {conf:.2f}, re-look {relook.conf:.2f})"
-                + (" even after an enhanced pass" if escalated else "")
-                + " -> routed to human review")
+    # ======================================================================= no calibration
+    def _decide_uncalibrated(self, gray, dets: list[Detection], cf: CanonicalFrame,
+                             altitude_m: Optional[float] = None) -> list[Candidate]:
+        """No calibrated tiers for this model: no promise and no threshold, so every find goes to a person
+        (REVIEW) with its physical evidence. No re-look: nothing calibrated says it could change anything."""
+        out, failed = [], [False] * len(dets)
+        for i, det in enumerate(dets):
+            trace = [AgentStep(
+                tool="voi_check", latency_ms=0.0, conf_before=round(det.conf, 4),
+                rationale=(f"{det.cls_name} conf {det.conf:.2f}: can another observation change the decision? no - "
+                           "this model has no calibrated tiers, so a person decides every find"),
+                detail={"question": "can another observation change the decision?", "answer": "no"})]
+            proof, wc = self._physical_evidence(i, det, gray, cf, altitude_m, trace, failed)
+            rl = RelookResult(found=False, conf=0.0, gain=0.0, scale=1.0)
+            notes = evidence_notes(det.conf, det.cls_name, rl, proof)
+            notes[0] = "re-look: not run - this model has no calibrated tiers for it to change"
+            if wc:
+                notes.append("sits in the water column above the tracked seabed (fish / bubbles / surface "
+                             "return?) - not on the seabed; a human should check it")
+            ev = Evidence(relook=rl, shadow=proof, echo_ratio=proof.echo_ratio, evidence_score=round(det.conf, 4),
+                          notes=notes, p_pot=None)
+            trace.append(AgentStep(
+                tool="decide", latency_ms=0.0, conf_before=round(det.conf, 4), conf_after=round(det.conf, 4),
+                rationale=("no calibrated tiers for this model (python -m src.agentic.calibrate): no promise and no "
+                           "threshold -> REVIEW card; a person decides (nothing auto-confirmed, nothing set aside)"),
+                detail={"verdict": Verdict.REVIEW.value, "score": round(det.conf, 4), "mode": "uncalibrated",
+                        "tool_failed": failed[i]}))
+            trace.append(_handoff(Verdict.REVIEW, None))
+            out.append(Candidate(bbox=det.bbox, cls_id=det.cls_id, cls_name=det.cls_name, conf=det.conf,
+                                 evidence=ev, verdict=Verdict.REVIEW, trace=trace))
+        return out
 
 
 def _altitude_for(cf: CanonicalFrame, bbox) -> Optional[float]:
@@ -802,7 +771,7 @@ def main():
     ap.add_argument("--limit", type=int, default=0)
     a = ap.parse_args()
 
-    agent = ReLookAgent()
+    agent = TriageAgent()
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
     n = inf = 0

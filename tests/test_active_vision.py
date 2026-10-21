@@ -19,7 +19,7 @@ needs_model = pytest.mark.skipif(not DEFAULT_ONNX.exists(), reason="model weight
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from src.agentic import active
-from src.agentic.agent import ReLookAgent, AgentConfig
+from src.agentic.agent import TriageAgent, AgentConfig
 from src.agentic.evidence_model import EvidenceModel, THRESHOLDS
 from src.agentic.policy import GuaranteedTiers
 from src.agentic.shadow import ShadowProver, ShadowConfig
@@ -120,7 +120,7 @@ BINS = [{"lo": 0.06, "hi": 0.2, "p_pot": 0.1, "n": 10}, {"lo": 0.2, "hi": 0.35, 
 def _agent(dets, em):
     tiers = GuaranteedTiers(tau_review=0.06, tau_confirm=None, relook_mode=None, p_pot_bins=BINS,
                             guaranteed_class="ghost_gear", guarantees={"recall_promise": 0.79})
-    a = ReLookAgent(perceptor=_Stub(dets), shadow_prover=ShadowProver(ShadowConfig(nadir="top")),
+    a = TriageAgent(perceptor=_Stub(dets), shadow_prover=ShadowProver(ShadowConfig(nadir="top")),
                     cfg=AgentConfig(tiers=tiers))
     a.evidence_model = em
     return a

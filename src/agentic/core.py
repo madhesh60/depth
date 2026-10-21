@@ -124,7 +124,8 @@ def choose_mode(goal: Goal, modes: list[Mode], n_frames: int,
                      "expected_compute_s": None if comp is None else round(comp, 1),
                      "meets_goal": meets, "fits_budgets": fits, "why_not": why})
     if not opts:
-        return None, {"options": [], "why": "no calibrated mode - legacy rules, no promise", "goal_met": False}
+        return None, {"options": [], "why": "no calibrated mode - no promise: every find goes to a person",
+                      "goal_met": False}
     by = {m.name: m for m in modes}
     cost = lambda o: (o["expected_compute_s"] or 0.0, o["expected_analyst_min"] or 0.0, o["passes_per_frame"])
     ok = [o for o in opts if o["meets_goal"] and o["fits_budgets"]]
@@ -262,7 +263,7 @@ class SurveyAgent:
                                        self.pipe.ms_per_pass())
             choice["why"] = ("the promise does not apply to this recording, so no mode can buy one - the cheapest "
                              "look (standard) serves the full human review")
-        run.log("choose_mode", choice["why"], decided=(mode.label if mode else "legacy rules"),
+        run.log("choose_mode", choice["why"], decided=(mode.label if mode else "uncalibrated"),
                 options=choice["options"], observed={"usable_frames": usable,
                                                      "ms_per_pass": self.pipe.ms_per_pass()})
         if applies and not choice["goal_met"] and mode is not None:
@@ -340,7 +341,7 @@ class SurveyAgent:
 
         # 4. plan for people and the boat
         g = self.pipe.guarantees(agent)
-        g["perception_mode"] = mode.name if mode else "legacy"
+        g["perception_mode"] = mode.name if mode else "uncalibrated"
         if not applies:
             a = self._applicability or {}
             g["promise_withdrawn"] = {"was": g.get("recall_promise"), "why": a.get("why"),

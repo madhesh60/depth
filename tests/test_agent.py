@@ -15,7 +15,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from src.detection.infer import Detection
-from src.agentic.agent import ReLookAgent, AgentConfig, render
+from src.agentic.agent import TriageAgent, AgentConfig, render
 from src.agentic.shadow import ShadowProver, ShadowConfig
 from src.agentic.types import RelookResult, Verdict
 
@@ -35,7 +35,7 @@ class _StubPerceptor:
 
 
 def _agent(dets, relook_normal, relook_enhanced=None, cfg=None):
-    return ReLookAgent(
+    return TriageAgent(
         perceptor=_StubPerceptor(dets, relook_normal, relook_enhanced),
         shadow_prover=ShadowProver(ShadowConfig(nadir="top")),
         cfg=cfg or AgentConfig(),
@@ -50,51 +50,36 @@ def _det(conf, box=(90, 60, 110, 84)):
     return Detection(bbox=box, cls_id=0, cls_name="fishing_gear", conf=conf)
 
 
-def test_strong_relook_is_confirmed_with_trace():
-    res = _agent([_det(0.30)], relook_normal=0.55).run_frame(_frame())
-    c = res.candidates[0]
-    assert c.verdict is Verdict.CONFIRMED
-    tools = [s.tool for s in c.trace]
-    # adaptive controller: re-look is the agent's first probe, decide is last
-    assert tools[0] == "zoom_relook" and "shadow_check" in tools and tools[-1] == "decide"
-    # strong first look ⇒ no enhanced re-look needed
-    assert "enhance_relook" not in tools
-    assert c.trace[-1].detail["confirm_path"] == "relook"
+class _CountingStub(_StubPerceptor):
+    """Counts re-looks, so a test can show that none were spent."""
+    def __init__(self, dets):
+        super().__init__(dets, 0.9)
+        self.relooks = 0
+
+    def zoom_relook(self, frame, bbox, cls_name="ghost_gear", enhance=False):
+        self.relooks += 1
+        return super().zoom_relook(frame, bbox, cls_name, enhance)
 
 
-def test_high_confidence_path_confirms_and_skips_escalation():
-    """A detection the detector is already sure about (conf ≥ 0.60, precision ~0.83 — STUDY-04) is
-    auto-confirmed even if it does not re-fire, and the agent skips the expensive enhanced re-look."""
-    res = _agent([_det(0.68)], relook_normal=0.0, relook_enhanced=0.9).run_frame(_frame())
-    c = res.candidates[0]
-    assert c.verdict is Verdict.CONFIRMED
-    tools = [s.tool for s in c.trace]
-    assert "enhance_relook" not in tools                       # early-stop: no wasted second inference
-    assert c.trace[-1].detail["confirm_path"] == "high_confidence"
-    assert c.trace[-1].detail["escalated"] is False
-
-
-def test_enhanced_relook_can_upgrade_decision():
-    """A low-confidence candidate that only re-fires after the CLAHE 'try harder' pass gets confirmed,
-    and the trace records the enhanced re-look that changed the outcome."""
-    res = _agent([_det(0.18)], relook_normal=0.30, relook_enhanced=0.52).run_frame(_frame())
-    c = res.candidates[0]
-    assert c.verdict is Verdict.CONFIRMED
-    assert "enhance_relook" in [s.tool for s in c.trace]
-    assert c.evidence.relook.conf == 0.52
-
-
-def test_review_and_rejected_tiers():
-    review = _agent([_det(0.20)], relook_normal=0.22, relook_enhanced=0.24).run_frame(_frame())
-    assert review.candidates[0].verdict is Verdict.REVIEW
-    rejected = _agent([_det(0.11)], relook_normal=0.0).run_frame(_frame())
-    assert rejected.candidates[0].verdict is Verdict.REJECTED
+def test_an_uncalibrated_model_sends_every_find_to_a_person():
+    """No fitted tiers (a model onboarded before calibrate.py ran): no promise and no threshold, so even a
+    confident find and a faint one both become REVIEW cards - nothing auto-confirmed, nothing set aside."""
+    stub = _CountingStub([_det(0.95, (10, 10, 30, 30)), _det(0.06, (90, 60, 110, 84))])
+    agent = TriageAgent(perceptor=stub, shadow_prover=ShadowProver(ShadowConfig(nadir="top")), cfg=AgentConfig())
+    r = agent.run_frame(_frame(), frame_id="Rec9_wcp_ss_port_00001")
+    assert agent.mode == "uncalibrated" and [c.verdict for c in r.candidates] == [Verdict.REVIEW, Verdict.REVIEW]
+    assert stub.relooks == 0 and r.stage_ms["inferences"] == 1          # no re-look: nothing it could change
+    for c in r.candidates:
+        tools = [s.tool for s in c.trace]
+        assert tools[0] == "voi_check" and "shadow_check" in tools and tools[-2:] == ["decide", "handoff"]
+        assert "no calibrated tiers" in _dec(c).rationale and _dec(c).detail["mode"] == "uncalibrated"
+        assert c.evidence.p_pot is None and c.evidence.notes[0].startswith("re-look: not run")
 
 
 def test_frame_result_counts_and_serialisation():
-    dets = [_det(0.30, (90, 60, 110, 84)), _det(0.11, (10, 10, 26, 30))]
-    res = _agent(dets, relook_normal=0.0, relook_enhanced=0.0)
-    # first det: conf 0.30 no relook -> REVIEW ; second: conf 0.11 no relook -> LOW_RISK
+    dets = [_det(0.30, (90, 60, 110, 84)), _det(0.06, (10, 10, 26, 30))]
+    res = _agent(dets, relook_normal=0.0, relook_enhanced=0.0, cfg=AgentConfig(tiers=_tiers()))
+    # first det: conf 0.30 in the band -> REVIEW ; second: conf 0.06 < tau_review -> LOW_RISK
     r = res.run_frame(_frame())
     assert r.counts["review"] == 1 and r.counts["low_risk"] == 1
     d = r.to_dict()
@@ -118,7 +103,7 @@ def test_toolbox_estimate_height_is_relative():
 
 
 def test_orientation_comes_from_source_rule_not_a_guess():
-    agent = ReLookAgent(perceptor=_StubPerceptor([_det(0.3)], 0.0), shadow_prover=ShadowProver())
+    agent = TriageAgent(perceptor=_StubPerceptor([_det(0.3)], 0.0), shadow_prover=ShadowProver())
     r = agent.run_frame(_frame(), frame_id="Rec9_wcp_ss_port_00031")
     assert r.nadir == "top" and r.orientation["source"] == "source-rule"
     u = agent.run_frame(_frame(), frame_id="BC_POST_T2_00_00_1_7")
@@ -141,7 +126,7 @@ def _boundary_survey(conf_a=0.30, conf_b=0.30):
                 return [Detection((186, 60, 200, 84), 0, "fishing_gear", conf_a)]
             return [Detection((0, 62, 12, 86), 0, "fishing_gear", conf_b)]   # chunk 11: leading edge
 
-    agent = ReLookAgent(perceptor=_Seq(), shadow_prover=ShadowProver(), cfg=AgentConfig())
+    agent = TriageAgent(perceptor=_Seq(), shadow_prover=ShadowProver(), cfg=AgentConfig(tiers=_tiers()))
     frames = [("Rec6_wcp_ss_port_00010", _frame()), ("Rec6_wcp_ss_port_00011", _frame())]
     return AgenticPipeline(agent=agent).run_survey(frames, track=None, survey_id="t")
 
@@ -198,7 +183,7 @@ def _tiers(**kw):
 def test_value_of_information_relooks_only_the_uncertain_band():
     dets = [_det(0.70, (10, 10, 30, 30)), _det(0.30, (60, 60, 80, 80)), _det(0.06, (120, 120, 140, 140))]
     stub = _BatchStub(dets, {0.30: 0.62})
-    agent = ReLookAgent(perceptor=stub, shadow_prover=ShadowProver(ShadowConfig(nadir="top")),
+    agent = TriageAgent(perceptor=stub, shadow_prover=ShadowProver(ShadowConfig(nadir="top")),
                         cfg=AgentConfig(tiers=_tiers()))
     r = agent.run_frame(_frame(), frame_id="Rec9_wcp_ss_port_00001")
     v = [c.verdict for c in r.candidates]
@@ -212,7 +197,7 @@ def test_value_of_information_relooks_only_the_uncertain_band():
 
 def test_review_card_carries_calibrated_p_pot_and_promise_text():
     stub = _BatchStub([_det(0.20)], {0.20: 0.35})
-    agent = ReLookAgent(perceptor=stub, shadow_prover=ShadowProver(ShadowConfig(nadir="top")),
+    agent = TriageAgent(perceptor=stub, shadow_prover=ShadowProver(ShadowConfig(nadir="top")),
                         cfg=AgentConfig(tiers=_tiers()))
     c = agent.run_frame(_frame()).candidates[0]
     assert c.verdict is Verdict.REVIEW and c.evidence.p_pot == 0.6 and c.evidence.evidence_score == 0.35
@@ -221,7 +206,7 @@ def test_review_card_carries_calibrated_p_pot_and_promise_text():
 
 def test_no_precision_promise_means_nothing_is_auto_confirmed():
     stub = _BatchStub([_det(0.95)], {})
-    agent = ReLookAgent(perceptor=stub, shadow_prover=ShadowProver(ShadowConfig(nadir="top")),
+    agent = TriageAgent(perceptor=stub, shadow_prover=ShadowProver(ShadowConfig(nadir="top")),
                         cfg=AgentConfig(tiers=_tiers(tau_confirm=None)))
     c = agent.run_frame(_frame()).candidates[0]
     assert c.verdict is Verdict.REVIEW                       # even conf 0.95 is never auto-confirmed
@@ -232,7 +217,7 @@ def test_no_precision_promise_means_nothing_is_auto_confirmed():
 def test_non_guaranteed_classes_never_auto_confirm():
     dets = [Detection((10, 10, 40, 40), 2, "structural_fragment", 0.9),
             Detection((60, 60, 90, 90), 3, "natural_formation", 0.9)]
-    agent = ReLookAgent(perceptor=_BatchStub(dets, {}), shadow_prover=ShadowProver(ShadowConfig(nadir="top")),
+    agent = TriageAgent(perceptor=_BatchStub(dets, {}), shadow_prover=ShadowProver(ShadowConfig(nadir="top")),
                         cfg=AgentConfig(tiers=_tiers()))
     r = agent.run_frame(_frame())
     assert [c.verdict for c in r.candidates] == [Verdict.REVIEW, Verdict.LOW_RISK]
