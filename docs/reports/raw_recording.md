@@ -17,6 +17,8 @@ Recording **R01224** — 9xx/11xx/helix (67-byte ping headers), fresh water, sta
 
 The track also lies on the river channel in satellite imagery (checked on the studio map).
 
+**Data dropouts** (per ping, from the recording itself — `chunk_dropouts`): 0 of 6906 pings flagged (0.00%: 0 dark, 0 after a time gap, 0.0 s of missing pings) in 0 of 14 frames. Thresholds are assumptions (25% of the neighbours' median intensity; 3× the median ping interval), checked on injected dropouts in the test suite. Pitch and roll are not in the ping header, so they are not corrected.
+
 ## 2. A measured range scale — and the agent's cross-check of the seabed
 
 First estimate: metres per range sample = the sonar's own depth (m) ÷ the Stage-1 bottom-track altitude (samples), per chunk of 500 pings, median over confident chunks. That estimate trusts the tracker, and the tracker is not always right — so the agent then **cross-checks every chunk's seabed against the depth sounder**, re-runs the OpenCV tracker where they conflict, trusts the image where the sounder lost lock, and **re-fits the scale** from the sounder-backed chunks until it stops moving ([STUDY-16](sensor_check.md)). Its uncertainty is the larger of the robust spread and the gap to the beam-physics estimate (PINGMapper's formula: 0.108 m transducer, 455 kHz).
@@ -35,7 +37,7 @@ First-estimate per-chunk values (cm / sample): 1.58, 2.09, 2.1, 2.19, 2.19, 2.19
 
 ![a real frame and the real track](../img/raw_recording.jpg)
 
-- 14 frames (500 pings each, port + starboard) in **3.6 s** on this laptop — 42× faster than the recording.
+- 14 frames (500 pings each, port + starboard) in **4.1 s** on this laptop — 36× faster than the recording.
 - **2 review cards**, 0 auto-confirmed (no precision promise), P(pot) 0.12–0.20; heights 0.11–0.11 m where a shadow was measured.
 - No crab pots are known in this reach of the Colorado River and there is no ground truth, so every card is a **false alarm or an unknown object on out-of-domain water**: **48 cards per hour of sonar** at the detector floor 0.05 — the review load this model would put on an analyst here (2 of 2 fit a 2-minute budget at the assumed 8 s per card).
 - Every pin is placed from its **own ping's GPS fix and heading** plus the measured ground range; error radius = 3 m GPS (assumed) + range × (scale uncertainty + sin 6°): 7.9–8.0 m here.

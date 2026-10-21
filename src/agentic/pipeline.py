@@ -63,6 +63,23 @@ def check_geometry(c: Candidate) -> Optional[str]:
     return None
 
 
+def _flag_dropouts(result: FrameResult, fix: PingFix) -> None:
+    """A frame with pings that were not imaged: one incident, and a note on every find that touches them."""
+    runs = fix.dropout_cols or []
+    touched = 0
+    for c in result.candidates:
+        x1, _, x2, _ = c.bbox
+        if any(a <= x2 and x1 <= b for a, b in runs):
+            touched += 1
+            if c.evidence is not None:
+                c.evidence.notes.insert(0, "touches a data dropout (pings not imaged) - the seabed next to it was not "
+                                           "seen, so the evidence there is incomplete")
+    result.incidents.append(incident(
+        "data_dropout", f"{result.frame_id}: {len(runs)} stretch(es) of pings not imaged "
+        f"({100 * (fix.dropout_share or 0):.1f}% of the frame)" + (f"; {touched} find(s) touch one" if touched else ""),
+        frame_id=result.frame_id, runs_px=runs, share=fix.dropout_share, affected=touched or None))
+
+
 class AgenticPipeline:
     def __init__(self, agent: Optional[ReLookAgent] = None, m_per_px: float = DEFAULT_M_PER_PX):
         self.agent = agent or ReLookAgent()
@@ -130,6 +147,8 @@ class AgenticPipeline:
                 result.incidents.append(incident("invalid_geometry", f"{frame_id}: {bad} position(s) failed the check",
                                                  frame_id=frame_id, affected=bad,
                                                  simulated="invalid_geometry" in faults))
+            if fix.dropout_cols:
+                _flag_dropouts(result, fix)
         if progress_cb:
             progress_cb("act", {"geotagged": fix is not None})
         return result

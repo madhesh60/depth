@@ -83,6 +83,11 @@ CATALOGUE: dict[str, tuple[str, str, str, str, str]] = {
         "the promise is withdrawn for this survey; every proposal still reaches a person as a card, and the agent "
         "asks for a full review",
         "approve the full review (look at every frame), or treat the cards as hints only"),
+    "data_dropout": (
+        "warning", "input", "Data dropout: some pings were not imaged",
+        "the dropped pings are marked on the frame and any find touching them says so; the recall promise covers "
+        "imaged seabed only - a pot inside a dropout cannot be seen",
+        "re-survey the dropped stretch if pots matter there (the incident lists its pings)"),
     "goal_not_met": (
         "warning", "plan", "The goal cannot be met",
         "the agent runs the best calibrated mode the budgets allow and states the promise it keeps",

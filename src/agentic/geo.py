@@ -59,6 +59,10 @@ class PingFix:
     bottom_line_px: Optional[list] = None
     geometry: Optional[str] = None
     altitude_bound_m: Optional[float] = None
+    # data dropouts in the analysed frame (humminbird.chunk_dropouts): [first, last] frame columns of the
+    # pings that were not imaged, and their share of the frame's pings
+    dropout_cols: Optional[list] = None
+    dropout_share: Optional[float] = None
 
 
 def offset_latlon(lat: float, lon: float, dist_m: float, bearing_deg: float) -> tuple[float, float]:

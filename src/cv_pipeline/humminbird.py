@@ -19,6 +19,17 @@ must start with the marker and end its header with ``21``, sample counts are cap
 (``MAX_RETURNS``), file sizes are capped (``MAX_FILE_BYTES``), a corrupt ping is skipped with a
 recorded issue (resync on the next marker) instead of crashing, and nothing is executed or written.
 
+Data dropouts (``chunk_dropouts``): vehicle motion lifts the transducer or aerates the water, and the
+recorder can skip pings — the problem statement's "data dropouts caused by heave, pitch and roll". Each
+ping is checked from the recording itself: a **gap** (the time since the previous ping is more than
+``GAP_K`` × the channel's median interval: pings are missing) or a **dark** ping (mean intensity below
+``DARK_K`` × the median of its ``DROP_WIN`` neighbours or of the whole channel, or almost no non-zero
+samples: the seabed was not imaged). Flagged pings are reported per frame (``meta[fid]["dropouts"]``)
+and carried on the frame's fix, so the agent files a ``data_dropout`` incident and notes finds that touch
+one. The thresholds are design assumptions, checked on injected dropouts (``tests/test_dropouts.py``),
+not fitted. Pitch and roll are not in the ping header (no attitude sensor fields), so they are not
+corrected; heave moves the seabed in the image and is followed by Stage 1's per-ping bottom track.
+
 Validation (``validate()``; report ``docs/reports/raw_recording.md``) — before any number is trusted:
 GPS speed vs the sonar's speed field, course-over-ground vs heading, record/time monotonicity,
 and port/starboard agreement. The **range scale** is *measured*: sonar depth (m, from the unit)
@@ -49,6 +60,9 @@ LAT_K = 1.0067642927                 # Humminbird latitude correction
 MAX_FILE_BYTES = 4 * 1024 ** 3       # 4 GB per .SON — a 12-h recording is ~1.5 GB
 MAX_RETURNS = 20000                  # samples per ping (Mega imaging ≈ 1.5–5 k)
 MAX_HEADER = 256
+DARK_K = 0.25                        # a ping darker than this share of its neighbours' median = not imaged
+GAP_K = 3.0                          # a ping interval above this × the median interval = missing pings
+DROP_WIN = 51                        # neighbours (pings) for the rolling median
 BEAMS = {0: "down_low", 1: "down_high", 2: "port", 3: "starboard", 4: "down_mega"}
 TAGS = {0x80: "record", 0x81: "time_ms", 0x82: "utm_e", 0x83: "utm_n", 0x84: "heading", 0x85: "speed",
         0x87: "depth_cm", 0x50: "beam", 0x51: "volt_scale", 0x92: "freq_hz"}
@@ -265,6 +279,37 @@ def chunk_recording(rec: Recording, nchunk: int = 500,
     return chunks
 
 
+def chunk_dropouts(pings: list, son: np.ndarray, median_dt_ms: float, channel_energy: float) -> dict:
+    """Data dropouts in one chunk: ``son`` is samples × pings (nadir first). Returns the per-ping mask,
+    the counts by kind, the seconds of missing pings and the runs ``[first, last]`` (ping indices)."""
+    n = son.shape[1] if son.ndim == 2 else 0
+    if n == 0:
+        return {"n": 0, "dark": 0, "gap": 0, "missing_s": 0.0, "runs": [], "mask": np.zeros(0, bool)}
+    energy = son.astype(np.float32).mean(axis=0)
+    nonzero = (son > 0).mean(axis=0)
+    half = DROP_WIN // 2
+    win = np.lib.stride_tricks.sliding_window_view(np.pad(energy, half, mode="edge"), 2 * half + 1)
+    local = np.median(win, axis=1)
+    dark = (energy < DARK_K * local) | (energy < DARK_K * channel_energy) | (nonzero < 0.05)
+    t = np.array([p.time_ms for p in pings], float)
+    dt = np.diff(t, prepend=t[0]) if len(t) == n else np.zeros(n)
+    gap = (dt > GAP_K * median_dt_ms) if median_dt_ms > 0 else np.zeros(n, bool)
+    mask = dark | gap
+    runs, i = [], 0
+    while i < n:
+        if mask[i]:
+            j = i
+            while j + 1 < n and mask[j + 1]:
+                j += 1
+            runs.append([i, j])
+            i = j + 1
+        else:
+            i += 1
+    missing = float(np.sum(dt[gap] - median_dt_ms)) / 1000.0 if gap.any() else 0.0
+    return {"n": n, "dark": int(dark.sum()), "gap": int(gap.sum()), "missing_s": round(missing, 2),
+            "runs": runs, "mask": mask}
+
+
 def frames_and_track(rec: Recording, nchunk: int = 500, size: int = 640,
                      channels: tuple[str, ...] = ("port", "starboard"),
                      crosscheck: bool = True) -> tuple[list, dict, dict]:
@@ -296,6 +341,14 @@ def frames_and_track(rec: Recording, nchunk: int = 500, size: int = 640,
                      "iterations": geo["iterations"]}
     frames, track, meta = [], {}, {}
     max_depth = max((p.depth_m for _, _, ps, _ in chunks for p in ps if p.depth_m), default=None)
+    # data dropouts: per channel, the median ping interval and ping energy are the reference
+    ref = {}
+    for cname in {c for c, _, _, _ in chunks}:
+        ps_all = [p for c, _, ps, _ in chunks if c == cname for p in ps]
+        dts = np.diff([p.time_ms for p in ps_all])
+        en = np.concatenate([son.astype(np.float32).mean(axis=0) for c, _, _, son in chunks if c == cname])
+        ref[cname] = (float(np.median(dts[dts > 0])) if (dts > 0).any() else 0.0, float(np.median(en)) if en.size else 0.0)
+    drops = {"pings": 0, "dark": 0, "gap": 0, "missing_s": 0.0, "frames_with": 0, "total_pings": 0}
     for cname, j, ps, son in chunks:
         img = cv2.resize(son, (size, size), interpolation=cv2.INTER_AREA)
         fid = f"{rec.name}_ss_{'port' if cname == 'port' else 'star'}_{j:05d}"
@@ -310,6 +363,16 @@ def frames_and_track(rec: Recording, nchunk: int = 500, size: int = 640,
         mid = size // 2
         m_per_px = scale["m_per_sample"] * son.shape[0] / size if scale["m_per_sample"] else None
         g = geo["chunks"].get((cname, j)) if geo else None
+        dr = chunk_dropouts(ps, son, *ref[cname])
+        to_col = lambda i: int(round(i * (size - 1) / max(1, len(ps) - 1)))
+        drop_cols = [[to_col(a), to_col(b)] for a, b in dr["runs"]]
+        n_drop = int(dr["mask"].sum())
+        drops["pings"] += n_drop
+        drops["dark"] += dr["dark"]
+        drops["gap"] += dr["gap"]
+        drops["missing_s"] += dr["missing_s"]
+        drops["frames_with"] += int(n_drop > 0)
+        drops["total_pings"] += len(ps)
         track[fid] = PingFix(lat=round(lat[mid], 7), lon=round(lon[mid], 7), heading_deg=round(heading[mid], 1),
                              synthetic=False, ping_lat=lat, ping_lon=lon, ping_heading=heading,
                              depth_m=(g.altitude_m if g is not None else float(np.median(depths)) if depths else None),
@@ -317,15 +380,22 @@ def frames_and_track(rec: Recording, nchunk: int = 500, size: int = 640,
                              range_scale_rel_unc=scale["rel_unc"],
                              bottom_line_px=g.line_resampled(size) if g is not None else None,
                              geometry=g.status if g is not None else None,
-                             altitude_bound_m=max_depth)
+                             altitude_bound_m=max_depth,
+                             dropout_cols=drop_cols or None,
+                             dropout_share=round(n_drop / max(1, len(ps)), 4) if n_drop else None)
         meta[fid] = {"channel": cname, "pings": [ps[0].record, ps[-1].record], "n_pings": len(ps),
                      "samples": int(son.shape[0]), "freq_hz": ps[0].freq_hz, "time_ms": [ps[0].time_ms, ps[-1].time_ms],
                      "depth_m_median": float(np.median(depths)) if depths else None,
                      "range_m_per_px": track[fid].range_m_per_px,
-                     "geometry": {**g.to_dict(), "lines": g.overlay_lines(size)} if g is not None else None}
-    out = {"frames": meta, "range_scale": scale}
+                     "geometry": {**g.to_dict(), "lines": g.overlay_lines(size)} if g is not None else None,
+                     "dropouts": {"pings": n_drop, "dark": dr["dark"], "gap": dr["gap"], "missing_s": dr["missing_s"],
+                                  "runs_px": drop_cols}}
+    drops["share"] = round(drops["pings"] / max(1, drops["total_pings"]), 5)
+    drops["missing_s"] = round(drops["missing_s"], 2)
+    drops["params"] = {"dark_k": DARK_K, "gap_k": GAP_K, "window_pings": DROP_WIN, "status": "assumed, not fitted"}
+    out = {"frames": meta, "range_scale": scale, "dropouts": drops}
     if geo:
-        out["geometry"] = {**summary(geo), "log": geo["log"]}
+        out["geometry"] = {**summary(geo), "log": geo["log"], "dropouts": drops}
     return frames, track, out
 
 
@@ -531,6 +601,13 @@ def report(dat: Path) -> str:
          f"| depth field (min / median / max) | {P['depth_m'][0]} / {P['depth_m'][1]} / {P['depth_m'][2]} m | | the field is in **decimetres** (confirmed below) |",
          f"| port vs starboard fixes at the same time | {v['port_vs_starboard']['fix_distance_m_max']} m apart | | both channels share each ping's fix |", "",
          "The track also lies on the river channel in satellite imagery (checked on the studio map).", "",
+         f"**Data dropouts** (per ping, from the recording itself — `chunk_dropouts`): "
+         f"{meta['dropouts']['pings']} of {meta['dropouts']['total_pings']} pings flagged "
+         f"({meta['dropouts']['share']:.2%}: {meta['dropouts']['dark']} dark, {meta['dropouts']['gap']} after a time gap, "
+         f"{meta['dropouts']['missing_s']} s of missing pings) in {meta['dropouts']['frames_with']} of {len(frames)} frames. "
+         f"Thresholds are assumptions ({DARK_K:.0%} of the neighbours' median intensity; {GAP_K:g}× the median ping "
+         "interval), checked on injected dropouts in the test suite. Pitch and roll are not in the ping header, so they "
+         "are not corrected.", "",
          "## 2. A measured range scale — and the agent's cross-check of the seabed", "",
          "First estimate: metres per range sample = the sonar's own depth (m) ÷ the Stage-1 bottom-track altitude "
          "(samples), per chunk of 500 pings, median over confident chunks. That estimate trusts the tracker, and the "

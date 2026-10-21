@@ -242,6 +242,14 @@ class SurveyAgent:
                               "iterations": geometry.get("iterations")},
                     decided=f"{geometry.get('trusted', 0)} of {geometry.get('chunks', 0)} chunks trusted for metres and "
                             f"ground range; {c.get('not_measured', 0)} withheld (slant range, widened error radius)")
+            d = geometry.get("dropouts") or {}
+            if d.get("pings"):
+                run.log("check_dropouts", f"{d['pings']} of {d['total_pings']} pings ({d['share']:.2%}) were not imaged "
+                        f"({d['dark']} dark, {d['gap']} after a time gap, {d['missing_s']} s missing) in "
+                        f"{d['frames_with']} frame(s) - a pot there cannot be seen",
+                        observed={k: d.get(k) for k in ("pings", "share", "dark", "gap", "missing_s", "frames_with")},
+                        decided="flag the dropped stretches per frame (data_dropout incident); the promise covers imaged "
+                                "seabed only")
 
         applies = self._check_promise(run, frames, bad, survey_incidents)
 
