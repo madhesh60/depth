@@ -171,7 +171,9 @@ src/agentic/      core (the loop) · applicability · study_applicability · stu
                   study · effort · study_causal · active · evidence_model · counterfactual · sensor_check ·
                   study_sensor · types
 src/bench/        product_bench · fingerprint · compare · cool_attest · verify_cool · cool_docs · load_test
-src/dashboard/    app (FastAPI) · jobs · metrics · samples · mcp_server · ogc · integrations · ratelimit · origin_guard
+src/dashboard/    app (FastAPI + wiring) · service (state, survey run) · routes/ (system · analyze · survey · people ·
+                  approvals · connect) · detector_queue · jobs · metrics · samples · mcp_server · mcp_session · ogc ·
+                  integrations · ratelimit · origin_guard
 webui/            zero-build vanilla studio (index.html, app.js, styles.css, twin3d.js) · embed/ · samples/ ·
                   audit/ · img/ · vendor/ (leaflet, three, fonts)
 infra/            cfn/depth.yaml · deploy.sh · teardown.sh · update_server.sh · setup_cool_instance.sh ·

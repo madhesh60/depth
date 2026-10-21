@@ -57,7 +57,7 @@ mcp = FastMCP("DEPTH", instructions=INSTRUCTIONS, website_url="https://github.co
 
 
 def _app():
-    from . import app as A                          # lazy: app.py imports this module to mount /mcp
+    from . import service as A                      # lazy: app.py imports this module to mount /mcp
     return A
 
 
@@ -86,7 +86,8 @@ def _cand_summary(c, i: int) -> dict:
 def depth_status() -> dict:
     """Model, calibrated promises, OpenCV build (COOL or stock) and limits of this DEPTH server."""
     A = _app()
-    h = A.health()
+    from .routes.system import health
+    h = health()
     return {"model": h["model"], "model_loaded": h["model_loaded"], "opencv": h["opencv"],
             "cool": h["is_cool_path"], "calibration": h["calibration"], "limits": h["limits"],
             "approvals": A._APPROVALS.counts(),
@@ -274,7 +275,8 @@ def get_stage1_counterfactual(survey_id: str) -> dict:
 @mcp.tool(annotations=_READ)
 def get_mission_brief(survey_id: str, public: bool = False) -> dict:
     """The one-page hand-over for the crew. Every number in it is checked against the survey."""
-    out = _app().mission_brief(survey_id=survey_id, public=public, writer="template")
+    from .routes.survey import mission_brief
+    out = mission_brief(survey_id=survey_id, public=public, writer="template")
     return {k: out[k] for k in ("text", "writer", "grounding")}
 
 

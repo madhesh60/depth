@@ -355,7 +355,8 @@ src/agentic/      the core loop (core.py: goal -> check the promise -> choose ho
                   cross-check (STUDY-16), active vision (active, evidence_model, counterfactual), guarantees,
                   geo, routes, re-survey, approvals, mission brief, 3D twin, provenance, labels, study, effort
 src/bench/        COOL benchmark (product workload, provenance, comparison, COOL receipt)
-src/dashboard/    FastAPI service (jobs, limits, rate limits, metrics) · MCP server · OGC API · webhooks
+src/dashboard/    FastAPI service: app.py (wiring) · service.py (state) · routes/ (one router per area) ·
+                  jobs, limits, rate limits, metrics · MCP server + a recorded session · OGC API · webhooks
 webui/            zero-build studio (+ three.js twin) · embed/depth-embed.js (drop-in panel) · 8 sample frames
 infra/            Graviton + COOL deploy (dry-run by default) + 3-way benchmark
 models/<MODEL>/   calibration.json + effort/audit data (weights: GitHub Release, fetch_model)

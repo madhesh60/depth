@@ -23,6 +23,7 @@ from fastapi.testclient import TestClient
 
 from src.agentic.approvals import ApprovalError, ApprovalStore
 from src.dashboard import app as app_mod
+from src.dashboard import service as service_mod
 from src.dashboard import mcp_server
 from src.detection.infer import DEFAULT_ONNX
 
@@ -45,7 +46,7 @@ def _call(c, name, args, i=9):
 
 @pytest.fixture(scope="module")
 def client(tmp_path_factory):
-    app_mod._APPROVALS = ApprovalStore(tmp_path_factory.mktemp("approvals"))
+    service_mod._APPROVALS = ApprovalStore(tmp_path_factory.mktemp("approvals"))
     hosts = mcp_server.mcp.settings.transport_security.allowed_hosts
     if "testserver" not in hosts:
         hosts.append("testserver")

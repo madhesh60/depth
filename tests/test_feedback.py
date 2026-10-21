@@ -67,7 +67,8 @@ def test_agreement_with_shipped_ground_truth(tmp_path):
 def test_api_feedback_roundtrip(tmp_path, monkeypatch):
     from fastapi.testclient import TestClient
     import src.dashboard.app as app_mod
-    monkeypatch.setattr(app_mod, "_FEEDBACK", FeedbackStore(tmp_path))
+    import src.dashboard.service as service_mod
+    monkeypatch.setattr(service_mod, "_FEEDBACK", FeedbackStore(tmp_path))
     c = TestClient(app_mod.app)
     r = c.post("/api/feedback", json={"decision": "missed", "bbox": [5, 5, 25, 25], "frame_id": "Rec6_wcp_ss_port_00005",
                                        "cls_name": "fishing_gear"})

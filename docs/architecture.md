@@ -382,7 +382,9 @@ Weights: `python -m src.detection.fetch_model` (GitHub Release `exp003-v1`, SHA-
 6. `src/agentic/mission.py` → `plan_mission` / `apply_human` — stitching, routes, re-survey passes and the
    person-confirmed re-plan.
 7. `src/agentic/incidents.py` — every failure the agent handles, and the drills (`?simulate=`).
-8. `src/dashboard/app.py` — the HTTP API the studio (`webui/app.js`) and the MCP / OGC channels use.
+8. `src/dashboard/app.py` → `routes/` — the HTTP API the studio (`webui/app.js`) and the MCP / OGC channels use
+   (one router per area: system, analyze, survey, people, approvals, connect); `service.py` holds the shared
+   state and the survey run.
 
 ```
 src/cv_pipeline/  canonical.py (Stage 1) · humminbird.py (raw recordings, STUDY-14) · orientation.py ·
@@ -398,8 +400,9 @@ src/agentic/      core.py (the core loop) · applicability.py + study_applicabil
                   pipeline.py · approvals.py · feedback.py · study.py · effort.py · twin.py (3D twin) ·
                   provenance.py · brief.py (mission brief) · study_causal.py (STUDY-12) · types.py
 src/bench/        product_bench.py · fingerprint.py · compare.py (COOL benchmark)
-src/dashboard/    app.py · jobs.py · metrics.py · samples.py · mcp_server.py · ogc.py · integrations.py ·
-                  ratelimit.py · origin_guard.py
+src/dashboard/    app.py (the app + wiring) · service.py (state, survey run) · routes/ (system · analyze ·
+                  survey · people · approvals · connect) · detector_queue.py · jobs.py · metrics.py · samples.py ·
+                  mcp_server.py · mcp_session.py · ogc.py · integrations.py · ratelimit.py · origin_guard.py
 webui/            index.html · app.js · twin3d.js (three.js twin) · styles.css · embed/depth-embed.js ·
                   samples/ (8 CC-BY-SA frames) · audit/ · vendor/leaflet · vendor/three
 infra/            cfn/depth.yaml · deploy.sh · setup_cool_instance.sh · depth.service · update_server.sh ·

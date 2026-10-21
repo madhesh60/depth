@@ -93,8 +93,9 @@ def test_the_app_refuses_to_start_in_public_mode_without_tokens(monkeypatch):
 def test_the_api_locks_out_after_wrong_pins(monkeypatch):
     from fastapi.testclient import TestClient
     import src.dashboard.app as app_mod
+    import src.dashboard.service as service_mod
     monkeypatch.setenv("DEPTH_APPROVER_PIN", "246810")
-    monkeypatch.setattr(app_mod, "_PIN_GUARD", PinGuard(max_fails=2, lock_s=900))
+    monkeypatch.setattr(service_mod, "_PIN_GUARD", PinGuard(max_fails=2, lock_s=900))
     c = TestClient(app_mod.app)
     body = {"decision": "approved", "by": "A. Person", "pin": "1"}
     assert [c.post("/api/approvals/AR-none/decide", json=body).status_code for _ in range(2)] == [403, 403]

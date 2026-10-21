@@ -19,6 +19,7 @@ from fastapi.testclient import TestClient
 
 from src.agentic.approvals import ApprovalStore
 from src.dashboard import app as app_mod
+from src.dashboard import service as service_mod
 from src.dashboard import integrations as integ
 from src.dashboard.ogc import build_features
 from src.detection.infer import DEFAULT_ONNX
@@ -123,8 +124,8 @@ def test_webhook_signed_delivery_and_guards(tmp_path, receiver, monkeypatch):
 
 
 def test_webhook_api_admin_token_and_events(tmp_path, receiver, monkeypatch):
-    app_mod._WEBHOOKS = integ.Webhooks(tmp_path / "wh")
-    app_mod._APPROVALS = ApprovalStore(tmp_path / "ap")
+    service_mod._WEBHOOKS = integ.Webhooks(tmp_path / "wh")
+    service_mod._APPROVALS = ApprovalStore(tmp_path / "ap")
     monkeypatch.setenv("DEPTH_ADMIN_TOKEN", "adm")
     assert client.post("/api/integrations/webhooks", json={"url": receiver}).status_code == 403
     h = client.post("/api/integrations/webhooks", json={"url": receiver, "events": ["approval.requested"]},
@@ -147,7 +148,7 @@ def test_survey_completed_event_is_emitted(tmp_path, monkeypatch):
     if not DEFAULT_ONNX.exists():
         pytest.skip("model absent")
     sent = []
-    monkeypatch.setattr(app_mod._WEBHOOKS, "emit", lambda ev, data: sent.append((ev, data)) or 0)
+    monkeypatch.setattr(service_mod._WEBHOOKS, "emit", lambda ev, data: sent.append((ev, data)) or 0)
     s = client.post("/api/survey?use_samples=1&gps=synthetic&budget_minutes=1").json()
     ev = [d for e, d in sent if e == "survey.completed"]
     assert ev and ev[0]["survey_id"] == s["survey_id"] and ev[0]["human_approval_required"] is True

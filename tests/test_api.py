@@ -61,8 +61,8 @@ def test_upload_rejects_undecodable_image():
 
 
 def test_survey_frame_limit(monkeypatch):
-    import src.dashboard.app as app_mod
-    monkeypatch.setattr(app_mod, "MAX_FRAMES", 2)
+    import src.dashboard.service as service_mod
+    monkeypatch.setattr(service_mod, "MAX_FRAMES", 2)
     files = [("files", (f"f{i}.png", b"x", "image/png")) for i in range(3)]
     assert client.post("/api/jobs/survey", files=files).status_code == 413
 
@@ -70,8 +70,8 @@ def test_survey_frame_limit(monkeypatch):
 def test_sync_survey_redirects_big_runs_to_jobs(monkeypatch):
     if not _HAVE_SAMPLES:
         return
-    import src.dashboard.app as app_mod
-    monkeypatch.setattr(app_mod, "MAX_SYNC_FRAMES", 1)
+    import src.dashboard.service as service_mod
+    monkeypatch.setattr(service_mod, "MAX_SYNC_FRAMES", 1)
     r = client.post("/api/survey?use_samples=1")
     assert r.status_code == 413 and "/api/jobs/survey" in r.json()["detail"]
 
@@ -135,8 +135,8 @@ def test_analyze_and_report_path():
     assert rec["progress"]["done"] == rec["progress"]["total"] == job["frames"]
     assert client.get(f"/api/report/csv?survey_id={job['survey_id']}").status_code == 200
     # evicted from memory → the brief is rebuilt from the persisted JSON report
-    from src.dashboard import app as app_mod
-    app_mod._SURVEYS.pop(job["survey_id"], None)
+    from src.dashboard import service as service_mod
+    service_mod._SURVEYS.pop(job["survey_id"], None)
     bp = client.get(f"/api/brief?survey_id={job['survey_id']}&public=1").json()
     assert bp["grounding"]["ok"] and bp["facts"]["public"] is True and bp["facts"]["frames"] == job["frames"]
 
