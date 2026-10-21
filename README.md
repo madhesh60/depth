@@ -33,7 +33,7 @@ Madhesh) · **Targets:** Agentic Vision · Best Use of COOL · **License:** AGPL
 | **Crab-pot detector**, AP@0.5 | **0.482** (95% CI 0.43–0.55): the 0.70 target is **not met** | v2b test, 214 unique frames |
 | **The promises wrap any detector** | the same calibration code: EXP-001 **≥ 63%**, EXP-003 **≥ 78%**, each verified on its own unseen test | [`calibration_exp001.md`](docs/calibration_exp001.md) · [`calibration_exp003.md`](docs/calibration_exp003.md) |
 | **Speed per frame**, standard look | **157 ms** x86 · **197 ms** Graviton4; looking harder (the default) costs **≈ 5×** | EC2 4 vCPU, stock OpenCV 5 (COOL pending) |
-| **Checks** | **284** tests · ruff · mypy · a headless-Chrome UI test, all in CI | 2026-10-21 |
+| **Checks** | **286** tests · ruff · mypy · a headless-Chrome UI test, all in CI | 2026-10-21 |
 
 **Not yet measured, and said so:** Graviton + COOL timings (the Marketplace subscription is pending), the
 look-harder mode on EC2, analyst minutes saved and audited false-alarm precision (both need people). The

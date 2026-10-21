@@ -60,8 +60,8 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
   plan → ask), Stage 1, the EXP-003 detector through `cv2.dnn` (new engine, recorded), evidence, calibrated
   tiers (≥ 78% one look, ≥ 84% looking harder — both checked for correlated frames), survey planning and
   person-approved actions — on the sample frames and on a raw Humminbird recording with real GPS and a
-  per-ping dropout mask. `ruff check .` (with bugbear) is clean; the full suite passes (278, 2026-10-21;
-  coverage 61% of `src/`, 86% of the runtime modules).
+  per-ping dropout mask. `ruff check .` (with bugbear) and `mypy` (the decision core) are clean, both in CI; the
+  full suite passes (286, 2026-10-21; coverage 60% of `src/`, 85% of the runtime modules).
 - **Waiting on AWS:** the Graviton + COOL runs (the Marketplace subscription is with AWS Support) and
   CloudFront (account verification). The stock EC2 benchmarks and the demo-server load test are done.
 - **Needs people:** the timed user study and the blinded false-alarm audit.
@@ -77,6 +77,33 @@ Current numbers, each with its split: README "At a glance" and
 ---
 
 ## 4. Session log
+
+### 2026-10-21 (sweep 70) — the second judge audit: what still held, fixed
+
+The new local `JUDGE_AUDIT.md` (scored at `a7215ef`) was re-checked item by item; what was already good was
+left alone, and these held and are fixed:
+
+- **A guard the re-check found:** `calibrate` / `study_look_harder --model M` while another detector was
+  loaded would have fit M's tiers with the loaded model's classes and thresholds; both now refuse
+  (`require_loaded_model`). EXP-001 gets the same correlated-frames rule as EXP-003 (65% → 63%).
+- **COOL report:** a "Where COOL acts" section — stock → COOL per workload and per OpenCV op, the forward's
+  share of the frame, and the headline the registered claim rule picks (or "no separated speed-up").
+- **On-board budget:** one Graviton4 core runs the frame in 599 ms / 240 MB → a survey-hour in ~168 s,
+  ~21× faster than the sonar records (README, JUDGES.md, technical report).
+- **The architecture picture** still showed EXP-001's 65% and no core loop: redrawn as built (the core
+  loop with its withdraw branch, both promises with their test results, 151 of 222, the true AWS status).
+- **README first screen:** seven one-line rows and one sentence per judging criterion; the full numbers
+  stay in `docs/JUDGES.md`.
+- **Studio at 1024–1440 px:** Survey's last inspector tabs hid behind a fade and the goal text was cut;
+  the tab strip wraps and the goal options are short.
+- **The first Analyze broke its own 2-s budget** (2.12 s): the provenance stamp's first call (model hash +
+  EC2 probe, ~0.6 s) ran inside it. It warms at start now, and the measured rest of an answer comes off the
+  budget before the detector passes are priced. Laptop: first answer 1.35 s.
+- **Types:** `mypy` on the decision core (9 files); CI now runs ruff and mypy before the tests.
+- **Tests:** 286 passed (two halves), 0 failed; `tests/ui_smoke.py` PASS.
+- **Not done here (needs the owner, AWS or people):** COOL, a public URL, the c8g.large look-harder row
+  and the load-test re-run, the timed study, the blinded audit, the video, the Lucidchart drawing, the
+  GitHub description and topics, and the owner's call on an AI-assistance line.
 
 ### 2026-10-21 (sweep 69) — the judge audit, fixed where code and data could fix it
 
