@@ -180,9 +180,8 @@ class TriageAgent:
             stage_ms={"stage1": stage1_ms, "see": see_ms, "look_harder": look_ms, "prove_decide": prove_decide_ms,
                       "inferences": float(n_inf)},
             nadir=orient.label, orientation=orient.to_dict(), stage1=s1,
-            incidents=_frame_incidents(frame_id, candidates, cf, self._faults) + ([incident(
-                "tool_failed", f"{frame_id}: the look-harder tile pass failed - {perception['fallback']}",
-                frame_id=frame_id, simulated="tool_failed" in self._faults)] if perception.get("fallback") else []),
+            incidents=_frame_incidents(frame_id, candidates, cf, self._faults) + ([_tile_pass_incident(
+                frame_id, perception, self._faults)] if perception.get("fallback") else []),
             active=self._active_info(), perception=perception,
         )
 
@@ -733,6 +732,17 @@ def _frame_incidents(frame_id: str, cands: list[Candidate], cf: CanonicalFrame, 
         out.append(incident("tool_failed", f"{frame_id}: an evidence tool failed on {nf} find(s)",
                             frame_id=frame_id, affected=nf, simulated="tool_failed" in faults))
     return out
+
+
+def _tile_pass_incident(frame_id: str, perception: dict, faults: set) -> dict:
+    """The closer look failed on this frame: a timeout is told as one (``tool_timeout``), anything else as
+    ``tool_failed``; either way the frame keeps its first look and the survey drops to the standard promise."""
+    err = next((str((st.get("detail") or {}).get("error", "")) for st in reversed(perception.get("steps") or [])
+                if st.get("status") == "failed"), "")
+    code = "tool_timeout" if err.startswith("ToolTimeout") else "tool_failed"
+    return incident(code, f"{frame_id}: the look-harder tile pass {'overran its deadline' if code == 'tool_timeout' else 'failed'}"
+                          f" - {perception['fallback']}", frame_id=frame_id,
+                    simulated=bool({"tool_failed", "tool_timeout"} & faults) or None)
 
 
 def _counts(cands: list[Candidate]) -> dict:

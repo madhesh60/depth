@@ -117,3 +117,13 @@ def test_the_calibrated_mode_carries_its_own_promise_and_threshold():
     assert GuaranteedTiers.from_calibration(cal, "no_such_mode") is None
     cfg = AgentConfig.from_calibration("look_harder")
     assert cfg.look_harder == {"tile_frac": 0.6, "merge_iou": 0.5} and cfg.perception_mode == "look_harder"
+
+
+def test_a_tile_pass_timeout_is_told_as_a_timeout():
+    from src.agentic.agent import _tile_pass_incident
+    perc = {"fallback": "first look only", "steps": [{"tool": "look_harder", "status": "failed",
+                                                       "detail": {"error": "ToolTimeout: look_harder did not answer within 20 s"}}]}
+    assert _tile_pass_incident("f1", perc, set())["code"] == "tool_timeout"
+    perc["steps"][0]["detail"]["error"] = "RuntimeError: boom"
+    inc = _tile_pass_incident("f1", perc, {"tool_failed"})
+    assert inc["code"] == "tool_failed" and inc["simulated"] is True
