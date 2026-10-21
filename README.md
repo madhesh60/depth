@@ -31,6 +31,7 @@ Madhesh) · **Targets:** Agentic Vision · Best Use of COOL · **License:** AGPL
 | Stage-1 altitude, port vs starboard (no labels needed) | agree to **1.6 px** (random pairs 5.3 px) | STUDY-08 |
 | Product frame, standard look | **157 ms** x86 · **197 ms** Graviton4 · looking harder ≈ **5×** that | EC2 4 vCPU, stock OpenCV 5 (COOL pending) · laptop, interleaved |
 | OpenCV 5's new DNN engine (the one that loads) | **634 of 634** detections identical to the classic engine, 0 tier flips | STUDY-20, calibration split |
+| On one CPU core (on-board budget) | **599 ms/frame, 240 MB** → one survey-hour (280 frames) in ~168 s: **~21× faster than the sonar records** | EC2 Graviton4, 1 thread, measured frame × measured frames/hour |
 | Raw sonar recording, real GPS | range scale **2.03 cm/sample ± 10.2%**, measured | Colorado River, Humminbird |
 | Tests | **281** passed, CI on every push (line coverage 60% of `src/`: **85% of the runtime modules**, 26% of the offline study scripts, whose outputs are the reports); a headless-Chrome UI smoke test drives every mode with 0 JS errors (`python tests/ui_smoke.py`); a few tests need optional data and skip without it | `pytest -q` · 2026-10-21 |
 
@@ -279,6 +280,8 @@ deployed; EXP-002/004/005 were trained and did not beat it
 - **Not validated in the field**: no recording has both real pots and real GPS; the river recordings have
   no known pots. **No human study and no blinded audit yet**: analyst minutes and audited precision are
   assumptions until people run them (Study and Audit tabs).
+- **No small board measured** (Raspberry Pi / Jetson): the on-board figure is one core of a server CPU (Graviton4:
+  599 ms/frame, 240 MB) — a survey-hour then takes ~168 s, but a small board's core is slower.
 - **Not deployed yet**: COOL (Marketplace subscription pending), a public URL (CloudFront account
   verification pending), the optional Bedrock brief writer (off on the demo server). Active vision is built
   but off: it failed its own validation.

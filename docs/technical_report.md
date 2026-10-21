@@ -265,6 +265,7 @@ known crab pots.
 | full product path, 4 threads (EC2, 2026-10-20) | c8g.xlarge Graviton4, stock OpenCV 5 | 197 ms | 5.1 | 33.3 s · $0.0015 |
 | standard vs **look harder** (5 passes), interleaved, 2026-10-21 | laptop x86, stock OpenCV 5, 8 threads | 406 → 2,110 ms | 2.5 → 0.47 | ≈ 5× |
 | `cv2.dnn` forward, classic vs new engine (STUDY-20) | laptop x86, 8 threads / 1 thread | 411 vs 374 ms / 765 vs 886 ms | — | within noise — no claim |
+| **on-board budget: one core** (EC2, 2026-10-20) | c8g.xlarge Graviton4, 1 thread, 240 MB peak | 599 ms | 1.7 | ~168 s (280 frames/h, derived) → ~21× real time |
 | real 1-h recording end to end (EC2) | c8i.xlarge x86 / c8g.xlarge Graviton4, stock | — | — | RTF 0.0135 / 0.0171 |
 | load test, 4 clients + 1 survey, 120 s | c8g.large demo server (stock, rehearsal) | p95 2.0 s (mark 3 s) | 291/291 ok | **passed — before the look-harder mode existed; re-run pending** |
 | **⏳ pending:** Graviton **COOL** (c8g.xlarge + c8g.large) | Marketplace subscription waiting on AWS | — | — | — |
@@ -332,6 +333,9 @@ on Spot → S3.
 - **Labels.** Labels are incomplete, so precision is a lower estimate (the audit will quantify this).
 - **GPS.** The public crab-pot frames carry no GPS, so their demo track is synthetic and labelled as such everywhere, including the counterfactual's metres. The raw-recording path has **real** per-ping GPS and a measured range scale, but that recording is a river with no known pots: it measures false alarms, not recall.
 - **Heights.** On crab-pot frames heights are relative (h/H). On raw recordings they are in metres from the sonar's measured depth. The range scale there is measured: the tracker alone made 5 false picks among the 11 first-estimate chunks, the agent's cross-check against the depth sounder resolves them (STUDY-16, [`sensor_check.md`](reports/sensor_check.md)), and the remaining uncertainty (± 10.2%) is carried into every error radius.
+- **Edge.** The on-board figure is one core of a server CPU (Graviton4: 599 ms/frame, 240 MB → a survey-hour in
+  ~168 s, ~21× real time, derived from the measured frame time and the real recording's 280 frames/hour); no
+  Raspberry Pi or Jetson was measured.
 - **Effort.** Analyst seconds per card are assumed until the study measures them; at the assumed timings DEPTH saves time only on mostly empty seabed (§4.4).
 
 ## 7. Responsible use

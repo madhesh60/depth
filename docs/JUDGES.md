@@ -44,6 +44,7 @@ with the submission, and the studio says so under the PIN field.
 | OpenCV 5's new DNN engine | loads by default; **634 of 634** detections identical to the classic engine, 0 tier flips; speed: within noise on the laptop | [`dnn_engine.md`](reports/dnn_engine.md) (STUDY-20) |
 | Product frame, standard look (stock OpenCV 5, 4 vCPU) | **157 ms** x86 (c8i.xlarge) · **197 ms** Graviton4 (c8g.xlarge) | [`cool_benchmark.md`](reports/cool_benchmark.md) |
 | Looking harder costs | **≈ 5×** the standard frame (laptop, interleaved: 406 → 2,110 ms) | `benchmarks/laptop_x86_modes*` |
+| On one CPU core (on-board budget) | 599 ms/frame and 240 MB on one Graviton4 core → a survey-hour (280 frames) in ~168 s, **~21× faster than the sonar records** (no small board measured) | `benchmarks/graviton_stock_t1__product.json` × the real recording |
 | Analyst minutes (ASSUMED 20 s/frame, 8 s/card) | pot-dense test: DEPTH 62.7 vs manual 55.7 min (**slower**); faster only when < 23% of frames hold a pot | [`effort_curve.md`](reports/effort_curve.md) |
 | Real 1-h recording (another sonar, promise withdrawn) | **54 review cards per hour** of sonar | same |
 | Seabed measurement moves the boat | without Stage 1, 151 of 222 pins leave their own error circle | [`causal_trace.md`](reports/causal_trace.md) (STUDY-12) |
