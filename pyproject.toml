@@ -8,9 +8,15 @@ target-version = "py310"
 extend-exclude = ["*.ipynb"]
 
 [tool.ruff.lint]
-# Default rule set (pycodestyle E4/E7/E9 + Pyflakes F).
+# Default rule set (pycodestyle E4/E7/E9 + Pyflakes F) + flake8-bugbear (B).
+extend-select = ["B"]
 # E731: short local helpers written as lambdas are the project's idiom.
-ignore = ["E731"]
+# B008: FastAPI's Query()/Body()/File() defaults are its documented idiom.
+# B023: every closure over a loop variable is called inside the iteration that defines it (all 23 sites
+#       reviewed 2026-10-21) - the rule guards against closures that outlive the loop, which none do.
+# B905: zip() runs over parallel lists that are equal by construction; strict= would add a runtime check.
+# (pyupgrade's UP rules are not adopted: they would rewrite every Optional[...] annotation.)
+ignore = ["E731", "B008", "B023", "B905"]
 
 [tool.ruff.lint.per-file-ignores]
 # Test modules put the repository root on sys.path before importing src.

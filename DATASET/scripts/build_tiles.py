@@ -85,7 +85,7 @@ def tile_boxes(labels, W, H, x0, y0, tw, th, min_vis):
 def cut_rects(labels, W, H, x0, y0, tw, th, min_vis):
     """Pixel rectangles (tile coordinates) of boxes the tile cuts but ``tile_boxes`` drops."""
     out = []
-    for c, cx, cy, bw, bh in labels:
+    for _c, cx, cy, bw, bh in labels:
         x1, y1, x2, y2 = (cx - bw / 2) * W, (cy - bh / 2) * H, (cx + bw / 2) * W, (cy + bh / 2) * H
         ix1, iy1, ix2, iy2 = max(x1, x0), max(y1, y0), min(x2, x0 + tw), min(y2, y0 + th)
         if ix2 <= ix1 or iy2 <= iy1:

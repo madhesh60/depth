@@ -147,7 +147,7 @@ def build_crabpot(dst_split_dir, corrupt_counter, drop_counter):
             written[raw_split].append(stem)
             if not kept:
                 empties[v2split] += 1
-            for ln in kept:
+            for _ln in kept:
                 boxes[v2split] += 1
     return written, empties, boxes
 

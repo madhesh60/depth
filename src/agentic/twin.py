@@ -188,7 +188,7 @@ def survey_twin(frames: list[tuple[str, np.ndarray]], result: SurveyResult, trac
                 x, y = _enu(fx.ping_lat[k], fx.ping_lon[k], lat0, lon0)
                 path.append([round(x, 3), round(y, 3)])
     else:
-        for fid, fx in sorted(((f, track[f]) for f, _ in frames if f in track),
+        for _fid, fx in sorted(((f, track[f]) for f, _ in frames if f in track),
                               key=lambda kv: _along(kv[1], lat0, lon0, fixes[0].heading_deg)):
             cx, cy = _enu(fx.lat, fx.lon, lat0, lon0)
             path.append([round(cx, 3), round(cy, 3)])

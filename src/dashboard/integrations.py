@@ -59,7 +59,7 @@ def check_url(url: str) -> None:
     try:
         addrs = {ai[4][0] for ai in socket.getaddrinfo(u.hostname, u.port or (443 if u.scheme == "https" else 80))}
     except socket.gaierror:
-        raise WebhookError(f"cannot resolve {u.hostname}")
+        raise WebhookError(f"cannot resolve {u.hostname}") from None
     for a in addrs:
         ip = ipaddress.ip_address(a.split("%")[0])
         if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast or ip.is_unspecified:

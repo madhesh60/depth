@@ -237,7 +237,7 @@ def make_router(surveys: Callable[[], list[dict]], approvals: Callable[[], objec
                 bb = [float(x) for x in bbox.split(",")]
                 assert len(bb) == 4 and bb[0] <= bb[2] and bb[1] <= bb[3]
             except (ValueError, AssertionError):
-                raise HTTPException(400, "bbox must be minLon,minLat,maxLon,maxLat")
+                raise HTTPException(400, "bbox must be minLon,minLat,maxLon,maxLat") from None
         feats = build_features(cid, pick(survey_id), approvals(), public or _public_forced())
         if bb:
             feats = [f for f in feats if _in_bbox(f, bb)]

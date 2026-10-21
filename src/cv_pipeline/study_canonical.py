@@ -171,7 +171,7 @@ def part_b(C: Canonicaliser, modes=("raw", "gray", "gain"), reps: int = 1000) ->
             rec[m] = {"p3": _label(dets, gts, 0.3), "p5": _label(dets, gts, 0.5), "n_gt": len(gts)}
             if m == "raw" and cf.measured:
                 lab = dict(zip([b for _, b in sorted(dets, key=lambda d: -d[0])], [t for _, t in rec[m]["p3"]]))
-                for conf, box in dets:
+                for _conf, box in dets:
                     inwc = cf.in_water_column(box)
                     tp = lab.get(box, 0)
                     wc["tp" if tp else "fp"] += 1

@@ -95,7 +95,7 @@ def build(model: str = "EXP-001", split: str = "val", n: int = 60, catch: int = 
     root = Path(root or split_root(model, split) or (V1 / split))
     frames = blob["frames"]
     items = []
-    for fi, fr in enumerate(frames):
+    for _fi, fr in enumerate(frames):
         s, tp, _, _ = label([fr], lambda c: c["conf"])
         cands = sorted(fr["cands"], key=lambda c: -c["conf"])      # label() order = conf desc
         for c, ok in zip(cands, tp):

@@ -106,7 +106,7 @@ def run(model: str = "EXP-001", split: str = "test", n: int = 12) -> dict:
                 used.add(bj)
             else:
                 fas.append({"frame": fr["name"], "bbox": c["bbox"], "conf": c["conf"], "img": img, "gt": fr["gt"]})
-        for j, gb in enumerate(fr["gt"]):
+        for gb in fr["gt"]:
             reach = max((_iou(c["bbox"], gb) for c in cands), default=0.0)
             H, W = g.shape
             edge = gb[0] <= 3 or gb[1] <= 3 or gb[2] >= W - 3 or gb[3] >= H - 3      # cut by the chunk boundary

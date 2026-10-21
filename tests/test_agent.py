@@ -158,7 +158,7 @@ class _BatchStub(_StubPerceptor):
 
     def relook_batch(self, frame, items, enhance=False):
         out = []
-        for bbox, cls in items:
+        for bbox, _cls in items:
             d = next(d for d in self.dets if d.bbox == bbox)
             self.relooked.append(d.conf)
             c = self.relook_by_conf.get(d.conf, 0.0)

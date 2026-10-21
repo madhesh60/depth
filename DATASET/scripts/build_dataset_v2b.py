@@ -147,7 +147,7 @@ def dedupe(paths: list[Path]) -> tuple[list[Path], dict]:
     for p in paths:
         (by_key[frame_key(p.name)] if ".rf." in p.name else passthrough).append(p)
     kept, stats = list(passthrough), Counter()
-    for k, ps in sorted(by_key.items()):
+    for _k, ps in sorted(by_key.items()):
         best, info = pick_copy(ps)
         kept.append(best)
         stats["frames"] += 1

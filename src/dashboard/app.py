@@ -245,7 +245,7 @@ def _pipeline_or_503(faults: set = frozenset()) -> AgenticPipeline:
     try:
         return get_pipeline()
     except Exception as e:
-        raise _fail(503, incident("model_unavailable", f"the detector could not be loaded: {type(e).__name__}: {e}"[:300]))
+        raise _fail(503, incident("model_unavailable", f"the detector could not be loaded: {type(e).__name__}: {e}"[:300])) from e
 
 
 def _b64(img: np.ndarray, quality: int = 85) -> str:
@@ -628,7 +628,7 @@ def feedback(rec: dict = Body(...)):
     try:
         saved = _FEEDBACK.add(rec, img)
     except ValueError as e:
-        raise HTTPException(400, str(e))
+        raise HTTPException(400, str(e)) from e
     return {"saved": saved, "stats": _FEEDBACK.stats()}
 
 
@@ -644,7 +644,7 @@ def study_plan(participant: str = Query("anon", max_length=40)):
     try:
         plan = study_mod.plan(participant)
     except ValueError as e:
-        raise HTTPException(400, str(e))
+        raise HTTPException(400, str(e)) from e
     pipe = get_pipeline()
     g = load_calibration().guaranteed_class
     cards = []
@@ -731,7 +731,7 @@ def audit_tag(body: dict = Body(...)):
     try:
         rec = fp_audit.add_tag(str(body.get("item", "")), str(body.get("tag", "")), str(body.get("annotator", "")))
     except ValueError as e:
-        raise HTTPException(400, str(e))
+        raise HTTPException(400, str(e)) from e
     return {"saved": rec}
 
 
@@ -799,7 +799,7 @@ def analyze(sample: Optional[str] = Query(None), nadir: Optional[str] = Query(No
         except HTTPException as e:
             if e.status_code != 400:
                 raise
-            raise _fail(422, incident("corrupt_frame", str(e.detail)))
+            raise _fail(422, incident("corrupt_frame", str(e.detail))) from e
     elif sample:
         p = samples_mod.sample_path(sample)
         if not p or not p.exists():
@@ -1002,7 +1002,7 @@ def survey_decide(survey_id: str, request: Request, body: dict = Body(...)):
     try:
         _PIN_GUARD.check(client_of(request.scope), body.get("pin"))
     except PermissionError as e:
-        raise HTTPException(403, str(e))
+        raise HTTPException(403, str(e)) from e
     s = _SURVEYS.get(survey_id)
     if s is None:
         raise HTTPException(409, "this survey is no longer in memory - re-run it to decide on its hazards")
@@ -1011,10 +1011,10 @@ def survey_decide(survey_id: str, request: Request, body: dict = Body(...)):
         t = apply_human(s, str(body.get("hazard_id", "")), str(body.get("decision", "")), str(body.get("by", "")),
                         str(body.get("note", "")))
     except KeyError:
-        raise HTTPException(404, "unknown hazard_id")
+        raise HTTPException(404, "unknown hazard_id") from None
     except ValueError as e:
         msg = str(e)
-        raise HTTPException(409 if any(k in msg for k in ("already", "not on the", "no decision", "no priority")) else 400, msg)
+        raise HTTPException(409 if any(k in msg for k in ("already", "not on the", "no decision", "no priority")) else 400, msg) from e
     label = _survey_label(s, t, str(body.get("decision", "")))
     replan = s.mission.replans[-1] if s.mission.replans else None
     requests = _sync_agent_requests(s, reason=f"re-planned after {t.human_by or body.get('by')} chose "
@@ -1118,7 +1118,7 @@ def approval_request(body: dict = Body(...)):
         r = _APPROVALS.request(body.get("survey_id", ""), body.get("action", ""), body.get("targets") or [],
                                body.get("rationale", ""), requested_by=body.get("requested_by", "api"), channel="api")
     except ApprovalError as e:
-        raise HTTPException(400, str(e))
+        raise HTTPException(400, str(e)) from e
     _notify("approval.requested", r)
     return r
 
@@ -1131,11 +1131,11 @@ def approval_decide(rid: str, request: Request, body: dict = Body(...)):
         _PIN_GUARD.check(client_of(request.scope), body.get("pin"))
         r = _APPROVALS.decide(rid, body.get("decision", ""), body.get("by", ""), body.get("note", ""), body.get("pin"))
     except PermissionError as e:
-        raise HTTPException(403, str(e))
+        raise HTTPException(403, str(e)) from e
     except KeyError:
-        raise HTTPException(404, "unknown request id")
+        raise HTTPException(404, "unknown request id") from None
     except ApprovalError as e:
-        raise HTTPException(409 if "already" in str(e) else 400, str(e))
+        raise HTTPException(409 if "already" in str(e) else 400, str(e)) from e
     _notify("approval.decided", r)
     s = _SURVEYS.get(r.get("survey_id"))
     if s is not None and rid in (s.plan_args.get("requests") or {}).values():
@@ -1212,7 +1212,7 @@ def webhooks_add(request: Request, body: dict = Body(...)):
     try:
         return _WEBHOOKS.add(body.get("url", ""), body.get("events"), body.get("description", ""))
     except WebhookError as e:
-        raise HTTPException(400, str(e))
+        raise HTTPException(400, str(e)) from e
 
 
 @app.delete("/api/integrations/webhooks/{hid}")
@@ -1229,7 +1229,7 @@ def webhooks_test(hid: str, request: Request):
     try:
         return _WEBHOOKS.send_now(hid)
     except KeyError:
-        raise HTTPException(404, "unknown webhook")
+        raise HTTPException(404, "unknown webhook") from None
 
 
 # ---- OGC API - Features: any GIS / operations console reads hazards, passes, routes, work orders -----
