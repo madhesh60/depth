@@ -90,9 +90,14 @@ fi
 chmod 600 /etc/depth/mcp.env
 # Approver PIN: only people holding it can approve / decline / confirm (agents and API-token holders
 # can only ASK). Generated once, root-only; hand it to the judges privately with the submission.
-# DEPTH_APPROVALS_OPEN=1 skips it (the studio then says approvals are open to anyone).
-if [ "${DEPTH_APPROVALS_OPEN:-0}" != "1" ] && [ ! -s /etc/depth/approver.env ]; then
-  ( umask 077; printf 'DEPTH_APPROVER_PIN=%s\n' "$(od -An -N4 -tu4 /dev/urandom | tr -d ' \n' | tail -c 6)" > /etc/depth/approver.env )
+# DEPTH_APPROVALS_OPEN=1 opens approvals on purpose instead (the studio then says they are open to anyone;
+# the server refuses to start in public mode with neither a PIN nor this explicit choice).
+if [ ! -s /etc/depth/approver.env ]; then
+  if [ "${DEPTH_APPROVALS_OPEN:-0}" = "1" ]; then
+    ( umask 077; printf 'DEPTH_APPROVALS_OPEN=1\n' > /etc/depth/approver.env )
+  else
+    ( umask 077; printf 'DEPTH_APPROVER_PIN=%s\n' "$(od -An -N4 -tu4 /dev/urandom | tr -d ' \n' | tail -c 6)" > /etc/depth/approver.env )
+  fi
 fi
 [ -f /etc/depth/approver.env ] && chmod 600 /etc/depth/approver.env
 # Admin token for webhook management and the operator load test (same handling).

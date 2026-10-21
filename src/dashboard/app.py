@@ -78,13 +78,13 @@ from src.agentic import effort as effort_mod
 from src.detection import fp_audit
 from src.agentic.twin import frame_twin, survey_twin
 from src.agentic import brief as brief_mod
-from src.agentic.approvals import ApprovalStore, ApprovalError, pin_ok, pin_required
+from src.agentic.approvals import ApprovalStore, ApprovalError, PinGuard, pin_required
 from src.agentic.incidents import DRILLS, catalogue as incident_catalogue, incident, parse_simulate
 from src.agentic.pipeline import validate_frame
 from .mcp_server import ENDPOINT as MCP_ENDPOINT
 from .integrations import Webhooks, WebhookError, EVENTS as WEBHOOK_EVENTS
-from .ratelimit import RateLimitMiddleware
-from .origin_guard import OriginGuardMiddleware
+from .ratelimit import RateLimitMiddleware, client_of
+from .origin_guard import OriginGuardMiddleware, public_config_errors
 from src.bench import cool_attest
 
 log = logging.getLogger("depth.api")
@@ -112,6 +112,7 @@ configure_runtime()                             # $DEPTH_THREADS
 _METRICS = Metrics()
 _FEEDBACK = FeedbackStore()
 _APPROVALS = ApprovalStore()
+_PIN_GUARD = PinGuard()                         # wrong-PIN lockout per client
 _WEBHOOKS = Webhooks()
 PUBLIC_URL = os.environ.get("DEPTH_PUBLIC_URL", "").rstrip("/")     # e.g. https://<cloudfront-domain>
 _STUDY: "OrderedDict[str, dict]" = OrderedDict()          # active study sessions (plan + the cards shown)
@@ -149,6 +150,10 @@ def _warm_in_background() -> None:
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    errs = public_config_errors()                       # a public server never runs with an open door
+    if errs:
+        raise RuntimeError("DEPTH refuses to start in public mode: " + "; ".join(errs)
+                           + " - infra/setup_cool_instance.sh generates them (DEPTH_PUBLIC=0 for a local proxy test)")
     if os.environ.get("DEPTH_LAZY_MODEL", "0") != "1":
         threading.Thread(target=_warm_in_background, name="depth-warmup", daemon=True).start()
     async with MCP_ENDPOINT.new_manager().run():       # /mcp: a fresh stateless manager per lifespan
@@ -982,12 +987,14 @@ def mission_brief(survey_id: str = Query(...), public: bool = Query(False),
 
 # ---- a person's decision on a hazard -> the agent re-plans (routes, queue, budget, passes) ----------
 @app.post("/api/survey/{survey_id}/decide")
-def survey_decide(survey_id: str, body: dict = Body(...)):
+def survey_decide(survey_id: str, request: Request, body: dict = Body(...)):
     """confirm / reject a card, mark a route stop recovered / not_found, or undo. Made by a named
     person in the studio (``DEPTH_APPROVER_PIN`` when set). The agent's own verdict is never
     overwritten; the plan is rebuilt around the decision and every decision is logged."""
-    if not pin_ok(body.get("pin")):
-        raise HTTPException(403, "approver PIN required - decisions are made by a person in the DEPTH studio")
+    try:
+        _PIN_GUARD.check(client_of(request.scope), body.get("pin"))
+    except PermissionError as e:
+        raise HTTPException(403, str(e))
     s = _SURVEYS.get(survey_id)
     if s is None:
         raise HTTPException(409, "this survey is no longer in memory - re-run it to decide on its hazards")
@@ -1109,9 +1116,11 @@ def approval_request(body: dict = Body(...)):
 
 
 @app.post("/api/approvals/{rid}/decide")
-def approval_decide(rid: str, body: dict = Body(...)):
-    """A person's decision, made in the DEPTH studio. Needs ``DEPTH_APPROVER_PIN`` when that is set."""
+def approval_decide(rid: str, request: Request, body: dict = Body(...)):
+    """A person's decision, made in the DEPTH studio. Needs ``DEPTH_APPROVER_PIN`` when that is set (with a
+    wrong-PIN lockout per client)."""
     try:
+        _PIN_GUARD.check(client_of(request.scope), body.get("pin"))
         r = _APPROVALS.decide(rid, body.get("decision", ""), body.get("by", ""), body.get("note", ""), body.get("pin"))
     except PermissionError as e:
         raise HTTPException(403, str(e))

@@ -11,7 +11,9 @@ Storage is an append-only JSONL event log (``runs/approvals/events.jsonl``): eve
 decision is kept, state is rebuilt by replay — auditable, diffable, never edited in place.
 
 ``DEPTH_APPROVER_PIN`` (optional): when set, deciding requires it, so an automated client holding the
-API or MCP token still cannot approve its own request.
+API or MCP token still cannot approve its own request. :class:`PinGuard` locks a client out after
+``DEPTH_PIN_MAX_FAILS`` (5) wrong PINs within ``DEPTH_PIN_LOCK_S`` (900 s) — a 6-digit PIN then takes
+years to guess from one address, where the per-minute rate limit alone allowed ~11 days.
 """
 from __future__ import annotations
 
@@ -42,6 +44,42 @@ def pin_ok(pin: Optional[str]) -> bool:
     """True when no PIN is configured, or ``pin`` matches it (constant-time compare)."""
     want = os.environ.get("DEPTH_APPROVER_PIN")
     return not want or hmac.compare_digest(str(pin or "").encode(), want.encode())
+
+
+class PinGuard:
+    """Wrong-PIN lockout per client: ``max_fails`` wrong PINs within ``lock_s`` lock that client out for
+    ``lock_s``, even with the right PIN; a right PIN clears the count. No PIN configured = nothing to guard."""
+
+    def __init__(self, max_fails: Optional[int] = None, lock_s: Optional[float] = None):
+        self.max_fails = int(os.environ.get("DEPTH_PIN_MAX_FAILS", "5")) if max_fails is None else max_fails
+        self.lock_s = float(os.environ.get("DEPTH_PIN_LOCK_S", "900")) if lock_s is None else lock_s
+        self._fails: dict[str, list[float]] = {}
+        self._locked: dict[str, float] = {}
+        self._lock = threading.Lock()
+
+    def check(self, client: str, pin: Optional[str], now: Optional[float] = None) -> None:
+        """Raise :class:`PermissionError` when the client is locked out or the PIN is wrong."""
+        if not pin_required():
+            return
+        now = time.monotonic() if now is None else now
+        with self._lock:
+            until = self._locked.get(client, 0.0)
+            if until > now:
+                raise PermissionError(f"too many wrong approver PINs from this address - locked for another "
+                                      f"{int(until - now) + 1} s")
+            if pin_ok(pin):
+                self._fails.pop(client, None)
+                return
+            q = [t for t in self._fails.get(client, []) if now - t < self.lock_s] + [now]
+            self._fails[client] = q
+            if len(q) >= self.max_fails:
+                self._locked[client], self._fails[client] = now + self.lock_s, []
+            if len(self._fails) + len(self._locked) > 10_000:   # bounded memory under a flood of clients
+                for k in list(self._fails)[:5_000]:
+                    self._fails.pop(k, None)
+                for k in [k for k, t in self._locked.items() if t <= now]:
+                    self._locked.pop(k, None)
+        raise PermissionError("approver PIN required - approvals are made by a person in the DEPTH studio")
 
 
 class ApprovalStore:
