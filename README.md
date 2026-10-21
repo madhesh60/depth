@@ -32,7 +32,7 @@ Madhesh) · **Targets:** Agentic Vision · Best Use of COOL · **License:** AGPL
 | Product frame, standard look | **157 ms** x86 · **197 ms** Graviton4 · looking harder ≈ **5×** that | EC2 4 vCPU, stock OpenCV 5 (COOL pending) · laptop, interleaved |
 | OpenCV 5's new DNN engine (the one that loads) | **634 of 634** detections identical to the classic engine, 0 tier flips | STUDY-20, calibration split |
 | Raw sonar recording, real GPS | range scale **2.03 cm/sample ± 10.2%**, measured | Colorado River, Humminbird |
-| Tests | **278** passed, CI on every push (line coverage 61% of `src/`: **86% of the runtime modules**, 26% of the offline study scripts, whose outputs are the reports); a few need optional data and skip without it | `pytest -q` · 2026-10-21 |
+| Tests | **281** passed, CI on every push (line coverage 60% of `src/`: **85% of the runtime modules**, 26% of the offline study scripts, whose outputs are the reports); a headless-Chrome UI smoke test drives every mode with 0 JS errors (`python tests/ui_smoke.py`); a few tests need optional data and skip without it | `pytest -q` · 2026-10-21 |
 
 **Not yet measured, and said so:** Graviton + COOL timings (stock Graviton and x86 were measured on EC2 on
 2026-10-20, §4; the COOL runs wait on the Marketplace subscription), the look-harder mode on EC2 and a load

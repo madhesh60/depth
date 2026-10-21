@@ -5,3 +5,4 @@ pytest-asyncio==1.4.0
 pytest-cov==7.1.0
 httpx==0.28.1
 ruff==0.15.17
+websockets==15.0.1      # tests/ui_smoke.py drives headless Chrome over the DevTools protocol

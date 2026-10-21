@@ -252,7 +252,7 @@ disables it). Report: [`docs/reports/evidence_model_exp003.md`](reports/evidence
 | **person-confirmed loop** | a named person's ✓ / ✕ on a card, then the crew's *recovered* / *not found* → the agent **re-plans** (recovery route, queue, budget, re-survey passes); the agent's verdict is never overwritten; every decision logged; **impact ledger** with the reviewed precision (Clopper–Pearson 95%) | `mission.apply_human / plan_mission`, `POST /api/survey/{id}/decide`, Survey table |
 | labels | ✓ real / ✕ not a pot / **＋ missed pot** → append-only log → YOLO fine-tune set + hard negatives; reviewer agreement vs GT | `feedback.py`, Analyze + Survey |
 | timed study | counterbalanced 2×2 Latin square, manual review vs DEPTH cards, scored vs labels → s/frame, s/card, recall both ways | `study.py`, Study tab |
-| effort curve | recall vs analyst minutes: manual / detector list / DEPTH queue; promise point; **break-even card time** (6.88 s at 20 s/frame, EXP-003); forecast vs actual (162.5 vs 209 real pots) | `effort.py`, Study tab |
+| effort curve | recall vs analyst minutes: manual / detector list / DEPTH queue; promise point; **break-even card time** (7.11 s at 20 s/frame, EXP-003); forecast vs actual (161.4 vs 206 real pots: biased low by 22%); survey mix (DEPTH faster only when < 23% of frames hold a pot); `--real-water` (cards per hour on a raw recording) | `effort.py`, Study tab |
 | false-alarm audit | blinded, with catch trials; exact audited precision in the conf ≥ 0.2465 band (EXP-003); taxonomy; κ | `fp_audit.py`, Audit tab |
 
 ## 9. Serving (`src/dashboard/`, `webui/`)

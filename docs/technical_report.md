@@ -388,6 +388,7 @@ python -m src.cv_pipeline.humminbird report
 
 Checked on a fresh clone (2026-10-12): `fetch_model` installed the published weights with a matching
 hash, and the suite passed (202 passed, 3 skipped: the optional raw recording and the unpublished
-EXP-001 weights). On 2026-10-21, with the local data present: **278 passed**, line coverage 61% of
-`src/` (86% of the runtime modules; the offline study and training scripts are run as commands, and their
-outputs are the reports). The datasets are git-ignored; their builders are in `DATASET/scripts/`.
+EXP-001 weights). On 2026-10-21, with the local data present: **281 passed**, line coverage 60% of
+`src/` (85% of the runtime modules; the offline study and training scripts are run as commands, and their
+outputs are the reports), and `python tests/ui_smoke.py` drove every studio mode in headless Chrome
+with 0 JS errors. The datasets are git-ignored; their builders are in `DATASET/scripts/`.

@@ -255,11 +255,12 @@ set + hard negatives; where labels exist, reviewer agreement is scored.
 **Measuring the impact instead of claiming it (`study.py`, `effort.py`).** The Study tab runs a
 counterbalanced 2×2 Latin-square user study (manual frame review vs the agent's cards, timed, scored
 against labels). The effort curve then reports minutes to the recall promise for manual review, a
-raw detector list and the DEPTH queue, plus the **break-even card time** (6.88 s for EXP-003 at 20 s/frame) —
-with assumed timings the DEPTH queue costs more than manual review at the promise (65.5 vs 56.3 min),
+raw detector list and the DEPTH queue, plus the **break-even card time** (7.11 s for EXP-003 at 20 s/frame) —
+with assumed timings the DEPTH queue costs more than manual review at the promise (62.7 vs 55.7 min),
 and only the study with people decides the real answer. The
-agent's own forecast of "pots these minutes will buy" is biased low on unseen data (EXP-003: 162.5
-forecast vs 209 real at the promise point) — conservative, and reported as such.
+agent's own forecast of "pots these minutes will buy" is biased low on unseen data (EXP-003: 161.4
+forecast vs 206 real at the promise point, −22%); the effort report names the bias — P(pot) is fit on the
+calibration recordings, so on another survey it can err either way.
 
 **Auditing the labels (`fp_audit.py`).** A blinded audit with catch trials asks whether the
 detector's most confident "false alarms" are really unlabelled objects — giving an exact audited

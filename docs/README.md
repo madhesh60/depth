@@ -35,7 +35,7 @@ Every number in these documents names its split and the command that regenerates
 | a raw Humminbird recording with real GPS and a measured range scale (STUDY-14) | [`raw_recording.md`](reports/raw_recording.md) *(generated)* |
 | the agent cross-checks its seabed track against the depth sounder (STUDY-16) | [`sensor_check.md`](reports/sensor_check.md) *(generated)* |
 | active vision: OpenCV evidence → belief → action (STUDY-15; validation failed, off by default) | [`evidence_model_exp003.md`](reports/evidence_model_exp003.md) *(generated)* |
-| analyst effort: break-even card time 6.88 s (timings assumed until the study runs) | [`effort_curve.md`](reports/effort_curve.md) *(generated)* |
+| analyst effort: break-even card time 7.11 s; DEPTH faster only when < 23% of frames hold a pot (timings assumed until the study runs) | [`effort_curve.md`](reports/effort_curve.md) *(generated)* |
 | per-stage latency, $ / survey-hour, COOL provenance | [`cool_benchmark.md`](reports/cool_benchmark.md) *(generated)*, raw JSON in [`../benchmarks/`](../benchmarks) |
 | the earlier EXP-001 baseline: deploy-faithful evaluation and its guaranteed tiers | [`eval_exp001.md`](reports/eval_exp001.md) · [`calibration_exp001.md`](calibration_exp001.md) *(generated)* |
 

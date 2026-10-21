@@ -103,7 +103,11 @@ Every item of the local `JUDGE_AUDIT.md` was checked against the repo first; the
   without its tokens; analyze responses 34% lighter + gzip; ruff with bugbear; 16 exception chains.
 - **Docs:** `docs/JUDGES.md` (one page + glossary), README limits section, every 79% → 78% with the reason,
   video script with an "if COOL has not run" line, technical report, model card.
-- **Tests:** 278 passed (two halves, low memory), 0 failed. **Not done here (needs the owner or people):**
+- **Structure:** `app.py` split into `service.py` + six routers; `webui/app.js` split into eleven scripts
+  (`webui/js/`), checked line by line and in headless Chrome (`tests/ui_smoke.py`: every mode, 0 JS errors);
+  a favicon; a recorded MCP session (`docs/reports/mcp_session.md`); the studio shows where the PIN is.
+- **Tests:** 281 passed (two halves, low memory), 0 failed; coverage 60% of `src/` (85% runtime).
+  **Not done here (needs the owner or people):**
   COOL, a public URL, the load-test re-run, the timed study, the blinded audit, the video, Lucidchart.
 
 ### 2026-10-20 (sweep 68) — the agent at the core: a goal-driven loop, a stronger promise, and knowing when it does not apply
