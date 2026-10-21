@@ -59,6 +59,7 @@ from fastapi.staticfiles import StaticFiles
 
 from src.agentic.pipeline import AgenticPipeline
 from src.agentic.core import Goal, SurveyAgent, calibrated_modes, choose_mode
+from src.dashboard.detector_queue import DetectorQueue, interactive_budget
 from src.agentic.agent import render
 from src.agentic.perception import Perceptor
 from src.agentic.shadow import ShadowProver
@@ -102,6 +103,7 @@ _IMAGE_TYPES = {"image/jpeg", "image/png", "image/bmp", "image/tiff", "image/web
 _PIPELINE: Optional[AgenticPipeline] = None
 _MODEL_STATE = {"loaded": False, "loading": False, "error": None, "warmup_ms": None}
 _INFER_LOCK = threading.Lock()                  # one inference at a time on the shared cv2.dnn net
+_QUEUE = DetectorQueue()                        # expected compute of the analyze calls in flight
 _LOAD_LOCK = threading.Lock()
 _PROVER = ShadowProver()
 _SURVEYS: "OrderedDict[str, SurveyResult]" = OrderedDict()   # bounded LRU (report downloads)
@@ -759,6 +761,16 @@ def sample_thumb(sample_id: str, size: int = Query(220, ge=32, le=640)):
                     headers={"Cache-Control": "public, max-age=3600"})
 
 
+def _interactive_goal(recall: Optional[float], compute_s: Optional[float], ms_per_pass) -> tuple[Goal, Optional[dict]]:
+    """The goal of one analyze call. An explicit ``compute_s`` is pure compute; the default interactive
+    budget is answer time, so the compute already queued for the network is taken off it first."""
+    if compute_s is not None:
+        return Goal(recall=recall, compute_s=compute_s), None
+    n, wait = _QUEUE.ahead()
+    load = interactive_budget(INTERACTIVE_S, n, wait, bool(_JOBS.counts().get("running")), ms_per_pass)
+    return Goal(recall=recall, compute_s=max(0.2, load["left_s"])), load
+
+
 @app.post("/api/analyze")
 def analyze(sample: Optional[str] = Query(None), nadir: Optional[str] = Query(None),
             file: Optional[UploadFile] = File(None), simulate: Optional[str] = Query(None),
@@ -792,15 +804,19 @@ def analyze(sample: Optional[str] = Query(None), nadir: Optional[str] = Query(No
 
     t0 = time.perf_counter()
     pipe = _pipeline_or_503(faults)
-    goal = Goal(recall=recall, compute_s=INTERACTIVE_S if compute_s is None else compute_s)
+    goal, load = _interactive_goal(recall, compute_s, pipe.ms_per_pass())
     mode, choice = choose_mode(goal, calibrated_modes(), 1, pipe.ms_per_pass())
+    if load and load["calls_ahead"]:
+        choice["why"] = (f"the detector is busy ({load['calls_ahead']} call(s) ahead, ~{load['wait_s']:.1f} s) -> "
+                         f"{load['left_s']:.1f} s of the {load['budget_s']:g}-s answer budget left: " + choice["why"])
     agent = pipe.agent_for(mode.name if mode else "standard")
-    with _INFER_LOCK:
+    with _QUEUE.call((mode.passes if mode else 1) * (pipe.ms_per_pass() or 0.0) / 1000.0), _INFER_LOCK:
         result = pipe.run_frame(frame, frame_id=frame_id, nadir=nadir, faults=faults, agent=agent)
     payload = _frame_payload(frame, result)
     payload["wall_ms"] = round((time.perf_counter() - t0) * 1000, 1)
     payload["guarantees"] = pipe.guarantees(agent)
-    payload["agent_choice"] = {"goal": goal.to_dict(), "mode": mode.to_dict() if mode else None, **choice}
+    payload["agent_choice"] = {"goal": goal.to_dict(), "mode": mode.to_dict() if mode else None, **choice,
+                               "server_load": load}
     payload["provenance"] = provenance_stamp()
     payload["frame_ref"] = {"sample": sample} if (sample and file is None) else _frame_ref(frame_id)
     try:
