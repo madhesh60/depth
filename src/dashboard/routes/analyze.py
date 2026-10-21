@@ -25,11 +25,13 @@ router = APIRouter()
 
 def _interactive_goal(recall: Optional[float], compute_s: Optional[float], ms_per_pass) -> tuple[Goal, Optional[dict]]:
     """The goal of one analyze call. An explicit ``compute_s`` is pure compute; the default interactive
-    budget is answer time, so the compute already queued for the network is taken off it first."""
+    budget is answer time, so the compute already queued for the network and the measured rest of an answer
+    are taken off it first."""
     if compute_s is not None:
         return Goal(recall=recall, compute_s=compute_s), None
     n, wait = S._QUEUE.ahead()
-    load = interactive_budget(S.INTERACTIVE_S, n, wait, bool(S._JOBS.counts().get("running")), ms_per_pass)
+    load = interactive_budget(S.INTERACTIVE_S, n, wait, bool(S._JOBS.counts().get("running")), ms_per_pass,
+                              S._QUEUE.overhead_s())
     return Goal(recall=recall, compute_s=max(0.2, load["left_s"])), load
 
 
@@ -75,9 +77,9 @@ def analyze(sample: Optional[str] = Query(None), nadir: Optional[str] = Query(No
                          f"{load['left_s']:.1f} s of the {load['budget_s']:g}-s answer budget left: " + choice["why"])
     agent = pipe.agent_for(mode.name if mode else "standard")
     with S._QUEUE.call((mode.passes if mode else 1) * (pipe.ms_per_pass() or 0.0) / 1000.0), S._INFER_LOCK:
+        t_in = time.perf_counter()                                    # waiting for the network ends here
         result = pipe.run_frame(frame, frame_id=frame_id, nadir=nadir, faults=faults, agent=agent)
     payload = S._frame_payload(frame, result, full=images == "full")
-    payload["wall_ms"] = round((time.perf_counter() - t0) * 1000, 1)
     payload["guarantees"] = pipe.guarantees(agent)
     payload["agent_choice"] = {"goal": goal.to_dict(), "mode": mode.to_dict() if mode else None, **choice,
                                "server_load": load}
@@ -89,5 +91,8 @@ def analyze(sample: Optional[str] = Query(None), nadir: Optional[str] = Query(No
         S.log.exception("frame twin failed")
         payload["twin"] = {"available": False, "reason": f"twin error: {type(e).__name__}"}
         payload["incidents"].append(incident("view_failed", f"3D twin: {type(e).__name__}"))
+    t_end = time.perf_counter()
+    payload["wall_ms"] = round((t_end - t0) * 1000, 1)                  # the whole answer, server side
+    S._QUEUE.note_overhead((t_end - t_in) * 1000 - sum(result.stage_ms.get(k) or 0.0 for k in ("see", "look_harder")))
     S._METRICS.record("analyze", frame_id, result.stage_ms, payload["wall_ms"], result.counts)
     return JSONResponse(payload)

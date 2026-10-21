@@ -106,6 +106,10 @@ def _warm_in_background() -> None:
         get_pipeline()
     except Exception:
         log.exception("model failed to load at startup")
+    try:                    # the stamp's first call hashes the model and probes for EC2 (~0.6 s off EC2):
+        provenance_stamp()  # pay it at start, not inside the first person's answer
+    except Exception:
+        log.exception("provenance stamp failed at startup")
 
 
 def _notify(event: str, payload: dict) -> None:

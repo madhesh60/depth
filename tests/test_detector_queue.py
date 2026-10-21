@@ -74,3 +74,22 @@ def test_an_idle_server_looks_harder_and_a_busy_one_does_not():
 def _goal(left_s: float):
     from src.agentic.core import Goal
     return Goal(compute_s=max(0.2, left_s))
+
+
+def test_the_rest_of_an_answer_comes_off_the_budget():
+    # 5 passes at 300 ms (1.5 s) fit a 2-s answer, but not once 0.6 s of Stage 1, images and provenance is paid
+    b = interactive_budget(2.0, 0, 0.0, False, 300.0, overhead_s=0.6)
+    assert b["overhead_s"] == 0.6 and b["left_s"] == 1.4
+    mode, _ = choose_mode(_goal(b["left_s"]), _MODES, 1, 300.0)
+    assert mode.name == "standard"
+
+
+def test_the_queue_measures_the_rest_of_an_answer():
+    q = DetectorQueue()
+    assert q.overhead_s() == 0.0                                   # nothing measured yet: nothing taken off
+    q.note_overhead(500.0)
+    assert q.overhead_s() == 0.5
+    q.note_overhead(0.0)                                           # a moving average: one fast answer
+    assert abs(q.overhead_s() - 0.4) < 1e-9                        # does not erase it
+    q.note_overhead(-5.0)                                          # clock noise never enlarges the budget
+    assert q.overhead_s() <= 0.4

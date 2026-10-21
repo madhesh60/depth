@@ -142,8 +142,8 @@ The same goal produces different runs: with no recall asked for, the agent looks
 for ≥ 78% it takes the cheaper single look; with a tight compute budget it prices both modes with its
 measured pace and drops to one look, mid-run if needed; on the raw river recordings it withdraws the
 promise and asks for a full review. A single analyze call has a 2-s answer budget: the agent first takes
-off the compute already queued for the network, so an idle server looks harder and a busy one takes the
-standard look (tested in the suite; the EC2 load test with it is pending). **Per-frame active vision**
+off the compute already queued for the network and the measured rest of an answer (Stage 1, evidence,
+images), so an idle server looks harder and a busy one takes the standard look (tested in the suite; the EC2 load test with it is pending). **Per-frame active vision**
 (below the dashed line) is built and tested, but it failed its own validation, so it stays off by default
 and labelled experimental.
 

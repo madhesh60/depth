@@ -24,7 +24,9 @@ moves. Every failure is caught, contained and told to that person. This page is 
 | `plan` | hazards → queue, budget, routes, passes; then one approval request per action | a person's decision → re-plan |
 
 `/api/analyze` makes the same mode choice against an interactive budget (2 s, `DEPTH_INTERACTIVE_S`) and
-shows it above the evidence cards.
+shows it above the evidence cards. The budget is answer time: the compute already queued for the network and
+the measured rest of an answer (Stage 1, evidence, images, provenance, the 3D view; a moving average) come off
+it before the detector passes are priced (`server_load` in the response).
 
 ## 0 · Per chunk of a raw recording: the agent re-measures its own geometry (on by default)
 
