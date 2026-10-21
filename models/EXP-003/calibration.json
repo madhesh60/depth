@@ -38,7 +38,7 @@
       },
       "report": "docs/calibration_exp003.md",
       "recall_promise_cp": 0.79,
-      "recall_promise_basis": "STUDY-21 block bootstrap (b = 8): docs/reports/dependence.md"
+      "recall_promise_basis": "STUDY-21 block bootstrap (b = 8): 95% bound 0.782 < Clopper-Pearson 0.79 - restated"
     },
     "guaranteed_class": "ghost_gear",
     "non_hazard_classes": [],

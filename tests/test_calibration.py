@@ -61,3 +61,14 @@ def _run_all():
 
 if __name__ == "__main__":
     _run_all()
+
+
+def test_a_tool_refuses_a_model_its_detector_did_not_load():
+    """calibrate / look-harder load the detector's classes and thresholds at import, from $DEPTH_MODEL:
+    another --model would quietly run the wrong network (and could overwrite that model's calibration)."""
+    import pytest
+    from src.detection.calibration import DEFAULT_MODEL, require_loaded_model
+    require_loaded_model(DEFAULT_MODEL, "src.agentic.calibrate")             # the loaded model: fine
+    other = "EXP-001" if DEFAULT_MODEL != "EXP-001" else "EXP-003"
+    with pytest.raises(SystemExit, match=f"DEPTH_MODEL={other} python -m src.agentic.calibrate"):
+        require_loaded_model(other, "src.agentic.calibrate")

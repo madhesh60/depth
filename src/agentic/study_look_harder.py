@@ -54,7 +54,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from src.detection.calibration import DEFAULT_MODEL, load_calibration, save_calibration
+from src.detection.calibration import DEFAULT_MODEL, load_calibration, require_loaded_model, save_calibration
 from src.detection.infer import DEFAULT_ONNX, Detection, _iou
 from .calibrate import FLOOR, MATCH_IOU, collect, list_frames, p_pot_bins
 from .guarantees import best_recall_guarantee, cp_upper, default_grid, tau_review
@@ -241,6 +241,7 @@ def main():
     ap.add_argument("--verify", action="store_true", help="score the verification split (once)")
     ap.add_argument("--write", action="store_true", help="write modes.look_harder if G1 and G2 pass")
     a = ap.parse_args()
+    require_loaded_model(a.model, "src.agentic.study_look_harder")
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
     cal_json = load_calibration(a.model)

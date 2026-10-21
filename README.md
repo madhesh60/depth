@@ -234,7 +234,7 @@ recordings ([`docs/reports/exp005_diagnosis.md`](docs/reports/exp005_diagnosis.m
 
 **Agent** — recall promise **≥ 84%** when it looks harder (2×2 tile pass, 5 inferences/frame; held on
 test at 86.0%, lower bound 82.0%) and **≥ 78%** with one look (held at 81.1%, lower bound 76.7%;
-EXP-001's was ≥ 65%), both fit on the validation recordings. Clopper-Pearson alone supported 79% for one
+EXP-001's is ≥ 63%, 65% before the same check), both fit on the validation recordings. Clopper-Pearson alone supported 79% for one
 look; a block bootstrap over correlated frames supports 78.2%, so that promise was restated (STUDY-21). A
 promise is a pooled rate: per recording, the one-look promise held on 5 of 6 (test Rec9: 74.7%); the promise is withdrawn on recordings
 that do not look like them (another sonar: 22 of 22 surveys). Nothing auto-confirmed (no precision

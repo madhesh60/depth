@@ -139,7 +139,8 @@ def apply_r1(promise: float, frames: list[dict], tau: float) -> dict:
            "recall_promise_basis": f"Clopper-Pearson; STUDY-21 block bootstrap (b = {BLOCKS[-1]}) {lcb:.3f} - stands"}
     if lcb < promise - 1e-9:
         out.update(recall_promise=float(np.floor(lcb * 100 + 1e-9) / 100), recall_promise_cp=promise,
-                   recall_promise_basis=f"STUDY-21 block bootstrap (b = {BLOCKS[-1]}): {REPORT.relative_to(REPO).as_posix()}")
+                   recall_promise_basis=f"STUDY-21 block bootstrap (b = {BLOCKS[-1]}): 95% bound {lcb:.3f} "
+                                        f"< Clopper-Pearson {promise:.2f} - restated")
     return out
 
 

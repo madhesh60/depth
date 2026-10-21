@@ -179,7 +179,7 @@ full frame + 2×2 tiles, the scale EXP-003 trained on) raises the ceiling to 0.8
 held on test (86.0%, LCB 82.0%)** at 3.86 vs 2.68 cards per test frame
 ([`look_harder.md`](reports/look_harder.md)).
 
-EXP-001 (earlier): **≥ 65% of pots reach a human, held on test (86.2%, LCB 80.5%)**; 90% not achievable
+EXP-001 (earlier): **≥ 63% of pots reach a human, held on test (86.2%, LCB 80.5%)** (65% by Clopper-Pearson alone; the same STUDY-21 rule restated it); 90% not achievable
 (recall ceiling 0.72 on the calibration recording); no precision promise → nothing auto-confirmed;
 re-look did not beat confidence (1 inference/frame). The agent re-looks only where it could change a
 tier (value of information); every call — including the ones it chose not to make — is in the trace.

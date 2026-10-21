@@ -16,7 +16,8 @@
       "structural_fragment": 0.25,
       "natural_formation": 0.25
     },
-    "relook_conf": 0.05
+    "relook_conf": 0.05,
+    "input": "raw"
   },
   "tiers": {
     "method": "conformal-LTT (Clopper-Pearson, fixed-sequence)",
@@ -24,7 +25,7 @@
     "tau_review": 0.05,
     "tau_confirm": null,
     "guarantees": {
-      "recall_promise": 0.65,
+      "recall_promise": 0.63,
       "requested_recall_achievable": false,
       "precision_promise": null,
       "best_precision_promise_achievable": 0.6246,
@@ -35,7 +36,9 @@
         "confirmed_precision": null,
         "precision_promise_held": null
       },
-      "report": "docs/calibration_exp001.md"
+      "report": "docs/calibration_exp001.md",
+      "recall_promise_cp": 0.65,
+      "recall_promise_basis": "STUDY-21 block bootstrap (b = 8): 95% bound 0.634 < Clopper-Pearson 0.65 - restated"
     },
     "policy": "baseline_conf",
     "relook_mode": null,
@@ -90,7 +93,7 @@
   "fit": {
     "split": "`DATASET/03_yolo_ready_dataset_v1/val` crabpot_*wcp_ss_*.jpg \u2014 66 unique frames, recordings ['Rec19']",
     "frames": 66,
-    "created": "2026-09-24",
+    "created": "2026-10-21",
     "note": "fitted by `python -m src.agentic.calibrate` (calibration split only; test scored once)",
     "pots": 134,
     "verified_on": "`DATASET/03_yolo_ready_dataset_v1/test` crabpot_*wcp_ss_*.jpg \u2014 92 unique frames, recordings ['Rec10', 'Rec3', 'Rec4', 'Rec6']"

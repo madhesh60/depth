@@ -174,7 +174,7 @@ validation recordings Rec10 / 12 / 16 (**163 unique frames**, 186 pots) and veri
 
 | Promise (95% confidence) | Requested | What EXP-003 (deployed) can support | Verified on test |
 |---|---|---|---|
-| **Recall** — pots that reach a human (CONFIRMED+REVIEW) | ≥ 90% | **≥ 78%** (79% by Clopper-Pearson alone; restated for correlated frames, STUDY-21) — 90% is impossible: the detector's recall ceiling on the calibration recordings is 0.85 (EXP-001: ≥ 65%) | **held** — 81.1% (the test's own lower bound 76.7%) |
+| **Recall** — pots that reach a human (CONFIRMED+REVIEW) | ≥ 90% | **≥ 78%** (79% by Clopper-Pearson alone; restated for correlated frames, STUDY-21) — 90% is impossible: the detector's recall ceiling on the calibration recordings is 0.85 (EXP-001: ≥ 63%) | **held** — 81.1% (the test's own lower bound 76.7%) |
 | **Precision** — CONFIRMED finds that are real | ≥ 85% | **none** — the best any threshold supports is 56.5% | — (nothing auto-confirmed) |
 
 So with EXP-003 **every find goes to a human**, in P(pot) order. That is the honest consequence of the

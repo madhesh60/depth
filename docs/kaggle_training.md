@@ -6,7 +6,7 @@ in with ONE command.
 History:
 
 - EXP-002 was underfit ([`exp002_diagnosis.md`](reports/exp002_diagnosis.md)).
-- EXP-003 fixed that and raised the recall promise from 65% to 79% (78% once correlated frames are accounted for, STUDY-21)
+- EXP-003 fixed that and raised the recall promise from 65% to 79% (63% → 78% once correlated frames are accounted for, STUDY-21)
   ([`exp003_diagnosis.md`](reports/exp003_diagnosis.md)).
 - EXP-004's data cleanup helped wrecks but not pots ([`exp004_diagnosis.md`](reports/exp004_diagnosis.md)).
 - EXP-005's stronger brightness/scale jitter made pots **worse** on both seeds (Δ −0.10 / −0.07). The

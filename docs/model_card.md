@@ -57,7 +57,7 @@ is auto-confirmed: every find goes to a person, in P(pot) order. Re-look policie
 detector confidence on the calibration recordings, so the agent does not spend them. The acoustic
 shadow is evidence and relative height, never a gate.
 
-Compared with EXP-001 on each model's own unseen data: recall promise ≥ 65% → **≥ 78%**, review cards
+Compared with EXP-001 on each model's own unseen data: recall promise ≥ 63% → **≥ 78%** (both after STUDY-21's correlated-frames rule; 65% → 79% before it), review cards
 per frame 3.2 → 2.7 (test), ranking AUC 0.74 → 0.80 (val). There is no same-frames head-to-head: EXP-001
 is not leakage-free on v2b test.
 

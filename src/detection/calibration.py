@@ -74,6 +74,15 @@ def _deep_merge(base: dict, over: dict) -> dict:
     return out
 
 
+def require_loaded_model(model: str, tool: str) -> None:
+    """A script that runs the detector loads its classes and thresholds at import, from ``$DEPTH_MODEL``. A
+    different ``--model`` would quietly run the wrong network and class names (and could overwrite that
+    model's calibration with the result), so it is refused with the command that works."""
+    if model != DEFAULT_MODEL:
+        raise SystemExit(f"--model {model}, but the detector in this process is {DEFAULT_MODEL} (classes and "
+                         f"thresholds load at import from $DEPTH_MODEL). Run:  DEPTH_MODEL={model} python -m {tool}")
+
+
 def calibration_path(model: Optional[str] = None) -> Path:
     forced = os.environ.get("DEPTH_CALIBRATION")
     if forced:

@@ -150,6 +150,11 @@ Promote each into the log below with full results as it runs.
   `calibrate.py`'s defaults still pointed at EXP-001's v1 split and class; the documented command would have
   recalibrated EXP-003 on the wrong data — the defaults now follow `--model`.
   Report: [`docs/reports/dependence.md`](reports/dependence.md) · `python -m src.agentic.study_dependence`.
+- **Second detector (same day):** `calibrate.py` with R1, run on EXP-001's cached predictions, restates its
+  promise **65% → 63%** (bound 0.634; test recall 86.2% still holds) — the same procedure now stands behind
+  both detectors. Found on the way: `--model EXP-001` alone still ran EXP-003's network and class names
+  (they load at import from `$DEPTH_MODEL`), so it would have written a garbage calibration; the tools now
+  refuse a mismatch and print the command that works (`DEPTH_MODEL=EXP-001 python -m src.agentic.calibrate`).
 
 **Registration (committed before any number above was computed, `0819d50`):**
 
