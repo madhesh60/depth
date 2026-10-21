@@ -115,6 +115,26 @@ Promote each into the log below with full results as it runs.
 
 ## Experiment log
 
+### STUDY-21 — Does the recall promise survive correlated frames? (REGISTERED 2026-10-21, not yet run)
+
+- **Why.** The Clopper-Pearson bound behind "≥ 79% (95% confidence)" treats every pot as independent.
+  Port and starboard frames of the same pings, consecutive frames of a recording and one sonar set-up are
+  not independent, so the real uncertainty is larger. The judge audit raised it; `guarantees.py` claimed
+  `calibrate.py` reports a frame-group bootstrap of the promise, and it did not.
+- **Protocol** (fixed in `src/agentic/study_dependence.py` and committed before any number was computed):
+  cached per-frame detections only, no new inference, no threshold changed; the test split's cached
+  predictions (scored once in STUDY-18) are only broken down by recording. Blocks = ping-index runs of
+  `b` ∈ {1, 4, 8} within a recording (port + starboard of the same pings always together).
+  **A1** (gate, calibration split): block bootstrap within recordings, B = 20,000, seed 0 → the
+  dependence-aware 95% lower bound at each mode's shipped τ, the CP bound and the design effect.
+  **A2** (reported): recall per recording on the 3 calibration + 3 test recordings, leave-one-recording-out
+  refits, and a two-stage (recording → block) bootstrap as a sensitivity check.
+- **Decision rule R1:** if the `b` = 8 lower bound is ≥ the promise, the promise stands; otherwise it is
+  restated to that bound (rounded down to 0.01) in `calibration.json` (`recall_promise_cp` keeps the old
+  value) and everywhere it is shown, τ unchanged, the test result re-compared against it. Either way the
+  headline says *promise* and names its assumption (exchangeable with the calibration pots; a pooled rate,
+  not a per-survey guarantee), with the per-recording spread next to it.
+
 ### STUDY-19 — Does the promise apply to this recording? The applicability check (SHIPPED — on by default)
 
 - **Why.** The recall promise is fit on three crab-pot recordings and says nothing about a sonar the
