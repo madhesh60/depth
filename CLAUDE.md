@@ -174,7 +174,8 @@ src/bench/        product_bench · fingerprint · compare · cool_attest · veri
 src/dashboard/    app (FastAPI + wiring) · service (state, survey run) · routes/ (system · analyze · survey · people ·
                   approvals · connect) · detector_queue · jobs · metrics · samples · mcp_server · mcp_session · ogc ·
                   integrations · ratelimit · origin_guard
-webui/            zero-build vanilla studio (index.html, app.js, styles.css, twin3d.js) · embed/ · samples/ ·
+webui/            zero-build vanilla studio (index.html, js/ — 11 classic scripts in load order, styles.css,
+                  twin3d.js) · embed/ · samples/ ·
                   audit/ · img/ · vendor/ (leaflet, three, fonts)
 infra/            cfn/depth.yaml · deploy.sh · teardown.sh · update_server.sh · setup_cool_instance.sh ·
                   depth.service · golive.sh · bench_fleet.sh · bench_userdata.sh · bench_cool.sh · lib.sh

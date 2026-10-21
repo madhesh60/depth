@@ -77,7 +77,7 @@ app.add_middleware(OriginGuardMiddleware)              # behind CloudFront: only
 @app.middleware("http")
 async def _revalidate_static(request, call_next):
     """Browsers must revalidate the zero-build UI on every load (ETag makes it cheap), so a judge
-    never sees a stale app.js/styles.css after a deploy."""
+    never sees a stale script or stylesheet after a deploy."""
     resp = await call_next(request)
     path = request.url.path
     if path.startswith(("/vendor/", "/img/")):          # pinned third-party files + static art: cache a week

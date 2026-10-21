@@ -12,6 +12,7 @@
         integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" />
   <link rel="preload" href="vendor/fonts/inter-latin-var.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" href="img/favicon.svg" type="image/svg+xml" />
 </head>
 <body>
 <!-- the sea: a nautical chart under the glass (img/bathymetry.svg, made with OpenCV) -->
@@ -452,6 +453,17 @@
         integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="></script>
 <script type="importmap">{ "imports": { "three": "./vendor/three/three.module.min.js" } }</script>
 <script type="module" src="twin3d.js"></script>
-<script src="app.js"></script>
+<!-- the studio: classic scripts in order, one shared scope; the boot runs on DOMContentLoaded (js/core.js) -->
+<script src="js/core.js"></script>
+<script src="js/trace.js"></script>
+<script src="js/panels.js"></script>
+<script src="js/viewer.js"></script>
+<script src="js/analyze.js"></script>
+<script src="js/survey.js"></script>
+<script src="js/connect.js"></script>
+<script src="js/decisions.js"></script>
+<script src="js/study.js"></script>
+<script src="js/twin-panel.js"></script>
+<script src="js/demo.js"></script>
 </body>
 </html>

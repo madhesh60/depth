@@ -286,12 +286,12 @@ Hardening:
 * **Map:** Leaflet vendored (SRI-checked); keyless basemaps with an offline grid fallback.
 
 UI: a zero-build studio with five modes (Analyze · Survey · Study · Audit · Connect)
-(`webui/styles.css`, `webui/app.js`).
+(`webui/styles.css`, `webui/js/`).
 
 - **Look:** Apple-style dark materials in deep-ocean tones: three floating glass layers over
   near-black navy and a faint static nautical chart. The wordmark has no icon. The depth contours are
   made with OpenCV (`webui/img/make_bathymetry.py`). Marine palette: aqua is the single call to
-  action; seafoam / sand / slate / coral mark the verdicts. It is synced with `app.js` and `twin3d.js`.
+  action; seafoam / sand / slate / coral mark the verdicts. It is synced with `webui/js/` and `twin3d.js`.
 - **Type:** Apple devices get the real **SF Pro**. It is the system font and may not be
   redistributed, so everyone else gets **Inter** (vendored, OFL), the closest open match, with no
   stylistic alternates. **Sentence case everywhere**: no all-caps, and no raw `snake_case`, because
@@ -382,7 +382,7 @@ Weights: `python -m src.detection.fetch_model` (GitHub Release `exp003-v1`, SHA-
 6. `src/agentic/mission.py` → `plan_mission` / `apply_human` — stitching, routes, re-survey passes and the
    person-confirmed re-plan.
 7. `src/agentic/incidents.py` — every failure the agent handles, and the drills (`?simulate=`).
-8. `src/dashboard/app.py` → `routes/` — the HTTP API the studio (`webui/app.js`) and the MCP / OGC channels use
+8. `src/dashboard/app.py` → `routes/` — the HTTP API the studio (`webui/js/`) and the MCP / OGC channels use
    (one router per area: system, analyze, survey, people, approvals, connect); `service.py` holds the shared
    state and the survey run.
 
@@ -403,7 +403,9 @@ src/bench/        product_bench.py · fingerprint.py · compare.py (COOL benchma
 src/dashboard/    app.py (the app + wiring) · service.py (state, survey run) · routes/ (system · analyze ·
                   survey · people · approvals · connect) · detector_queue.py · jobs.py · metrics.py · samples.py ·
                   mcp_server.py · mcp_session.py · ogc.py · integrations.py · ratelimit.py · origin_guard.py
-webui/            index.html · app.js · twin3d.js (three.js twin) · styles.css · embed/depth-embed.js ·
+webui/            index.html · js/ (core · trace · panels · viewer · analyze · survey · connect · decisions ·
+                  study · twin-panel · demo — classic scripts, one scope, no build) · twin3d.js (three.js twin) ·
+                  styles.css · embed/depth-embed.js ·
                   samples/ (8 CC-BY-SA frames) · audit/ · vendor/leaflet · vendor/three
 infra/            cfn/depth.yaml · deploy.sh · setup_cool_instance.sh · depth.service · update_server.sh ·
                   bench_fleet.sh · bench_userdata.sh · bench_cool.sh · teardown.sh · lib.sh
