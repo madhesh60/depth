@@ -27,6 +27,12 @@ def test_health():
     assert j["status"] == "ok" and j["opencv"]
 
 
+def test_json_is_gzipped_when_the_client_accepts_it():
+    r = client.get("/api/health", headers={"Accept-Encoding": "gzip"})
+    assert r.status_code == 200 and r.headers.get("content-encoding") == "gzip" and r.json()["status"] == "ok"
+    assert client.get("/api/health", headers={"Accept-Encoding": "identity"}).headers.get("content-encoding") is None
+
+
 def test_samples_endpoint():
     j = client.get("/api/samples").json()
     assert "samples" in j and isinstance(j["samples"], list)
@@ -89,7 +95,9 @@ def test_analyze_and_report_path():
     a = client.post(f"/api/analyze?sample={sid}")
     assert a.status_code == 200
     body = a.json()
-    assert "counts" in body and "overlay_png" in body and body["overlay_png"].startswith("data:image")
+    assert "counts" in body and body["frame_png"].startswith("data:image") and "overlay_png" not in body   # lean default
+    full = client.post(f"/api/analyze?sample={sid}&images=full")
+    assert full.json()["overlay_png"].startswith("data:image") and len(full.content) > len(a.content)
     for c in body["candidates"]:
         assert c["verdict"] in ("confirmed", "review", "low_risk")
         tools = [st["tool"] for st in c["trace"]]          # [look_harder] voi_check ... decide -> handoff

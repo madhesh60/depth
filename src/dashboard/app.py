@@ -54,6 +54,7 @@ import cv2
 import numpy as np
 from fastapi import Body, FastAPI, File, UploadFile, Query, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
@@ -198,6 +199,9 @@ def _survey_event(d: dict) -> dict:
 
 
 app = FastAPI(title="DEPTH — See→Prove→Decide→Act", version="2.0.0", lifespan=lifespan)
+# gzip the JSON (an analyze response carries base64 JPEGs: ~25% smaller); event streams (/mcp) are never
+# buffered - Starlette excludes text/event-stream - and CloudFront passes an encoded response through
+app.add_middleware(GZipMiddleware, minimum_size=1024, compresslevel=5)
 app.add_middleware(RateLimitMiddleware)                # per-client limits on the expensive endpoints
 _cors = [o.strip() for o in os.environ.get("DEPTH_CORS_ORIGINS", "").split(",") if o.strip()]
 if _cors:
@@ -307,18 +311,20 @@ def _frame_ref(frame_id: str) -> dict:
     return {"upload": sha} if sha else {}
 
 
-def _frame_payload(frame: np.ndarray, result) -> dict:
+def _frame_payload(frame: np.ndarray, result, full: bool = False) -> dict:
+    """The frame result + its images (JPEG data URLs, despite the ``_png`` names). The studio draws the
+    boxes itself and shows the CLAHE re-look, so by default the server-rendered overlay and the plain zoom
+    are left out (~1.18 MB -> ~0.78 MB on a 7-find frame); ``full=True`` (``?images=full``) adds them."""
     d = result.to_dict()
     d["frame_png"] = _b64(frame)
-    d["overlay_png"] = _b64(render(frame, result))
+    if full:
+        d["overlay_png"] = _b64(render(frame, result))
     for cand, cd in zip(result.candidates, d["candidates"]):
         cd["crop_png"] = _evidence_crop(frame, cand)
         rv = Perceptor.relook_view(frame, cand.bbox)      # the agent's-eye zoom (display-only)
         if rv:
-            cd["relook_view"] = {
-                "zoom_png": _b64(rv["zoom"]), "enhanced_png": _b64(rv["enhanced"]),
-                "scale": round(rv["scale"], 2), "obj_box": rv["obj_box"],
-            }
+            cd["relook_view"] = {"enhanced_png": _b64(rv["enhanced"]), "scale": round(rv["scale"], 2),
+                                 "obj_box": rv["obj_box"], **({"zoom_png": _b64(rv["zoom"])} if full else {})}
     return d
 
 
@@ -781,7 +787,9 @@ def analyze(sample: Optional[str] = Query(None), nadir: Optional[str] = Query(No
             file: Optional[UploadFile] = File(None), simulate: Optional[str] = Query(None),
             recall: Optional[float] = Query(None, ge=0.5, le=0.99, description="recall promise to keep (the goal)"),
             compute_s: Optional[float] = Query(None, ge=0.2, le=60, description="compute budget, s (default interactive)"),
-            active: bool = Query(False, description="run active vision even if not validated (EXPERIMENTAL)")):
+            active: bool = Query(False, description="run active vision even if not validated (EXPERIMENTAL)"),
+            images: str = Query("lean", pattern="^(lean|full)$",
+                                description="full = also the server-rendered overlay and the plain zoom per find")):
     faults = _drills(simulate) | ({"opt:active"} if active is True else set())
     if "corrupt_frame" in faults:
         raise _fail(422, incident("corrupt_frame", "the frame could not be decoded (failure drill)", simulated=True))
@@ -817,7 +825,7 @@ def analyze(sample: Optional[str] = Query(None), nadir: Optional[str] = Query(No
     agent = pipe.agent_for(mode.name if mode else "standard")
     with _QUEUE.call((mode.passes if mode else 1) * (pipe.ms_per_pass() or 0.0) / 1000.0), _INFER_LOCK:
         result = pipe.run_frame(frame, frame_id=frame_id, nadir=nadir, faults=faults, agent=agent)
-    payload = _frame_payload(frame, result)
+    payload = _frame_payload(frame, result, full=images == "full")
     payload["wall_ms"] = round((time.perf_counter() - t0) * 1000, 1)
     payload["guarantees"] = pipe.guarantees(agent)
     payload["agent_choice"] = {"goal": goal.to_dict(), "mode": mode.to_dict() if mode else None, **choice,
