@@ -51,24 +51,51 @@ PER_CLASS_CONF = _CAL.conf
 DEFAULT_IOU_NMS = _CAL.iou_nms
 
 _ENGINES = {"auto": "ENGINE_AUTO", "new": "ENGINE_NEW", "classic": "ENGINE_CLASSIC"}
+# The cv2.dnn engine the last network actually loaded with: a Net cannot be asked which engine built it,
+# so _read_net records it (provenance, /api/health, benchmarks; STUDY-20 measures what it is worth).
+ENGINE: dict = {"requested": None, "loaded": None, "fallback": None}
 
 
 def configure_runtime(threads: Optional[int] = None) -> dict:
     """Pin OpenCV's thread pool so benchmarks are comparable (``$DEPTH_THREADS``; 0 = OpenCV
-    default). Returns the effective settings for provenance logs."""
+    default). Returns the effective settings for provenance logs (:func:`runtime_info`)."""
     n = threads if threads is not None else int(os.environ.get("DEPTH_THREADS", "0") or 0)
     if n > 0:
         cv2.setNumThreads(n)
-    return {"threads": cv2.getNumThreads(), "engine": os.environ.get("DEPTH_DNN_ENGINE", "auto")}
+    return runtime_info()
+
+
+def runtime_info() -> dict:
+    """Threads, and the DNN engine asked for vs the one that loaded (None until a network is loaded)."""
+    return {"threads": cv2.getNumThreads(), "engine": ENGINE["loaded"],
+            "engine_requested": os.environ.get("DEPTH_DNN_ENGINE", "auto").lower(),
+            "engine_fallback": ENGINE["fallback"]}
 
 
 def _read_net(onnx_path: Path):
     """``cv2.dnn.readNetFromONNX`` with the engine from ``$DEPTH_DNN_ENGINE`` (auto|new|classic).
-    ENGINE_AUTO (default) tries OpenCV 5's new engine first and falls back to the classic one."""
-    eng = getattr(cv2.dnn, _ENGINES.get(os.environ.get("DEPTH_DNN_ENGINE", "auto").lower(), "ENGINE_AUTO"), None)
-    if eng is None:
+    ``auto`` (default) does what ENGINE_AUTO does — OpenCV 5's new engine first, the classic one if
+    the new one cannot load the model — but explicitly, so the engine that loaded is known
+    (:data:`ENGINE`). On EXP-003 ENGINE_AUTO's output is bit-identical to ENGINE_NEW's."""
+    want = os.environ.get("DEPTH_DNN_ENGINE", "auto").lower()
+    if not hasattr(cv2.dnn, "ENGINE_NEW"):                     # an OpenCV without the engine switch
+        ENGINE.update(requested=want, loaded="default", fallback=None)
         return cv2.dnn.readNetFromONNX(str(onnx_path))
-    return cv2.dnn.readNetFromONNX(str(onnx_path), eng)
+    forced = os.environ.get("OPENCV_FORCE_DNN_ENGINE")       # OpenCV's own override wins over ours
+    errors = []
+    for name in {"new": ("new",), "classic": ("classic",)}.get(want, ("new", "classic")):
+        try:
+            net = cv2.dnn.readNetFromONNX(str(onnx_path), getattr(cv2.dnn, _ENGINES[name]))
+        except cv2.error as e:
+            errors.append(f"{name}: {str(e).strip().splitlines()[-1][:160]}")
+            continue
+        if net.empty():
+            errors.append(f"{name}: empty network")
+            continue
+        ENGINE.update(requested=want, loaded=name if not forced else f"forced:{forced}",
+                      fallback="; ".join(errors) or None)
+        return net
+    raise RuntimeError(f"cv2.dnn could not load {onnx_path.name}: " + "; ".join(errors))
 
 
 @dataclass
@@ -117,6 +144,7 @@ class YoloOnnxDetector:
                 f"or export a training run: python -m src.detection.export_onnx"
             )
         self.net = _read_net(onnx_path)
+        self.engine = ENGINE["loaded"]
         self._onnx_path = str(onnx_path)
         self.names = list(names)
         self.class_aware_nms = class_aware_nms

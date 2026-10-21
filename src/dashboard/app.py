@@ -66,7 +66,7 @@ from src.agentic.geo import synthetic_track, stage1_counterfactual
 from src.agentic.mission import export
 from src.agentic.types import SurveyResult
 from src.detection.calibration import SHIPPED_MODEL, load_calibration
-from src.detection.infer import configure_runtime, DEFAULT_ONNX
+from src.detection.infer import configure_runtime, runtime_info, DEFAULT_ONNX
 from . import samples as samples_mod
 from .jobs import JobStore, REPORT_FORMATS, PUBLIC_FORMATS
 from src.agentic.provenance import stamp as provenance_stamp
@@ -106,7 +106,7 @@ _LOAD_LOCK = threading.Lock()
 _PROVER = ShadowProver()
 _SURVEYS: "OrderedDict[str, SurveyResult]" = OrderedDict()   # bounded LRU (report downloads)
 _JOBS = JobStore(max_jobs=50, workers=1)
-_RUNTIME = configure_runtime()
+configure_runtime()                             # $DEPTH_THREADS
 _METRICS = Metrics()
 _FEEDBACK = FeedbackStore()
 _APPROVALS = ApprovalStore()
@@ -580,7 +580,7 @@ def health():
     return {
         "status": "ok", "opencv": cv2.__version__,
         "cv2_file": cv2_file, "is_cool_path": "/opt/cool" in cv2_file,
-        "runtime": _RUNTIME,
+        "runtime": runtime_info(),                  # threads + the cv2.dnn engine that loaded
         # models/<M>/best.onnx (fetch_model) or runs/<M>/weights/best.onnx (a training run)
         "model": DEFAULT_ONNX.parent.name if DEFAULT_ONNX.parent.parent.name == "models" else DEFAULT_ONNX.parent.parent.name,
         "model_loaded": _MODEL_STATE["loaded"], "model_loading": _MODEL_STATE["loading"],
@@ -731,7 +731,7 @@ def audit_summary():
 def metrics():
     """Rolling per-stage latency on this server + host / OpenCV (COOL) provenance."""
     out = _METRICS.summary()
-    out["runtime"] = _RUNTIME
+    out["runtime"] = runtime_info()
     return out
 
 

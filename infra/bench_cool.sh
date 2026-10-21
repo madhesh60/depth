@@ -11,6 +11,7 @@
 #   * all vCPUs: product + cv + survey (a real 1-h sonar recording end to end), 3 interleaved repeats,
 #     the parity record (every detection per frame), CPU use, peak memory;
 #   * 1 thread: product + cv (per-core comparison - an Intel vCPU is a hyper-thread, a Graviton vCPU a core);
+#   * STUDY-20: OpenCV 5's two DNN engines (classic vs new) on this machine - speed + same answers;
 #   * provenance: COOL only if cv2 loads from /opt/cool (refuses to mislabel); on EC2 the machine's
 #     AWS-signed identity (instance type, AMI, Marketplace product code) is saved as <label>__receipt.json.
 # Stock runs use a private venv (Ubuntu 24.04 / PEP 668); COOL runs use COOL's interpreter as-is - nothing
@@ -73,4 +74,6 @@ for T in $THREADS; do
   "$PY" -m src.bench.product_bench --label "$L" --workloads "$W" --threads "$T" --n "$NN" --repeats "$REPEATS" \
     --frames "$FRAMES" --price-hour "$PRICE_HOUR" --price-source "$PRICE_SOURCE" --out benchmarks "${EXTRA[@]}"
 done
+# STUDY-20: which cv2.dnn engine loads, what it is worth here, and whether the answers match
+"$PY" -m src.bench.dnn_engine --label "$LABEL" --frames "$FRAMES" --threads "${THREADS// /,}" --out benchmarks
 echo "== done [$LABEL] — gather benchmarks/*.json from every machine, then: python -m src.bench.compare =="

@@ -1,0 +1,188 @@
+{
+ "label": "laptop_x86",
+ "created": "2026-10-21T13:08:46",
+ "workload": "dnn_engine",
+ "fingerprint": {
+  "opencv": {
+   "version": "5.0.0",
+   "cv2_file": "C:\\Users\\RAJ\\AppData\\Local\\Programs\\Python\\Python310\\lib\\site-packages\\cv2\\__init__.py",
+   "is_cool_path": false,
+   "threads": 1,
+   "build_flags": {
+    "KleidiCV": false,
+    "NEON": false,
+    "IPP": true,
+    "TBB": false,
+    "OpenMP": false
+   }
+  },
+  "host": {
+   "machine": "AMD64",
+   "system": "Windows",
+   "python": "3.10.11",
+   "vcpus": 8,
+   "cpu_model": "Intel64 Family 6 Model 140 Stepping 1, GenuineIntel"
+  },
+  "ec2": {},
+  "cool": {},
+  "git_commit": "0819d50",
+  "model_sha256": "71339e99ad2b4b29f8d516967ce02e1fb5895434bf6f483cb517efe6750ba2f2",
+  "calibration_sha256": "95c75cf64befa4f61f939dd7953744c8c48329892436f86f00833e5628b6c5cc"
+ },
+ "config": {
+  "model": "EXP-003",
+  "onnx": "models/EXP-003/best.onnx",
+  "onnx_sha256": "71339e99ad2b4b29f8d516967ce02e1fb5895434bf6f483cb517efe6750ba2f2",
+  "imgsz": 640,
+  "timing_frames": "webui/samples",
+  "n_timing_frames": 8,
+  "rounds": 5,
+  "n_per_round": 20,
+  "threads": "0,1"
+ },
+ "load_s_median": {
+  "classic": 0.166,
+  "new": 0.142,
+  "auto": 0.143
+ },
+ "identification": {
+  "auto_equals": "new",
+  "frames": 8,
+  "auto_bit_identical": {
+   "new": true,
+   "classic": false
+  },
+  "new_vs_classic_max_abs_output": 0.004395,
+  "layers": {
+   "classic": 250,
+   "new": 212,
+   "auto": 212
+  }
+ },
+ "parity": {
+  "frames": 163,
+  "ref": 634,
+  "other": 634,
+  "match": 634,
+  "differ": 0,
+  "missing": 0,
+  "extra": 0,
+  "tier_flips": 0,
+  "max_dscore": 0.0,
+  "max_abs_output": 0.015106,
+  "ref_engine": "new",
+  "other_engine": "classic",
+  "rule": {
+   "iou": 0.9,
+   "dscore": 0.01
+  },
+  "mismatches": [],
+  "split": "DATASET/03_yolo_ready_dataset_v2b/val *wcp_ss_* (calibration split, unique frames)"
+ },
+ "timing": [
+  {
+   "threads": 8,
+   "rounds": 5,
+   "n_per_round": 20,
+   "engines": {
+    "classic": {
+     "median_ms": 411.3,
+     "p90_ms": 512.7,
+     "mean_ms": 439.2,
+     "round_medians_ms": [
+      480.2,
+      379.6,
+      387.3,
+      448.8,
+      405.6
+     ]
+    },
+    "new": {
+     "median_ms": 373.8,
+     "p90_ms": 519.8,
+     "mean_ms": 402.0,
+     "round_medians_ms": [
+      423.7,
+      346.5,
+      340.5,
+      442.8,
+      358.7
+     ]
+    },
+    "auto": {
+     "median_ms": 359.8,
+     "p90_ms": 462.2,
+     "mean_ms": 382.3,
+     "round_medians_ms": [
+      454.7,
+      328.0,
+      383.7,
+      366.9,
+      356.2
+     ]
+    }
+   },
+   "classic_over_new": {
+    "pooled": 1.1,
+    "per_round": [
+     1.014,
+     1.137
+    ],
+    "saved_ms": 37.5,
+    "separation": "round ranges overlap - within noise, no claim"
+   }
+  },
+  {
+   "threads": 1,
+   "rounds": 5,
+   "n_per_round": 20,
+   "engines": {
+    "classic": {
+     "median_ms": 764.9,
+     "p90_ms": 1196.2,
+     "mean_ms": 826.4,
+     "round_medians_ms": [
+      1099.3,
+      745.4,
+      619.5,
+      612.7,
+      844.6
+     ]
+    },
+    "new": {
+     "median_ms": 886.0,
+     "p90_ms": 1380.8,
+     "mean_ms": 982.7,
+     "round_medians_ms": [
+      769.1,
+      1064.6,
+      630.7,
+      985.1,
+      1180.3
+     ]
+    },
+    "auto": {
+     "median_ms": 1137.6,
+     "p90_ms": 1424.5,
+     "mean_ms": 1130.6,
+     "round_medians_ms": [
+      880.0,
+      1219.4,
+      959.2,
+      1145.1,
+      1122.6
+     ]
+    }
+   },
+   "classic_over_new": {
+    "pooled": 0.863,
+    "per_round": [
+     0.622,
+     1.429
+    ],
+    "saved_ms": -121.1,
+    "separation": "round ranges overlap - within noise, no claim"
+   }
+  }
+ ]
+}

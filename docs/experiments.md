@@ -135,6 +135,27 @@ Promote each into the log below with full results as it runs.
   headline says *promise* and names its assumption (exchangeable with the calibration pots; a pooled rate,
   not a per-survey guarantee), with the per-recording spread next to it.
 
+### STUDY-20 — OpenCV 5's new DNN engine on the detector: which one loads, speed, same answers (DONE on the laptop; EC2 rows pending)
+
+- **Why.** OpenCV 5 has two ONNX engines (`ENGINE_CLASSIC`, `ENGINE_NEW`); DEPTH asked for `ENGINE_AUTO`, and
+  every benchmark JSON said `"engine": "auto"` — the engine that actually ran was never known (judge audit).
+- **Protocol** in `src/bench/dnn_engine.py`, fixed before the first run. Disclosed: during the audit fix an
+  exploratory one-frame check had already shown AUTO's output equal to NEW's. Identification by bit-identical
+  raw outputs; 5 interleaved rounds × 20 forwards per engine, rotated order, all threads and 1 thread; speed
+  claimed only if the per-round ranges separate (STUDY-17 rule); parity on the 163 calibration frames through
+  the product decoder (class, IoU ≥ 0.9, |Δscore| ≤ 0.01, same tier). The test split is not read.
+- **Result (laptop x86, stock OpenCV 5.0.0):** `ENGINE_AUTO` loads the **new** engine (bit-identical on 8 of 8
+  frames; 212 layers vs classic 250). **Same answers: 634 of 634 detections identical, 0 tier flips**, so the
+  calibrated promise does not depend on the engine. **Speed: no claim** — 8 threads classic 411 ms vs new
+  374 ms (new faster in 5 of 5 paired rounds, ratio 1.01–1.14×, but the ranges overlap); 1 thread 765 vs 886 ms
+  (overlap). Noise floor: `auto` and `new` are the same engine yet differ by 4% (8 threads) and 28% (1 thread)
+  on this throttled, memory-starved laptop.
+- **Shipped:** `_read_net` loads the engines explicitly (new first, classic as the fallback — ENGINE_AUTO's
+  rule) and records the one that loaded: `infer.ENGINE` → `/api/health` `runtime.engine`, the provenance stamp
+  on every result (`opencv.dnn_engine`) and every benchmark JSON. `infra/bench_cool.sh` runs the study on every
+  EC2 machine, so the next fleet run adds x86, Graviton and COOL rows on quiet hardware.
+  Report: [`docs/reports/dnn_engine.md`](reports/dnn_engine.md) · `python -m src.bench.dnn_engine --label <host>`.
+
 ### STUDY-19 — Does the promise apply to this recording? The applicability check (SHIPPED — on by default)
 
 - **Why.** The recall promise is fit on three crab-pot recordings and says nothing about a sonar the

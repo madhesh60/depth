@@ -3,7 +3,8 @@ provenance.py — every result says exactly what produced it (observability, rev
 "observability" criterion; ties the COOL provenance into the product outputs).
 
 ``stamp()`` returns: model name + ONNX sha256, calibration sha256 (the promises in force), OpenCV
-version + where ``cv2`` was loaded from (``/opt/cool`` ⇒ COOL), code commit, host architecture / EC2
+version + where ``cv2`` was loaded from (``/opt/cool`` ⇒ COOL) + the ``cv2.dnn`` engine that loaded the
+network (new | classic), code commit, host architecture / EC2
 type, UTC time — and, on EC2, the SHA-256 of the AWS-signed instance identity document with the claims
 it signs (AMI, Marketplace product code, arm64, instance type; ``src/bench/cool_attest.py``), so a result
 names the attested machine that computed it (``GET /api/cool`` serves the document to check against). It is attached to ``/api/analyze`` responses and to every exported report, and heads
@@ -38,10 +39,11 @@ def _static(model_path: str, calibration_path: str) -> dict:
 
 
 def stamp() -> dict:
-    from src.detection.infer import DEFAULT_ONNX
+    from src.detection.infer import DEFAULT_ONNX, ENGINE
     from src.detection.calibration import calibration_path, load_calibration
     cal = load_calibration()
     s = dict(_static(str(DEFAULT_ONNX), str(calibration_path())))
+    s["opencv"] = {**s["opencv"], "dnn_engine": ENGINE["loaded"]}      # the cv2.dnn engine that loaded
     s["model"] = cal.data.get("model")
     s["guarantees"] = {k: (cal.guarantees or {}).get(k) for k in ("recall_promise", "precision_promise")}
     s["attestation"] = _attestation()

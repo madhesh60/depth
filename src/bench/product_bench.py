@@ -229,10 +229,10 @@ def main():
     a = ap.parse_args()
     kinds = [a.workload] if a.workload else [k.strip() for k in a.workloads.split(",") if k.strip()]
 
-    from src.detection.infer import configure_runtime, DEFAULT_ONNX
+    from src.detection.infer import configure_runtime, runtime_info, DEFAULT_ONNX
     from src.detection.calibration import calibration_path
     from .fingerprint import fingerprint
-    runtime = configure_runtime(a.threads if a.threads > 0 else None)
+    configure_runtime(a.threads if a.threads > 0 else None)
     fpr = fingerprint(DEFAULT_ONNX, calibration_path())
     vcpus = os.cpu_count() or 1
 
@@ -289,7 +289,8 @@ def main():
 
     od = Path(a.out)
     od.mkdir(parents=True, exist_ok=True)
-    common = {"label": a.label, "created": time.strftime("%Y-%m-%dT%H:%M:%S"), "fingerprint": fpr, "runtime": runtime}
+    common = {"label": a.label, "created": time.strftime("%Y-%m-%dT%H:%M:%S"), "fingerprint": fpr,
+              "runtime": runtime_info()}                          # + the cv2.dnn engine that loaded
     for k in kinds:
         R = reps[k]
         if k == "survey":
