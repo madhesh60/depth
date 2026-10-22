@@ -73,6 +73,7 @@ _METRICS = Metrics()
 _FEEDBACK = FeedbackStore()
 _APPROVALS = ApprovalStore()
 _PIN_GUARD = PinGuard()                         # wrong-PIN lockout per client
+_DECIDE_LOCK = threading.Lock()                 # a person's decision + the re-plan it causes, one at a time
 _WEBHOOKS = Webhooks()
 PUBLIC_URL = os.environ.get("DEPTH_PUBLIC_URL", "").rstrip("/")     # e.g. https://<cloudfront-domain>
 _STUDY: "OrderedDict[str, dict]" = OrderedDict()          # active study sessions (plan + the cards shown)

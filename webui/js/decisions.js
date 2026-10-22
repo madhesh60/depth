@@ -25,9 +25,15 @@ const Appr = {
     const by = ($("#apprName").value || "").trim();
     if (!by) { $("#apprName").focus(); $("#apprName").placeholder = "name required to decide"; return; }
     localStorage.setItem("depth.approver", by);
-    const r = await fetch(`${API}/api/approvals/${encodeURIComponent(id)}/decide`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ decision, by, pin: approverPin() }) });
+    const card = $(`#apprList .appr[data-id="${CSS.escape(id)}"]`);
+    if (card) card.querySelectorAll(".appr-btns button").forEach(b => b.disabled = true);   // one decision per request
+    let r, body;
+    try {
+      r = await fetch(`${API}/api/approvals/${encodeURIComponent(id)}/decide`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ decision, by, pin: approverPin() }) });
+      body = await r.json().catch(() => ({}));
+    } catch (e) { r = { ok: false, status: 0 }; body = { detail: "the server did not answer - try again" }; }
     if (r.status === 403) { $("#apprPin").hidden = false; $("#apprPin").focus(); }
-    const body = await r.json().catch(() => ({}));
+    if (r.status === 409) { toast(`Not recorded: ${body.detail}.`); setTimeout(toastHide, 5200); }   // someone decided first
     Log.push([{ tool: "human_gate", msg: r.ok ? `${id} ${decision} by ${by}` : `${id}: ${body.detail || r.status}`, t: "" }]);
     if (r.ok && body.dispatch && state.survey && body.survey_id === state.survey.survey_id) {
       state.survey.dispatch = body.dispatch;

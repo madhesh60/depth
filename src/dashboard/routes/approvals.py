@@ -39,9 +39,18 @@ def approval_request(body: dict = Body(...)):
 @router.post("/api/approvals/{rid}/decide")
 def approval_decide(rid: str, request: Request, body: dict = Body(...)):
     """A person's decision, made in the DEPTH studio. Needs ``DEPTH_APPROVER_PIN`` when that is set (with a
-    wrong-PIN lockout per client)."""
+    wrong-PIN lockout per client). A request is decided once: of two decisions at the same moment one is
+    accepted and the other gets 409 with who decided first."""
     try:
         S._PIN_GUARD.check(client_of(request.scope), body.get("pin"))
+    except PermissionError as e:
+        raise HTTPException(403, str(e)) from e
+    with S._DECIDE_LOCK:                  # the decision and the re-plan it causes are one step
+        return _decide(rid, body)
+
+
+def _decide(rid: str, body: dict) -> dict:
+    try:
         r = S._APPROVALS.decide(rid, body.get("decision", ""), body.get("by", ""), body.get("note", ""), body.get("pin"))
     except PermissionError as e:
         raise HTTPException(403, str(e)) from e

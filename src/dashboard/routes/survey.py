@@ -189,22 +189,24 @@ def survey_decide(survey_id: str, request: Request, body: dict = Body(...)):
     if s is None:
         raise HTTPException(409, "this survey is no longer in memory - re-run it to decide on its hazards")
     from src.agentic.mission import apply_human
-    try:
-        t = apply_human(s, str(body.get("hazard_id", "")), str(body.get("decision", "")), str(body.get("by", "")),
-                        str(body.get("note", "")))
-    except KeyError:
-        raise HTTPException(404, "unknown hazard_id") from None
-    except ValueError as e:
-        msg = str(e)
-        raise HTTPException(409 if any(k in msg for k in ("already", "not on the", "no decision", "no priority")) else 400, msg) from e
-    label = _survey_label(s, t, str(body.get("decision", "")))
-    replan = s.mission.replans[-1] if s.mission.replans else None
-    requests = S._sync_agent_requests(s, reason=f"re-planned after {t.human_by or body.get('by')} chose "
-                                              f"'{body.get('decision')}' on {t.oid}")
-    if replan is not None:
-        replan["requests"] = requests
-    d = s.to_dict()
-    d.pop("frames", None)
+    with S._DECIDE_LOCK:                              # one decision + its re-plan at a time: two on one card -> 200 + 409
+        try:
+            t = apply_human(s, str(body.get("hazard_id", "")), str(body.get("decision", "")), str(body.get("by", "")),
+                            str(body.get("note", "")))
+        except KeyError:
+            raise HTTPException(404, "unknown hazard_id") from None
+        except ValueError as e:
+            msg = str(e)
+            raise HTTPException(409 if any(k in msg for k in ("already", "not on the", "no decision", "no priority")) else 400, msg) from e
+        label = _survey_label(s, t, str(body.get("decision", "")))
+        replan = s.mission.replans[-1] if s.mission.replans else None
+        requests = S._sync_agent_requests(s, reason=f"re-planned after {t.human_by or body.get('by')} chose "
+                                                  f"'{body.get('decision')}' on {t.oid}")
+        if replan is not None:
+            replan["requests"] = requests
+        d = s.to_dict()
+        d.pop("frames", None)
+        dispatch, m, hz = S._dispatch(s), s.mission, t.to_dict()
     try:                                              # the persisted copy follows (OGC, reports)
         prov = provenance_stamp()
         old = json.loads(S._JOBS.report(survey_id, "json") or "{}")
@@ -215,10 +217,10 @@ def survey_decide(survey_id: str, request: Request, body: dict = Body(...)):
     except Exception:
         S.log.exception("persist after decision failed")
     S._notify("survey.replanned", {"survey_id": survey_id, "hazard_id": t.oid, "decision": body.get("decision"),
-                                   "by": t.human_by, "recovery_route": s.mission.recovery_route,
-                                   "route_length_m": s.mission.route_length_m, "impact": s.mission.impact})
-    return {"hazard": t.to_dict(), "tracked": d["tracked"], "mission": d["mission"], "replan": replan,
-            "label": label, "dispatch": S._dispatch(s)}
+                                   "by": t.human_by, "recovery_route": m.recovery_route,
+                                   "route_length_m": m.route_length_m, "impact": m.impact})
+    return {"hazard": hz, "tracked": d["tracked"], "mission": d["mission"], "replan": replan,
+            "label": label, "dispatch": dispatch}
 
 
 def _survey_label(s: SurveyResult, t, decision: str) -> Optional[dict]:

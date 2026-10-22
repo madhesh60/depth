@@ -8,7 +8,10 @@ DEPTH executes an action; an approved request is a signed-off work order that do
 receive (webhook ``approval.decided``).
 
 Storage is an append-only JSONL event log (``runs/approvals/events.jsonl``): every request and every
-decision is kept, state is rebuilt by replay — auditable, diffable, never edited in place.
+decision is kept, state is rebuilt by replay — auditable, diffable, never edited in place. A request is
+decided once: deciding or withdrawing checks and writes under one lock, so two people deciding the same
+request at the same moment get one success and one "already decided" (409), and on replay the first
+decision stands — a later one never silently replaces it.
 
 ``DEPTH_APPROVER_PIN`` (optional): when set, deciding requires it, so an automated client holding the
 API or MCP token still cannot approve its own request. :class:`PinGuard` locks a client out after
@@ -34,6 +37,12 @@ REPO = Path(__file__).resolve().parents[2]
 
 class ApprovalError(ValueError):
     pass
+
+
+def _already(r: dict) -> str:
+    """Why a request cannot be decided again: its status and who closed it."""
+    by = (r.get("decision") or {}).get("by")
+    return f"{r['id']} is already {r['status']}" + (f" by {by}" if by else "")
 
 
 def pin_required() -> bool:
@@ -87,7 +96,7 @@ class ApprovalStore:
         self.root = Path(root or os.environ.get("DEPTH_APPROVALS_DIR") or REPO / "runs" / "approvals")
         self.root.mkdir(parents=True, exist_ok=True)
         self.path = self.root / "events.jsonl"
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()            # held from the pending check to the write (decide / withdraw)
 
     # -- write -----------------------------------------------------------------------------------
     def _append(self, ev: dict) -> None:
@@ -117,26 +126,28 @@ class ApprovalStore:
         by = (by or "").strip()
         if not by:
             raise ApprovalError("the approver's name is required")
-        cur = self.get(rid)
-        if cur is None:
-            raise KeyError(rid)
-        if cur["status"] != "pending":
-            raise ApprovalError(f"{rid} is already {cur['status']}")
-        self._append({"type": "decision", "id": rid, "t": time.time(), "decision": decision,
-                      "by": by[:60], "note": (note or "")[:1000]})
-        return self._current(rid)
+        return self._close(rid, "decision", {"decision": decision, "by": by[:60], "note": (note or "")[:1000]})
 
     def withdraw(self, rid: str, reason: str, by: str = "DEPTH agent") -> dict:
         """The requester retracts a PENDING request (e.g. the agent re-planned and the route it asked
         for no longer exists). Never touches a request a person already decided."""
-        cur = self.get(rid)
-        if cur is None:
-            raise KeyError(rid)
-        if cur["status"] != "pending":
-            raise ApprovalError(f"{rid} is already {cur['status']}")
-        self._append({"type": "withdrawn", "id": rid, "t": time.time(), "by": str(by)[:60],
-                      "note": (reason or "")[:1000]})
-        return self._current(rid)
+        return self._close(rid, "withdrawn", {"by": str(by)[:60], "note": (reason or "")[:1000]})
+
+    def _close(self, rid: str, kind: str, fields: dict) -> dict:
+        """Decide or withdraw a PENDING request: the check and the write are one step under the lock, so
+        of two at the same moment one succeeds and the other gets "already ..." (never both)."""
+        with self._lock:
+            cur = self.get(rid)
+            if cur is None:
+                raise KeyError(rid)
+            if cur["status"] != "pending":
+                raise ApprovalError(_already(cur))
+            t = time.time()
+            self._append({"type": kind, "id": rid, "t": t, **fields})
+            r = self._current(rid)
+        if (r.get("decision") or {}).get("t") != t:              # another process wrote first: the first stands
+            raise ApprovalError(_already(r))
+        return r
 
     def _current(self, rid: str) -> dict:
         """The state of a request this store has just written (it is always there: the log is append-only)."""
@@ -157,12 +168,14 @@ class ApprovalStore:
                 continue
             if ev.get("type") == "request":
                 state[ev["id"]] = {**{k: v for k, v in ev.items() if k != "type"}, "status": "pending", "decision": None}
-            elif ev.get("type") == "decision" and ev.get("id") in state:
-                r = state[ev["id"]]
+                continue
+            r = state.get(ev.get("id"))
+            if r is None or r["status"] != "pending":
+                continue                                # decided once: a later decision never replaces the first
+            if ev.get("type") == "decision":
                 r["status"] = ev["decision"]
                 r["decision"] = {"by": ev["by"], "note": ev.get("note", ""), "t": ev["t"]}
-            elif ev.get("type") == "withdrawn" and ev.get("id") in state:
-                r = state[ev["id"]]
+            elif ev.get("type") == "withdrawn":
                 r["status"] = "withdrawn"
                 r["decision"] = {"by": ev.get("by", "DEPTH agent"), "note": ev.get("note", ""), "t": ev["t"]}
         return state
