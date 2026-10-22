@@ -132,6 +132,7 @@ budget) → plan → one approval request per action. Every step is logged in `a
 python -m uvicorn src.dashboard.app:app --port 8000    # the studio (Analyze/Survey/Study/Audit)
 pytest -q                                              # 293 tests; coverage 60% of src/ (85% runtime)
 python tests/ui_smoke.py                               # headless Chrome drives every studio mode (0 JS errors)
+python tests/ui_video.py                               # a captioned walkthrough MP4 of the studio (runs/video/)
 python -m ruff check .                                 # lint (config: pyproject.toml)
 python -m mypy                                         # type check the decision core (files: pyproject.toml)
 python -m src.detection.fetch_model                    # detector weights (SHA-256 checked)

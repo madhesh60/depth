@@ -24,6 +24,7 @@ and on screen from a regenerated report.
 
 ## Recording checklist
 
+- **Footage in one command:** `python tests/ui_video.py` records a captioned walkthrough of the real studio (about 2 minutes, 1080p, no sound; long waits time-lapsed and marked) to `runs/video/depth_walkthrough.mp4`, with the captions as `depth_walkthrough.srt`. Upload it as it is, or record the narration below over it (Windows: Clipchamp → import the MP4 → record a voice-over).
 - Live URL working (CloudFront) and the model provenance line reading **COOL** before recording the
   Graviton segment; otherwise record locally, say "recorded locally", and use the "if it has not" line.
 - Every number spoken comes from a regenerated report (`docs/reports/*.md`, `docs/calibration_exp003.md`);
