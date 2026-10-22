@@ -43,30 +43,33 @@ log — start at [`JUDGES.md`](JUDGES.md) (one page) or the [README](../README.m
 | Evaluation + ablation | ✅ Done | `evaluate.py` (deploy-faithful cv2.dnn): val-tuned thresholds/test-once, per-sensor & per-source tables, bootstrap CIs, mAP@0.5:0.95, confusion matrix, PR curves (`docs/reports/eval_exp003_test.md`). GhostVision head-to-head on the official 398-frame split: F1 0.41 vs their reported 0.71–0.73. |
 | Reporting engine | ✅ Done | `src/agentic/{geo,mission}.py`: honest geotag + GeoJSON/GPX/KML/CSV/JSON exports. |
 | Dashboard | ✅ Done | Zero-build static web app (`webui/`), served by FastAPI; hardened (job queue, per-frame model lock, upload limits, shipped samples, vendored Leaflet). See→Prove→Decide→Act stepper, evidence cards (conf→relook), agent trace, Leaflet hazard map + recovery route, downloads, honesty banners. Verified under uvicorn. |
-| AWS deployment | 🟡 Partly run | One stack, `infra/cfn/depth.yaml` via `infra/deploy.sh` (dry run by default): c8g COOL AMI + CloudFront + S3 + alarms. 2026-10-19: everything except CloudFront created (the account needs AWS Support verification first, so `EnableCdn=false` for now). The COOL subscription is still pending, so a rehearsal runs on stock Ubuntu. |
+| AWS deployment | 🟡 Partly run | One stack, `infra/cfn/depth.yaml` via `infra/deploy.sh` (dry run by default): c8g COOL AMI + CloudFront + S3 + alarms. 2026-10-19: everything except CloudFront created (the account needs AWS Support verification first, so `EnableCdn=false` for now). The COOL subscription is still pending, so a rehearsal runs on stock Ubuntu. 2026-10-22: a public HTTPS link without CloudFront is ready (`PUBLIC_HTTPS=1`, Caddy + Let's Encrypt on the Elastic IP) and waits for the owner's go-ahead; meanwhile judges get GitHub Codespaces (`.devcontainer/`). |
 | **COOL benchmark (Arm vs x86)** | 🟡 Stock EC2 done, COOL pending | Product-workload benchmark (`src/bench/`, `infra/golive.sh`): per stage, threads pinned, $/survey-hour, COOL provenance. 2026-10-20, stock OpenCV 5, 4 threads: c8i.xlarge x86 **157 ms/frame**, c8g.xlarge Graviton4 **197 ms**. The COOL runs wait on the Marketplace subscription (`PHASE=cool ./infra/golive.sh`). |
 | Agentic loop (See→Prove→Decide→Act) | ✅ Done | **Primary Agentic-Vision entry.** Guaranteed tiers (recall promise ≥ 78% with one look, held at 81.1% on test — Clopper-Pearson's 79% restated for correlated frames, STUDY-21; ≥ 84% looking harder, held at 86.0%; nothing auto-confirmed), the goal-driven core loop with the applicability check (STUDY-19), value-of-information agent, sensor cross-check (STUDY-16), opposite-side re-survey passes, person-confirmed loop, MCP / OGC / webhooks. Active vision is built but off by default: its validation failed (STUDY-15). |
+| One card per object (STUDY-23) | ✅ Done | Overlapping same-class review boxes in a frame share one card; the same pots reach a person. Test: 2.68 → 1.81 cards per frame (one look), 3.86 → 2.32 (looking harder). At assumed timings DEPTH now beats manual review: 43.2 vs 55.7 min (one look), 56.5 vs 57.3 (looking harder). |
 | Human studies | ⬜ Needs people | The timed user study (Study tab) and the blinded false-alarm audit (Audit tab) are built; neither has run with people yet. |
-| Submission package (report + video) | 🟡 In progress | Technical report (`docs/technical_report.md`) and video script (`docs/video_script.md`) drafted; the COOL numbers, the Lucidchart diagram and the recording remain. Due 2026-10-26. |
+| Submission package (report + video) | 🟡 In progress | Technical report and video script up to date; `tests/ui_video.py` records a captioned 108-s walkthrough of the real studio (`runs/video/`), ready to upload or narrate. The COOL numbers, the Lucidchart diagram and the owner's narrated recording remain. Due 2026-10-26. |
 
 Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ---
 
-## 3. Current state (2026-10-21)
+## 3. Current state (2026-10-22)
 
 - **Working end to end:** the studio and the agent on CPU with OpenCV 5 — the goal-driven core loop
   (`core.py`: check the promise applies → choose how hard to look → perceive with a compute-budget watch →
   plan → ask), Stage 1, the EXP-003 detector through `cv2.dnn` (new engine, recorded), evidence, calibrated
-  tiers (≥ 78% one look, ≥ 84% looking harder — both checked for correlated frames), survey planning and
-  person-approved actions — on the sample frames and on a raw Humminbird recording with real GPS and a
-  per-ping dropout mask. `ruff check .` (with bugbear) and `mypy` (the decision core) are clean, both in CI; the
-  full suite passes (286, 2026-10-21; coverage 60% of `src/`, 85% of the runtime modules).
-- **Waiting on AWS:** the Graviton + COOL runs (the Marketplace subscription is with AWS Support) and
-  CloudFront (account verification). The stock EC2 benchmarks and the demo-server load test are done.
+  tiers (≥ 78% one look, ≥ 84% looking harder — both checked for correlated frames), **one review card per
+  object** (STUDY-23), survey planning and person-approved actions — on the sample frames and on a raw
+  Humminbird recording with real GPS and a per-ping dropout mask. `ruff check .` (with bugbear) and `mypy` (the
+  decision core) are clean, both in CI; the full suite passes (293, 2026-10-22; coverage 60% of `src/`).
+- **Judges can run it:** one click in GitHub Codespaces (`.devcontainer/`), or five commands on a laptop.
+- **Waiting on AWS / the owner:** the Graviton + COOL runs (the Marketplace subscription needs a Visa or
+  Mastercard), CloudFront (account verification) or the ready `PUBLIC_HTTPS=1` link, and the EC2 look-harder
+  row + load-test re-run. The stock EC2 benchmarks and the first load test are done.
 - **Needs people:** the timed user study and the blinded false-alarm audit.
-- **Left for submission:** the final COOL numbers in the report and the README, the Lucidchart diagram,
-  the video.
+- **Left for submission:** the COOL numbers (or the plain "not run" line), the narrated video (footage:
+  `python tests/ui_video.py`), the Lucidchart diagram, the GitHub description and topics.
 - **Environment:** global Python 3.10 (no venv). Runtime pinned in `requirements.txt` (OpenCV 5.0.0.93);
   tests and lint in `requirements-dev.txt`; training on Kaggle (`requirements-train.txt`). AWS CLI v2,
   profile `hackathon`, us-east-1.
@@ -77,6 +80,41 @@ Current numbers, each with its split: README "At a glance" and
 ---
 
 ## 4. Session log
+
+### 2026-10-22 (sweep 71) — the third audit list: one card per object, a click-to-run path, the video's footage
+
+The owner's list was checked item by item. Already fixed in sweep 70 and left alone: the README picture (as
+built since `b3cad2a`), the README's one-line rows and `progress.md`'s 78%. What held, and what changed:
+
+- **Too many review cards (≈ 5 per frame looking harder) — STUDY-23** (protocol `1284aed` before the test
+  split was read): the detector puts two or three boxes on one pot, and each was a card. Within a frame,
+  same-class review boxes that sit half inside each other now share one card; no box is dropped, so the same
+  pots reach a person (checked: 214 and 227 of 264). Test: **2.68 → 1.81** and **3.86 → 2.32** cards per frame;
+  1 of 462 cards holds two pots. The default survey of the 8 demo frames: 42 → 25 hazards; an Analyze answer
+  0.72 → 0.57 MB.
+- **"Does it save time?"** Still not measured (needs people), but the estimate flipped: at the same assumed
+  timings DEPTH reaches its promise in **43.2 vs 55.7** min (one look; was 62.7, slower) and **56.5 vs 57.3**
+  looking harder (was 96.9); empty seabed 34 / 47 vs 56 min per survey-hour. `effort.py` now reports both
+  modes, and the Study tab switches between them. The P(pot) forecast's low bias grew (22% → 34%), stated.
+- **STUDY-12 and the counterfactual re-run** on one card per object: 95 of 142 pins leave their error circle
+  without Stage 1 (151 of 222 before; the same 67%); the 8 frames 12 of 18. The 150-s river recording: 1 card.
+- **Speed for the default mode:** shown next to the standard look everywhere (157 ms; ≈ 5×, about 0.8 s
+  estimated, the EC2 run pending). Batching the 4 tiles was tried: the published ONNX has batch size 1 and
+  `cv2.dnn` refuses a batch of 4, so it waits for a re-export (which changes the model hash).
+- **No live link:** GitHub Codespaces (`.devcontainer/`, a README button) runs the real studio in a browser;
+  and `PUBLIC_HTTPS=1 ./infra/deploy.sh` (Caddy + Let's Encrypt on the Elastic IP, 443 only; cfn-lint: 0
+  findings) is ready for the owner's go-ahead.
+- **Video:** `tests/ui_video.py` records a captioned 108-s walkthrough of the real studio (waits time-lapsed and
+  marked) plus an `.srt`; the script names the one-card moment.
+- **README:** the first screen leads with "DEPTH does not claim a better detector — it makes any detector
+  dependable", try-it / live / video / judges rows, one-line numbers, "Not done — said plainly" (COOL, link,
+  no field proof, time not measured, weak detector), studio screenshots; a "How it was built" line names the AI
+  coding assistant. JUDGES, technical report, architecture, agentic vision and the docs map follow.
+- **Tests:** 293 passed (two halves), 0 failed; `tests/ui_smoke.py` PASS; ruff and mypy (now incl. `cards.py`)
+  clean.
+- **Not done here (needs the owner, AWS or people):** COOL (a Visa / Mastercard for the Marketplace), the
+  live link (`PUBLIC_HTTPS=1` or CloudFront), the EC2 look-harder row and load test, the timed study and the
+  blinded audit, the narrated video, Lucidchart, the GitHub description and topics.
 
 ### 2026-10-21 (sweep 70) — the second judge audit: what still held, fixed
 
