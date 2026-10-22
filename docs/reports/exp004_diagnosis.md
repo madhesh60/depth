@@ -1,5 +1,7 @@
 # EXP-004 — cleaner data did not beat EXP-003; what limits the detector now
 
+> **Status (2026-10-22):** a dated report: its numbers are as of when it was written. Since then EXP-003 became the deployed model (2026-10-06) and its one-look recall promise was restated from ≥ 79% to **≥ 78%** for correlated frames (STUDY-21, 2026-10-21). Current figures: [`calibration_exp003.md`](../calibration_exp003.md).
+
 **Verdict.** EXP-004 (cleaned data, 2 classes) is **not better than EXP-003** for ghost gear. A paired
 bootstrap over the same validation frames gives ΔAP@0.5 = −0.03 (95% CI −0.11 to +0.05). EXP-004g
 (ghost gear only) is **worse**: ΔAP −0.07, 3% chance it is better, and it overfits. The cleanup did

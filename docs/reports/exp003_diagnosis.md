@@ -1,5 +1,7 @@
 # EXP-003 — the fixed recipe: what it achieved, what is left, and why EXP-004 is about data
 
+> **Status (2026-10-22):** a dated report: its numbers are as of when it was written. Since then EXP-003 became the deployed model (2026-10-06) and its one-look recall promise was restated from ≥ 79% to **≥ 78%** for correlated frames (STUDY-21, 2026-10-21). Current figures: [`calibration_exp003.md`](../calibration_exp003.md).
+
 **Verdict.** The EXP-002 fixes worked.
 
 - **Ghost gear:** EXP-003 (fixed tiles) fits its training frames and transfers to new recordings. It

@@ -49,7 +49,7 @@ Reference: `DATASET/03_yolo_ready_dataset_v2b/val` *wcp_ss_* — 163 unique fram
 
 `test_xsonar` in 25-frame surveys: the promise is withdrawn in **22 of 22** chunks.
 
-What the check prevents: on `test_xsonar` the standard threshold (τ = 0.060) keeps **23.9%** of 1265 pots while the tiers would print "≥ 79%" (cached once-run predictions, 555 frames).
+What the check prevents: on `test_xsonar` the standard threshold (τ = 0.060) keeps **23.9%** of 1265 pots while the tiers would print "≥ 78%" (cached once-run predictions, 555 frames).
 
 **G1** — no test recording and not the demo frames flagged: **PASS**
 **G2** — `test_xsonar` flagged: **PASS**

@@ -3,7 +3,7 @@ applicability.py — does the recall promise apply to THIS recording? (STUDY-19)
 
 The recall promise is fit on the calibration recordings (``calibration.json``). It says nothing about a
 sonar the detector has never seen: on the cross-sonar split the validation threshold keeps only 11% of
-the pots (``docs/reports/eval_exp003_test_xsonar.md``) while the tiers would still print "≥ 79%". So
+the pots (``docs/reports/eval_exp003_test_xsonar.md``) while the tiers would still print "≥ 78%". So
 before the agent keeps a promise it checks that the frames look like the frames the promise was fit on.
 
 * **Per frame** — eight OpenCV 5 image statistics of the sonogram as the detector sees it (brightness,

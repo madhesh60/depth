@@ -1,5 +1,7 @@
 # EXP-005 — stronger brightness and scale jitter made the detector worse
 
+> **Status (2026-10-22):** a dated report: its numbers are as of when it was written. Since then EXP-003 became the deployed model (2026-10-06) and its one-look recall promise was restated from ≥ 79% to **≥ 78%** for correlated frames (STUDY-21, 2026-10-21). Current figures: [`calibration_exp003.md`](../calibration_exp003.md).
+
 **Verdict.** Both EXP-005 runs are **worse than EXP-003** for ghost gear, so neither is onboarded and
 the test split was not touched. A paired bootstrap over the same validation frames gives:
 

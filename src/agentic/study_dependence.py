@@ -1,8 +1,9 @@
 """
 study_dependence.py — STUDY-21: does the recall promise survive correlated frames?
 
-The Clopper-Pearson bound behind "≥ 79% of pots reach a person (95% confidence)" treats every pot as an
-independent trial. Pots are not independent: port and starboard frames of the same pings show the same
+The Clopper-Pearson bound behind the first printed promise, "≥ 79% of pots reach a person (95% confidence)"
+(restated to ≥ 78% by this study), treats every pot as an independent trial. Pots are not independent: port
+and starboard frames of the same pings show the same
 seabed, consecutive frames of a recording share a site, a gain setting and sometimes an object, and a
 recording shares one sonar set-up. Correlation makes the real uncertainty larger than the bound says.
 (``guarantees.py`` claimed that ``calibrate.py`` reports a frame-group bootstrap; it did not — this study

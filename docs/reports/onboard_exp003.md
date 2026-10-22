@@ -1,5 +1,7 @@
 # Onboarding EXP-003
 
+> **Status (2026-10-22):** the onboarding record of 2026-10-02. EXP-003's one-look recall promise was restated from ≥ 0.79 to **≥ 0.78** for correlated frames (STUDY-21, 2026-10-21). Current figures: [`calibration_exp003.md`](../calibration_exp003.md).
+
 _`python -m src.detection.onboard_model` · 2026-10-02 17:20_
 
 - classes `['ghost_gear', 'wreck_debris']` · input 640px · ONNX sha256 `71339e99ad2b4b29…` · cv2.dnn 5.0.0: forward OK at 640px, output (1, 6, 8400)

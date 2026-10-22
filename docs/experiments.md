@@ -98,11 +98,11 @@ focus first, aug-ablation demoted.
 |---|---|---|
 | ✅ EXP-001 | Baseline (**done** — 40 ep) | YOLO11s detect, v1, 640, sonar aug → mAP@0.5 0.822 (aggregate), sonar fishing_gear R 0.47 |
 | ❌ EXP-002 | Higher resolution + tiles on clean v2b (run 2026-09-30) | **Underfit**: auto-optimizer AdamW 0.00167 + tile label poisoning. Val ghost AP 0.25 → rejected (see log) |
-| ✅ EXP-003 | The EXP-002 causes fixed: explicit SGD 0.01, fixed tiles; tiles vs full frames at 640 | **Recall promise 65% → 79%** (held on test at 81%), fewer review cards; wreck fails; official-split F1 0.41 |
+| ✅ EXP-003 | The EXP-002 causes fixed: explicit SGD 0.01, fixed tiles; tiles vs full frames at 640 | **Recall promise 65% → 79%** (held on test at 81%; 63% → 78% after STUDY-21), fewer review cards; wreck fails; official-split F1 0.41 |
 | ❌ EXP-004 | Clean data: no fish-finder screenshots, no rotated copies; + a ghost-only arm | No gain for pots (Δ −0.03 [−0.11, +0.05]); wreck ceiling 0.10 → 0.30 |
 | ❌ EXP-005 | Cleaned data + stronger brightness/scale jitter, two seeds | Worse for pots, both seeds: Δ −0.10 / −0.07 vs EXP-003; false alarms ×1.6–2.1 |
 | ✅ (in v2b) | **Sonar-only** training raises the target-domain numbers + removes the optical→natural_formation shortcut (optical debris is 0% and off-product) | filter to crabpot/uatd/mpulse/seabed/shipwreck |
-| ✅ STUDY-18 | **Tiled train+infer**: EXP-003 trained on tiles; the 2×2 tile pass at inference became the agent's *look-harder* mode | promise 79% → **84%**, held on test at 86.0% (cards / frame 2.68 → 3.86) |
+| ✅ STUDY-18 | **Tiled train+infer**: EXP-003 trained on tiles; the 2×2 tile pass at inference became the agent's *look-harder* mode | promise 79% (78% after STUDY-21) → **84%**, held on test at 86.0% (cards / frame 2.68 → 3.86) |
 | (old plan) | Oversampling fishing_gear + small-object aug (copy_paste>0, scale-up mosaic) lifts recall | minority oversample + aug |
 | (old plan) | Aug ablation: are the ~62% baked-in v0 augs helping or just doubling online aug? | originals-only vs baked-aug (demoted) |
 
@@ -248,7 +248,7 @@ Promote each into the log below with full results as it runs.
 
 - **Why.** The recall promise is fit on three crab-pot recordings and says nothing about a sonar the
   detector has never seen. On `test_xsonar` the standard threshold keeps **23.9%** of 1,265 pots while
-  the tiers would print "≥ 79%" (cached once-run predictions) — a silent failure.
+  the tiers would print "≥ 79%" (≥ 78% since STUDY-21) (cached once-run predictions) — a silent failure.
 - **Check** (`src/agentic/applicability.py`): eight OpenCV statistics per frame (brightness, contrast,
   `cv2.Laplacian` speckle texture, `cv2.Sobel` along- vs across-track gradient, dark and saturated pixel
   shares, HSV colour saturation, `cv2.calcHist` / `cv2.compareHist` histogram distance) → the frame's
@@ -682,6 +682,7 @@ it is a card load, not a recall-backed saving). `python -m src.agentic.effort --
 
 - **EXP-003 onboarded** (test scored once):
   - recall promise **≥ 79%** (EXP-001: ≥ 65%), held on test at **81.1%** (lower bound 76.7%, 264 pots);
+    restated to ≥ 78% (EXP-001: ≥ 63%) for correlated frames by STUDY-21 on 2026-10-21;
   - recall ceiling 0.85 val / 0.84 test;
   - 3.5 / 2.7 review cards per frame (EXP-001: 4.2 / 3.2); ranking AUC 0.80 (EXP-001: 0.74);
   - v2b test: ghost AP@0.5 0.48 (CI 0.43–0.55), wreck AP 0.16;
