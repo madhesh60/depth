@@ -34,7 +34,7 @@ const Demo = {
       cancelTour(); toastHide();
       setActive(true); await runAnalyze(); state._tourOptOut = true; cancelTour(); await wait(400);
       const cs = state._analyze.candidates || [];
-      const changed = c => c.evidence && c.evidence.action && c.evidence.action !== c.evidence.action0;
+      const changed = c => c.card_of == null && c.evidence && c.evidence.action && c.evidence.action !== c.evidence.action0;
       let ci = cs.findIndex(c => changed(c) && c.evidence.conflict); if (ci < 0) ci = cs.findIndex(changed);
       if (ci >= 0) { selectCandidate(ci); await wait(500); const at = $(`.ev-card[data-id="${ci}"] .atrace`); if (at) at.scrollIntoView({ block: "center" }); }
       const ev = ci >= 0 ? cs[ci].evidence : null;

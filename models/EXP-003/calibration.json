@@ -168,5 +168,40 @@
         "created": "2026-10-20"
       }
     }
+  },
+  "cards": {
+    "rule": "same class; at least ios of the smaller box inside the other; transitive; head = the strongest box (src/agentic/cards.py)",
+    "ios": 0.5,
+    "study": "STUDY-23",
+    "report": "docs/reports/card_grouping.md",
+    "cards_per_frame_cal": {
+      "standard": 1.988,
+      "look_harder": 2.472
+    },
+    "boxes_per_frame_cal": {
+      "standard": 3.515,
+      "look_harder": 4.933
+    },
+    "verified_on_test": {
+      "standard": {
+        "cards_per_frame": 1.809,
+        "boxes_per_frame": 2.683,
+        "drop": 0.3258,
+        "multi_pot_cards": 0,
+        "same_pots": true
+      },
+      "look_harder": {
+        "cards_per_frame": 2.322,
+        "boxes_per_frame": 3.859,
+        "drop": 0.3984,
+        "multi_pot_cards": 1,
+        "same_pots": true
+      }
+    },
+    "fit": {
+      "split": "Calibration: `DATASET/03_yolo_ready_dataset_v2b/val` *wcp_ss_*.jpg \u2014 163 unique frames, recordings ['Rec10', 'Rec12', 'Rec16']",
+      "verified_on": "Verification: `DATASET/03_yolo_ready_dataset_v2b/test` *wcp_ss_*.jpg \u2014 199 unique frames, recordings ['Rec14', 'Rec8', 'Rec9']",
+      "created": "2026-10-22"
+    }
   }
 }

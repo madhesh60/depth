@@ -53,7 +53,7 @@ from src.detection.calibration import DEFAULT_MODEL, load_calibration, require_l
 from src.detection.infer import DEFAULT_ONNX, _iou
 from .calibrate import MATCH_IOU, collect
 from .cards import group
-from .effort import DEFAULTS, FRAMES_PER_SURVEY_HOUR, _p_pot, curves
+from .effort import DEFAULTS, FRAMES_PER_SURVEY_HOUR, _p_pot, curves, match
 from .study_look_harder import PATTERN, V2B, collect_tiles, merged_frames
 
 REPO = Path(__file__).resolve().parents[2]
@@ -62,22 +62,6 @@ IOS = 0.5                                  # the rule: half of the smaller box l
 GATE_DROP = 0.25                           # G1 + G2: cards per frame fall at least this much, both modes
 GATE_MULTI = {"cal": 0.01, "ver": 0.02}    # cards holding >= 2 labelled pots, at most this share
 MODES = ("standard", "look_harder")
-
-
-def _tp_per_box(boxes: list[dict], gts: list[tuple]) -> list[int]:
-    """One-to-one greedy matching by confidence at IoU ≥ MATCH_IOU (``calibrate.label``'s rule): the pot each
-    box takes, or -1."""
-    used, out = [False] * len(gts), [-1] * len(boxes)
-    for i in sorted(range(len(boxes)), key=lambda k: -boxes[k]["conf"]):
-        best, bj = 0.0, -1
-        for j, g in enumerate(gts):
-            if not used[j]:
-                v = _iou(tuple(boxes[i]["bbox"]), g)
-                if v > best:
-                    best, bj = v, j
-        if bj >= 0 and best >= MATCH_IOU:
-            used[bj], out[i] = True, bj
-    return out
 
 
 def measure(frames: list[dict], tau: float, ios_min: float) -> dict:
@@ -91,7 +75,7 @@ def measure(frames: list[dict], tau: float, ios_min: float) -> dict:
     for fi, fr in enumerate(frames):
         gts = [tuple(g) for g in fr["gt"]]
         bx = [c for c in fr["cands"] if c["conf"] >= tau]
-        tp = _tp_per_box(bx, gts)
+        tp = match(bx, gts)
         hits = [{j for j, g in enumerate(gts) if _iou(tuple(b["bbox"]), g) >= MATCH_IOU} for b in bx]
         for i, b in enumerate(bx):
             reached_b |= {(fi, j) for j in hits[i]}
@@ -143,12 +127,15 @@ def _public(m: dict) -> dict:
 
 
 # ---------------------------------------------------------------------------------------- report
-def _pct(x) -> str:
-    return "—" if x is None else f"{100 * x:.0f}%"
-
-
 def _min(x) -> str:
     return "—" if x is None else f"{x:.1f}"
+
+
+def _even(x) -> str:
+    """The survey-mix break-even as words: DEPTH is faster below this share of frames with a pot."""
+    if x is None:
+        return "—"
+    return "any share (always faster)" if x >= 1 else "none (never faster)" if x <= 0 else f"< {x:.0%}"
 
 
 def report(model: str, res: dict) -> str:
@@ -184,15 +171,24 @@ def report(model: str, res: dict) -> str:
               "card; **one card is one decision whatever its box count** — an assumption until the Study tab measures "
               "it. Manual review reaches each promise in the same time either way.\n",
               "| mode (promise) | cards | cards to the promise | DEPTH min | manual min | break-even s / card | "
-              "faster when frames with a pot < |", "|---|---|--:|--:|--:|--:|--:|"]
+              "DEPTH faster when the share of frames with a pot is |", "|---|---|--:|--:|--:|--:|---|"]
         for mode in MODES:
             for arr in ("boxes", "cards"):
                 r = e[mode][arr]
                 L.append(f"| {mode} (≥ {res['promise'][mode]:.0%}) | {'one per box (before)' if arr == 'boxes' else '**one per object**'} | "
                          f"{r['cards_to_promise']} | {_min(r['minutes']['depth'])} | {_min(r['minutes']['manual'])} | "
-                         f"{r['breakeven_sec_per_card']} | {_pct(r['mix_breakeven'])} |")
+                         f"{r['breakeven_sec_per_card']} | {_even(r['mix_breakeven'])} |")
         L += ["", "The last column is the survey-mix break-even: the calibration split's cards per empty frame and "
-              "per frame with a pot, priced at the same timings (a real survey-hour is mostly empty seabed).\n"]
+              "per frame with a pot, priced at the same timings. A real survey-hour is mostly empty seabed — per "
+              f"survey-hour (~{FRAMES_PER_SURVEY_HOUR:.0f} frames), in minutes:\n",
+              "| share of frames with a pot | manual review | " + " | ".join(
+                  f"{m} · {'per box' if arr == 'boxes' else 'per object'}" for m in MODES for arr in ("boxes", "cards"))
+              + " |", "|--:|--:|" + "--:|" * 4]
+        rows = {(m, arr): e[m][arr]["mix_rows"] or [] for m in MODES for arr in ("boxes", "cards")}
+        for i, r0 in enumerate(rows[(MODES[0], "boxes")]):
+            L.append(f"| {r0['pot_share']:.0%} | {r0['manual_min']} | " + " | ".join(
+                str(rows[(m, arr)][i]["depth_min"]) for m in MODES for arr in ("boxes", "cards")) + " |")
+        L.append("")
     L += ["## 4. Decision\n", res["decision"], "",
           "Caveats: labels are incomplete, so a card's 'pots' are the labelled ones; the time a person needs for a "
           "card with three boxes on one object is assumed equal to a one-box card; the calibration split is 3 "

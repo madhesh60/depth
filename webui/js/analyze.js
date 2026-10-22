@@ -47,14 +47,16 @@ function renderAnalyze(d) {
   $("#viewer").classList.remove("boxes-off");
   const s1 = d.stage1 || {};
   $("#stageCap").textContent = `${d.frame_id} · ${d.width}×${d.height}px · nadir=${d.nadir}${d.orientation && d.orientation.source ? ` (${d.orientation.source})` : ""}`
-    + ` · seabed ${s1.measured ? `tracked @ ${s1.altitude_px} px` : "not measured"} · ${d.candidates.length} candidate(s)`;
+    + ` · seabed ${s1.measured ? `tracked @ ${s1.altitude_px} px` : "not measured"} · ${d.candidates.length} box(es)`;
   $("#verdictCounts").innerHTML = VERDICTS.map(v => `<span class="vc vc-${v}"><span class="n">${d.counts[v] || 0}</span>${VLABEL[v] || human(v)}</span>`).join("");
   const sm = d.stage_ms || {};
   $("#latency").textContent = `⏱ ${d.wall_ms}ms · stage1 ${fmt(sm.stage1)} · see ${fmt(sm.see)}`
     + (sm.look_harder > 1 ? ` · look harder ${fmt(sm.look_harder)}` : "") + ` · prove+decide ${fmt(sm.prove_decide)}`;
   const dl = $("#dockLatency"); if (dl) dl.textContent = `wall ${d.wall_ms}ms`;
 
-  state._boxes = d.candidates.map((c, i) => ({ id: i, bbox: c.bbox, verdict: c.verdict, conf: c.conf, cand: c }));
+  // one card per object (STUDY-23): a box folded into another box's card is drawn, but its card is the head's
+  state._boxes = d.candidates.map((c, i) => ({ id: i, bbox: c.bbox, verdict: c.verdict, conf: c.conf, cand: c,
+    member: c.card_of == null ? null : c.card_of }));
   state._cursor = -1;
   Viewer.render(d, state._boxes);
   $("#viewerEmpty").hidden = d.candidates.length > 0;
@@ -69,14 +71,16 @@ function renderAnalyze(d) {
   const incs = d.incidents || [];
   $("#frameIncidents").innerHTML = incs.map(incidentRow).join("");
   if (incs.some(i => i.severity !== "info" || i.simulated)) Notices.show(incs, d.frame_id);
-  $("#evMeta").textContent = d.candidates.length ? `${d.candidates.length} find${d.candidates.length > 1 ? "s" : ""}` : "";
+  const heads = state._boxes.filter(b => b.member == null), folded = state._boxes.length - heads.length;
+  $("#evMeta").textContent = d.candidates.length ? `${heads.length} card${heads.length > 1 ? "s" : ""}`
+    + (folded ? ` · ${state._boxes.length} boxes` : "") : "";
   const grid = $("#evidenceGrid"); grid.innerHTML = "";
   if (!d.candidates.length) {
     grid.innerHTML = `<p class="empty-hint">Nothing to prove on this frame. If you can see an object, use <b>Mark missed</b>; it becomes a training label.</p>`;
     buildClassLegend([]); applyFilters(); streamLog(d, []); return;
   }
   const order = { confirmed: 0, review: 1, low_risk: 2, rejected: 2 };
-  const ordered = state._boxes.slice().sort((a, b) =>
+  const ordered = heads.slice().sort((a, b) =>
     (order[a.verdict] - order[b.verdict]) || ((b.cand.evidence?.evidence_score || 0) - (a.cand.evidence?.evidence_score || 0)));
   ordered.forEach(b => grid.appendChild(evidenceCard(b.cand, b.id)));
   const first = grid.querySelector(".ev-card"); if (first) first.classList.add("is-linked");   // the strongest find opens
@@ -131,6 +135,8 @@ function streamLog(d, ordered) {
     { stage: true, tool: "SEE", msg: `perceive → ${d.candidates.length} candidate(s)`
         + (sm.look_harder > 1 ? ` (incl. the 2×2 tile look, ${fmt(sm.look_harder)}ms)` : ""),
       t: fmt((sm.see || 0) + (sm.look_harder || 0)) + "ms" }];
+  const pf = (d.perception || {}).folded;
+  if (pf) entries.push({ stage: true, tool: "ONE CARD", msg: `${pf} box(es) sit on the same object as a stronger box → shown on that box's card: ${ordered.length} card(s), every box kept (STUDY-23)`, t: "" });
   ordered.forEach(b => {
     const c = b.cand;
     entries.push({ stage: true, tool: `cand #${b.id}`, msg: `${c.cls_name} · det ${c.conf.toFixed(2)}`, t: "" });
@@ -239,6 +245,13 @@ function heightText(m, rel, run) {
   return "—";
 }
 
+// one card per object (STUDY-23): the other boxes the detector put on this object, listed on its card
+function cardBoxes(c) {
+  const m = (c.card_members || []).map(k => (state._boxes[k] || {}).cand).filter(Boolean);
+  if (!m.length) return "";
+  return `<p class="ev-boxes">One card for this object: <b>${m.length + 1} detector boxes</b> (${[c, ...m].map(x => x.conf.toFixed(2)).join(" · ")}), all drawn on the frame. One decision covers them; no box is dropped.</p>`;
+}
+
 function evidenceCard(c, id) {
   const ev = c.evidence || {}, sh = ev.shadow || {}, rl = ev.relook || {}, v = c.verdict;
   const card = document.createElement("div");
@@ -264,6 +277,7 @@ function evidenceCard(c, id) {
     </div>
     <div class="ev-body">
       <p class="ev-tier">${escapeHtml(tierPromise(c))}</p>
+      ${cardBoxes(c)}
       ${ev.action ? `<div class="conf-flow">
         <div class="conf-chip"><span class="lbl">Detector P</span><span class="val">${pp}</span></div>
         <div class="conf-arrow ${ev.p_evidence > ev.p_pot + 1e-6 ? "up" : ev.p_evidence < ev.p_pot - 1e-6 ? "down" : ""}"><div class="track"></div>

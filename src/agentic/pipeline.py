@@ -218,7 +218,8 @@ class AgenticPipeline:
         n = 0
         for fr in frame_results:
             for c in fr.candidates:
-                if c.verdict in _TRACKED_VERDICTS and id(c) not in merged_away:
+                # one hazard per review card: a box folded into another box's card (cards.py) is that hazard
+                if c.verdict in _TRACKED_VERDICTS and id(c) not in merged_away and c.card_of is None:
                     n += 1
                     t = _to_tracked(f"H{n:03d}", fr.frame_id, c)
                     if id(c) in also_in:
@@ -261,7 +262,7 @@ def _to_tracked(oid: str, frame_id: str, c: Candidate) -> TrackedObject:
         action0=ev.action0 if ev else None, conflict=ev.conflict if ev else None,
         request_resurvey=bool(ev.request_resurvey) if ev else False,
         info_bits=(ev.resurvey_gain or {}).get("info_bits") if ev else None,
-        in_water_column=getattr(c, "in_water_column", None),
+        in_water_column=getattr(c, "in_water_column", None), boxes=1 + len(c.card_members),
     )
 
 

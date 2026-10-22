@@ -3,31 +3,31 @@
 _`python -m src.agentic.effort` · model EXP-003 · verification split: `DATASET/03_yolo_ready_dataset_v2b/test` *wcp_ss_*.jpg — 199 unique frames, recordings ['Rec14', 'Rec8', 'Rec9']_
 
 Timings: **ASSUMED (no user study yet)** — 20 s per frame (manual), 8 s per card, manual recall 1.00, card accuracy 1.00.
+Cards: **one card per object** — a frame's overlapping same-class boxes share one card and one decision; no box is dropped, so the pots that reach a person are unchanged ([STUDY-23](card_grouping.md); one card per box before).
 
 ![effort curve](../img/effort_curve.png)
 
-| at the recall promise (≥ 78%) | manual review | DEPTH queue |
-|---|--:|--:|
-| analyst minutes for these 199 frames | 55.7 | 62.7 |
-| per survey-hour of sonar (~169 frames) | 47.2 | 53.1 |
-| cards reviewed | — | 470 |
+| perception mode | promise | cards to the promise | manual min (199 frames) | DEPTH min | manual min / survey-hour | DEPTH min / survey-hour | break-even card time |
+|---|--:|--:|--:|--:|--:|--:|--:|
+| standard look | ≥ 78% | 324 | 55.7 | **43.2** | 47.2 | 36.6 | 10.31 s |
+| looking harder (the default) | ≥ 84% | 424 | 57.3 | **56.5** | 48.6 | 47.9 | 8.11 s |
 
-**Break-even card time: 7.11 s.** DEPTH reaches the promise faster than manual review whenever reviewing one card takes less than this — it does not depend on the card timing, only on the manual seconds per frame and how many cards the promise needs. The timed study (`Study` mode) measures both.
+**Break-even card time:** DEPTH reaches the promise faster than manual review whenever reviewing one card takes less than this — it does not depend on the card timing, only on the manual seconds per frame and how many cards the promise needs. The timed study (`Study` mode) measures both.
 
-**Forecast vs actual:** at the promise point the agent forecast **161.4** real pots from its calibrated P(pot); **206.0** were real — the forecast is **biased low by 22%** on this split. P(pot) is fit on the calibration recordings, so budget mode's forecast (what it tells an analyst *before* they spend the minutes) is an estimate from those recordings, not a measured rate for a new survey; on another survey it can err either way.
+**Forecast vs actual** (standard look): at the promise point the agent forecast **136.4** real pots from its calibrated P(pot); **206.0** were real — the forecast is **biased low by 34%** on this split. P(pot) is fit on the calibration recordings, so budget mode's forecast (what it tells an analyst *before* they spend the minutes) is an estimate from those recordings, not a measured rate for a new survey; on another survey it can err either way.
 
 ## Survey mix — a real survey-hour is mostly empty seabed
 
-On the calibration split the queue raises **2.05 cards per empty frame** (42 frames without a pot) and 4.03 per frame with a pot (121 frames). Manual review pays per frame whatever it holds (here: every frame, so it finds every pot under the assumed manual recall); the queue pays per card (every card: ≥ 78% of pots, the promise). At the timings above, per survey-hour (~169 frames, modelled: 15 Hz, 640 pings per frame, both sides):
+Manual review pays per frame whatever it holds (here: every frame, so it finds every pot under the assumed manual recall); the queue pays per card. On the calibration split the queue raises **1.52 cards per empty frame** and 2.15 per frame with a pot (standard look); **2.10 cards per empty frame** and 2.60 per frame with a pot (looking harder (the default)). Per survey-hour (~169 frames, modelled: 15 Hz, 640 pings per frame, both sides), at the timings above:
 
-| share of frames with a pot | manual review, min | DEPTH queue, min |
-|--:|--:|--:|
-| 0% | 56.2 | 46.1 |
-| 5% | 56.2 | 48.3 |
-| 20% | 56.2 | 55.0 |
-| 80% | 56.2 | 81.7 |
+| share of frames with a pot | manual review, min | DEPTH, standard look, min | DEPTH, looking harder (the default), min |
+|--:|--:|--:|--:|
+| 0% | 56.2 | 34.3 | 47.1 |
+| 5% | 56.2 | 35.0 | 47.7 |
+| 20% | 56.2 | 37.1 | 49.4 |
+| 80% | 56.2 | 45.5 | 56.3 |
 
-**Break-even: DEPTH is faster when fewer than 23% of frames hold a pot** (at these assumed timings; the recall promise is per pot, so it does not depend on the mix). On empty seabed the saving is small, because the detector at τ_review still raises about two cards per empty frame.
+**Break-even:** DEPTH is faster when the share of frames with a pot is at any share (standard look); below 80% (looking harder (the default)) — at these assumed timings; the recall promise is per pot, so it does not depend on the mix.
 
 ## Real water — raw recordings through the Survey tab's own path
 
@@ -35,12 +35,13 @@ No labels exist for these recordings (no known pots), so every card is a false-a
 
 | recording | sonar | frames / h | cards / h | promise applies | analyst min / h at 8 s per card | manual min / h at 20 s per frame |
 |---|--:|--:|--:|:--:|--:|--:|
-| `Test-Large-DS.DAT` | 60.1 min | 280 | **54** | no — withdrawn | 7.2 | 93.2 |
+| `Test-Large-DS.DAT` | 60.1 min | 280 | **48** | no — withdrawn | 6.4 | 93.2 |
 
 Honesty notes:
 - EXP-003's calibrated policy orders cards by detector confidence (`baseline_conf`, STUDY-07); DEPTH's gain over a sorted list is the stop rule (the promise) and the forecast, not the ranking.
-- The verification split is pot-dense (159 of 199 frames have at least one pot). A real survey-hour is mostly empty seabed: manual review still pays per frame, the queue pays per detection.
+- The verification split is pot-dense (159 of 199 frames have at least one pot). A real survey-hour is mostly empty seabed: manual review still pays per frame, the queue pays per card.
 - Manual recall of 1.0 is an optimistic assumption for manual review; the study measures it.
+- A card with several boxes on one object is assumed to take as long as a one-box card; the study measures what a card takes.
 
 ---
 _Regenerated by the script; do not edit by hand._

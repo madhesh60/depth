@@ -76,13 +76,13 @@ def stitch_boundaries(frames: list[FrameResult]) -> list[tuple[Candidate, Candid
         along, rng = ax
         used_b: set[int] = set()
         for a in fa.candidates:
-            if a.continues_in or not _touch(a, fa, along)[1]:           # must touch trailing edge
+            if a.continues_in or a.card_of is not None or not _touch(a, fa, along)[1]:   # trailing edge; a card's head
                 continue
             a_rc = 0.5 * (a.bbox[rng] + a.bbox[rng + 2])
             a_ext = a.bbox[rng + 2] - a.bbox[rng]
             best: Optional[tuple[float, int]] = None
             for j, b in enumerate(fb.candidates):
-                if j in used_b or b.cls_name != a.cls_name or not _touch(b, fb, along)[0]:
+                if j in used_b or b.card_of is not None or b.cls_name != a.cls_name or not _touch(b, fb, along)[0]:
                     continue
                 b_rc = 0.5 * (b.bbox[rng] + b.bbox[rng + 2])
                 tol = max(MIN_RANGE_TOL_PX, RANGE_TOL_FRAC * max(a_ext, b.bbox[rng + 2] - b.bbox[rng]))

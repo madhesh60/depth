@@ -12,7 +12,8 @@ Protocol (built into the app's **Study** mode, ~5–10 minutes per person):
   which arm, and which arm comes first, rotate with the session number (a 2×2 Latin square);
 * the browser times every frame and every card (ms, from display to answer);
 * scoring is server-side against ground truth: manual clicks within a labelled box (+8 px) find that
-  pot (one click per pot); a card is real if it overlaps a labelled pot at IoU ≥ 0.3.
+  pot (one click per pot); a card is real if one of its boxes overlaps a labelled pot at IoU ≥ 0.3 (a card
+  carries every box on one object: ``cards.py``, STUDY-23).
 
 Per session → ``runs/study/<session>.json``; :func:`summary` pools sessions → median s/frame and
 s/card, manual recall, card accuracy, DEPTH-arm recall (bounded by what the detector proposes) and
@@ -153,8 +154,10 @@ def score(p: dict, result: dict, cards_by_id: dict[str, dict]) -> dict:
             continue
         g = gt.get(c["frame_id"], [])
         used = matched.setdefault(c["frame_id"], set())
-        j = max(range(len(g)), key=lambda k: _iou(c["bbox"], g[k]), default=None)
-        real = j is not None and j not in used and _iou(c["bbox"], g[j]) >= CARD_IOU
+        boxes = c.get("boxes") or [c["bbox"]]             # a card carries every box on its object (STUDY-23)
+        ov = lambda k: max(_iou(b, g[k]) for b in boxes)
+        j = max(range(len(g)), key=ov, default=None)
+        real = j is not None and j not in used and ov(j) >= CARD_IOU
         if real:
             used.add(j)
         yes = ans.get("decision") == "real"

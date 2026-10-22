@@ -56,6 +56,12 @@ def group(boxes: Sequence[Sequence[float]], classes: Sequence[str], strength: Se
     return sorted(cards, key=lambda m: m[0])
 
 
+def _note(c: Candidate, step: AgentStep) -> None:
+    """Add the step before the trace's closing hand-off, so every chain still ends with who acts next."""
+    at = len(c.trace) - 1 if c.trace and c.trace[-1].tool == "handoff" else len(c.trace)
+    c.trace.insert(at, step)
+
+
 def _strength(c: Candidate) -> tuple:
     ev = c.evidence
     return (c.verdict is Verdict.CONFIRMED, (ev.p_pot or 0.0) if ev else 0.0,
@@ -84,16 +90,16 @@ def fold(cands: list[Candidate], ios_min: Optional[float]) -> int:
             m = cands[i]
             m.card_of = head
             h.card_members.append(i)
-            m.trace.append(AgentStep(
+            _note(m, AgentStep(
                 tool="one_card", latency_ms=0.0, conf_before=round(m.conf, 4), status="done",
                 rationale=(f"same object as find #{head} ({h.cls_name} {h.conf:.2f}): at least {ios_min:.0%} of the "
                            "smaller box lies inside the other -> shown on that card, not as a card of its own; "
                            "the box is kept (STUDY-23)"),
                 detail={"card_of": head, "ios_min": ios_min}))
             folded += 1
-        h.trace.append(AgentStep(
+        _note(h, AgentStep(
             tool="one_card", latency_ms=0.0, conf_before=round(h.conf, 4), status="done",
-            rationale=(f"{len(g) - 1} more {h.cls_name} box(es) on this object (at least {ios_min:.0%} of the smaller "
+            rationale=(f"{len(g) - 1} more {h.cls_name} box{'' if len(g) == 2 else 'es'} on this object (at least {ios_min:.0%} of the smaller "
                        "box inside the other) are shown on this card -> one decision per object; no box dropped, "
                        "so the recall promise is unchanged (STUDY-23)"),
             detail={"members": list(h.card_members), "ios_min": ios_min}))

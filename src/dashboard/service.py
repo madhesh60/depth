@@ -21,7 +21,7 @@ import threading
 import time
 from collections import OrderedDict
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable, Optional, Sequence
 
 import cv2
 import numpy as np
@@ -183,10 +183,17 @@ def _b64(img: np.ndarray, quality: int = 85) -> str:
     return "data:image/jpeg;base64," + base64.b64encode(buf).decode() if ok else ""
 
 
-def _evidence_crop(frame: np.ndarray, cand, target: int = 300) -> str:
-    """Zoomed crop around a candidate with the shadow/echo overlay — the evidence-card image."""
+def _evidence_crop(frame: np.ndarray, cand, target: int = 300, others: Sequence = ()) -> str:
+    """Zoomed crop around a candidate with the shadow/echo overlay — the evidence-card image. ``others``: the
+    other boxes on the same card (one card per object, STUDY-23), outlined thinly; the crop covers them all."""
     vis = _PROVER.overlay(frame, cand.bbox, cand.evidence.shadow) if cand.evidence else frame
-    x1, y1, x2, y2 = cand.bbox
+    if others:
+        vis = vis.copy() if vis is frame else vis
+        for b in others:
+            cv2.rectangle(vis, (int(b[0]), int(b[1])), (int(b[2]), int(b[3])), (200, 190, 120), 1, cv2.LINE_AA)
+    boxes = [cand.bbox, *others]
+    x1, y1 = min(b[0] for b in boxes), min(b[1] for b in boxes)
+    x2, y2 = max(b[2] for b in boxes), max(b[3] for b in boxes)
     bw, bh = x2 - x1, y2 - y1
     pad = int(max(bw, bh) * 1.6) + 12
     H, W = frame.shape[:2]
@@ -253,7 +260,9 @@ def _frame_payload(frame: np.ndarray, result, full: bool = False) -> dict:
     if full:
         d["overlay_png"] = _b64(render(frame, result))
     for cand, cd in zip(result.candidates, d["candidates"]):
-        cd["crop_png"] = _evidence_crop(frame, cand)
+        if cand.card_of is not None:                      # drawn on its head's card (STUDY-23): no images of its own
+            continue
+        cd["crop_png"] = _evidence_crop(frame, cand, others=[result.candidates[k].bbox for k in cand.card_members])
         rv = Perceptor.relook_view(frame, cand.bbox)      # the agent's-eye zoom (display-only)
         if rv:
             cd["relook_view"] = {"enhanced_png": _b64(rv["enhanced"]), "scale": round(rv["scale"], 2),

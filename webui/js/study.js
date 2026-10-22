@@ -29,6 +29,9 @@ function wireStudy() {
     else if (!$("#studyManual").hidden && e.key === "Enter") { manualNext(); e.preventDefault(); }
     else if (!$("#studyManual").hidden && e.key === "Backspace") { Study.clicks.pop(); drawMarks(); e.preventDefault(); }
   });
+  $$("#effMode button").forEach(b => b.addEventListener("click", () => {
+    $$("#effMode button").forEach(x => x.classList.toggle("on", x === b)); loadEffort(true);
+  }));
   ["effSpf", "effSpc"].forEach(id => $("#" + id).addEventListener("input", () => {
     $("#effSpfV").textContent = $("#effSpf").value + " s"; $("#effSpcV").textContent = $("#effSpc").value + " s";
     clearTimeout(Study._eff); Study._eff = setTimeout(() => loadEffort(true), 120);
@@ -146,7 +149,8 @@ function renderStudySummary(s) {
 }
 
 async function loadEffort(fromSliders) {
-  const q = fromSliders ? `?sec_per_frame=${$("#effSpf").value}&sec_per_card=${$("#effSpc").value}` : "";
+  const mb = $("#effMode button.on"), md = mb ? mb.dataset.mode : "standard";
+  const q = `?mode=${md}` + (fromSliders ? `&sec_per_frame=${$("#effSpf").value}&sec_per_card=${$("#effSpc").value}` : "");
   let j; try { j = await fetch(`${API}/api/effort${q}`).then(r => { if (!r.ok) throw 0; return r.json(); }); } catch { $("#effChart").innerHTML = `<p class="empty-hint">No effort data for this model yet (python -m src.agentic.effort).</p>`; return; }
   const C = j.curves, W = 300, H = 170, P = { l: 30, r: 8, t: 8, b: 22 };
   $("#effProv").textContent = j.provenance.startsWith("measured") ? "measured" : j.provenance.startsWith("set") ? "what-if" : "assumed";
@@ -165,7 +169,8 @@ async function loadEffort(fromSliders) {
     <text x="${W - P.r}" y="${H - 6}" text-anchor="end">analyst minutes (${j.frames} frames)</text></svg>
     <div class="eff-leg"><span><i style="background:${EFF.man}"></i>manual</span><span><i style="background:${EFF.list}"></i>detector list</span><span><i style="background:${EFF.depth}"></i>DEPTH queue</span><span><i style="background:none;border-top:1px dashed ${EFF.depth}"></i>DEPTH forecast</span></div>`;
   const ph = C.per_survey_hour_min || {};
-  $("#effStats").innerHTML = `At the promise (≥ ${Math.round(R * 100)}%): manual <b>${mt.manual != null ? mt.manual.toFixed(1) : "—"} min</b>, DEPTH <b>${mt.depth != null ? mt.depth.toFixed(1) : "never"}</b>${mt.depth != null ? ` min (${C.cards_to_promise} cards)` : " — card accuracy too low for the promise"} · per survey-hour ${ph.manual ?? "—"} vs ${ph.depth ?? "—"} min.<br/>
+  const lhBtn = $('#effMode button[data-mode="look_harder"]'); if (lhBtn) lhBtn.hidden = !(j.modes || []).includes("look_harder");
+  $("#effStats").innerHTML = `${(j.cards || {}).one_per_object ? "One card per object (STUDY-23). " : ""}At the promise (≥ ${Math.round(R * 100)}%): manual <b>${mt.manual != null ? mt.manual.toFixed(1) : "—"} min</b>, DEPTH <b>${mt.depth != null ? mt.depth.toFixed(1) : "never"}</b>${mt.depth != null ? ` min (${C.cards_to_promise} cards)` : " — card accuracy too low for the promise"} · per survey-hour ${ph.manual ?? "—"} vs ${ph.depth ?? "—"} min.<br/>
     <b>Break-even: ${C.breakeven_sec_per_card ?? "—"} s per card</b> — faster card review than this and DEPTH wins.<br/>
     Forecast: the agent expected <b>${C.forecast_at_promise ?? "—"}</b> real pots at that point; <b>${C.actual_at_promise ?? "—"}</b> were real.`;
 }

@@ -65,7 +65,7 @@ def frame_twin(frame: np.ndarray, result: FrameResult, nadir: Optional[str] = No
     idx = np.linspace(0, n_pings - 1, min(n_pings, 96)).round().astype(int)
     objects = []
     for i, c in enumerate(result.candidates):
-        if c.ping_px is None or c.ground_range_px is None:
+        if c.ping_px is None or c.ground_range_px is None or c.card_of is not None:   # one object per card
             continue
         x1, y1, x2, y2 = c.bbox
         corners = [cf.to_canonical(x, y) for x, y in ((x1, y1), (x2, y2))]

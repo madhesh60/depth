@@ -15,13 +15,40 @@ Calibration: `DATASET/03_yolo_ready_dataset_v2b/val` *wcp_ss_*.jpg — 163 uniqu
 
 **G1** — cards per frame fall ≥ 25% in both modes; ≤ 1% of cards hold two or more labelled pots: **PASS**
 
-## 2. Verification split
+## 2. Verification split (scored once)
 
-_Not scored yet (`--verify`)._
+Verification: `DATASET/03_yolo_ready_dataset_v2b/test` *wcp_ss_*.jpg — 199 unique frames, recordings ['Rec14', 'Rec8', 'Rec9']
+
+| mode | τ_review | boxes / frame | **cards / frame** | fewer cards | cards with ≥ 2 pots | pots that reach a person (boxes → cards) |
+|---|--:|--:|--:|--:|--:|--:|
+| standard | 0.060 | 2.68 | **1.81** | 33% | 0 of 360 | 214 → 214 of 264 (same pots) |
+| look_harder | 0.055 | 3.86 | **2.32** | 40% | 1 of 462 | 227 → 227 of 264 (same pots) |
+
+**G2** — the same pots reach a person; cards per frame fall ≥ 25% in both modes; ≤ 2% of cards hold two or more labelled pots: **PASS**
+
+## 3. What it does to the analyst's minutes (ASSUMED timings)
+
+Verification split, 199 frames; 20 s per frame for manual review and 8 s per card; **one card is one decision whatever its box count** — an assumption until the Study tab measures it. Manual review reaches each promise in the same time either way.
+
+| mode (promise) | cards | cards to the promise | DEPTH min | manual min | break-even s / card | DEPTH faster when the share of frames with a pot is |
+|---|---|--:|--:|--:|--:|---|
+| standard (≥ 78%) | one per box (before) | 470 | 62.7 | 55.7 | 7.11 | < 23% |
+| standard (≥ 78%) | **one per object** | 324 | 43.2 | 55.7 | 10.31 | any share (always faster) |
+| look_harder (≥ 84%) | one per box (before) | 727 | 96.9 | 57.3 | 4.73 | none (never faster) |
+| look_harder (≥ 84%) | **one per object** | 424 | 56.5 | 57.3 | 8.11 | < 80% |
+
+The last column is the survey-mix break-even: the calibration split's cards per empty frame and per frame with a pot, priced at the same timings. A real survey-hour is mostly empty seabed — per survey-hour (~169 frames), in minutes:
+
+| share of frames with a pot | manual review | standard · per box | standard · per object | look_harder · per box | look_harder · per object |
+|--:|--:|--:|--:|--:|--:|
+| 0% | 56.2 | 46.1 | 34.3 | 70.2 | 47.1 |
+| 5% | 56.2 | 48.3 | 35.0 | 72.9 | 47.7 |
+| 20% | 56.2 | 55.0 | 37.1 | 81.2 | 49.4 |
+| 80% | 56.2 | 81.7 | 45.5 | 114.2 | 56.3 |
 
 ## 4. Decision
 
-_Pending the verification split._
+**Ship** one card per object: the product folds a frame's overlapping same-class review boxes into one card (`calibration.json` `cards.ios` = 0.5). The recall promise is unchanged — the same pots reach a person — and the card counts the core loop plans with come from this study.
 
 Caveats: labels are incomplete, so a card's 'pots' are the labelled ones; the time a person needs for a card with three boxes on one object is assumed equal to a one-box card; the calibration split is 3 recordings.
 

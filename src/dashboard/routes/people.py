@@ -58,11 +58,13 @@ def study_plan(participant: str = Query("anon", max_length=40)):
         with S._INFER_LOCK:
             res = pipe.run_frame(img, frame_id=fr["frame_id"])
         for i, c in enumerate(res.candidates):
-            if c.verdict is None or c.verdict.value not in ("confirmed", "review") or c.cls_name != g:
+            if c.verdict is None or c.verdict.value not in ("confirmed", "review") or c.cls_name != g or c.card_of is not None:
                 continue
             cards.append({"card_id": f"{fr['frame_id'][-12:]}-{i}", "frame_id": fr["frame_id"], "bbox": list(c.bbox),
+                          "boxes": [list(c.bbox)] + [list(res.candidates[k].bbox) for k in c.card_members],
                           "p_pot": c.evidence.p_pot if c.evidence else None, "conf": round(c.conf, 3),
-                          "verdict": c.verdict.value, "crop_png": S._evidence_crop(img, c, 280)})
+                          "verdict": c.verdict.value,
+                          "crop_png": S._evidence_crop(img, c, 280, [res.candidates[k].bbox for k in c.card_members])})
     cards.sort(key=lambda c: (-(c["p_pot"] or 0), -c["conf"]))           # the DEPTH queue order
     S._STUDY[plan["session_id"]] = {"plan": plan, "cards": {c["card_id"]: c for c in cards}}
     while len(S._STUDY) > 32:
@@ -99,12 +101,16 @@ def study_summary():
 def effort(sec_per_frame: Optional[float] = Query(None, gt=0, le=600),
            sec_per_card: Optional[float] = Query(None, gt=0, le=120),
            manual_recall: Optional[float] = Query(None, gt=0, le=1),
-           card_accuracy: Optional[float] = Query(None, gt=0, le=1)):
+           card_accuracy: Optional[float] = Query(None, gt=0, le=1),
+           mode: str = Query("standard", pattern="^(standard|look_harder)$",
+                             description="perception mode: its own queue and promise")):
     """Recall-vs-minutes curves for manual review / detector list / DEPTH queue with any timings."""
     ep = S.REPO / "models" / load_calibration().data.get("model", SHIPPED_MODEL) / "effort_curve.json"
     if not ep.exists():
         raise HTTPException(404, "no effort data for this model - run python -m src.agentic.effort")
     E = json.loads(ep.read_text(encoding="utf-8"))
+    modes = ["standard", *sorted((E.get("modes") or {}).keys())]
+    E = effort_mod.for_mode(E, mode)
     params, prov = effort_mod.measured_params()
     for k, v in (("sec_per_frame", sec_per_frame), ("sec_per_card", sec_per_card),
                  ("manual_recall", manual_recall), ("card_accuracy", card_accuracy)):
@@ -112,7 +118,8 @@ def effort(sec_per_frame: Optional[float] = Query(None, gt=0, le=600),
             params[k], prov = v, "set in the UI"
     C = effort_mod.curves(E, **params)
     return {"curves": C, "provenance": prov, "frames": E["frames"], "pots": E["pots"],
-            "frames_per_survey_hour": E["frames_per_survey_hour"], "split": E.get("split")}
+            "frames_per_survey_hour": E["frames_per_survey_hour"], "split": E.get("split"),
+            "mode": E.get("mode", "standard"), "modes": modes, "cards": E.get("cards")}
 
 
 # ---- blinded false-alarm audit (src/detection/fp_audit.py) ------------------------------------

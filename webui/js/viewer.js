@@ -68,17 +68,17 @@ const Viewer = (() => {
     const proof = document.createElementNS(SVGNS, "g"); proof.id = "proofLayer"; s.appendChild(proof);
     boxes.forEach(b => {
       const [x1, y1, x2, y2] = b.bbox;
-      const g = document.createElementNS(SVGNS, "g");
-      g.setAttribute("class", `bx bx-${b.verdict}`); g.dataset.id = b.id;
+      const g = document.createElementNS(SVGNS, "g"), card = b.member == null ? b.id : b.member;
+      g.setAttribute("class", `bx bx-${b.verdict}${b.member == null ? "" : " bx-member"}`); g.dataset.id = b.id; g.dataset.card = card;
       const r = document.createElementNS(SVGNS, "rect");
       r.setAttribute("x", x1); r.setAttribute("y", y1);
       r.setAttribute("width", x2 - x1); r.setAttribute("height", y2 - y1);
       g.appendChild(r);
       const t = document.createElementNS(SVGNS, "text");
       t.setAttribute("x", x1 + 2); t.setAttribute("y", y1 - 3);
-      t.setAttribute("class", "bx-label"); t.textContent = b.conf.toFixed(2);
+      t.setAttribute("class", "bx-label"); t.textContent = b.member == null ? b.conf.toFixed(2) : "";
       g.appendChild(t);
-      g.addEventListener("click", ev => { ev.stopPropagation(); selectCandidate(b.id); });
+      g.addEventListener("click", ev => { ev.stopPropagation(); selectCandidate(card); });
       s.appendChild(g);
     });
   }
@@ -98,7 +98,7 @@ const Viewer = (() => {
     }
     p.classList.remove("flash"); void p.offsetWidth; p.classList.add("flash");
   }
-  function highlight(id, on) { const g = svg().querySelector(`.bx[data-id="${id}"]`); if (g) g.classList.toggle("bx-hi", on); }
+  function highlight(id, on) { svg().querySelectorAll(`.bx[data-card="${id}"]`).forEach(g => g.classList.toggle("bx-hi", on)); }
   function pulse(id) {
     const g = svg().querySelector(`.bx[data-id="${id}"]`); if (!g) return;
     g.classList.remove("bx-pulse"); void g.getBBox; g.classList.add("bx-pulse");

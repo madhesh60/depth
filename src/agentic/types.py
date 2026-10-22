@@ -252,6 +252,7 @@ class TrackedObject:
     also_in: list[str] = field(default_factory=list)   # other chunks showing the same object
     p_pot: Optional[float] = None                      # calibrated P(real pot) for REVIEW ordering
     sightings: int = 1                                 # passes/frames that saw it (repeat sightings merged)
+    boxes: int = 1                                     # detector boxes on its review card (cards.py, STUDY-23)
     # a PERSON's decision (the agent's verdict above is never overwritten): confirmed | rejected |
     # recovered (a crew brought it up) | not_found (a crew went, nothing there); None = undecided
     human: Optional[str] = None

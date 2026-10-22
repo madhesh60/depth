@@ -115,7 +115,25 @@ Promote each into the log below with full results as it runs.
 
 ## Experiment log
 
-### STUDY-23 — One review card per object (REGISTERED 2026-10-22; verification pending)
+### STUDY-23 — One review card per object (SHIPPED 2026-10-22 — on by default)
+
+- **Result (verification split, scored once, 199 frames): G2 PASS.** Standard look 2.68 → **1.81** review
+  cards per frame (−33%), looking harder 3.86 → **2.32** (−40%); the **same pots reach a person** (214 and 227
+  of 264); 0 of 360 and 1 of 462 cards hold two labelled pots. At the assumed timings (20 s per frame, 8 s
+  per card, one card = one decision) the minutes to the promise flip: standard **43.2 vs 55.7** manual
+  (break-even card time 7.11 → **10.31 s**), looking harder **56.5 vs 57.3** (4.73 → 8.11 s); per
+  survey-hour of empty seabed 34 and 47 minutes against manual 56 (looking harder was *slower* than manual
+  at every mix before: 70 minutes). The P(pot) forecast is now biased low by 34% (22% before): a card's
+  P(pot) is still its best box's, and a card with several boxes is likelier real than its best box alone —
+  reported, not refit. Real water (the 1-h Solix recording, promise withdrawn): 54 → **48 cards per hour**.
+- **Shipped:** `cards.fold` runs on every frame after the tiers are set (`calibration.json` `cards.ios` = 0.5,
+  written by `study_cards.py --write`); a folded box keeps its trace (`one_card` step) and is drawn dashed on
+  its head's card; counts, hazards, stitching, the 3D twin, the Study tab's cards and the core loop's
+  card estimates (`calibrated_modes`) all follow the cards; `effort.py` now reports both modes. Default
+  survey of the 8 demo frames: 42 → 25 hazards. Report: [`card_grouping.md`](reports/card_grouping.md) ·
+  [`effort_curve.md`](reports/effort_curve.md) · `python -m src.agentic.study_cards --verify`.
+
+**Registration** (`1284aed`, committed before the verification split was read for this question):
 
 - **Why.** The judge audit: about 5 review cards per frame in the default mode, and at the assumed timings
   DEPTH was slower than manual review on the pot-dense test split. The cards showed why: the detector often

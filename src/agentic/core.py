@@ -77,20 +77,22 @@ class Mode:
 
 
 def calibrated_modes(cal=None) -> list[Mode]:
-    """The modes ``calibration.json`` carries (a mode is there only if it passed its gates)."""
+    """The modes ``calibration.json`` carries (a mode is there only if it passed its gates). Expected cards per
+    frame are review cards as a person sees them: one per object when STUDY-23's rule is on (``cards``)."""
     cal = cal or load_calibration()
     t = cal.tiers
     if t.get("tau_review") is None:
         return []
     g = t.get("guarantees") or {}
+    per_card = (cal.cards.get("cards_per_frame_cal") or {}) if cal.card_ios else {}
     bins, frames = t.get("p_pot_bins") or [], (cal.data.get("fit") or {}).get("frames") or 0
+    boxes = round(sum(b["n"] for b in bins) / frames, 3) if bins and frames else None
     out = [Mode("standard", "standard look", float(g.get("recall_promise") or 0.0), float(t["tau_review"]),
-                round(sum(b["n"] for b in bins) / frames, 3) if bins and frames else None, 1,
-                dict(g.get("verified_on_test") or {}), g.get("report"))]
+                per_card.get("standard", boxes), 1, dict(g.get("verified_on_test") or {}), g.get("report"))]
     for name, m in cal.modes.items():
         if m.get("tau_review") is not None and m.get("recall_promise") is not None:
             out.append(Mode(name, m.get("label", name), float(m["recall_promise"]), float(m["tau_review"]),
-                            m.get("cards_per_frame_cal"), int(m.get("forward_passes_per_frame", 1)),
+                            per_card.get(name, m.get("cards_per_frame_cal")), int(m.get("forward_passes_per_frame", 1)),
                             dict(m.get("verified_on_test") or {}), m.get("report")))
     return out
 
@@ -335,10 +337,13 @@ class SurveyAgent:
         n_new = sum(int(fr.perception.get("new") or 0) for fr in results)
         n_up = sum(int(fr.perception.get("raised") or 0) for fr in results)
         cards = sum(fr.counts.get("review", 0) + fr.counts.get("confirmed", 0) for fr in results)
+        folded = sum(int(fr.perception.get("folded") or 0) for fr in results)
         run.log("perceive", f"{len(results)} frame(s) perceived with OpenCV 5 (Stage 1 + cv2.dnn + evidence)"
-                + (f"; the closer tile look added {n_new} candidate(s) and raised {n_up}" if n_new or n_up else ""),
-                observed={"frames": len(results), "cards": cards, "tile_new": n_new, "tile_raised": n_up,
-                          "seconds": round(time.perf_counter() - t_run, 2)})
+                + (f"; the closer tile look added {n_new} candidate(s) and raised {n_up}" if n_new or n_up else "")
+                + (f"; {cards + folded} review boxes -> {cards} cards, one per object ({folded} boxes on another "
+                   "box's card, none dropped - STUDY-23)" if folded else ""),
+                observed={"frames": len(results), "cards": cards, "boxes_on_cards": cards + folded,
+                          "tile_new": n_new, "tile_raised": n_up, "seconds": round(time.perf_counter() - t_run, 2)})
 
         # 4. plan for people and the boat
         g = self.pipe.guarantees(agent)

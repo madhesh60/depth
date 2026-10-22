@@ -49,6 +49,7 @@ import numpy as np
 from src.cv_pipeline.canonical import Canonicaliser, CanonicalFrame
 from src.detection.calibration import load_calibration
 from src.detection.infer import Detection
+from .cards import fold as fold_cards
 from .perception import Perceptor
 from .shadow import ShadowProver
 from .tools import Toolbox
@@ -78,6 +79,9 @@ class AgentConfig:
     # look; "look_harder" = + the 2×2 tile pass; ``look_harder`` holds its geometry from calibration.json
     perception_mode: str = "standard"
     look_harder: Optional[dict] = None
+    # one review card per object (cards.py, STUDY-23): a frame's same-class review boxes join one card when
+    # at least this share of the smaller box lies inside the other; None = every box is its own card
+    card_ios: Optional[float] = None
 
     @classmethod
     def from_calibration(cls, mode: str = "standard") -> "AgentConfig":
@@ -86,7 +90,7 @@ class AgentConfig:
         if tiers is None and mode != "standard":
             raise ValueError(f"perception mode {mode!r} is not calibrated for {cal.data.get('model')}")
         m = cal.modes.get(mode) if mode != "standard" else None
-        return cls(tiers=tiers, perception_mode=mode,
+        return cls(tiers=tiers, perception_mode=mode, card_ios=cal.card_ios,
                    look_harder={"tile_frac": float(m["tile_frac"]), "merge_iou": float(m["merge_iou"])} if m else None)
 
 
@@ -169,6 +173,7 @@ class TriageAgent:
                                if src == "tiles" else "the closer 2×2 tile look raised this find's score"),
                     detail={"source": src}))
         n_inf += perception.get("passes", 0)
+        perception["folded"] = fold_cards(candidates, self.cfg.card_ios)   # one review card per object (STUDY-23)
         prove_decide_ms = (time.perf_counter() - t0) * 1000
         if progress_cb:
             progress_cb("decide", {"counts": _counts(candidates)})
@@ -746,7 +751,7 @@ def _tile_pass_incident(frame_id: str, perception: dict, faults: set) -> dict:
 
 
 def _counts(cands: list[Candidate]) -> dict:
-    return {v.value: sum(c.verdict is v for c in cands) for v in Verdict}
+    return {v.value: sum(c.verdict is v and c.card_of is None for c in cands) for v in Verdict}
 
 
 # ---- rendering + CLI ----------------------------------------------------------------------------

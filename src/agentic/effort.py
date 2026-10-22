@@ -11,7 +11,11 @@ pot counted — including the ones the detector never proposes) for three workfl
    (``sec_per_card``), i.e. a detector with no triage;
 3. **DEPTH queue** — the REVIEW/CONFIRMED cards in calibrated P(pot) order, with the **recall
    promise** marked (reviewing the queue down to τ_review is what the guarantee is about) and the
-   agent's **forecast** (Σ P(pot) of the cards reviewed so far) next to what actually happened.
+   agent's **forecast** (Σ P(pot) of the cards reviewed so far) next to what actually happened. A card is
+   what a person sees: **one card per object** when ``calibration.json`` carries STUDY-23's rule
+   (``cards.ios``, ``cards.py``) — a frame's overlapping same-class boxes on one card, none dropped —
+   for both perception modes: the standard look and **looking harder** (the default when no recall goal
+   is set), each at its own promise.
 
 Honesty notes (printed in the report):
 * when the calibrated policy is ``baseline_conf`` (EXP-001, EXP-003) the order *is* confidence order (STUDY-07) — DEPTH's gain over a sorted list
@@ -40,6 +44,7 @@ import hashlib
 import json
 import time
 from pathlib import Path
+from typing import Optional
 
 import numpy as np
 
@@ -58,42 +63,99 @@ def _p_pot(conf: float, bins: list[dict]) -> float:
     return float(bins[0]["p_pot"]) if bins else 0.0
 
 
+def match(boxes: list[dict], gts: list[tuple]) -> list[int]:
+    """One-to-one greedy matching by confidence at IoU ≥ ``calibrate.MATCH_IOU`` (``calibrate.label``'s rule):
+    the labelled pot each box takes, or -1."""
+    from src.agentic.calibrate import MATCH_IOU
+    from src.detection.infer import _iou
+    used, out = [False] * len(gts), [-1] * len(boxes)
+    for i in sorted(range(len(boxes)), key=lambda k: -boxes[k]["conf"]):
+        best, bj = 0.0, -1
+        for j, g in enumerate(gts):
+            if not used[j]:
+                v = _iou(tuple(boxes[i]["bbox"]), g)
+                if v > best:
+                    best, bj = v, j
+        if bj >= 0 and best >= MATCH_IOU:
+            used[bj], out[i] = True, bj
+    return out
+
+
+def frame_cards(boxes: list[dict], ios_min: Optional[float]) -> list[list[int]]:
+    """A frame's review boxes as cards (box indices, head first): one card per object with STUDY-23's rule
+    (``cards.group``; a cache holds one class), else one card per box."""
+    if not ios_min:
+        return [[i] for i in range(len(boxes))]
+    from src.agentic.cards import group
+    return group([b["bbox"] for b in boxes], ["one class"] * len(boxes), [b["conf"] for b in boxes], ios_min)
+
+
+def _queue(frames: list[dict], tau: float, bins: list[dict], ios_min: Optional[float]) -> list[list[float]]:
+    """The DEPTH queue on a split, in P(pot) order: per card [labelled pots its boxes took, P(pot) of its head]."""
+    q = []
+    for fr in frames:
+        bx = [c for c in fr["cands"] if c["conf"] >= tau]
+        tp = match(bx, [tuple(g) for g in fr["gt"]])
+        for m in frame_cards(bx, ios_min):
+            q.append((sum(tp[i] >= 0 for i in m), _p_pot(bx[m[0]]["conf"], bins), bx[m[0]]["conf"]))
+    q.sort(key=lambda c: (-c[1], -c[2]))
+    return [[tp, round(p, 4)] for tp, p, _ in q]
+
+
+def _mix(frames: list[dict], tau: float, ios_min: Optional[float]) -> dict:
+    """Cards per empty frame and per frame with a pot — the survey-mix inputs (calibration split)."""
+    n = lambda f: len(frame_cards([c for c in f["cands"] if c["conf"] >= tau], ios_min))
+    empty, pots = [f for f in frames if not f["gt"]], [f for f in frames if f["gt"]]
+    return {"split": "calibration", "empty_frames": len(empty), "pot_frames": len(pots),
+            "cards_per_empty_frame": round(sum(map(n, empty)) / max(1, len(empty)), 3),
+            "cards_per_pot_frame": round(sum(map(n, pots)) / max(1, len(pots)), 3)}
+
+
 def build(model: str = "EXP-001") -> dict:
-    """Card/frame facts of the verification split → a compact JSON the UI can replay."""
+    """Card/frame facts of the verification split → a compact JSON the UI can replay. The top level is the
+    standard look; ``modes.look_harder`` the closer look (when calibrated and its tile pass is cached)."""
     from src.agentic.calibrate import label
     from src.detection.calibration import load_calibration
     cal = load_calibration(model)
     t = cal.tiers
-    blob = json.loads((REPO / "runs" / "calib" / f"{model}_test.json").read_text())
-    frames = blob["frames"]
+    calib = REPO / "runs" / "calib"
+    frames = json.loads((calib / f"{model}_test.json").read_text())["frames"]
+    cal_frames = json.loads((calib / f"{model}_val.json").read_text())["frames"]
     tau = float(t.get("tau_review") or 0.0)
-    bins = t.get("p_pot_bins") or []
-    # survey order: per frame, its cards (by conf) with one-to-one TP labels
-    survey, depth = [], []
+    ios_min = cal.card_ios
+    survey = []                      # a detector with no triage: every detection at the floor, in survey order
     for fi, fr in enumerate(frames):
         s, tp, _, _ = label([fr], lambda c: c["conf"])
-        for sc, ok in sorted(zip(s, tp), key=lambda x: -x[0]):
-            survey.append({"f": fi, "conf": round(float(sc), 4), "tp": int(ok)})
-            if sc >= tau:
-                depth.append({"f": fi, "conf": round(float(sc), 4), "tp": int(ok), "p": round(_p_pot(sc, bins), 4)})
-    depth.sort(key=lambda c: (-c["p"], -c["conf"]))
+        survey += [[fi, int(ok)] for _, ok in sorted(zip(s, tp), key=lambda x: -x[0])]
     g = t.get("guarantees") or {}
-    cal_frames = json.loads((REPO / "runs" / "calib" / f"{model}_val.json").read_text())["frames"]
-    empty, pots = [f for f in cal_frames if not f["gt"]], [f for f in cal_frames if f["gt"]]
-    cards = lambda fs: sum(sum(c["conf"] >= tau for c in f["cands"]) for f in fs)
-    return {
-        "model": model, "split": (cal.data.get("fit") or {}).get("verified_on"),
-        "frames": len(frames), "pots": int(sum(len(f["gt"]) for f in frames)),
-        "pots_per_frame": [len(f["gt"]) for f in frames],
-        "tau_review": tau, "recall_promise": g.get("recall_promise"),
-        "detector_list": [[c["f"], c["tp"]] for c in survey],
-        "depth_queue": [[c["tp"], c["p"]] for c in depth],
-        "frames_per_survey_hour": round(FRAMES_PER_SURVEY_HOUR, 2),
-        "survey_mix": {"split": "calibration", "empty_frames": len(empty), "pot_frames": len(pots),
-                       "cards_per_empty_frame": round(cards(empty) / max(1, len(empty)), 3),
-                       "cards_per_pot_frame": round(cards(pots) / max(1, len(pots)), 3)},
-        "note": "verification split (unseen, unique frames); timings are parameters — see docs/reports/effort_curve.md",
-    }
+    E = {"model": model, "split": (cal.data.get("fit") or {}).get("verified_on"),
+         "frames": len(frames), "pots": int(sum(len(f["gt"]) for f in frames)),
+         "pots_per_frame": [len(f["gt"]) for f in frames],
+         "tau_review": tau, "recall_promise": g.get("recall_promise"), "mode": "standard",
+         "cards": ({"one_per_object": True, "ios": ios_min, "study": cal.cards.get("study") or "STUDY-23"}
+                   if ios_min else {"one_per_object": False}),
+         "detector_list": survey, "depth_queue": _queue(frames, tau, t.get("p_pot_bins") or [], ios_min),
+         "frames_per_survey_hour": round(FRAMES_PER_SURVEY_HOUR, 2), "survey_mix": _mix(cal_frames, tau, ios_min),
+         "note": "verification split (unseen, unique frames); timings are parameters — see docs/reports/effort_curve.md",
+         "modes": {}}
+    lh = cal.modes.get("look_harder") or {}
+    tiles = {k: calib / f"{model}_{k}_tiles.json" for k in ("test", "val")}
+    if lh.get("tau_review") is not None and all(q.exists() for q in tiles.values()):
+        from src.agentic.study_look_harder import merged_frames
+        cls, tau_lh = cal.guaranteed_class, float(lh["tau_review"])
+        merged = {k: merged_frames(f, json.loads(tiles[k].read_text())["frames"], cls)
+                  for k, f in (("test", frames), ("val", cal_frames))}
+        E["modes"]["look_harder"] = {
+            "mode": "look_harder", "tau_review": tau_lh, "recall_promise": lh.get("recall_promise"),
+            "depth_queue": _queue(merged["test"], tau_lh, lh.get("p_pot_bins") or [], ios_min),
+            "survey_mix": _mix(merged["val"], tau_lh, ios_min)}
+    return E
+
+
+def for_mode(E: dict, mode: Optional[str]) -> dict:
+    """The effort facts of one perception mode (``standard`` = the top level)."""
+    m = (E.get("modes") or {}).get(mode or "standard")
+    return {**E, **m} if m else E
 
 
 def survey_mix(E: dict, sec_per_frame: float, sec_per_card: float) -> dict:
@@ -194,33 +256,38 @@ def measured_params() -> tuple[dict, str]:
     return dict(DEFAULTS), "ASSUMED (no user study yet)"
 
 
-def chart(E: dict, C: dict, out: Path, provenance: str) -> None:
+def chart(E: dict, C: dict, out: Path, provenance: str, C_lh: Optional[dict] = None) -> None:
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
-    ink, ink2, surface = "#0b0b0b", "#52514e", "#fcfcfb"
-    col = {"manual": "#2a78d6", "detector_list": "#eb6834", "depth": "#1baf7a"}   # validated slots 1-3
+    ink2, surface = "#52514e", "#fcfcfb"
+    col = {"manual": "#2a78d6", "detector_list": "#eb6834", "depth": "#1baf7a", "look_harder": "#7a5bd6"}
     fig, ax = plt.subplots(figsize=(7.6, 4.2), facecolor=surface)
     ax.set_facecolor(surface)
-    lab = {"manual": "manual review (every frame)", "detector_list": "detector list (survey order)",
-           "depth": "DEPTH queue (P(pot) order)"}
+    per = "one card per object" if (E.get("cards") or {}).get("one_per_object") else "one card per box"
+    lab = {"manual": "manual review (every frame)", "detector_list": "detector list (every box, survey order)",
+           "depth": f"DEPTH, standard look ({per})"}
     for k in ("manual", "detector_list", "depth"):
         x, y = C[k]
         ax.plot(x, y, color=col[k], linewidth=2, label=lab[k])
+    if C_lh:
+        x, y = C_lh["depth"]
+        ax.plot(x, y, color=col["look_harder"], linewidth=2, label="DEPTH, looking harder (the default)")
     fx, fy = C["forecast"]
     ax.plot(fx, fy, color=col["depth"], linewidth=1.2, linestyle=(0, (3, 3)), label="DEPTH forecast (Σ P(pot))")
-    R = C["promise"]
-    if R:
+    for CC, k_dep, nm, dy in ((C, "depth", "DEPTH", -15), (C_lh, "look_harder", "DEPTH, closer look", 9)):
+        R = (CC or {}).get("promise")
+        if not R:
+            continue
         ax.axhline(R, color="#9a9890", linewidth=0.8, linestyle=":")
-        ax.text(0.2, R + 0.012, f"recall promise ≥ {R:.0%} (95% conf.)", fontsize=8, color=ink2)
-        offs = {"manual": (-74, 10), "depth": (8, -16)}          # keep the two labels apart when they coincide
-        names = {"manual": "manual", "depth": "DEPTH"}
-        for k in ("manual", "depth"):
-            m = C["minutes_to_promise"][k]
-            if m is not None:
-                ax.plot([m], [R], marker="o", markersize=8, color=col[k], markeredgecolor=surface, markeredgewidth=2)
-                ax.annotate(f"{names[k]} {m:.1f} min", (m, R), textcoords="offset points", xytext=offs[k],
-                            fontsize=8, color=ink)
+        ax.text(0.2, R + 0.012, f"promise ≥ {R:.0%} (95% conf.)", fontsize=8, color=ink2)
+        pts = [(CC["minutes_to_promise"][k], colour, name) for k, colour, name in
+               (("manual", col["manual"], "manual"), ("depth", col[k_dep], nm)) if CC["minutes_to_promise"][k] is not None]
+        for i, (m, colour, name) in enumerate(sorted(pts)):        # left point: label on its left; right point: right
+            ax.plot([m], [R], marker="o", markersize=8, color=colour, markeredgecolor=surface, markeredgewidth=2)
+            ax.annotate(f"{name} {m:.1f} min", (m, R), textcoords="offset points", xytext=(-8 if i == 0 else 8, dy),
+                        ha="right" if i == 0 else "left", fontsize=8, color=colour, fontweight="bold",
+                        bbox={"boxstyle": "round,pad=0.15", "fc": surface, "ec": "none", "alpha": 0.9})
     ax.set_xlabel(f"analyst minutes for {E['frames']} frames  ·  timings {provenance}", fontsize=8, color=ink2)
     ax.set_ylabel("share of all labelled pots found", fontsize=8, color=ink2)
     ax.set_ylim(0, 1.0)
@@ -239,30 +306,48 @@ def chart(E: dict, C: dict, out: Path, provenance: str) -> None:
     plt.close(fig)
 
 
-def report(E: dict, C: dict, provenance: str) -> str:
+def _even_text(even: Optional[float]) -> str:
+    if even is None:
+        return "—"
+    return "at any share" if even >= 1 else "never" if even <= 0 else f"below {even:.0%}"
+
+
+def report(E: dict, C: dict, provenance: str, C_lh: Optional[dict] = None) -> str:
     from src.detection.calibration import load_calibration
     policy = load_calibration(E["model"]).tiers.get("policy")
     with_pot = sum(1 for n in E["pots_per_frame"] if n > 0)
     p = C["params"]
-    mt, pm = C["minutes_to_promise"], C["per_survey_hour_min"]
     fa, fc = C.get("actual_at_promise"), C.get("forecast_at_promise")
     bias = (fc - fa) / fa if fa and fc is not None else None
-    sm, mix = E.get("survey_mix") or {}, C.get("survey_mix") or {}
-    even = mix.get("breakeven_pot_share")
-    mix_lines = [] if not mix else [
-        "## Survey mix — a real survey-hour is mostly empty seabed", "",
-        f"On the calibration split the queue raises **{sm['cards_per_empty_frame']:.2f} cards per empty frame** "
-        f"({sm['empty_frames']} frames without a pot) and {sm['cards_per_pot_frame']:.2f} per frame with a pot "
-        f"({sm['pot_frames']} frames). Manual review pays per frame whatever it holds (here: every frame, so it finds "
-        f"every pot under the assumed manual recall); the queue pays per card (every card: ≥ {E['recall_promise']:.0%} "
-        f"of pots, the promise). At the timings above, per survey-hour (~{E['frames_per_survey_hour']:.0f} frames, "
-        "modelled: 15 Hz, 640 pings per frame, both sides):", "",
-        "| share of frames with a pot | manual review, min | DEPTH queue, min |", "|--:|--:|--:|",
-        *[f"| {r['pot_share']:.0%} | {r['manual_min']} | {r['depth_min']} |" for r in mix["rows"]], "",
-        (f"**Break-even: DEPTH is faster when fewer than {even:.0%} of frames hold a pot** (at these assumed "
-         "timings; the recall promise is per pot, so it does not depend on the mix). On empty seabed the saving "
-         "is small, because the detector at τ_review still raises about two cards per empty frame."
-         if even is not None and 0 <= even <= 1 else "No break-even inside 0–100% at these timings."), ""]
+    one = (E.get("cards") or {}).get("one_per_object")
+    modes = [("standard look", E, C)] + ([("looking harder (the default)", for_mode(E, "look_harder"), C_lh)]
+                                          if C_lh else [])
+    rows = []
+    for name, _, CC in modes:
+        mt, pm = CC["minutes_to_promise"], CC["per_survey_hour_min"]
+        rows.append(f"| {name} | ≥ {CC['promise']:.0%} | {CC['cards_to_promise']} | "
+                    f"{'—' if mt['manual'] is None else round(mt['manual'], 1)} | "
+                    f"**{'—' if mt['depth'] is None else round(mt['depth'], 1)}** | {pm['manual']} | {pm['depth']} | "
+                    f"{CC['breakeven_sec_per_card']} s |")
+    mix_lines = []
+    if all((CC.get("survey_mix") or {}).get("rows") for _, _, CC in modes):
+        sm = [EE.get("survey_mix") or {} for _, EE, _ in modes]
+        mixes = [CC["survey_mix"] for _, _, CC in modes]
+        mix_lines = [
+            "## Survey mix — a real survey-hour is mostly empty seabed", "",
+            "Manual review pays per frame whatever it holds (here: every frame, so it finds every pot under the "
+            "assumed manual recall); the queue pays per card. On the calibration split the queue raises "
+            + "; ".join(f"**{m['cards_per_empty_frame']:.2f} cards per empty frame** and {m['cards_per_pot_frame']:.2f} "
+                        f"per frame with a pot ({name})" for (name, _, _), m in zip(modes, sm))
+            + f". Per survey-hour (~{E['frames_per_survey_hour']:.0f} frames, modelled: 15 Hz, 640 pings per frame, "
+            "both sides), at the timings above:", "",
+            "| share of frames with a pot | manual review, min | " + " | ".join(f"DEPTH, {name}, min" for name, _, _ in modes)
+            + " |", "|--:|--:|" + "--:|" * len(modes),
+            *[f"| {r['pot_share']:.0%} | {r['manual_min']} | " + " | ".join(str(mx["rows"][i]["depth_min"]) for mx in mixes)
+              + " |" for i, r in enumerate(mixes[0]["rows"])], "",
+            "**Break-even:** DEPTH is faster when the share of frames with a pot is "
+            + "; ".join(f"{_even_text(mx.get('breakeven_pot_share'))} ({name})" for (name, _, _), mx in zip(modes, mixes))
+            + " — at these assumed timings; the recall promise is per pot, so it does not depend on the mix.", ""]
     runs = _real_water_runs(E["model"])
     water_lines = [] if not runs else [
         "## Real water — raw recordings through the Survey tab's own path", "",
@@ -280,20 +365,19 @@ def report(E: dict, C: dict, provenance: str) -> str:
     L = ["# Analyst effort — recall of pots vs review minutes", "",
          f"_`python -m src.agentic.effort` · model {E['model']} · verification split: {E['split']}_", "",
          f"Timings: **{provenance}** — {p['sec_per_frame']:.0f} s per frame (manual), {p['sec_per_card']:.0f} s per "
-         f"card, manual recall {p['manual_recall']:.2f}, card accuracy {p['card_accuracy']:.2f}.", "",
+         f"card, manual recall {p['manual_recall']:.2f}, card accuracy {p['card_accuracy']:.2f}.",
+         ("Cards: **one card per object** — a frame's overlapping same-class boxes share one card and one decision; "
+          "no box is dropped, so the pots that reach a person are unchanged "
+          "([STUDY-23](card_grouping.md); one card per box before)." if one else "Cards: one per detector box."), "",
          "![effort curve](../img/effort_curve.png)", "",
-         f"| at the recall promise (≥ {C['promise']:.0%}) | manual review | DEPTH queue |", "|---|--:|--:|",
-         f"| analyst minutes for these {E['frames']} frames | {mt['manual'] if mt['manual'] is None else round(mt['manual'], 1)} | "
-         f"{mt['depth'] if mt['depth'] is None else round(mt['depth'], 1)} |",
-         f"| per survey-hour of sonar (~{E['frames_per_survey_hour']:.0f} frames) | {pm['manual']} | {pm['depth']} |",
-         f"| cards reviewed | — | {C['cards_to_promise']} |",
-         "",
-         f"**Break-even card time: {C['breakeven_sec_per_card']} s.** DEPTH reaches the promise faster than "
-         f"manual review whenever reviewing one card takes less than this — it does not depend on the card "
-         f"timing, only on the manual seconds per frame and how many cards the promise needs. The timed "
-         f"study (`Study` mode) measures both.", "",
-         f"**Forecast vs actual:** at the promise point the agent forecast **{C['forecast_at_promise']}** real "
-         f"pots from its calibrated P(pot); **{C['actual_at_promise']}** were real — the forecast is "
+         f"| perception mode | promise | cards to the promise | manual min ({E['frames']} frames) | DEPTH min | "
+         f"manual min / survey-hour | DEPTH min / survey-hour | break-even card time |",
+         "|---|--:|--:|--:|--:|--:|--:|--:|", *rows, "",
+         "**Break-even card time:** DEPTH reaches the promise faster than manual review whenever reviewing one card "
+         "takes less than this — it does not depend on the card timing, only on the manual seconds per frame and how "
+         "many cards the promise needs. The timed study (`Study` mode) measures both.", "",
+         f"**Forecast vs actual** (standard look): at the promise point the agent forecast **{C['forecast_at_promise']}** "
+         f"real pots from its calibrated P(pot); **{C['actual_at_promise']}** were real — the forecast is "
          + (f"**biased {'low' if bias < 0 else 'high'} by {abs(bias):.0%}** on this split" if bias else "unbiased")
          + ". P(pot) is fit on the calibration recordings, so budget mode's forecast (what it tells an analyst "
            "*before* they spend the minutes) is an estimate from those recordings, not a measured rate for a "
@@ -305,8 +389,10 @@ def report(E: dict, C: dict, provenance: str) -> str:
           if policy == "baseline_conf" else
           f"- {E['model']}'s calibrated policy is `{policy}`; the queue order is P(pot) under that policy."),
          f"- The verification split is pot-dense ({with_pot} of {E['frames']} frames have at least one pot). A "
-         "real survey-hour is mostly empty seabed: manual review still pays per frame, the queue pays per detection.",
+         "real survey-hour is mostly empty seabed: manual review still pays per frame, the queue pays per card.",
          "- Manual recall of 1.0 is an optimistic assumption for manual review; the study measures it.",
+         *(["- A card with several boxes on one object is assumed to take as long as a one-box card; the study "
+            "measures what a card takes."] if one else []),
          "", "---", "_Regenerated by the script; do not edit by hand._", ""]
     return "\n".join(L)
 
@@ -337,12 +423,14 @@ def main():
         out.write_text(json.dumps(rw, indent=1), encoding="utf-8")
         print(f"real water: {rw['cards']} cards in {rw['sonar_s']:.0f} s of sonar -> {rw['cards_per_hour']} cards/h -> {out}")
     C = curves(E, **params)
+    C_lh = curves(for_mode(E, "look_harder"), **params) if (E.get("modes") or {}).get("look_harder") else None
     (REPO / "models" / model / "effort_curve.json").write_text(json.dumps(E), encoding="utf-8")
-    chart(E, C, REPO / "docs" / "img" / "effort_curve.png", prov)
-    (REPO / "docs" / "reports" / "effort_curve.md").write_text(report(E, C, prov), encoding="utf-8")
-    print(json.dumps({k: C[k] for k in ("promise", "minutes_to_promise", "cards_to_promise",
-                                        "breakeven_sec_per_card", "per_survey_hour_min",
-                                        "forecast_at_promise", "actual_at_promise")}, indent=1))
+    chart(E, C, REPO / "docs" / "img" / "effort_curve.png", prov, C_lh)
+    (REPO / "docs" / "reports" / "effort_curve.md").write_text(report(E, C, prov, C_lh), encoding="utf-8")
+    keys = ("promise", "minutes_to_promise", "cards_to_promise", "breakeven_sec_per_card", "per_survey_hour_min",
+            "forecast_at_promise", "actual_at_promise")
+    print(json.dumps({name: {k: CC[k] for k in keys} for name, CC in (("standard", C), ("look_harder", C_lh)) if CC},
+                     indent=1))
 
 
 if __name__ == "__main__":

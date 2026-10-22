@@ -164,6 +164,19 @@ class Calibration:
         return copy.deepcopy(self.data.get("modes") or {})
 
     @property
+    def cards(self) -> dict:
+        """One review card per object (``study_cards.py``, STUDY-23): ``ios`` (a frame's same-class review boxes
+        are one card when at least this share of the smaller box lies inside the other) and the cards per frame
+        each mode raised on the calibration split. Written only after the study's gates passed; absent → every
+        box is its own card."""
+        return copy.deepcopy(self.data.get("cards") or {})
+
+    @property
+    def card_ios(self) -> Optional[float]:
+        v = (self.data.get("cards") or {}).get("ios")
+        return None if v is None else float(v)
+
+    @property
     def severity(self) -> dict:
         """How bad a hazard is IF it is real — an OPERATOR POLICY, not fitted from data. Keys:
         ``class_weight`` (per class, default 1), ``suspended_weight`` (box above the tracked seabed:
