@@ -31,7 +31,7 @@ flowchart LR
       S1[Stage 1 canonicalise<br/>bottom track · slant→ground]
       S2[See: YOLO11 ONNX<br/>cv2.dnn · OpenCV 5 /opt/cool]
       S3[Prove: shadow · height · water column]
-      S4[Decide: calibrated tiers<br/>≥78% of pots reach a person · ≥84% looking harder]
+      S4[Decide: calibrated tiers<br/>≥78% of pots reach a person · ≥84% looking harder<br/>one review card per object]
       S5[Act: geotag · stitch · routes<br/>re-survey passes · mission brief]
       S0 --> S1 --> S2 --> S3 --> S4 --> S5
     end
