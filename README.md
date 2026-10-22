@@ -36,7 +36,11 @@ and **Best Use of COOL** · AGPL-3.0
 
 ### Not done — said plainly
 
-- <!-- cool:status -->**COOL has not run yet.** The AWS Marketplace subscription to the COOL AMI is blocked on payment: the Marketplace does not accept the account's card (it needs a Visa or Mastercard), and an AWS Support case is open. Until then the demo server runs stock OpenCV 5 in rehearsal mode and says so. The COOL benchmark, the AWS-signed receipt and its verifier are built and run in one command once the subscription is active (`PHASE=cool ./infra/golive.sh`).<!-- /cool:status -->
+- **COOL:** <!-- cool:status -->has not run yet. The AWS Marketplace subscription to the COOL AMI is blocked on payment: the Marketplace does not accept the account's card (it needs a Visa or Mastercard), and an AWS Support case is open. Until then the demo server runs stock OpenCV 5 in rehearsal mode and says so. The COOL benchmark, the AWS-signed receipt and its verifier are built and run in one command once the subscription is active (`PHASE=cool ./infra/golive.sh`).<!-- /cool:status -->
+- **The test split is not fresh any more.** Each study scored it once, but STUDY-18, 19, 21 and 23 all used the same 199 test frames, and STUDY-23 was started because of a test-split result. Treat the test numbers as checked, not untouched.
+- **The 8 demo frames all come from one test recording (Rec9)** — the one where the one-look promise fell short (74.7% against 78%). They show the product working, not a best case.
+- **No real LLM run recorded yet.** The recorded MCP session (`mcp_session.md`) uses a scripted client; `python -m src.dashboard.llm_session`
+  lets Claude drive DEPTH for real (tested with a stand-in model) and needs an API key to record.
 - **No live link yet** (CloudFront account verification). Codespaces or the five commands run the same studio.
 - **No field proof.** No recording has both real pots and real GPS: the pot frames carry synthetic GPS
   (labelled on screen), and the real-GPS river recordings hold no known pots.

@@ -37,14 +37,27 @@ def test_rows_and_headline(tmp_path):
     assert cool_docs.apply(c, dry=True) == ["docs/technical_report.md", "README.md", "docs/JUDGES.md"]
 
 
-def test_every_document_tells_the_same_cool_story():
-    """One wording of COOL's status: every block says PENDING_STATUS, and no other 'not run' wording is left."""
-    for doc in cool_docs.STATUS_DOCS:
-        text = doc.read_text(encoding="utf-8")
+def _story(texts: dict) -> set:
+    """Every cool:status block of every document must say the same thing, either still pending or ran."""
+    said = set()
+    for name, text in texts.items():
         blocks = cool_docs.status_blocks(text)
-        assert blocks and all(b == cool_docs.PENDING_STATUS for b in blocks), doc.name
+        assert blocks, name
+        for b in blocks:                                # the marker never starts a line (GitHub: raw HTML)
+            assert f"**COOL:** {cool_docs.STATUS_START}{b}" in text, name
         outside = cool_docs.swap_status(text, "")
-        assert "COOL has not run" not in outside and "waiting on a payment method" not in outside, doc.name
+        assert "COOL has not run" not in outside and "waiting on a payment method" not in outside, name
+        said |= set(blocks)
+    return said
+
+
+def test_every_document_tells_the_same_cool_story():
+    """One wording of COOL's status, now and after a COOL run (so golive's pushed docs keep CI green)."""
+    texts = {d.name: d.read_text(encoding="utf-8") for d in cool_docs.STATUS_DOCS}
+    said = _story(texts)
+    assert said == {cool_docs.PENDING_STATUS} or all(s.startswith("ran - ") for s in said)
+    if said == {cool_docs.PENDING_STATUS}:
+        assert cool_docs.PENDING_ROW in texts["technical_report.md"]   # the row apply() fills
 
 
 def test_a_cool_run_replaces_every_status_block(tmp_path):
@@ -52,9 +65,10 @@ def test_a_cool_run_replaces_every_status_block(tmp_path):
         shutil.copy(f, tmp_path)
     _fake_cool(tmp_path, "graviton_stock", "graviton_cool")
     c = cool_docs.collect(tmp_path)
-    for doc in cool_docs.STATUS_DOCS:
-        done = cool_docs.swap_status(doc.read_text(encoding="utf-8"), cool_docs.status_done(c, doc))
-        blocks = cool_docs.status_blocks(done)
-        assert blocks and all(b.startswith("**COOL ran.**") for b in blocks) and cool_docs.PENDING_STATUS not in done
-        if doc.parent.name == "docs":                       # links stay relative to the document
-            assert "](docs/" not in "".join(blocks) and "](reports/cool_benchmark.md)" in blocks[0]
+    done = {d.name: cool_docs.swap_status(d.read_text(encoding="utf-8"), cool_docs.status_done(c, d))
+            for d in cool_docs.STATUS_DOCS}
+    said = _story(done)                                  # the go-live state passes the same story test
+    assert all(s.startswith("ran - ") for s in said) and not any(cool_docs.PENDING_STATUS in t for t in done.values())
+    for name in ("JUDGES.md", "technical_report.md"):    # docs/*.md: links stay relative to the document
+        b = cool_docs.status_blocks(done[name])[0]
+        assert "](docs/" not in b and "](reports/cool_benchmark.md)" in b

@@ -80,6 +80,7 @@ def analyze(sample: Optional[str] = Query(None), nadir: Optional[str] = Query(No
         mode, choice = choose_mode(Goal(compute_s=goal.compute_s), modes[:1], 1, pipe.ms_per_pass())
         choice["why"] = ("the promise does not apply to this frame, so no mode can buy one - the cheapest look "
                          "(standard); a person looks at the whole frame")
+        choice["goal_met"] = recall is None
     if load and load["calls_ahead"]:
         choice["why"] = (f"the detector is busy ({load['calls_ahead']} call(s) ahead, ~{load['wait_s']:.1f} s) -> "
                          f"{load['left_s']:.1f} s of the {load['budget_s']:g}-s answer budget left: " + choice["why"])
@@ -88,7 +89,9 @@ def analyze(sample: Optional[str] = Query(None), nadir: Optional[str] = Query(No
         t_in = time.perf_counter()                                    # waiting for the network ends here
         result = pipe.run_frame(frame, frame_id=frame_id, nadir=nadir, faults=faults, agent=agent)
     payload = S._frame_payload(frame, result, full=images == "full")
-    payload["guarantees"] = pipe.guarantees(agent)
+    # a closer look that failed on this frame falls back to the first look: it carries the standard promise
+    fell_back = bool(result.perception.get("fallback"))
+    payload["guarantees"] = pipe.guarantees(pipe.agent_for("standard") if fell_back else agent)
     payload["applicability"] = chk
     if not applies:
         payload["guarantees"] = S._withdraw_frame_promise(payload["guarantees"], chk)

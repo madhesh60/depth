@@ -54,19 +54,19 @@ const NO_3D = "The 3D view needs WebGL, the browser's 3D graphics, and it is off
   + "works. To see the 3D view, turn on hardware acceleration or open the studio in another browser.";
 function makeTwin(ui, opts) {
   if (Twin.no3d) return null;
+  if (!window.DepthTwin.supported()) { Twin.no3d = NO_3D; console.warn("3D twin: no WebGL"); return null; }
   try {
-    if (!window.DepthTwin.supported()) throw new Error("WebGL is not available");
     return window.DepthTwin.create(ui.canvas, opts);
-  } catch (e) {
-    Twin.no3d = String((e && e.message) || e);
-    console.warn("3D twin unavailable:", Twin.no3d);
+  } catch (e) {                                  // WebGL is there, so this is a bug: say so, and log it
+    Twin.no3d = `The 3D view failed to start (${String((e && e.message) || e)}). Everything else in DEPTH works.`;
+    console.error("3D twin failed:", e);
     return null;
   }
 }
 function showNo3d(ui) {
   ui.wrap.classList.add("no-3d");
   ui.empty.hidden = false;
-  ui.empty.textContent = NO_3D;
+  ui.empty.textContent = Twin.no3d || NO_3D;
 }
 function showFrameTwin() {
   twinReady(() => {

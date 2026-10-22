@@ -235,6 +235,7 @@ function pickFile(file) {
   state.selected = { file };
   $$(".sample-card").forEach(c => c.classList.remove("is-sel"));
   $("#nadirField").hidden = false;              // an upload's sonar edge is the person's to say (never guessed)
+  $("#nadirSel").value = "";                     // a new frame: no answer carried over from the last one
   $("#analyzeBtn").disabled = false;
   $("#analyzeHint").textContent = `Uploaded ${file.name}. Pick where the sonar is (above), so range and shadow can be measured; then run.`;
 }

@@ -1,7 +1,8 @@
 """cool_docs.py — COOL's status in the docs: one sentence while it is pending, the measured numbers once it ran.
 
 **One COOL story.** :data:`PENDING_STATUS` is the only wording of COOL's status. Every document that states it
-(:data:`STATUS_DOCS`) holds it between ``<!-- cool:status -->`` and ``<!-- /cool:status -->``;
+(:data:`STATUS_DOCS`) holds it as ``**COOL:** <!-- cool:status -->…<!-- /cool:status -->`` - the marker never starts
+the line, or GitHub would show the line as raw HTML;
 ``tests/test_cool_docs.py`` checks that every block says exactly this and that no other "COOL has not run"
 wording is left beside them.
 
@@ -29,7 +30,7 @@ PENDING_TARGET = "Graviton COOL pending. |"
 README_START, README_END = "<!-- cool:readme -->", "<!-- /cool:readme -->"
 STATUS_START, STATUS_END = "<!-- cool:status -->", "<!-- /cool:status -->"
 STATUS_DOCS = (README, JUDGES, REPORT)
-PENDING_STATUS = ("**COOL has not run yet.** The AWS Marketplace subscription to the COOL AMI is blocked on payment: "
+PENDING_STATUS = ("has not run yet. The AWS Marketplace subscription to the COOL AMI is blocked on payment: "
                   "the Marketplace does not accept the account's card (it needs a Visa or Mastercard), and an AWS "
                   "Support case is open. Until then the demo server runs stock OpenCV 5 in rehearsal mode and says "
                   "so. The COOL benchmark, the AWS-signed receipt and its verifier are built and run in one command "
@@ -124,7 +125,7 @@ def status_done(c: dict, doc: Path) -> str:
     h = headline(c)
     if doc.parent != ROOT:                                     # docs/*.md link to reports/ beside them
         h = h.replace("](docs/", "](")
-    return f"**COOL ran.** {h}"
+    return f"ran - {h}"
 
 
 def apply(c: dict, dry: bool = False) -> list[str]:

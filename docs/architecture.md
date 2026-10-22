@@ -151,8 +151,8 @@ The survey is run by an agent with a goal, not by a fixed pipeline (`SurveyAgent
    **full review** (`full_review` approval request). One frame analysed on its own (Analyze, MCP
    `analyze_frame`) has no share to bound: `Reference.check_frame` withdraws its promise only when it is more
    unusual than every calibration frame (conformal p at its floor, 1 / 164), and marks a caution when it is
-   merely unusual (p ≤ 0.05) — added 2026-10-22, checked on the 8 demo frames (all keep it) and on non-sonar
-   pictures (all lose it), not on a registered split;
+   merely unusual (p ≤ 0.05) — added 2026-10-22, checked on the 8 demo frames (all keep it), colour pictures and
+   screenshots (they lose it) and grey noise (only a caution), not on a registered split;
 3. **choose how hard to look** (`choose_mode`) — the calibrated modes are `standard` (`tiers`) and
    `look_harder` (`modes.look_harder`, STUDY-18). With a recall goal: the cheapest mode that keeps it
    within the compute budget; without one: the strongest promise the compute budget allows (the studio's

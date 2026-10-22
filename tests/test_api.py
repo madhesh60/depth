@@ -82,6 +82,28 @@ def test_analyze_withdraws_the_promise_on_a_picture_that_is_not_sonar():
         assert s["guarantees"]["recall_promise"] and "promise_withdrawn" not in s["guarantees"]
 
 
+def test_a_failed_closer_look_carries_the_standard_promise():
+    """The tile pass failed -> first look only: the frame (and its cards) carry the standard promise, not 84%."""
+    if not (_HAVE_MODEL and _HAVE_SAMPLES):
+        print("  skip  test_a_failed_closer_look_carries_the_standard_promise (model/samples absent)")
+        return
+    sid = samples_mod.list_samples()[0]["id"]
+    b = client.post(f"/api/analyze?sample={sid}&compute_s=60&simulate=tool_failed").json()
+    assert b["agent_choice"]["mode"]["name"] == "look_harder" and b["perception"].get("fallback")
+    std = client.get("/api/health").json()["calibration"]["guarantees"]["recall_promise"]
+    assert b["guarantees"]["recall_promise"] == std < b["agent_choice"]["mode"]["promise"]
+
+
+def test_a_withdrawn_promise_never_meets_a_recall_goal():
+    if not _HAVE_MODEL:
+        return
+    import cv2
+    from test_applicability import not_sonar
+    ok, buf = cv2.imencode(".jpg", not_sonar())
+    b = client.post("/api/analyze?compute_s=60&recall=0.78", files={"file": ("c.jpg", buf.tobytes(), "image/jpeg")}).json()
+    assert b["agent_choice"]["promise_applies"] is False and b["agent_choice"]["goal_met"] is False
+
+
 def test_survey_frame_limit(monkeypatch):
     import src.dashboard.service as service_mod
     monkeypatch.setattr(service_mod, "MAX_FRAMES", 2)
