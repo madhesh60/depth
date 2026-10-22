@@ -6,29 +6,29 @@ Same detections in both arms — both run the detector through `cv2.dnn`. DETECT
 
 ## Active vision OFF (the default)
 
-27 hazards.
+18 hazards.
 
 | downstream | Detector only | + Stage 1 + OpenCV evidence | |
 |---|---|---|---|
 | Decision (agent action) | tier from the detector | same tier (active vision off) | with active vision off the evidence is shown to people but does not change the action |
-| Priority (top 10 of the queue) | H009, H013, H019, H010, H001 | H009, H013, H019, H010, H001 | 0 of 10 differ; Kendall τ 1.0 |
-| Geolocation | slant range, frame-centre ping | Stage-1 ground range, own ping | median shift 6.5 m; 17 of 27 pins leave their own error circle |
-| Re-survey route | 6 pass(es), 15.5 boat-min | 6 pass(es), 15.4 boat-min | 4 identical pass(es); ranked by p(1-p) with vs p(1-p) without |
-| Human approval | 15 inspection stop(s), 6 pass request(s), 0 conflicts | 15 inspection stop(s), 6 pass request(s), 0 conflict(s) flagged | every action still waits for a named person in both arms |
+| Priority (top 10 of the queue) | H007, H009, H014, H008, H001 | H007, H009, H014, H008, H001 | 0 of 10 differ; Kendall τ 1.0 |
+| Geolocation | slant range, frame-centre ping | Stage-1 ground range, own ping | median shift 7.0 m; 12 of 18 pins leave their own error circle |
+| Re-survey route | 5 pass(es), 13.7 boat-min | 6 pass(es), 15.4 boat-min | 4 identical pass(es); ranked by p(1-p) with vs p(1-p) without |
+| Human approval | 15 inspection stop(s), 5 pass request(s), 0 conflicts | 15 inspection stop(s), 6 pass request(s), 0 conflict(s) flagged | every action still waits for a named person in both arms |
 
 OpenCV tools per candidate: shadow check run 31 / skipped 0; zoom re-look run 0 / skipped 31 (skipped = value of information 0).
 
 ## Active vision EXPERIMENTAL (switched on; not validated)
 
-27 hazards.
+18 hazards.
 
 | downstream | Detector only | + Stage 1 + OpenCV evidence | |
 |---|---|---|---|
-| Decision (agent action) | 8 accept | 3 accept | 7 of 27 hazards change action |
-| Priority (top 10 of the queue) | H009, H014, H010, H019, H001 | H009, H014, H010, H019, H001 | 0 of 10 differ; Kendall τ 0.977 |
-| Geolocation | slant range, frame-centre ping | Stage-1 ground range, own ping | median shift 6.5 m; 17 of 27 pins leave their own error circle |
-| Re-survey route | 6 pass(es), 15.5 boat-min | 1 pass(es), 3.3 boat-min | 0 identical pass(es); ranked by bits with vs p(1-p) without |
-| Human approval | 15 inspection stop(s), 6 pass request(s), 0 conflicts | 15 inspection stop(s), 1 pass request(s), 7 conflict(s) flagged | every action still waits for a named person in both arms |
+| Decision (agent action) | 8 accept | 3 accept | 7 of 18 hazards change action |
+| Priority (top 10 of the queue) | H007, H010, H008, H014, H001 | H007, H010, H008, H014, H001 | 0 of 10 differ; Kendall τ 0.961 |
+| Geolocation | slant range, frame-centre ping | Stage-1 ground range, own ping | median shift 7.0 m; 12 of 18 pins leave their own error circle |
+| Re-survey route | 5 pass(es), 13.7 boat-min | 1 pass(es), 3.3 boat-min | 0 identical pass(es); ranked by bits with vs p(1-p) without |
+| Human approval | 15 inspection stop(s), 5 pass request(s), 0 conflicts | 15 inspection stop(s), 1 pass request(s), 7 conflict(s) flagged | every action still waits for a named person in both arms |
 
 Example **H001** (`Rec9_wcp_ss_port_00010`, conf 0.567): the detector alone says ACCEPT (P 0.63) but the shadow check says REVIEW (P 0.57) → ACCEPT → REVIEW, opposite-side pass requested (a person approves it).
 

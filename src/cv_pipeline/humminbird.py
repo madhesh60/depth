@@ -633,9 +633,11 @@ def report(dat: Path) -> str:
          "![a real frame and the real track](../img/raw_recording.jpg)", "",
          f"- {len(frames)} frames (500 pings each, port + starboard) in **{wall:.1f} s** on this laptop — {P['duration_s'] / wall:.0f}× "
          f"faster than the recording.",
-         f"- **{len(res.tracked)} review cards**, 0 auto-confirmed (no precision promise), P(pot) "
-         f"{min(pp):.2f}–{max(pp):.2f}; heights {min(hts):.2f}–{max(hts):.2f} m where a shadow was measured." if pp and hts else
-         f"- **{len(res.tracked)} review cards**, 0 auto-confirmed.",
+         f"- **{len(res.tracked)} review card{'' if len(res.tracked) == 1 else 's'}** (one per object, STUDY-23; "
+         f"{sum(t.boxes for t in res.tracked)} detector boxes), 0 auto-confirmed (no precision promise)"
+         + (f", P(pot) {min(pp):.2f}–{max(pp):.2f}" if pp else "")
+         + (f"; heights {min(hts):.2f}–{max(hts):.2f} m where a shadow was measured" if hts else "; no shadow measured")
+         + ".",
          f"- No crab pots are known in this reach of the Colorado River and there is no ground truth, so every card is "
          f"a **false alarm or an unknown object on out-of-domain water**: **{len(res.tracked) / dur_h:.0f} cards per hour "
          f"of sonar** at the detector floor 0.05 — the review load this model would put on an analyst here "

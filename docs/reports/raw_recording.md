@@ -37,10 +37,10 @@ First-estimate per-chunk values (cm / sample): 1.58, 2.09, 2.1, 2.19, 2.19, 2.19
 
 ![a real frame and the real track](../img/raw_recording.jpg)
 
-- 14 frames (500 pings each, port + starboard) in **4.1 s** on this laptop — 36× faster than the recording.
-- **2 review cards**, 0 auto-confirmed (no precision promise), P(pot) 0.12–0.20; heights 0.11–0.11 m where a shadow was measured.
-- No crab pots are known in this reach of the Colorado River and there is no ground truth, so every card is a **false alarm or an unknown object on out-of-domain water**: **48 cards per hour of sonar** at the detector floor 0.05 — the review load this model would put on an analyst here (2 of 2 fit a 2-minute budget at the assumed 8 s per card).
-- Every pin is placed from its **own ping's GPS fix and heading** plus the measured ground range; error radius = 3 m GPS (assumed) + range × (scale uncertainty + sin 6°): 7.9–8.0 m here.
+- 14 frames (500 pings each, port + starboard) in **2.9 s** on this laptop — 51× faster than the recording.
+- **1 review card** (one per object, STUDY-23; 2 detector boxes), 0 auto-confirmed (no precision promise), P(pot) 0.20–0.20; no shadow measured.
+- No crab pots are known in this reach of the Colorado River and there is no ground truth, so every card is a **false alarm or an unknown object on out-of-domain water**: **24 cards per hour of sonar** at the detector floor 0.05 — the review load this model would put on an analyst here (1 of 1 fit a 2-minute budget at the assumed 8 s per card).
+- Every pin is placed from its **own ping's GPS fix and heading** plus the measured ground range; error radius = 3 m GPS (assumed) + range × (scale uncertainty + sin 6°): 8.0–8.0 m here.
 
 ## Limits
 

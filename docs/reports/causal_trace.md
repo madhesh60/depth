@@ -6,7 +6,7 @@ One survey, three runs. **full** = the product; **no_stage1** = Stage-1 geometry
 
 Caveats: the track is a synthetic demo (one recording = one line; recordings on parallel lines 500 m apart) and metres use the demo range scale (0.05 m/px) — shifts scale with it, the error circles (≥ 3 m, 25% of ground range) mostly do too. Frame sets are small; this measures *whether and where* OpenCV output drives the plan, not accuracy.
 
-## shipped samples — 8 frames, 27 hazards
+## shipped samples — 8 frames, 18 hazards
 
 | downstream decision | full vs **no_stage1** | full vs **no_shadow** |
 |---|---|---|
@@ -15,13 +15,13 @@ Caveats: the track is a synthetic demo (one recording = one line; recordings on 
 | analyst-budget picks changed | 0 | 0 |
 | inspection route: stops in a different position | 8 (409.8 → 430.1 m) | 0 (409.8 → 409.8 m) |
 | repeat-sighting merges | 0 → 0 | 0 → 0 |
-| re-survey passes (identical target sets) | 6 → 6 (4 identical); boat 15.4 → 15.5 min | 6 → 6 (6 identical); boat 15.4 → 15.4 min |
-| geotag shift (median / p90 / max, m) | 6.5 / 14.6 / 15.6 | 0.0 / 0.0 / 0.0 |
-| hazards pushed outside their own stated error circle | 17 of 27 | 0 of 27 |
+| re-survey passes (identical target sets) | 6 → 5 (4 identical); boat 15.4 → 13.7 min | 6 → 6 (6 identical); boat 15.4 → 15.4 min |
+| geotag shift (median / p90 / max, m) | 7.5 / 14.7 / 15.6 | 0.0 / 0.0 / 0.0 |
+| hazards pushed outside their own stated error circle | 12 of 18 | 0 of 18 |
 | water-column flags | 0 → 0 | 0 → 0 |
-| hazards with a relative height | 7 → 7 | 7 → 0 |
+| hazards with a relative height | 4 → 4 | 4 → 0 |
 
-## 03_yolo_ready_dataset_v2b / test (unique crab-pot frames) — 80 frames, 223 hazards
+## 03_yolo_ready_dataset_v2b / test (unique crab-pot frames) — 80 frames, 143 hazards
 
 | downstream decision | full vs **no_stage1** | full vs **no_shadow** |
 |---|---|---|
@@ -30,22 +30,22 @@ Caveats: the track is a synthetic demo (one recording = one line; recordings on 
 | analyst-budget picks changed | 0 | 0 |
 | inspection route: stops in a different position | 4 (2747.0 → 2746.6 m) | 0 (2747.0 → 2747.0 m) |
 | repeat-sighting merges | 0 → 1 | 0 → 0 |
-| re-survey passes (identical target sets) | 40 → 41 (36 identical); boat 103.9 → 103.5 min | 40 → 40 (40 identical); boat 103.9 → 103.9 min |
+| re-survey passes (identical target sets) | 39 → 40 (35 identical); boat 103.3 → 103.1 min | 39 → 39 (39 identical); boat 103.3 → 103.3 min |
 | geotag shift (median / p90 / max, m) | 9.1 / 15.0 / 15.7 | 0.0 / 0.0 / 0.0 |
-| hazards pushed outside their own stated error circle | 151 of 222 | 0 of 223 |
+| hazards pushed outside their own stated error circle | 95 of 142 | 0 of 143 |
 | water-column flags | 0 → 0 | 0 → 0 |
-| hazards with a relative height | 100 → 100 | 100 → 0 |
+| hazards with a relative height | 58 → 58 | 58 → 0 |
 
 ## One hazard, end to end — the trace
 
-**H009** (ghost_gear) in `Rec9_wcp_ss_port_00012`, box [497, 242, 524, 266]:
+**H007** (ghost_gear) in `Rec9_wcp_ss_port_00012`, box [497, 242, 524, 266]:
 
 | step | OpenCV 5 output | → decision / action |
 |---|---|---|
 | Stage 1 | bottom track: sonar altitude **29.4 px**; object on ping 510.5, slant → ground range **252.4 px** | geotag [37.802012, -76.149226] ± 3.2 m |
 | See | `cv2.dnn` YOLO11 confidence 0.708 | tier **REVIEW**, calibrated P(pot) 0.6327 |
 | Prove | thin-line shadow **clear**, relative height h/H 0.178 | evidence on the card (never a gate) |
-| Decide | P(pot) ordering | queue rank 1 of 27; in the analyst budget: yes |
+| Decide | P(pot) ordering | queue rank 1 of 18; in the analyst budget: yes |
 | Act | its position + P(pot) | inspection stop 11; re-survey pass **RS3** (heading 20.0°) — its shadow must flip 290.0° → 110.0° |
 | **without Stage 1** | slant range, frame-centre ping | geotag moves **9.5 m** (± 3.2 m); inspection stop 10; re-survey pass RS3 |
 
@@ -62,7 +62,7 @@ Its logged tool calls:
 
 ## Reading
 
-**shipped samples:** withholding Stage 1 flips 0 tiers (it never gates) but moves the median hazard by 6.5 m (max 15.6 m), reorders 8 inspection stops, and leaves 4 of 6 re-survey passes unchanged — 17 of 27 pins would land outside their own stated error circle; withholding the shadow changes 0 tiers, 0 budget picks and 0 route stops — none, as designed (evidence for the human, never a gate). **03_yolo_ready_dataset_v2b / test (unique crab-pot frames):** withholding Stage 1 flips 0 tiers (it never gates) but moves the median hazard by 9.1 m (max 15.7 m), reorders 4 inspection stops, and leaves 36 of 40 re-survey passes unchanged — 151 of 222 pins would land outside their own stated error circle; withholding the shadow changes 0 tiers, 0 budget picks and 0 route stops — none, as designed (evidence for the human, never a gate).
+**shipped samples:** withholding Stage 1 flips 0 tiers (it never gates) but moves the median hazard by 7.5 m (max 15.6 m), reorders 8 inspection stops, and leaves 4 of 6 re-survey passes unchanged — 12 of 18 pins would land outside their own stated error circle; withholding the shadow changes 0 tiers, 0 budget picks and 0 route stops — none, as designed (evidence for the human, never a gate). **03_yolo_ready_dataset_v2b / test (unique crab-pot frames):** withholding Stage 1 flips 0 tiers (it never gates) but moves the median hazard by 9.1 m (max 15.7 m), reorders 4 inspection stops, and leaves 35 of 39 re-survey passes unchanged — 95 of 142 pins would land outside their own stated error circle; withholding the shadow changes 0 tiers, 0 budget picks and 0 route stops — none, as designed (evidence for the human, never a gate).
 
 ---
 _Regenerated by the script; do not edit by hand._
