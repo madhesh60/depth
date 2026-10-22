@@ -3,7 +3,8 @@ ui_smoke.py — the studio in a real headless Chrome: every mode driven, every J
 
 Starts the server on a free local port (fresh approvals log), opens the studio in headless Chrome over the
 DevTools protocol and drives it: boot → the Terms glossary → Analyze a sample → a Survey → the Agent tab → Connect → Study →
-Audit → the 3D twin → the guided demo. It records every JS exception, console error and failed or 4xx/5xx
+Audit → the 3D twin (or, without WebGL, its plain message) → an upload with its sonar edge set → a picture that is not
+sonar (the promise withdrawn) → the guided demo. It records every JS exception, console error and failed or 4xx/5xx
 request, and exits 1 if there was any. Needs the model (``python -m src.detection.fetch_model``), Chrome or
 Chromium (``$CHROME`` or on the usual paths) and ``websockets`` (requirements-dev.txt). Not collected by
 pytest (it takes ~2 min and a browser); run it by hand:
@@ -57,7 +58,31 @@ STEPS = [
       for m in ("connect", "study", "audit")],
     ("twin", "(async () => { setMode('analyze'); await new Promise(r => setTimeout(r, 400)); "
              "const b = document.querySelector('.dim-btn[data-dim=\"3d\"]'); if (b) b.click(); "
-             "await new Promise(r => setTimeout(r, 2500)); return {canvas: document.querySelectorAll('canvas').length}; })()"),
+             "await new Promise(r => setTimeout(r, 2500)); const e = document.querySelector('#twinFrameWrap .twin-empty'); "
+             "const back = document.querySelector('.dim-btn[data-dim=\"2d\"]'); if (back) back.click(); "
+             "return {canvas: document.querySelectorAll('.twin-canvas canvas').length, "
+             "no_webgl: !!(e && !e.hidden && /WebGL/.test(e.textContent))}; })()"),
+    # an upload: the person says where the sonar is (never guessed) -> range and shadow are measured
+    ("upload", "(async () => { const blob = await (await fetch('/samples/Rec9_wcp_ss_port_00011.jpg')).blob(); "
+               "pickFile(new File([blob], 'my_upload.jpg', {type: 'image/jpeg'})); "
+               "const shown = !document.querySelector('#nadirField').hidden; document.querySelector('#nadirSel').value = 'top'; "
+               "await runAnalyze(); await new Promise(r => setTimeout(r, 600)); const a = state._analyze || {}; "
+               "return {picker_shown: shown, nadir_source: (a.orientation || {}).source || null, "
+               "seabed: !!(a.stage1 || {}).measured, cards: document.querySelectorAll('.ev-card').length}; })()"),
+    # a picture that is not sonar: the promise is withdrawn for it, and every card says so
+    ("not_sonar", "(async () => { const c = document.createElement('canvas'); c.width = 640; c.height = 480; "
+                  "const g = c.getContext('2d'); g.fillStyle = '#5a96c8'; g.fillRect(0, 0, 640, 480); "
+                  "['#e33', '#3c3', '#fc0', '#c3f'].forEach((col, i) => { g.fillStyle = col; g.beginPath(); "
+                  "g.arc(120 + 130 * i, 160 + 60 * (i % 2), 50, 0, 7); g.fill(); }); g.fillStyle = '#fff'; "
+                  "g.font = 'bold 90px sans-serif'; g.fillText('HELLO', 160, 380); "
+                  "const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.9)); "
+                  "pickFile(new File([blob], 'cartoon.jpg', {type: 'image/jpeg'})); document.querySelector('#nadirSel').value = ''; "
+                  "await runAnalyze(); await new Promise(r => setTimeout(r, 600)); const a = state._analyze || {}; "
+                  "const t = [...document.querySelectorAll('.ev-tier')].map(x => x.textContent); "
+                  "return {promise_applies: (a.agent_choice || {}).promise_applies, "
+                  "recall_promise: (a.guarantees || {}).recall_promise ?? null, "
+                  "line: (document.querySelector('#framePerception') || {}).textContent || '', cards: t.length, "
+                  "cards_say_no_promise: t.every(x => x.startsWith('No promise'))}; })()"),
     ("demo", "(async () => { document.querySelector('#demoBtn').click(); await new Promise(r => setTimeout(r, 6000)); "
              "const on = Demo.on; Demo.stop(); return {started: on}; })()"),
 ]
@@ -69,8 +94,11 @@ FULL_DEMO = ("demo", "(async () => { document.querySelector('#demoBtn').click();
 EXPECT = {"boot": lambda v: v["samples"] > 0, "terms": lambda v: v["terms"] >= 8, "analyze": lambda v: v["cards"] > 0, "survey": lambda v: v["hazards"] > 0,
           "agent_tab": lambda v: v["clicked"], "connect": lambda v: v["mode"] == "connect",
           "study": lambda v: v["mode"] == "study", "audit": lambda v: v["mode"] == "audit",
-          "twin": lambda v: v["canvas"] > 0, "demo": lambda v: v["started"] and v.get("finished", True)
-          and v.get("step", "7/7") == "7/7"}
+          "twin": lambda v: v["canvas"] > 0 or v["no_webgl"],        # no WebGL here: the plain message, no crash
+          "upload": lambda v: v["picker_shown"] and v["nadir_source"] == "user" and v["seabed"] and v["cards"] > 0,
+          "not_sonar": lambda v: v["promise_applies"] is False and v["recall_promise"] is None
+          and "no promise for this frame" in v["line"] and v["cards_say_no_promise"],
+          "demo": lambda v: v["started"] and v.get("finished", True) and v.get("step", "7/7") == "7/7"}
 
 
 def _free_port() -> int:
