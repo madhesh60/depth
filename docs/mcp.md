@@ -88,6 +88,11 @@ A recorded run of exactly this chain on the real server (Streamable HTTP, a scri
 for an LLM agent, a person approving with the PIN): [`reports/mcp_session.md`](reports/mcp_session.md) —
 regenerate it with `python -m src.dashboard.mcp_session`.
 
+**A real model in the loop:** `python -m src.dashboard.llm_session` hands the same tools to Claude (the Claude API, or
+`--bedrock` for Amazon Bedrock; `pip install anthropic`). The model chooses every call itself, a person approves with
+the PIN, and the model reads the outcome back; the run is written to `docs/reports/llm_session.md`. The loop is
+tested with a stand-in model (`tests/test_llm_session.py`); a run with a real model needs the owner's API key.
+
 ## Security
 
 | setting | effect |

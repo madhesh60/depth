@@ -126,7 +126,8 @@ Per find ─► next OpenCV tool = the cheapest one whose result could CHANGE th
 
 It never dispatches; MCP and API clients can only ask. A recorded session on the real server shows the whole
 chain — an external agent runs a survey over MCP, asks, its own attempt to approve is refused, a person
-approves, the agent reads the work order back: [`mcp_session.md`](docs/reports/mcp_session.md).
+approves, the agent reads the work order back: [`mcp_session.md`](docs/reports/mcp_session.md). With a real model
+choosing every call: `python -m src.dashboard.llm_session` (Claude API or `--bedrock`; [`docs/mcp.md`](docs/mcp.md)).
 
 **Every agent decision that is on by default was validated before it was switched on** (protocol committed
 before the unseen data was scored):

@@ -138,6 +138,7 @@ python -m ruff check .                                 # lint (config: pyproject
 python -m mypy                                         # type check the decision core (files: pyproject.toml)
 python -m src.detection.fetch_model                    # detector weights (SHA-256 checked)
 python -m src.dashboard.mcp_server                     # MCP over stdio
+python -m src.dashboard.llm_session [--bedrock]        # a real Claude drives DEPTH over MCP (needs a key)
 
 # Detector, agent, people
 python -m src.detection.evaluate                       # eval [--model M --test-split S]
@@ -180,7 +181,7 @@ src/agentic/      core (the loop) · applicability · study_applicability · stu
                   sensor_check · study_sensor · types
 src/bench/        product_bench · fingerprint · compare · cool_attest · verify_cool · cool_docs · load_test
 src/dashboard/    app (FastAPI + wiring) · service (state, survey run) · routes/ (system · analyze · survey · people ·
-                  approvals · connect) · detector_queue · jobs · metrics · samples · mcp_server · mcp_session · ogc ·
+                  approvals · connect) · detector_queue · jobs · metrics · samples · mcp_server · mcp_session · llm_session · ogc ·
                   integrations · ratelimit · origin_guard
 webui/            zero-build vanilla studio (index.html, js/ — 11 classic scripts in load order, styles.css,
                   twin3d.js) · embed/ · samples/ ·
