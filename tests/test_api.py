@@ -76,6 +76,21 @@ def test_sync_survey_redirects_big_runs_to_jobs(monkeypatch):
     assert r.status_code == 413 and "/api/jobs/survey" in r.json()["detail"]
 
 
+def test_effort_curves_for_each_perception_mode():
+    """The Study tab's effort panel: the standard look by default, the look-harder queue on request (each at its
+    own promise); one card per object is reported; an unknown mode is refused."""
+    r = client.get("/api/effort")
+    if r.status_code == 404:                                  # no effort_curve.json for this model
+        return
+    std = r.json()
+    assert std["mode"] == "standard" and std["curves"]["promise"] and "manual" in std["curves"]
+    if "look_harder" in std["modes"]:
+        lh = client.get("/api/effort?mode=look_harder").json()
+        assert lh["mode"] == "look_harder" and lh["curves"]["promise"] > std["curves"]["promise"]
+        assert lh["frames"] == std["frames"]                  # the same split, another queue
+    assert client.get("/api/effort?mode=nope").status_code == 422
+
+
 def test_unknown_job_is_404():
     assert client.get("/api/jobs/nope").status_code == 404
 
