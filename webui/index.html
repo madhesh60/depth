@@ -108,8 +108,8 @@
         </label>
         <details class="opts">
           <summary>Options</summary>
-          <label class="field" title="Wall-clock budget for perception on this survey. The agent prices each mode with its measured pace and re-plans mid-run if it would overrun. Empty = no limit."><span>Compute budget (seconds)</span>
-            <input type="number" id="goalCompute" min="1" max="3600" step="1" placeholder="no limit" />
+          <label class="field" title="Wall-clock budget for perception on this survey (20 s by default, so a first survey stays quick on a small machine). The agent prices each mode with its measured pace, keeps the strongest promise that fits, and re-plans mid-run if it would overrun. Empty = no limit (the closer look whenever no recall goal is set)."><span>Compute budget (seconds)</span>
+            <input type="number" id="goalCompute" min="1" max="3600" step="1" value="20" placeholder="no limit" />
           </label>
           <label class="field"><span>Analyst budget (minutes)</span>
             <input type="number" id="budgetMin" min="1" max="600" step="1" value="2" />
