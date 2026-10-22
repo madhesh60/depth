@@ -17,6 +17,9 @@
 #                                                                     #   Support to verify it): the origin stays
 #                                                                     #   closed; the checks run on the box over SSM
 #   ENABLE_CDN=1 APPLY=1 ./infra/deploy.sh                            # add CloudFront later (same server)
+#   PUBLIC_HTTPS=1 APPLY=1 ./infra/deploy.sh                          # no CloudFront yet: HTTPS on the Elastic IP
+#                                                                     #   (Caddy + Let's Encrypt, <ip>.sslip.io;
+#                                                                     #   443 opens, 8000 stays closed)
 # Code updates on the running server: ./infra/update_server.sh (SSM, no SSH, no replacement).
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -27,6 +30,7 @@ SECRET_PARAM="${SECRET_PARAM:-/depth/$STACK/origin-secret}"
 COOL_CODE="${COOL_PRODUCT_CODE:-aajkmdd4qo3r7yhqg61a7aah9}"     # Cloud Optimized OpenCV for AWS Graviton4
 TEMPLATE=infra/cfn/depth.yaml
 case "${ENABLE_CDN:-}" in 0) CDN=false ;; 1|"") CDN=true ;; *) die "ENABLE_CDN must be 0 or 1" ;; esac
+case "${PUBLIC_HTTPS:-}" in 0) HTTPS=false ;; 1) HTTPS=true ;; "") HTTPS="" ;; *) die "PUBLIC_HTTPS must be 0 or 1" ;; esac
 
 # resolve_ami: sets AMI REH ROOTDEV ROOT_GIB (+ checks arm64, the COOL product code and the subscription)
 resolve_ami() {
@@ -114,7 +118,8 @@ if [ "$STATUS" = NONE ] || [ "$STATUS" = REVIEW_IN_PROGRESS ]; then
 
   PARAMS=(CoolAmiId="$AMI" Rehearsal="$REH" InstanceType="$INSTANCE_TYPE" RootDeviceName="$ROOTDEV"
           RootVolumeGiB="$ROOT_GIB" GitRef="$GIT_REF" VpcId="$VPC" SubnetId="$SUBNET" CloudFrontPrefixListId="$PL"
-          OriginSecretParam="$SECRET_PARAM" AlertEmail="$ALERT_EMAIL" StopAt="$STOP_AT" EnableCdn="$CDN")
+          OriginSecretParam="$SECRET_PARAM" AlertEmail="$ALERT_EMAIL" StopAt="$STOP_AT" EnableCdn="$CDN"
+          PublicHttps="${HTTPS:-false}")
 else
   # update: only what you set changes; every other parameter keeps its value (no accidental replacement)
   if [ -n "${REHEARSAL:-}" ] || [ -n "${COOL_AMI_ID:-}" ]; then
@@ -130,6 +135,7 @@ else
   [ -n "${STOP_AT:-}" ] && PARAMS+=(StopAt="$STOP_AT")
   [ -n "${ALERT_EMAIL:-}" ] && PARAMS+=(AlertEmail="$ALERT_EMAIL")
   [ -n "${ENABLE_CDN:-}" ] && PARAMS+=(EnableCdn="$CDN")
+  [ -n "${HTTPS:-}" ] && PARAMS+=(PublicHttps="$HTTPS")
 fi
 
 say "template"
@@ -158,6 +164,29 @@ say "deploying (the instance signals only once DEPTH serves; ~15-25 min)"
 URL=$(stack_output "$STACK" Url)                  # empty while CloudFront is off
 IID=$(stack_output "$STACK" InstanceId)
 echo "instance $IID · dashboard: $(stack_output "$STACK" DashboardUrl)"
+HTTPS_URL=$(stack_output "$STACK" HttpsUrl)       # PublicHttps=true: Caddy on the Elastic IP
+if { [ -z "$URL" ] || [ "$URL" = None ]; } && [ -n "$HTTPS_URL" ] && [ "$HTTPS_URL" != None ]; then
+  HOST="${HTTPS_URL#https://}"
+  say "HTTPS on the Elastic IP without CloudFront: Caddy + Let's Encrypt for $HOST"
+  # Ubuntu's own caddy package first, Caddy's signed apt repository as the fallback; Caddy gets the certificate
+  # itself (TLS-ALPN on 443) and proxies to the app on loopback, flushing at once (MCP streams)
+  SSM_COMMENT="DEPTH HTTPS (Caddy)" ssm_run "$IID" "set -e
+export DEBIAN_FRONTEND=noninteractive
+if ! command -v caddy >/dev/null; then
+  apt-get -o DPkg::Lock::Timeout=300 update -y >/dev/null
+  apt-get -o DPkg::Lock::Timeout=300 install -y caddy >/dev/null 2>&1 || {
+    curl -1sLf https://dl.cloudsmith.io/public/caddy/stable/gpg.key | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+    curl -1sLf https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt > /etc/apt/sources.list.d/caddy-stable.list
+    apt-get -o DPkg::Lock::Timeout=300 update -y >/dev/null; apt-get -o DPkg::Lock::Timeout=300 install -y caddy >/dev/null; }
+fi
+printf '%s {\n\treverse_proxy 127.0.0.1:8000 {\n\t\tflush_interval -1\n\t}\n\theader Strict-Transport-Security \"max-age=31536000\"\n}\n' '$HOST' > /etc/caddy/Caddyfile
+caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null
+systemctl enable caddy >/dev/null 2>&1; systemctl restart caddy
+want='DEPTH_PUBLIC_URL=$HTTPS_URL'
+( umask 022; printf '%s\n' \"\$want\" > /etc/depth/public.env ); systemctl restart depth
+echo \"caddy \$(caddy version | cut -d' ' -f1) serving $HOST; DEPTH restarted\""
+  URL="$HTTPS_URL"
+fi
 
 if [ -n "$URL" ] && [ "$URL" != None ]; then
   say "public address -> the server (/etc/depth/public.env: links in webhooks and briefs)"
@@ -165,7 +194,7 @@ if [ -n "$URL" ] && [ "$URL" != None ]; then
 [ \"\$(cat /etc/depth/public.env 2>/dev/null)\" = \"\$want\" ] && echo unchanged && exit 0
 ( umask 022; printf '%s\n' \"\$want\" > /etc/depth/public.env ); systemctl restart depth; echo 'set; DEPTH restarted'"
 
-  say "live check through CloudFront: $URL"
+  say "live check: $URL"
   for i in $(seq 1 60); do
     H=$(curl -fsS "$URL/api/health" 2>/dev/null || true)
     if printf '%s' "$H" | grep -q '"model_loaded":true'; then

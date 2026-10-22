@@ -116,7 +116,7 @@ then `sudo systemctl restart depth` (over SSM).
 
 | concern | how |
 |---|---|
-| network | origin port 8000 open only to CloudFront's origin-facing prefix list; no port 22; egress 443/80 only |
+| network | origin port 8000 open only to CloudFront's origin-facing prefix list; no port 22; egress 443/80 only. `PublicHttps=true` (no CloudFront yet) opens 443 to Caddy and nothing else |
 | origin bypass | CloudFront adds `X-Origin-Verify`; the app refuses requests without it (`origin_guard.py`); the value lives in an SSM parameter, never in the template |
 | access | SSM Session Manager only (no key pair); IMDSv2 required, hop limit 1 |
 | identity | instance role: this bucket, this log group, this stack's signal, one parameter; the fleet role may only write `bench/` |
@@ -162,3 +162,12 @@ Two waits a new account can hit, and how the stack keeps moving through them:
   checks the server on the box over SSM. It saves the receipt to `runs/infra/receipt.json` and verifies it
   from the file. `ENABLE_CDN=1 APPLY=1 ./infra/deploy.sh` adds CloudFront later to the same server, and writes
   the public address to it.
+* **A public link while CloudFront waits** → `PUBLIC_HTTPS=1 APPLY=1 ./infra/deploy.sh` (dry run without
+  `APPLY=1`). The stack opens **443 only** (`PublicHttpsIngress`); over SSM, `deploy.sh` installs Caddy (Ubuntu's
+  package, Caddy's signed apt repository as the fallback), which gets a free Let's Encrypt certificate for
+  `<elastic-ip>.sslip.io` (a DNS name that resolves to the address in it) and proxies to the app on loopback,
+  flushing at once for MCP streams. The app's tokens, the approver PIN with its lockout and the per-client rate
+  limits (Caddy sets `X-Forwarded-For`) still apply; port 8000 stays closed. The address is written to the server
+  (`DEPTH_PUBLIC_URL`) and checked like the CloudFront one. Once CloudFront is verified:
+  `PUBLIC_HTTPS=0 ENABLE_CDN=1 APPLY=1 ./infra/deploy.sh` closes 443 and moves the link to CloudFront.
+  Trade-offs, stated: no edge cache and no CloudFront security headers (Caddy adds HSTS); one public port.

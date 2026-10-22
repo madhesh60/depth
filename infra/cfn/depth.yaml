@@ -17,14 +17,15 @@ Metadata:
       this stack) plus the scheduled stop.
     must:
       - The instance MUST boot the COOL Marketplace AMI; the receipt at /api/cool proves it (AWS-signed).
-      - The origin MUST stay reachable only through this distribution (prefix list + X-Origin-Verify).
+      - The origin MUST stay reachable only through this distribution (prefix list + X-Origin-Verify). The one
+        documented exception is PublicHttps=true while CloudFront is unavailable (Caddy on 443, below).
       - No inbound SSH; administration is SSM Session Manager only.
   AWS::CloudFormation::Interface:
     ParameterGroups:
       - Label: {default: COOL server}
         Parameters: [CoolAmiId, InstanceType, RootDeviceName, RootVolumeGiB, GitRef]
       - Label: {default: Network}
-        Parameters: [VpcId, SubnetId, CloudFrontPrefixListId, OriginSecretParam, EnableCdn]
+        Parameters: [VpcId, SubnetId, CloudFrontPrefixListId, OriginSecretParam, EnableCdn, PublicHttps]
       - Label: {default: Operations}
         Parameters: [AlertEmail, StopAt, Rehearsal]
 
@@ -91,10 +92,20 @@ Parameters:
     Description: >-
       false while the account awaits CloudFront verification (new accounts must be verified by AWS Support
       before creating distributions): everything else deploys; the origin stays closed to the internet.
+  PublicHttps:
+    Type: String
+    Default: "false"
+    AllowedValues: ["false", "true"]
+    Description: >-
+      true = a public HTTPS address without CloudFront (while AWS has not verified the account for it): Caddy on
+      the server terminates TLS on 443 for <elastic-ip>.sslip.io with a free Let's Encrypt certificate and proxies
+      to the app on loopback; 443 opens to the internet, 8000 stays closed. deploy.sh sets Caddy up over SSM.
+      Set it back to false when CloudFront is on.
 
 Conditions:
   IsUsEast1: !Equals [!Ref "AWS::Region", us-east-1]
   CdnOn: !Equals [!Ref EnableCdn, "true"]
+  HttpsOn: !Equals [!Ref PublicHttps, "true"]
   EdgeAlarmOn: !And [!Condition IsUsEast1, !Condition CdnOn]
 
 Resources:
@@ -268,7 +279,7 @@ Resources:
       com.aws.cloudformation.Context:
         why: The origin accepts CloudFront's origin-facing ranges on 8000 and nothing else; egress is HTTPS/HTTP only.
         must:
-          - Never add 0.0.0.0/0 ingress or port 22.
+          - Never add 0.0.0.0/0 ingress or port 22 here (PublicHttpsIngress, 443 to Caddy, is the only exception).
     Properties:
       GroupDescription: DEPTH origin - tcp 8000 from CloudFront origin-facing ranges only, no SSH
       VpcId: !Ref VpcId
@@ -283,6 +294,22 @@ Resources:
         - {IpProtocol: tcp, FromPort: 80, ToPort: 80, CidrIp: 0.0.0.0/0, Description: "HTTP out (Ubuntu apt mirrors)"}
       Tags:
         - {Key: project, Value: depth}
+
+  PublicHttpsIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Condition: HttpsOn
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: >-
+          The only internet-facing port while CloudFront is unavailable - Caddy (TLS, Let's Encrypt) in front of the
+          app on loopback. The app's tokens, approver PIN with lockout and per-client rate limits still apply.
+    Properties:
+      GroupId: !Ref WebSecurityGroup
+      IpProtocol: tcp
+      FromPort: 443
+      ToPort: 443
+      CidrIp: 0.0.0.0/0
+      Description: HTTPS to Caddy (PublicHttps=true - no CloudFront yet)
 
   BenchSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -688,6 +715,12 @@ Outputs:
     Condition: CdnOn
     Description: CloudFront distribution
     Value: !Ref Distribution
+  HttpsUrl:
+    Condition: HttpsOn
+    Description: The live demo without CloudFront (Caddy + Let's Encrypt on the Elastic IP's sslip.io name)
+    Value: !Sub
+      - https://${Dashed}.sslip.io
+      - Dashed: !Join ["-", !Split [".", !Ref ElasticIp]]
   InstanceId:
     Description: The COOL server (SSM - aws ssm start-session --target <id>)
     Value: !Ref Instance
