@@ -62,7 +62,7 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
   tiers (≥ 78% one look, ≥ 84% looking harder — both checked for correlated frames), **one review card per
   object** (STUDY-23), survey planning and person-approved actions — on the sample frames and on a raw
   Humminbird recording with real GPS and a per-ping dropout mask. `ruff check .` (with bugbear) and `mypy` (the
-  decision core) are clean, both in CI; the full suite passes (301, 2026-10-22; coverage 60% of `src/`).
+  decision core) are clean, both in CI; the full suite passes (307, 2026-10-22; coverage 60% of `src/`).
 - **Judges can run it:** one click in GitHub Codespaces (`.devcontainer/`), or five commands on a laptop. CI runs
   the codespace's own setup in its image on 2 CPUs and plays the guided demo to its last step
   (`.github/workflows/codespaces.yml`); one real click in a codespace is still the owner's check.
@@ -82,6 +82,52 @@ Current numbers, each with its split: README "At a glance" and
 ---
 
 ## 4. Session log
+
+### 2026-10-22 (sweep 73) — a judge's review: the promise on one frame, the sonar edge for uploads, 3D without WebGL, one COOL story
+
+A judge-style review of the whole project (run in a cloud session: install from a clean clone, the full test
+suite, the UI test, the studio driven by hand) found three bugs a judge could hit and two doc
+inconsistencies. Each was reproduced first, then fixed with a test.
+
+- **A picture that is not sonar got the recall promise.** Uploading a cartoon (coloured circles, "HELLO") to
+  Analyze gave two ghost-gear cards saying "reach at least 84% of pots (95% confidence)": the applicability
+  check (STUDY-19) ran only in surveys. Now `Reference.check_frame` runs on every single frame (Analyze and
+  MCP `analyze_frame`): a frame more unusual than every one of the 163 calibration frames loses the promise
+  (incident `frame_promise_not_applicable`, the cheapest look, every card and the perception line say "no
+  promise for this frame"); a merely unusual frame keeps it with a caution. No new threshold: the floor is
+  1 / (n_cal + 1) from the stored reference. Checked on the 8 demo frames (all keep it) and non-sonar
+  pictures (all lose it), not on a registered split (STUDY-19 addendum in `experiments.md`). The card text
+  also now names the frame's own promise (84% when it looked harder), not always the standard 78%.
+- **An uploaded frame lost range, shadow and height.** The sonar edge comes from a filename rule (never
+  guessed), so one of the shipped samples re-uploaded under another name came back "orientation unknown —
+  shadow and range not measured", with no way to say where the sonar is. The Run box now asks "Where is the
+  sonar in your frame?" for an upload (not for samples) and sends `?nadir=`; the incident's advice points at
+  it. In the UI test the same frame uploaded with "Top edge" gets its seabed tracked and ground range on
+  every card.
+- **The 3D view threw an exception without WebGL** (virtual machines, remote desktops, hardware acceleration
+  off): `THREE.WebGLRenderer` failed uncaught. It now checks for WebGL once and shows a plain message
+  ("everything else in DEPTH works"); it never retries or stacks panels.
+- **Two COOL stories.** The README said COOL waited on "a payment method", `JUDGES.md` on "an AWS Support
+  case". Both were true; now one sentence (`cool_docs.PENDING_STATUS`) sits between `cool:status` markers in
+  the README, `JUDGES.md` and the technical report, a test checks every copy says exactly that, and
+  `cool_docs.py` replaces every copy once COOL has run (before, the README's "Not done" bullet would have
+  stayed stale; a dead replace for a sentence no longer in the README was removed). Shorter mentions
+  (architecture, Lucidchart note, infra README, CLAUDE.md) give the same reason: the Marketplace subscription
+  is blocked on payment.
+- **79% where it read as today's promise** (it is 78% since STUDY-21): a docstring, `applicability.md`
+  (changed by hand to the number its generator now prints from `calibration.json` — the report cannot be
+  regenerated without `DATASET/`), and `experiments.md` rows; the dated EXP-003/004/005 diagnosis reports and
+  the EXP-003 onboarding record keep their numbers and gained a dated status note. History ("Clopper-Pearson
+  alone gave 79%") is unchanged.
+- **Tests:** 306 passed, 1 skipped (307; 6 new); ruff and mypy clean; `tests/ui_smoke.py --full-demo` passes
+  every step, including the new ones (an upload with its sonar edge set, a picture that is not sonar, the 3D
+  step accepting the no-WebGL message). In the cloud session the only browser errors were map tiles blocked by
+  its network proxy.
+- **Not done here:** the public link. The cloud session's AWS credentials were rejected
+  (`InvalidClientTokenId`), so the owner runs it from the laptop after `aws login --profile hackathon`:
+  `APPLY=1 ./infra/update_server.sh` (the server moves to the pushed commit), then
+  `PUBLIC_HTTPS=1 APPLY=1 ./infra/deploy.sh` (443 opens; Caddy + Let's Encrypt on `<elastic-ip>.sslip.io`).
+  COOL is still blocked on payment.
 
 ### 2026-10-22 (sweep 72) — the round-3 audit's bugs, fixed with tests; the Codespaces path tested in CI
 
