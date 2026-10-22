@@ -15,7 +15,7 @@ const Appr = {
       $("#apprList").innerHTML = list.slice(0, 30).map(q => `<div class="appr" data-id="${escapeHtml(q.id)}">
         <div class="appr-top"><span class="act">${escapeHtml(q.action)}</span><span>${escapeHtml(q.targets.slice(0, 6).join(", "))}${q.targets.length > 6 ? " …" : ""}</span><span class="st ${q.status}">${q.status}</span></div>
         <div class="appr-why">${escapeHtml(q.rationale)}</div>
-        <div class="appr-meta">${escapeHtml(q.id)} · asked by ${escapeHtml(q.requested_by)} via ${escapeHtml(q.channel)} · ${new Date(q.t * 1000).toLocaleString()}${q.decision ? ` · ${q.status} by <b>${escapeHtml(q.decision.by)}</b>` : ""}${q.status === "approved" ? " · signed work order sent to consoles (DEPTH never dispatches)" : ""}</div>
+        <div class="appr-meta">${escapeHtml(q.id)} · asked by ${escapeHtml(q.requested_by)} via ${escapeHtml(q.channel)} · ${new Date(q.t * 1000).toLocaleString()}${q.decision ? ` · ${q.status} by <b>${escapeHtml(q.decision.by)}</b>${q.decision.note ? `: ${escapeHtml(q.decision.note)}` : ""}` : ""}${q.status === "approved" ? " · signed work order sent to consoles (DEPTH never dispatches)" : ""}</div>
         ${q.status === "pending" ? `<div class="appr-btns"><button class="ok" data-d="approved">Approve</button><button class="no" data-d="declined">Decline</button></div>` : ""}
       </div>`).join("");
       $$("#apprList .appr-btns button").forEach(b => b.onclick = () => this.decide(b.closest(".appr").dataset.id, b.dataset.d));

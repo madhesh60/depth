@@ -1,13 +1,16 @@
 """
-Tests for the approval gate under concurrency (src/agentic/approvals.py, the two decide routes,
+Tests for the approval gate under concurrency and restarts (src/agentic/approvals.py, the two decide routes,
 service._withdraw_orphans). A request is decided once: two people deciding it at the same moment get one 200
 and one 409 that names who decided first, never two OKs with one decision silently lost (judge audit
-2026-10-22, B1). The first decision stands on replay. No model needed: the plans are synthetic.
+2026-10-22, B1). The first decision stands on replay. The agent's requests whose survey left memory (a
+restart, the bounded survey memory) are withdrawn with the reason (B3); a console's own requests stay open.
+No model needed: the plans are synthetic.
 """
 from __future__ import annotations
 
 import json
 import threading
+from collections import OrderedDict
 
 import pytest
 from fastapi.testclient import TestClient
@@ -128,3 +131,32 @@ def test_api_card_decisions_at_once(store):
     assert sorted([a.status_code, b.status_code]) == [200, 409], (a.text, b.text)
     s = S._SURVEYS["s-race-card"]
     assert len([h for h in s.mission.human_log if h["hazard"] == "H002"]) == 1
+
+
+# ---- the agent's requests outlive their survey: withdrawn, with the reason --------------------------
+def test_a_restart_withdraws_the_agents_orphaned_requests(store, monkeypatch):
+    monkeypatch.setenv("DEPTH_LAZY_MODEL", "1")
+    old = store.request("survey-before-restart", "resurvey", ["H001"], "a pass the old plan asked for",
+                        requested_by=S._AGENT, channel="agent")
+    console = store.request("survey-before-restart", "inspect", ["H001"], "a partner console asks too", channel="api")
+    live = _planned("s-still-in-memory")
+    with TestClient(app_mod.app):                                # the server starts
+        pass
+    r = store.get(old["id"])
+    assert r["status"] == "withdrawn" and r["decision"]["by"] == S._AGENT
+    assert "restarted" in r["decision"]["note"] and "re-run the survey" in r["decision"]["note"]
+    assert store.get(console["id"])["status"] == "pending"      # a console's request is a work order in its own right
+    assert all(store.get(i)["status"] == "pending" for i in live.plan_args["requests"].values())
+    c = TestClient(app_mod.app)
+    assert c.post(f"/api/approvals/{old['id']}/decide", json={"decision": "approved", "by": "A"}).status_code == 409
+
+
+def test_a_survey_leaving_memory_withdraws_its_pending_requests(store, monkeypatch):
+    monkeypatch.setattr(S, "MAX_SURVEYS", 1)
+    monkeypatch.setattr(S, "_SURVEYS", OrderedDict())
+    _planned("s-old")
+    assert store.list(status="pending", survey_id="s-old")
+    _planned("s-new")                                            # the bounded memory drops s-old
+    assert not store.list(status="pending", survey_id="s-old")
+    assert all("left the server's memory" in r["decision"]["note"] for r in store.list(survey_id="s-old"))
+    assert store.list(status="pending", survey_id="s-new")

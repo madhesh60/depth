@@ -57,6 +57,10 @@ async def lifespan(_app: FastAPI):
     if errs:
         raise RuntimeError("DEPTH refuses to start in public mode: " + "; ".join(errs)
                            + " - infra/setup_cool_instance.sh generates them (DEPTH_PUBLIC=0 for a local proxy test)")
+    try:                                                # the agent's requests from before a restart lost their survey
+        S._withdraw_orphans("the server restarted (surveys live in memory only)")
+    except Exception:
+        S.log.exception("withdrawing orphaned approval requests failed")
     if os.environ.get("DEPTH_LAZY_MODEL", "0") != "1":
         threading.Thread(target=S._warm_in_background, name="depth-warmup", daemon=True).start()
     async with MCP_ENDPOINT.new_manager().run():       # /mcp: a fresh stateless manager per lifespan

@@ -28,7 +28,7 @@ import numpy as np
 from fastapi import HTTPException, UploadFile
 
 from src.agentic.agent import render
-from src.agentic.approvals import ApprovalStore, PinGuard
+from src.agentic.approvals import ApprovalError, ApprovalStore, PinGuard
 from src.agentic.core import Goal, SurveyAgent
 from src.agentic.feedback import FeedbackStore
 from src.agentic.geo import stage1_counterfactual, synthetic_track
@@ -356,7 +356,8 @@ def _remember(result: SurveyResult) -> None:
     _SURVEYS[result.survey_id] = result
     _SURVEYS.move_to_end(result.survey_id)
     while len(_SURVEYS) > MAX_SURVEYS:
-        _SURVEYS.popitem(last=False)
+        old, _ = _SURVEYS.popitem(last=False)
+        _withdraw_orphans(f"the survey left the server's memory (it keeps the last {MAX_SURVEYS})", old)
 
 
 def _run_survey(frames, gps: str, budget_minutes: Optional[float], nadir: Optional[str],
@@ -513,6 +514,26 @@ def _sync_agent_requests(s: SurveyResult, reason: str) -> list[dict]:
                                                  f"withdrew stale request {c['withdrawn']} ('{c['action']}') - {reason}",
                                     "detail": c})
     return changes
+
+
+def _withdraw_orphans(why: str, survey_id: Optional[str] = None) -> int:
+    """Withdraw the agent's pending requests whose survey is not in memory (the server restarted, or the
+    survey left the bounded memory): a decision on one could not re-plan anything, so the inbox says so
+    instead of offering it. Requests filed by people, partner consoles or MCP agents stay open — they are
+    work orders in their own right. Returns how many were withdrawn."""
+    n = 0
+    for r in _APPROVALS.list(status="pending", survey_id=survey_id, limit=100_000):
+        if r.get("channel") != "agent" or r["survey_id"] in _SURVEYS:
+            continue
+        try:
+            _APPROVALS.withdraw(r["id"], f"{why}, so a decision could not re-plan {r['survey_id']} - re-run the "
+                                         "survey and the agent files fresh requests", by=_AGENT)
+            n += 1
+        except (ApprovalError, KeyError):
+            pass                                        # a person decided it a moment earlier: that stands
+    if n:
+        log.info("withdrew %d orphaned approval request(s): %s", n, why)
+    return n
 
 
 def _dispatch(s: SurveyResult) -> dict:
