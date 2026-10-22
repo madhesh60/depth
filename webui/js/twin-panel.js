@@ -4,7 +4,7 @@
 "use strict";
 
 /* ------------------------------------------------------------------ 3D TWIN (webui/twin3d.js, three.js r160) */
-const Twin = { dim: "2d", sv: "map", frame: null, survey: null };
+const Twin = { dim: "2d", sv: "map", frame: null, survey: null, no3d: null };
 function twinReady(cb) { if (window.DepthTwin) cb(); else window.addEventListener("depthtwin-ready", cb, { once: true }); }
 function twinPanel(wrap, kind) {
   const survey = kind === "survey";
@@ -48,11 +48,32 @@ function wireTwin() {
     if (Twin.sv === "3d") showSurveyTwin(); else setTimeout(fitMap, 60);
   });
 }
+/* No WebGL (a VM, a remote desktop, hardware acceleration off): say so once, never throw, never retry. */
+const NO_3D = "The 3D view needs WebGL, the browser's 3D graphics, and it is off or not available in this browser "
+  + "(common in virtual machines, remote desktops, or with hardware acceleration turned off). Everything else in DEPTH "
+  + "works. To see the 3D view, turn on hardware acceleration or open the studio in another browser.";
+function makeTwin(ui, opts) {
+  if (Twin.no3d) return null;
+  try {
+    if (!window.DepthTwin.supported()) throw new Error("WebGL is not available");
+    return window.DepthTwin.create(ui.canvas, opts);
+  } catch (e) {
+    Twin.no3d = String((e && e.message) || e);
+    console.warn("3D twin unavailable:", Twin.no3d);
+    return null;
+  }
+}
+function showNo3d(ui) {
+  ui.wrap.classList.add("no-3d");
+  ui.empty.hidden = false;
+  ui.empty.textContent = NO_3D;
+}
 function showFrameTwin() {
   twinReady(() => {
+    if (!Twin.frameUi) Twin.frameUi = twinPanel($("#twinFrameWrap"), "frame");
     if (!Twin.frame) {
-      Twin.frameUi = twinPanel($("#twinFrameWrap"), "frame");
-      Twin.frame = window.DepthTwin.create(Twin.frameUi.canvas, { onPick: id => selectCandidate(id, true) });
+      Twin.frame = makeTwin(Twin.frameUi, { onPick: id => selectCandidate(id, true) });
+      if (!Twin.frame) return showNo3d(Twin.frameUi);
       Twin.frame.setExag(3); wireTwinPanel(Twin.frameUi, Twin.frame);
     }
     const d = state._analyze, ui = Twin.frameUi, tw = d && d.twin;
@@ -64,9 +85,10 @@ function showFrameTwin() {
 }
 function showSurveyTwin() {
   twinReady(() => {
+    if (!Twin.surveyUi) Twin.surveyUi = twinPanel($("#twinSurveyWrap"), "survey");
     if (!Twin.survey) {
-      Twin.surveyUi = twinPanel($("#twinSurveyWrap"), "survey");
-      Twin.survey = window.DepthTwin.create(Twin.surveyUi.canvas, { onReplayEnd: () => { const b = Twin.surveyUi.wrap.querySelector('[data-a="replay"]'); b.classList.remove("on"); b.textContent = "Replay"; } });
+      Twin.survey = makeTwin(Twin.surveyUi, { onReplayEnd: () => { const b = Twin.surveyUi.wrap.querySelector('[data-a="replay"]'); b.classList.remove("on"); b.textContent = "Replay"; } });
+      if (!Twin.survey) return showNo3d(Twin.surveyUi);
       Twin.survey.setExag(6); wireTwinPanel(Twin.surveyUi, Twin.survey);
     }
     const d = state.survey, ui = Twin.surveyUi, tw = d && d.twin;

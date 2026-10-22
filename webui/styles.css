@@ -540,6 +540,8 @@ input[type=range]:focus-visible::-webkit-slider-thumb { box-shadow: var(--ring);
 .twin-foot .tw-note { color: var(--review); }
 .twin-empty { position: absolute; inset: 46px 0 30px; display: grid; place-items: center; text-align: center; padding: 20px; color: var(--txt-3); font: var(--t-13); background: #050b14; z-index: 2; }
 .twin-empty[hidden] { display: none; }
+.twin-wrap.no-3d .twin-bar, .twin-wrap.no-3d .twin-foot { display: none; }   /* no WebGL: the message alone */
+.twin-wrap.no-3d .twin-empty { inset: 0; max-width: 520px; margin: 0 auto; line-height: 1.5; }
 .tw-labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
 .tw-lab { position: absolute; left: 0; top: 0; white-space: nowrap; margin: -24px 0 0 8px; font: 500 11px var(--sans); color: #fff; background: rgba(8, 14, 24, .78); border: 1px solid var(--line-2); padding: 2px 8px; border-radius: var(--r-pill); }
 .tw-lab-h { color: #fff3b8; }

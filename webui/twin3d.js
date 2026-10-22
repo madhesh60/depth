@@ -346,5 +346,18 @@ class TwinViewer {
   }
 }
 
-window.DepthTwin = { create: (el, opts) => new TwinViewer(el, opts) };
+// Can this browser draw 3D at all? WebGL is off in some virtual machines, remote desktops and locked-down
+// browsers; asked once (each probe costs a GL context), so the panel can say so instead of throwing.
+let webgl = null;
+function webglSupported() {
+  if (webgl === null) {
+    try {
+      const c = document.createElement("canvas");
+      webgl = !!(c.getContext("webgl2") || c.getContext("webgl"));
+    } catch (e) { webgl = false; }
+  }
+  return webgl;
+}
+
+window.DepthTwin = { supported: webglSupported, create: (el, opts) => new TwinViewer(el, opts) };
 window.dispatchEvent(new Event("depthtwin-ready"));
