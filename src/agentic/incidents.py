@@ -50,7 +50,8 @@ CATALOGUE: dict[str, tuple[str, str, str, str, str]] = {
     "orientation_unknown": (
         "warning", "stage1", "Sonar geometry not measured",
         "no ground range, shadow or height for this frame; finds still reach a person",
-        "set the frame's nadir edge (top / bottom / left / right) and re-run"),
+        "say which edge the sonar is on (Analyze: 'Where is the sonar in your frame?' above the Analyze button; "
+        "API: ?nadir=top|bottom|left|right) and re-run"),
     "model_unavailable": (
         "error", "see", "Detector unavailable",
         "no detection was run and nothing was decided; earlier results are untouched",

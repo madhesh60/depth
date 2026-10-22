@@ -168,6 +168,7 @@ function sonarGlyph() {
 
 function selectSample(id, card) {
   state.selected = { id };
+  $("#nadirField").hidden = true;               // a sample's sonar edge comes from its source rule
   $$(".sample-card").forEach(c => c.classList.toggle("is-sel", c === card));
   const s = state.samples.find(x => x.id === id);
   $("#analyzeBtn").disabled = false;
@@ -233,6 +234,7 @@ function wireKeyboard() {
 function pickFile(file) {
   state.selected = { file };
   $$(".sample-card").forEach(c => c.classList.remove("is-sel"));
+  $("#nadirField").hidden = false;              // an upload's sonar edge is the person's to say (never guessed)
   $("#analyzeBtn").disabled = false;
-  $("#analyzeHint").textContent = `Uploaded ${file.name}. Ready to run.`;
+  $("#analyzeHint").textContent = `Uploaded ${file.name}. Pick where the sonar is (above), so range and shadow can be measured; then run.`;
 }

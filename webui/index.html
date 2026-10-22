@@ -89,6 +89,17 @@
 
       <section class="panel run-dock" data-when="analyze">
         <div class="panel-head"><span class="panel-title">Run</span></div>
+        <!-- an upload's sonar edge is the person's to say (never guessed); shown only for an uploaded frame -->
+        <label class="field nadir-field" id="nadirField" hidden title="DEPTH never guesses where the sonar is. Tell it which edge of your frame the sonar (the boat's track, the water column) is on, and the agent measures ground range, the acoustic shadow and relative height. Not sure: finds still reach a person, without those measurements.">
+          <span>Where is the sonar in your frame?</span>
+          <select id="nadirSel">
+            <option value="">Not sure (don't guess)</option>
+            <option value="top">Top edge</option>
+            <option value="bottom">Bottom edge</option>
+            <option value="left">Left edge</option>
+            <option value="right">Right edge</option>
+          </select>
+        </label>
 <label class="switch-row" title="Let the agent choose its OpenCV tools by value of information. Experimental: its benefit failed the registered validation checks (docs/reports/evidence_model_exp003.md)."><input type="checkbox" class="activeToggle" /><span class="sw" aria-hidden="true"></span><span>Active vision <em>experimental</em></span></label>
         <button class="btn btn-primary btn-block" id="analyzeBtn" disabled>Analyze frame</button>
         <p class="panel-note" id="analyzeHint">Choose a sample above to begin.</p>

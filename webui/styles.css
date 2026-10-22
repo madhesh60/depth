@@ -244,6 +244,8 @@ body[data-mode="connect"] .dock { display: none; }
 .dropzone { display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; border: 1px dashed var(--line-2); border-radius: var(--radius); padding: 11px; color: var(--txt-3); font: var(--t-12); transition: border-color var(--t-fast), color var(--t-fast), background var(--t-fast); }
 .dropzone u { text-decoration: none; color: var(--txt-2); }
 .dropzone:hover, .dropzone.drag { border-color: var(--line-3); color: var(--txt); background: var(--hover); }
+.nadir-field { margin: 0 0 12px; }
+.nadir-field[hidden] { display: none; }
 .dz-ico { display: inline-grid; }
 
 /* ======================================================================================== buttons */

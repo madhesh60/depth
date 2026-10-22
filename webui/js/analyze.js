@@ -16,7 +16,11 @@ async function runAnalyze(simulate) {
 
   try {
     let url = `${API}/api/analyze`, opts = { method: "POST" };
-    if (state.selected.file) { const fd = new FormData(); fd.append("file", state.selected.file); opts.body = fd; }
+    if (state.selected.file) {
+      const fd = new FormData(); fd.append("file", state.selected.file); opts.body = fd;
+      const nadir = $("#nadirSel").value;                    // the person's answer: where the sonar is
+      if (nadir) url += `?nadir=${encodeURIComponent(nadir)}`;
+    }
     else url += `?sample=${encodeURIComponent(state.selected.id)}`;
     if (Active.on) url += `${url.includes("?") ? "&" : "?"}active=1`;
     if (simulate) url += `${url.includes("?") ? "&" : "?"}simulate=${simulate}`;
