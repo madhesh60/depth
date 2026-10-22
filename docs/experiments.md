@@ -115,6 +115,35 @@ Promote each into the log below with full results as it runs.
 
 ## Experiment log
 
+### STUDY-23 — One review card per object (REGISTERED 2026-10-22; verification pending)
+
+- **Why.** The judge audit: about 5 review cards per frame in the default mode, and at the assumed timings
+  DEPTH was slower than manual review on the pot-dense test split. The cards showed why: the detector often
+  puts two or three boxes on one pot (a tight box and a looser one around it; looking harder, the tile pass's
+  own box beside the first look's). Class-aware NMS at IoU 0.45 keeps them because a small box inside a large
+  one has a low IoU, and the repeat-sighting merge never joins two boxes of one frame (on purpose). So every
+  box was its own card, and a person judged the same pot two or three times.
+- **Rule** (`src/agentic/cards.py`, one function for the product and the study): within one frame, two review
+  boxes of the same class are **one card** when at least half of the smaller box lies inside the other
+  (intersection over the smaller box ≥ 0.5), joined transitively. The strongest box heads the card (tier,
+  P(pot), position, place in the queue); every other box stays on the card. **No box is dropped**, so the pots
+  that reach a person — and the recall promise — cannot change; the study checks that instead of assuming it.
+- **Protocol** (fixed in `src/agentic/study_cards.py`, committed before the verification split is read for this
+  question): STUDY-18's cached predictions for both modes (no refit, no new inference); per split and mode the
+  cards per frame before and after, cards holding two or more labelled pots, the pots that reach a person
+  before and after, and the analyst minutes to each mode's promise at the assumed timings (one card = one
+  decision whatever its box count — an assumption the Study tab measures). **G1** (calibration): ≥ 25% fewer
+  cards in both modes, ≤ 1% of cards with two or more pots. **G2** (verification, once): the same pots reach
+  a person in both modes, ≥ 25% fewer cards in both modes, ≤ 2% of cards with two or more pots. Ship only if
+  both pass.
+- **Disclosed:** the rule was chosen on the calibration split after trying IoU ≥ 0.3 / 0.2 / 0.1 and
+  intersection over the smaller box ≥ 0.8 / 0.6 / 0.5 / 0.3 / any overlap (32–44% fewer cards with one look,
+  38–51% looking harder, no card with two labelled pots in any variant); classes stay apart (joining them
+  changed 3 of ~400 cards and would put a wreck on a gear card).
+- **G1 (calibration split, 163 frames): PASS** — standard 3.52 → **1.99** cards per frame (−43%), look harder
+  4.93 → **2.47** (−50%); 0 of 324 and 0 of 403 cards hold two labelled pots; the same 157 and 165 of 186 pots
+  reach a person. Report: [`card_grouping.md`](reports/card_grouping.md).
+
 ### STUDY-22 — Data dropouts in a raw recording, per ping (DONE — on for raw recordings)
 
 - **Why.** The problem statement names "data dropouts caused by underwater vehicle motion (heave, pitch,

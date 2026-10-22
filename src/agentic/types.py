@@ -155,6 +155,10 @@ class Candidate:
     ground_range_px: Optional[float] = None
     in_water_column: Optional[bool] = None
     position_withheld: Optional[str] = None   # why lat/lon were withheld (pipeline.check_geometry)
+    # one review card per object (cards.py, STUDY-23): a box folded into another box's card names that box
+    # (its index in the frame's candidates); a card's head lists the boxes it carries
+    card_of: Optional[int] = None
+    card_members: list[int] = field(default_factory=list)
 
     @property
     def center(self) -> tuple[float, float]:
@@ -178,6 +182,8 @@ class Candidate:
             "ground_range_px": None if self.ground_range_px is None else round(self.ground_range_px, 1),
             "in_water_column": self.in_water_column,
             "position_withheld": self.position_withheld,
+            "card_of": self.card_of,
+            "card_members": list(self.card_members),
         }
 
 
@@ -201,7 +207,13 @@ class FrameResult:
 
     @property
     def counts(self) -> dict[str, int]:
-        return {v.value: len(self.by_verdict(v)) for v in Verdict}
+        """Per verdict, what a person sees: a box folded into another box's card (``card_of``) is not counted
+        again (``boxes`` counts every box)."""
+        return {v.value: sum(1 for c in self.by_verdict(v) if c.card_of is None) for v in Verdict}
+
+    @property
+    def boxes(self) -> int:
+        return len(self.candidates)
 
     def to_dict(self) -> dict:
         return {
@@ -212,6 +224,7 @@ class FrameResult:
             "orientation": dict(self.orientation),
             "stage1": dict(self.stage1),
             "counts": self.counts,
+            "boxes": self.boxes,
             "stage_ms": {k: round(v, 2) for k, v in self.stage_ms.items()},
             "candidates": [c.to_dict() for c in self.candidates],
             "incidents": list(self.incidents),
