@@ -62,7 +62,7 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
   tiers (≥ 78% one look, ≥ 84% looking harder — both checked for correlated frames), **one review card per
   object** (STUDY-23), survey planning and person-approved actions — on the sample frames and on a raw
   Humminbird recording with real GPS and a per-ping dropout mask. `ruff check .` (with bugbear) and `mypy` (the
-  decision core) are clean, both in CI; the full suite passes (307, 2026-10-22; coverage 60% of `src/`).
+  decision core) are clean, both in CI; the full suite passes (312, 2026-10-22; coverage 60% of `src/`).
 - **Judges can run it:** one click in GitHub Codespaces (`.devcontainer/`), or five commands on a laptop. CI runs
   the codespace's own setup in its image on 2 CPUs and plays the guided demo to its last step
   (`.github/workflows/codespaces.yml`); one real click in a codespace is still the owner's check.
@@ -83,6 +83,29 @@ Current numbers, each with its split: README "At a glance" and
 
 ## 4. Session log
 
+### 2026-10-22 (sweep 74) — the independent review's findings, a real-LLM session, two honest notes
+
+An independent review of sweep 73 (four reviewers, each finding checked by a skeptic) confirmed these; all fixed:
+
+- **A failed closer look still claimed 84%.** When the tile pass fails (the guided demo's `tool_failed` step),
+  the frame falls back to the first look, but the cards read the look-harder promise. The analyze route now
+  reports the standard promise for a frame that fell back; test added.
+- **The COOL status line showed raw `**` on GitHub** (a line starting with an HTML comment is an HTML block).
+  Each copy now reads `**COOL:** <!-- cool:status -->…`; the test checks the marker never starts a line, and
+  passes both before and after a COOL run (it failed on the go-live state). `golive.sh` now commits
+  `docs/JUDGES.md`, which `cool_docs.py` rewrites.
+- Smaller: a 3D view that fails in a browser *with* WebGL now says it failed and logs an error (the UI test
+  would have read it as "no WebGL"); a new upload resets the sonar-edge picker; a withdrawn promise never
+  reports a recall goal as met; the docs no longer say every non-sonar picture loses the promise (grey noise
+  gets only a caution).
+- **A real model in the loop:** `src/dashboard/llm_session.py` gives Claude DEPTH's MCP tools; the model picks
+  every call, a person approves with the PIN, and the run is written to `docs/reports/llm_session.md`. Tested
+  with a stand-in model against the real server (survey → queue → request → a person approves → status);
+  not yet run with a real model (needs the owner's API key).
+- **Said plainly in the README and `JUDGES.md`:** the test split was used by STUDY-18, 19, 21 and 23 (so it is
+  checked, not untouched), and the 8 demo frames all come from Rec9, the recording where the one-look promise
+  fell short.
+
 ### 2026-10-22 (sweep 73) — a judge's review: the promise on one frame, the sonar edge for uploads, 3D without WebGL, one COOL story
 
 A judge-style review of the whole project (run in a cloud session: install from a clean clone, the full test
@@ -95,8 +118,8 @@ inconsistencies. Each was reproduced first, then fixed with a test.
   MCP `analyze_frame`): a frame more unusual than every one of the 163 calibration frames loses the promise
   (incident `frame_promise_not_applicable`, the cheapest look, every card and the perception line say "no
   promise for this frame"); a merely unusual frame keeps it with a caution. No new threshold: the floor is
-  1 / (n_cal + 1) from the stored reference. Checked on the 8 demo frames (all keep it) and non-sonar
-  pictures (all lose it), not on a registered split (STUDY-19 addendum in `experiments.md`). The card text
+  1 / (n_cal + 1) from the stored reference. Checked on the 8 demo frames (all keep it), colour pictures and
+  screenshots (they lose it) and grey noise (only a caution), not on a registered split (STUDY-19 addendum in `experiments.md`). The card text
   also now names the frame's own promise (84% when it looked harder), not always the standard 78%.
 - **An uploaded frame lost range, shadow and height.** The sonar edge comes from a filename rule (never
   guessed), so one of the shipped samples re-uploaded under another name came back "orientation unknown —

@@ -32,7 +32,7 @@ and **Best Use of COOL** · AGPL-3.0
 | **Analyst minutes** (assumed timings) | DEPTH vs manual: one look **43.2 vs 55.7** · looking harder **56.5 vs 57.3** · empty seabed **34 / 47 vs 56** per hour | test · user study pending |
 | **Speed per frame** | one look **157 ms** · looking harder (the default when time allows) ≈ **5×**, about 0.8 s | EC2 x86, 4 vCPU · the 5× is the laptop's ratio |
 | **Crab-pot detector**, AP@0.5 | **0.482**; weaker than GhostVision (F1 0.41 vs 0.71–0.73) | v2b test, 214 frames |
-| **Checks** | **307** tests · ruff · mypy · a headless-Chrome UI test, all in CI; the Codespaces setup run in its own image on 2 CPUs, guided demo to the end | 2026-10-22 |
+| **Checks** | **312** tests · ruff · mypy · a headless-Chrome UI test, all in CI; the Codespaces setup run in its own image on 2 CPUs, guided demo to the end | 2026-10-22 |
 
 ### Not done — said plainly
 

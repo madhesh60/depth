@@ -130,7 +130,7 @@ budget) → plan → one approval request per action. Every step is logged in `a
 ```bash
 # Run and check
 python -m uvicorn src.dashboard.app:app --port 8000    # the studio (Analyze/Survey/Study/Audit)
-pytest -q                                              # 307 tests; coverage 60% of src/ (85% runtime)
+pytest -q                                              # 312 tests; coverage 60% of src/ (85% runtime)
 python tests/ui_smoke.py                               # headless Chrome drives every studio mode (0 JS errors)
 python tests/ui_smoke.py --full-demo                   # ... and plays the guided demo to its last step
 python tests/ui_video.py                               # a captioned walkthrough MP4 of the studio (runs/video/)
