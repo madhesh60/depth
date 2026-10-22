@@ -9,9 +9,15 @@ Chromium (``$CHROME`` or on the usual paths) and ``websockets`` (requirements-de
 pytest (it takes ~2 min and a browser); run it by hand:
 
     python tests/ui_smoke.py
+    python tests/ui_smoke.py --full-demo                          # play the guided demo to its last step
+    python tests/ui_smoke.py --url http://127.0.0.1:8000          # drive a server that is already running
+
+CI runs it the Codespaces way (``.github/workflows/codespaces.yml``): the devcontainer image, its own setup
+and start commands, 2 CPUs, ``--url`` and ``--full-demo``.
 """
 from __future__ import annotations
 
+import argparse
 import asyncio
 import json
 import os
@@ -39,8 +45,11 @@ STEPS = [
     ("analyze", "(async () => { document.querySelector('.sample-card').click(); await runAnalyze(); "
                 "await new Promise(r => setTimeout(r, 800)); "
                 "return {boxes: document.querySelectorAll('.bx').length, cards: document.querySelectorAll('.ev-card').length}; })()"),
-    ("survey", "(async () => { setMode('survey'); await new Promise(r => setTimeout(r, 400)); await runSurvey(); "
-               "await new Promise(r => setTimeout(r, 1500)); return {hazards: document.querySelectorAll('#hazBody tr').length}; })()"),
+    ("survey", "(async () => { setMode('survey'); await new Promise(r => setTimeout(r, 400)); const t0 = Date.now(); "
+               "await runSurvey(); const s = Math.round((Date.now() - t0) / 100) / 10, run = (state.survey || {}).agent_run || {}; "
+               "await new Promise(r => setTimeout(r, 1500)); return {hazards: document.querySelectorAll('#hazBody tr').length, "
+               "seconds: s, compute_budget_s: (run.goal || {}).compute_s, mode: (run.mode || {}).name, "
+               "downgraded_at: run.downgraded_at || null}; })()"),
     ("agent_tab", "(async () => { const b = [...document.querySelectorAll('button, .tab')].find(x => /^\\s*Agent\\s*$/.test(x.textContent)); "
                   "if (b) b.click(); await new Promise(r => setTimeout(r, 600)); return {clicked: !!b}; })()"),
     *[(m, f"(async () => {{ setMode('{m}'); await new Promise(r => setTimeout(r, 1500)); "
@@ -52,10 +61,16 @@ STEPS = [
     ("demo", "(async () => { document.querySelector('#demoBtn').click(); await new Promise(r => setTimeout(r, 6000)); "
              "const on = Demo.on; Demo.stop(); return {started: on}; })()"),
 ]
+FULL_DEMO = ("demo", "(async () => { document.querySelector('#demoBtn').click(); const t0 = Date.now(); "
+                     "await new Promise(r => setTimeout(r, 1000)); const on = Demo.on; "
+                     "while (Demo.on && Date.now() - t0 < 600000) await new Promise(r => setTimeout(r, 500)); "
+                     "return {started: on, finished: !Demo.on, step: document.querySelector('#demoStep').textContent, "
+                     "seconds: Math.round((Date.now() - t0) / 1000)}; })()")
 EXPECT = {"boot": lambda v: v["samples"] > 0, "terms": lambda v: v["terms"] >= 8, "analyze": lambda v: v["cards"] > 0, "survey": lambda v: v["hazards"] > 0,
           "agent_tab": lambda v: v["clicked"], "connect": lambda v: v["mode"] == "connect",
           "study": lambda v: v["mode"] == "study", "audit": lambda v: v["mode"] == "audit",
-          "twin": lambda v: v["canvas"] > 0, "demo": lambda v: v["started"]}
+          "twin": lambda v: v["canvas"] > 0, "demo": lambda v: v["started"] and v.get("finished", True)
+          and v.get("step", "7/7") == "7/7"}
 
 
 def _free_port() -> int:
@@ -76,7 +91,7 @@ def _ready(base: str, timeout: float = 300) -> None:
     raise SystemExit("the server did not load the model in time (python -m src.detection.fetch_model?)")
 
 
-async def _drive(port: int, dbg: int) -> tuple[dict, list]:
+async def _drive(base: str, dbg: int, steps: list) -> tuple[dict, list]:
     import websockets
     url = None
     for _ in range(60):
@@ -107,9 +122,9 @@ async def _drive(port: int, dbg: int) -> tuple[dict, list]:
 
         for d in ("Runtime.enable", "Log.enable", "Page.enable", "Network.enable"):
             await send(d)
-        await send("Page.navigate", {"url": f"http://127.0.0.1:{port}/"})
+        await send("Page.navigate", {"url": base + "/"})
         await asyncio.sleep(4)
-        for name, js in STEPS:
+        for name, js in steps:
             r = (await send("Runtime.evaluate", {"expression": js, "awaitPromise": True, "returnByValue": True}))["result"]
             results[name] = ({"error": r["exceptionDetails"].get("text")} if "exceptionDetails" in r
                              else r["result"].get("value"))
@@ -132,29 +147,40 @@ async def _drive(port: int, dbg: int) -> tuple[dict, list]:
 
 
 def main() -> int:
+    ap = argparse.ArgumentParser(description="drive the DEPTH studio in headless Chrome; 0 JS errors to pass")
+    ap.add_argument("--url", help="drive a server that is already running (default: start one on a free port)")
+    ap.add_argument("--full-demo", action="store_true", help="play the guided demo to its last step")
+    a = ap.parse_args()
     chrome = next((c for c in CANDIDATES if c and Path(c).exists()), None)
     if not chrome:
         print("no Chrome / Chromium found - set $CHROME")
         return 2
+    steps = [FULL_DEMO if name == "demo" and a.full_demo else (name, js) for name, js in STEPS]
     port, dbg = _free_port(), _free_port()
     env = {**os.environ, "DEPTH_APPROVALS_DIR": tempfile.mkdtemp(prefix="depth-ui-"), "DEPTH_PUBLIC": "0",
            "PYTHONPATH": str(REPO)}
     for k in ("DEPTH_APPROVER_PIN", "DEPTH_MCP_TOKEN", "DEPTH_TRUST_PROXY", "DEPTH_ORIGIN_SECRET"):
         env.pop(k, None)
-    srv = subprocess.Popen([sys.executable, "-m", "uvicorn", "src.dashboard.app:app", "--host", "127.0.0.1",
-                            "--port", str(port)], cwd=REPO, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    srv = None if a.url else subprocess.Popen(
+        [sys.executable, "-m", "uvicorn", "src.dashboard.app:app", "--host", "127.0.0.1", "--port", str(port)],
+        cwd=REPO, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    base = (a.url or f"http://127.0.0.1:{port}").rstrip("/")
+    # as root (a container: CI, Codespaces) Chromium needs --no-sandbox, and /dev/shm is small there
+    root = ["--no-sandbox", "--disable-dev-shm-usage"] if hasattr(os, "geteuid") and os.geteuid() == 0 else []
     browser = None
     try:
-        _ready(f"http://127.0.0.1:{port}")
+        _ready(base)
         browser = subprocess.Popen([chrome, "--headless=new", f"--remote-debugging-port={dbg}",
                                     f"--user-data-dir={tempfile.mkdtemp(prefix='depth-ui-chrome-')}", "--no-first-run",
-                                    "--no-default-browser-check", "--disable-gpu", "--window-size=1600,1000", "about:blank"],
+                                    "--no-default-browser-check", "--disable-gpu", "--window-size=1600,1000", *root,
+                                    "about:blank"],
                                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        results, errors = asyncio.run(_drive(port, dbg))
+        results, errors = asyncio.run(_drive(base, dbg, steps))
     finally:
         if browser:
             browser.kill()
-        srv.kill()
+        if srv:
+            srv.kill()
     failed = [k for k, ok in EXPECT.items() if not (isinstance(results.get(k), dict) and "error" not in results[k]
                                                    and ok(results[k]))]
     print(json.dumps({"steps": results, "failed_steps": failed, "errors": errors}, indent=1, ensure_ascii=False))

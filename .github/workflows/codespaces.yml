@@ -1,0 +1,80 @@
+# The judges' click-to-run path, tested the way a codespace runs it (README button -> .devcontainer/):
+# the devcontainer's image, its own setup command (postCreateCommand) and start command (postAttachCommand),
+# both read from devcontainer.json, on 2 CPUs and 4 GB (its hostRequirements). Then the real studio in
+# headless Chromium: boot -> Analyze -> a Survey with the studio's default 20-s compute budget -> the guided
+# demo to its last step, with 0 JS errors; and the first-survey time with and without that budget.
+# What only a real codespace shows (port forwarding, the browser tab it opens) is a person's check.
+name: codespaces
+
+on:
+  push:
+    branches: [main]
+    paths: [".devcontainer/**", "requirements.txt", "src/**", "webui/**", "models/**", "tests/ui_smoke.py",
+            ".github/workflows/codespaces.yml"]
+  workflow_dispatch:
+
+jobs:
+  studio-in-the-devcontainer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    container:
+      image: mcr.microsoft.com/devcontainers/python:1-3.10-bookworm
+      options: --cpus 2 --memory 4g --shm-size 1g
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read the codespace's commands from devcontainer.json
+        run: |
+          python - >> "$GITHUB_ENV" <<'EOF'
+          import json, re
+          cfg = json.loads(re.sub(r"(?m)^\s*//.*$", "", open(".devcontainer/devcontainer.json", encoding="utf-8").read()))
+          print("POST_CREATE=" + cfg["postCreateCommand"])
+          print("POST_ATTACH=" + cfg["postAttachCommand"])
+          EOF
+
+      - name: postCreateCommand - the codespace's setup
+        run: |
+          echo "$POST_CREATE"
+          time bash -c "$POST_CREATE"
+
+      - name: postAttachCommand - starts the studio, as when the browser attaches
+        run: |
+          echo "$POST_ATTACH"
+          setsid nohup bash -c "$POST_ATTACH" > /tmp/studio.log 2>&1 &
+          for i in $(seq 1 150); do
+            if curl -sf http://127.0.0.1:8000/api/health | python -c "import json, sys; sys.exit(0 if json.load(sys.stdin).get('model_loaded') else 1)"; then
+              echo "studio ready after ~$((2 * i)) s"; break
+            fi
+            sleep 2
+          done
+          curl -sf http://127.0.0.1:8000/api/health | python -c "import json, sys; h = json.load(sys.stdin); print({k: h.get(k) for k in ('model_loaded', 'model', 'opencv', 'warmup_ms', 'ms_per_pass', 'recording')})"
+
+      - name: Headless Chromium for the UI test (the test's tool, not part of the codespace)
+        run: |
+          apt-get update -qq || true
+          apt-get install -y -qq --no-install-recommends chromium > /dev/null
+          pip install -q websockets==15.0.1
+
+      - name: The studio, a survey and the guided demo to its last step - 0 JS errors
+        run: python tests/ui_smoke.py --url http://127.0.0.1:8000 --full-demo
+
+      - name: First-survey time on 2 CPUs - no compute budget vs the studio's default 20 s
+        run: |
+          python - <<'EOF'
+          import json, time, urllib.request
+          for q in ("", "&compute_s=20"):
+              t0 = time.time()
+              url = "http://127.0.0.1:8000/api/survey?use_samples=1&gps=synthetic&budget_minutes=2&boat_minutes=10" + q
+              d = json.load(urllib.request.urlopen(urllib.request.Request(url, method="POST"), timeout=900))
+              run = d.get("agent_run") or {}
+              print(f"compute budget {'20 s' if q else 'none'}: {time.time() - t0:.1f} s wall, look "
+                    f"{(run.get('mode') or {}).get('name')}, downgraded at {run.get('downgraded_at')}, "
+                    f"{len(d.get('tracked') or [])} hazards")
+          EOF
+
+      - name: Studio log
+        if: always()
+        run: tail -n 60 /tmp/studio.log || true
