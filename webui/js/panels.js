@@ -100,8 +100,11 @@ function renderGuarantees(c) {
   const g = c.guarantees || {}, v = g.verified_on_test || {};
   const pct = x => x == null ? "—" : `${Math.round(x * 100)}%`;
   const held = ok => ok == null ? "" : ok ? `<span class="g-held">held on test</span>` : `<span class="g-miss">NOT held on test</span>`;
-  meta.textContent = `≥ ${pct(g.recall_promise)}${v.recall_promise_held === true ? " · held" : ""}`;   // the rail has room for one short line
-  meta.title = `at least ${pct(g.recall_promise)} of real pots reach a person${v.recall_promise_held === true ? " — held on test" : ""}`;
+  // the rail has room for one short line: the one-look promise and, when calibrated, the closer look's
+  const lh = (state.modes || []).find(m => m.name !== "standard" && m.promise > (g.recall_promise || 0));
+  meta.textContent = `≥ ${pct(g.recall_promise)}${lh ? ` / ${pct(lh.promise)}` : ""}${v.recall_promise_held === true ? " · held" : ""}`;
+  meta.title = `at least ${pct(g.recall_promise)} of real pots reach a person with one look`
+    + (lh ? `, ${pct(lh.promise)} when the agent looks harder` : "") + (v.recall_promise_held === true ? " — held on test" : "");
   if (gate) gate.textContent = `${(c.detector_floor ?? c.tau_review).toFixed(2)} (floor) · review ≥ ${c.tau_review.toFixed(2)}`;
   if (tiers) tiers.textContent = `${c.method ? "conformal (CP · LTT)" : "calibrated"}${c.policy ? " · " + c.policy : ""}`;
   panel.innerHTML = `
