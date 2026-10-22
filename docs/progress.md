@@ -69,7 +69,7 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
   row + load-test re-run. The stock EC2 benchmarks and the first load test are done.
 - **Needs people:** the timed user study and the blinded false-alarm audit.
 - **Left for submission:** the COOL numbers (or the plain "not run" line), the narrated video (footage:
-  `python tests/ui_video.py`), the Lucidchart diagram, the GitHub description and topics.
+  `python tests/ui_video.py`), the Lucidchart diagram. The GitHub description and topics are set (2026-10-22).
 - **Environment:** global Python 3.10 (no venv). Runtime pinned in `requirements.txt` (OpenCV 5.0.0.93);
   tests and lint in `requirements-dev.txt`; training on Kaggle (`requirements-train.txt`). AWS CLI v2,
   profile `hackathon`, us-east-1.
@@ -114,7 +114,7 @@ built since `b3cad2a`), the README's one-line rows and `progress.md`'s 78%. What
   clean.
 - **Not done here (needs the owner, AWS or people):** COOL (a Visa / Mastercard for the Marketplace), the
   live link (`PUBLIC_HTTPS=1` or CloudFront), the EC2 look-harder row and load test, the timed study and the
-  blinded audit, the narrated video, Lucidchart, the GitHub description and topics.
+  blinded audit, the narrated video, Lucidchart. (The GitHub description and 12 topics were set the same day.)
 
 ### 2026-10-21 (sweep 70) — the second judge audit: what still held, fixed
 
