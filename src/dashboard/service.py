@@ -28,6 +28,7 @@ import numpy as np
 from fastapi import HTTPException, UploadFile
 
 from src.agentic.agent import render
+from src.agentic.applicability import Reference, frame_stats
 from src.agentic.approvals import ApprovalError, ApprovalStore, PinGuard
 from src.agentic.core import Goal, SurveyAgent
 from src.agentic.feedback import FeedbackStore
@@ -177,6 +178,27 @@ def _pipeline_or_503(faults: set = frozenset()) -> AgenticPipeline:
         return get_pipeline()
     except Exception as e:
         raise _fail(503, incident("model_unavailable", f"the detector could not be loaded: {type(e).__name__}: {e}"[:300])) from e
+
+
+_REFERENCE: dict = {}                           # the model's applicability reference (STUDY-19), read once
+
+
+def _frame_promise(frame: np.ndarray) -> Optional[dict]:
+    """Does the calibrated promise apply to this ONE frame (``Reference.check_frame``)? None when the model has
+    no applicability reference: the promise then stands unchecked, as a survey without one logs it."""
+    if "ref" not in _REFERENCE:
+        _REFERENCE["ref"] = Reference.load()
+    ref = _REFERENCE["ref"]
+    return None if ref is None else ref.check_frame(frame_stats(frame))
+
+
+def _withdraw_frame_promise(g: dict, chk: dict) -> dict:
+    """A frame's guarantees with the recall promise withdrawn - the same shape as a withdrawn survey's."""
+    g = dict(g)
+    g["promise_withdrawn"] = {"was": g.get("recall_promise"), "why": chk["why"],
+                              "check": {k: chk.get(k) for k in ("p_value", "p_floor", "driver", "n_cal")}}
+    g["recall_promise"] = None
+    return g
 
 
 def _b64(img: np.ndarray, quality: int = 85) -> str:

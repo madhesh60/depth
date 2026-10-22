@@ -60,6 +60,28 @@ def test_upload_rejects_undecodable_image():
     assert r.json()["detail"]["incident"]["code"] == "corrupt_frame"
 
 
+def test_analyze_withdraws_the_promise_on_a_picture_that_is_not_sonar():
+    if not _HAVE_MODEL:
+        print("  skip  test_analyze_withdraws_the_promise_on_a_picture_that_is_not_sonar (model absent)")
+        return
+    import cv2
+    from test_applicability import not_sonar
+    ok, buf = cv2.imencode(".jpg", not_sonar())
+    r = client.post("/api/analyze?compute_s=60", files={"file": ("cartoon.jpg", buf.tobytes(), "image/jpeg")})
+    assert ok and r.status_code == 200
+    b = r.json()
+    assert b["applicability"]["applies"] is False
+    g = b["guarantees"]
+    assert g["recall_promise"] is None and g["promise_withdrawn"]["was"] and "does NOT apply" in g["promise_withdrawn"]["why"]
+    ac = b["agent_choice"]
+    assert ac["promise_applies"] is False and ac["mode"]["name"] == "standard"      # no promise left to buy
+    assert any(i["code"] == "frame_promise_not_applicable" for i in b["incidents"])
+    if _HAVE_SAMPLES:                                                    # a demo frame keeps its promise
+        s = client.post(f"/api/analyze?sample={samples_mod.list_samples()[0]['id']}&compute_s=60").json()
+        assert s["applicability"]["applies"] and s["agent_choice"]["promise_applies"]
+        assert s["guarantees"]["recall_promise"] and "promise_withdrawn" not in s["guarantees"]
+
+
 def test_survey_frame_limit(monkeypatch):
     import src.dashboard.service as service_mod
     monkeypatch.setattr(service_mod, "MAX_FRAMES", 2)

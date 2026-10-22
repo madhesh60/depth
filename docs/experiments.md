@@ -274,6 +274,21 @@ Promote each into the log below with full results as it runs.
 - **Limits:** a coarse guard against another sonar or rendering; it does not detect subtle site or gain
   drift inside one sonar family, and passing it is not proof that the promise holds.
   Report: [`docs/reports/applicability.md`](reports/applicability.md) · `python -m src.agentic.study_applicability --verify`.
+- **2026-10-22 — one frame on its own (Analyze, MCP `analyze_frame`).** The check ran only in surveys, so the
+  judge audit's upload of a cartoon (coloured circles and "HELLO") got two ghost-gear cards saying "reach at
+  least 84% of pots (95% confidence)". One frame has no share to bound (a 1-frame lower bound is 0.05, never
+  above the 0.20 limit), so `Reference.check_frame` asks the strictest question the stored reference answers
+  with **no new threshold**: is the frame more unusual than every one of the 163 calibration frames (p at its
+  floor, 1 / 164)? Then the promise is withdrawn for that frame (incident `frame_promise_not_applicable`, the
+  cheapest look, every card says so); a frame like the calibration frames lands there at most once in 164. A
+  frame that is merely unusual (p ≤ 0.05) keeps the promise with a caution. **Checked, not verified on a
+  registered split** (the rule came after STUDY-19, and no split was set aside for it): the 8 demo frames all
+  keep it (p 0.049–0.915; Rec9 port #13, the survey check's one atypical demo frame, gets the caution); a
+  cartoon, two studio screenshots and a raw-recording overview image are withdrawn (scores 24–49 against the
+  largest calibration score, 7.74); a 90°-rotated and an inverted demo frame keep it (scores ≤ 1.3 — this
+  check does not see orientation); uniform grey noise and a contact sheet of sonar crops stay just inside
+  (p = 2 / 164: one calibration frame is stranger, score 7.74 vs 6.81 / 7.46), so they get the caution only.
+  Tests: `tests/test_applicability.py`, `tests/test_api.py`, `tests/test_mcp.py`, `tests/ui_smoke.py`.
 
 ### STUDY-18 — Look harder: a stronger recall promise from a second look (SHIPPED — a calibrated mode)
 

@@ -83,6 +83,12 @@ CATALOGUE: dict[str, tuple[str, str, str, str, str]] = {
         "the promise is withdrawn for this survey; every proposal still reaches a person as a card, and the agent "
         "asks for a full review",
         "approve the full review (look at every frame), or treat the cards as hints only"),
+    "frame_promise_not_applicable": (
+        "warning", "decide", "The recall promise does not apply to this frame",
+        "the promise is withdrawn for this frame: it is more unusual than every frame the promise was fit on; "
+        "every find still reaches a person as a card",
+        "look at the whole frame yourself, or treat the cards as hints only; to check a whole recording, run a "
+        "survey"),
     "data_dropout": (
         "warning", "input", "Data dropout: some pings were not imaged",
         "the dropped pings are marked on the frame and any find touching them says so; the recall promise covers "

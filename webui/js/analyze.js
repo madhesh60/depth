@@ -62,11 +62,14 @@ function renderAnalyze(d) {
   $("#viewerEmpty").hidden = d.candidates.length > 0;
 
   const ph = $("#analyzePlaceholder"); ph.querySelector("h3").textContent = "Choose a sonar frame";
-  const ac = d.agent_choice, pc = d.perception || {}, fp = $("#framePerception");
+  const ac = d.agent_choice, pc = d.perception || {}, fp = $("#framePerception"), chk = d.applicability;
   if (fp) {
     fp.hidden = !ac || !ac.mode;
-    if (ac && ac.mode) fp.innerHTML = `<b>${escapeHtml(ac.mode.label)}</b> · promise ≥ ${pctS(ac.mode.promise)} — ${escapeHtml(chainText({ rationale: ac.why }))}`
-      + (pc.passes ? ` <span class="muted">· the closer look added ${pc.new || 0}, raised ${pc.raised || 0}</span>` : "");
+    // the promise check for one frame (Reference.check_frame): withdrawn = unlike every calibration frame
+    const promise = ac && ac.promise_applies === false ? "no promise for this frame" : `promise ≥ ${pctS(ac && ac.mode ? ac.mode.promise : 0)}`;
+    if (ac && ac.mode) fp.innerHTML = `<b>${escapeHtml(ac.mode.label)}</b> · ${promise} — ${escapeHtml(chainText({ rationale: ac.why }))}`
+      + (pc.passes ? ` <span class="muted">· the closer look added ${pc.new || 0}, raised ${pc.raised || 0}</span>` : "")
+      + (chk && chk.caution ? ` <span class="muted">· ${escapeHtml(chainText({ rationale: chk.why }))}</span>` : "");
   }
   const incs = d.incidents || [];
   $("#frameIncidents").innerHTML = incs.map(incidentRow).join("");
@@ -153,9 +156,17 @@ function relooked(c) {
   return (c.trace || []).some(s => /relook/.test(s.tool));
 }
 function decideDetail(c) { const d = (c.trace || []).find(s => s.tool === "decide"); return (d && d.detail) || {}; }
+// the promise this frame was decided under: its own perception mode's, or none when the check withdrew it
+function frameGuarantees() {
+  const a = state._analyze;
+  return (a && a.guarantees) || (state.calibration && state.calibration.guarantees) || {};
+}
 function tierPromise(c) {
-  const g = (state.calibration && state.calibration.guarantees) || {}, d = decideDetail(c);
+  const g = frameGuarantees(), d = decideDetail(c);
   if (d.mode !== "calibrated" && d.mode !== "active") return "Legacy rule (no calibrated promise)";
+  if (g.promise_withdrawn) return c.verdict === "low_risk"
+    ? "No promise on this frame: it is unlike every frame the promise was fit on. Below the review threshold, but look at the whole frame yourself"
+    : "No promise on this frame: it is unlike every frame the promise was fit on. Treat this card as a hint and look at the whole frame";
   if (c.verdict === "confirmed") return `Confirmed tier: at least ${Math.round((g.precision_promise || 0) * 100)}% are real (95% confidence)`;
   if (c.verdict === "review") return `Review and confirmed together reach at least ${Math.round((g.recall_promise || 0) * 100)}% of pots (95% confidence)`;
   if (((state.calibration || {}).non_hazard_classes || []).includes(c.cls_name)) return "Natural seabed class: not a hazard, kept for audit";

@@ -15,6 +15,14 @@ before the agent keeps a promise it checks that the frames look like the frames 
 * **Per survey** — the promise is **withdrawn** when the 95% Clopper-Pearson lower bound of the atypical
   share exceeds ``share_limit`` (set from 13 in-distribution training recordings, STUDY-19). One odd frame
   never withdraws it; a different sonar does.
+* **One frame on its own** (Analyze, MCP ``analyze_frame``) — a single frame has no share to bound, so
+  :meth:`Reference.check_frame` asks the strictest question the reference answers without a new
+  threshold: is the frame more unusual than *every* calibration frame (its conformal p-value at the floor
+  ``1 / (n_cal + 1)``)? Then the promise is withdrawn for that frame — a frame like the calibration frames
+  lands there at most once in ``n_cal + 1``. A frame that is merely unusual (p ≤ ``alpha_frame``) keeps
+  the promise with a caution: one frame cannot decide; a survey of its recording does. This rule was added
+  after STUDY-19 and is checked only on the shipped demo frames and hand-made non-sonar images
+  (``tests/test_applicability.py``), not on a registered verification split.
 
 It is a coarse guard against a different sonar or rendering, not a fine-grained drift detector: the
 report states what it catches. Fit and verified by ``study_applicability.py``; stored in
@@ -122,6 +130,28 @@ class Reference:
                 "share": round(k / n, 3) if n else None, "share_lcb": round(lcb, 3),
                 "share_limit": self.share_limit, "alpha_frame": self.alpha_frame,
                 "drivers": dict(top), "why": why, "p_values": [round(p, 4) for p, _ in pv]}
+
+    def check_frame(self, s: dict) -> dict:
+        """The verdict for ONE frame analysed on its own: ``applies`` False when the frame is more unusual
+        than every calibration frame (see the module docstring); ``caution`` True when it is unusual
+        (p ≤ ``alpha_frame``) but not beyond them all — the promise is kept, and only a survey can tell."""
+        p, driver = self.pvalue(s)
+        n_cal = len(self.cal_scores)
+        floor = 1.0 / (n_cal + 1)
+        beyond = p <= floor + 1e-12
+        unusual = p <= self.alpha_frame
+        if beyond:
+            why = (f"this frame is more unusual than every one of the {n_cal} calibration frames (p = {p:.4f}, "
+                   f"most unusual: {driver}) -> the recall promise does NOT apply to it")
+        elif unusual:
+            why = (f"this frame looks unlike the calibration recordings (p = {p:.4f} <= {self.alpha_frame:g}, most "
+                   f"unusual: {driver}), but not beyond all {n_cal} of them -> the promise is kept; one frame cannot "
+                   "decide - a survey of its recording does")
+        else:
+            why = f"this frame looks like the calibration recordings (p = {p:.4f}) -> the promise applies"
+        return {"applies": not beyond, "caution": bool(unusual and not beyond), "p_value": round(p, 4),
+                "p_floor": round(floor, 4), "alpha_frame": self.alpha_frame, "driver": driver,
+                "n_cal": n_cal, "why": why}
 
     # -- storage -----------------------------------------------------------------------------
     def save(self, path: Path) -> Path:

@@ -105,8 +105,10 @@ def analyze_frame(sample_id: Optional[str] = None, image_base64: Optional[str] =
                   frame_id: str = "upload", nadir: Optional[str] = None) -> dict:
     """Run the full agent on ONE sonar frame: Stage 1 (seabed track -> altitude, ground range), See
     (YOLO11 via OpenCV 5 cv2.dnn), Prove (shadow, relative height, water column), Decide (calibrated
-    tier + P(pot)). Give a sample_id from list_samples, or a base64 PNG/JPEG. Returns every candidate
-    with its tier, evidence and the agent's reason."""
+    tier + P(pot)). Give a sample_id from list_samples, or a base64 PNG/JPEG; for an upload, nadir says
+    which edge the sonar is on (top|bottom|left|right) - without it, range and shadow are not measured.
+    Returns every candidate with its tier, evidence and the agent's reason, and whether the recall promise
+    applies to this frame (``applicability``; withdrawn for a frame unlike every calibration frame)."""
     import cv2
     import numpy as np
     A = _app()
@@ -128,11 +130,15 @@ def analyze_frame(sample_id: Optional[str] = None, image_base64: Optional[str] =
     with A._INFER_LOCK:
         r = pipe.run_frame(frame, frame_id=fid, nadir=nadir)
     A._METRICS.record("mcp_analyze", fid, r.stage_ms, None, r.counts)
+    chk = A._frame_promise(frame)
+    g = pipe.guarantees()
+    if chk is not None and not chk["applies"]:
+        g = A._withdraw_frame_promise(g, chk)
     return {"frame_id": fid, "size": [r.width, r.height], "counts": r.counts,
             "stage1": {k: r.stage1.get(k) for k in ("altitude_px", "measured", "track_conf", "palette")},
             "orientation": r.orientation, "candidates": [_cand_summary(c, i) for i, c in enumerate(r.candidates)],
-            "stage_ms": {k: round(v, 1) for k, v in r.stage_ms.items()}, "guarantees": pipe.guarantees(),
-            "provenance": A.provenance_stamp()}
+            "stage_ms": {k: round(v, 1) for k, v in r.stage_ms.items()}, "guarantees": g,
+            "applicability": chk, "provenance": A.provenance_stamp()}
 
 
 @mcp.tool(annotations=_READ)

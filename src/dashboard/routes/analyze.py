@@ -1,6 +1,6 @@
 """
 routes/analyze.py — one frame: See → Prove → Decide, with the agent's mode choice priced against the server
-queue.
+queue, after checking that the recall promise applies to the frame at all (``Reference.check_frame``).
 """
 from __future__ import annotations
 
@@ -70,8 +70,16 @@ def analyze(sample: Optional[str] = Query(None), nadir: Optional[str] = Query(No
 
     t0 = time.perf_counter()
     pipe = S._pipeline_or_503(faults)
+    chk = S._frame_promise(frame)                                       # STUDY-19's check, for one frame
+    applies = chk is None or chk["applies"]
     goal, load = _interactive_goal(recall, compute_s, pipe.ms_per_pass())
-    mode, choice = choose_mode(goal, calibrated_modes(), 1, pipe.ms_per_pass())
+    modes = calibrated_modes()
+    if applies:
+        mode, choice = choose_mode(goal, modes, 1, pipe.ms_per_pass())
+    else:                                                               # no promise left to buy: the cheapest look
+        mode, choice = choose_mode(Goal(compute_s=goal.compute_s), modes[:1], 1, pipe.ms_per_pass())
+        choice["why"] = ("the promise does not apply to this frame, so no mode can buy one - the cheapest look "
+                         "(standard); a person looks at the whole frame")
     if load and load["calls_ahead"]:
         choice["why"] = (f"the detector is busy ({load['calls_ahead']} call(s) ahead, ~{load['wait_s']:.1f} s) -> "
                          f"{load['left_s']:.1f} s of the {load['budget_s']:g}-s answer budget left: " + choice["why"])
@@ -81,8 +89,13 @@ def analyze(sample: Optional[str] = Query(None), nadir: Optional[str] = Query(No
         result = pipe.run_frame(frame, frame_id=frame_id, nadir=nadir, faults=faults, agent=agent)
     payload = S._frame_payload(frame, result, full=images == "full")
     payload["guarantees"] = pipe.guarantees(agent)
+    payload["applicability"] = chk
+    if not applies:
+        payload["guarantees"] = S._withdraw_frame_promise(payload["guarantees"], chk)
+        payload["incidents"].append(incident("frame_promise_not_applicable", chk["why"], p_value=chk["p_value"],
+                                             driver=chk["driver"]))
     payload["agent_choice"] = {"goal": goal.to_dict(), "mode": mode.to_dict() if mode else None, **choice,
-                               "server_load": load}
+                               "promise_applies": applies, "server_load": load}
     payload["provenance"] = provenance_stamp()
     payload["frame_ref"] = {"sample": sample} if (sample and file is None) else S._frame_ref(frame_id)
     try:

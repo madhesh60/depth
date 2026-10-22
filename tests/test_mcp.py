@@ -103,6 +103,23 @@ def test_agent_asks_person_decides(client):
     assert not err and st[0]["status"] == "approved" and st[0]["decision"]["by"] == "R. Analyst"
 
 
+def test_analyze_frame_over_mcp_checks_the_promise_applies(client):
+    """An agent sending a picture that is not sonar gets no recall promise back, over the real /mcp path."""
+    if not _HAVE_MODEL:
+        pytest.skip("model absent")
+    import base64
+
+    import cv2
+    from test_applicability import not_sonar
+    ok, buf = cv2.imencode(".png", not_sonar())
+    err, f = _call(client, "analyze_frame", {"image_base64": base64.b64encode(buf.tobytes()).decode(),
+                                             "frame_id": "cartoon"}, i=31)
+    assert ok and not err and f["applicability"]["applies"] is False
+    assert f["guarantees"]["recall_promise"] is None and f["guarantees"]["promise_withdrawn"]["was"] > 0
+    err, s = _call(client, "analyze_frame", {"sample_id": service_mod.samples_mod.list_samples()[0]["id"]}, i=32)
+    assert not err and s["applicability"]["applies"] and s["guarantees"]["recall_promise"]
+
+
 def test_approval_store_rules(tmp_path, monkeypatch):
     st = ApprovalStore(tmp_path)
     with pytest.raises(ApprovalError):
@@ -140,3 +157,4 @@ def test_stdio_with_the_official_client():
     if frame is not None:                                     # the model loads lazily inside the tool call
         f = json.loads(frame.content[0].text)
         assert not frame.isError and f["candidates"] and f["provenance"]["model"]
+        assert f["applicability"]["applies"] and f["guarantees"]["recall_promise"]   # a demo frame keeps it
