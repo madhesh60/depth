@@ -46,7 +46,7 @@ jobs:
           setsid nohup bash -c "$POST_ATTACH" > /tmp/studio.log 2>&1 &
           for i in $(seq 1 150); do
             if curl -sf http://127.0.0.1:8000/api/health | python -c "import json, sys; sys.exit(0 if json.load(sys.stdin).get('model_loaded') else 1)"; then
-              echo "studio ready after ~$((2 * i)) s"; break
+              echo "::notice title=Studio ready::the codespace setup finished and the studio loaded the model after ~$((2 * i)) s"; break
             fi
             sleep 2
           done
@@ -59,9 +59,19 @@ jobs:
           pip install -q websockets==15.0.1
 
       - name: The studio, a survey and the guided demo to its last step - 0 JS errors
-        run: python tests/ui_smoke.py --url http://127.0.0.1:8000 --full-demo
+        run: |
+          python tests/ui_smoke.py --url http://127.0.0.1:8000 --full-demo | tee /tmp/ui_smoke.out
+          python - <<'EOF'
+          import json
+          t = open("/tmp/ui_smoke.out", encoding="utf-8").read()
+          r = json.loads(t[t.index("{"):t.rindex("}") + 1])
+          s, d = r["steps"]["survey"], r["steps"]["demo"]
+          print(f"::notice title=Studio in the codespace image (2 CPUs)::survey of the 8 demo frames {s['seconds']} s "
+                f"(compute budget {s['compute_budget_s']} s, look {s['mode']}, downgraded at {s['downgraded_at']}); "
+                f"guided demo {d['step']} in {d['seconds']} s; {len(r['errors'])} JS errors")
+          EOF
 
-      - name: First-survey time on 2 CPUs - no compute budget vs the studio's default 20 s
+      - name: Survey time on 2 CPUs - no compute budget vs the studio's default 20 s
         run: |
           python - <<'EOF'
           import json, time, urllib.request
@@ -70,9 +80,9 @@ jobs:
               url = "http://127.0.0.1:8000/api/survey?use_samples=1&gps=synthetic&budget_minutes=2&boat_minutes=10" + q
               d = json.load(urllib.request.urlopen(urllib.request.Request(url, method="POST"), timeout=900))
               run = d.get("agent_run") or {}
-              print(f"compute budget {'20 s' if q else 'none'}: {time.time() - t0:.1f} s wall, look "
-                    f"{(run.get('mode') or {}).get('name')}, downgraded at {run.get('downgraded_at')}, "
-                    f"{len(d.get('tracked') or [])} hazards")
+              print(f"::notice title=Survey of the 8 demo frames, 2 CPUs, compute budget {'20 s' if q else 'none'}::"
+                    f"{time.time() - t0:.1f} s wall, look {(run.get('mode') or {}).get('name')}, downgraded at "
+                    f"{run.get('downgraded_at')}, {len(d.get('tracked') or [])} hazards")
           EOF
 
       - name: Studio log
