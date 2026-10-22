@@ -1,6 +1,7 @@
 # The judges' click-to-run path, tested the way a codespace runs it (README button -> .devcontainer/):
 # the devcontainer's image, its own setup command (postCreateCommand) and start command (postAttachCommand),
-# both read from devcontainer.json, on 2 CPUs and 4 GB (its hostRequirements). Then the real studio in
+# both read from devcontainer.json and run as the codespace's user (vscode), on 2 CPUs and 4 GB (its
+# hostRequirements). Then the real studio in
 # headless Chromium: boot -> Analyze -> a Survey with the studio's default 20-s compute budget -> the guided
 # demo to its last step, with 0 JS errors; and the first-survey time with and without that budget.
 # What only a real codespace shows (port forwarding, the browser tab it opens) is a person's check.
@@ -35,15 +36,16 @@ jobs:
           print("POST_ATTACH=" + cfg["postAttachCommand"])
           EOF
 
-      - name: postCreateCommand - the codespace's setup
+      - name: postCreateCommand - the codespace's setup, as its user (vscode)
         run: |
+          chown -R vscode:vscode "$GITHUB_WORKSPACE"
           echo "$POST_CREATE"
-          time bash -c "$POST_CREATE"
+          time runuser -u vscode -- env PATH="$PATH" HOME=/home/vscode bash -c "$POST_CREATE"
 
       - name: postAttachCommand - starts the studio, as when the browser attaches
         run: |
           echo "$POST_ATTACH"
-          setsid nohup bash -c "$POST_ATTACH" > /tmp/studio.log 2>&1 &
+          setsid nohup runuser -u vscode -- env PATH="$PATH" HOME=/home/vscode bash -c "$POST_ATTACH" > /tmp/studio.log 2>&1 &
           for i in $(seq 1 150); do
             if curl -sf http://127.0.0.1:8000/api/health | python -c "import json, sys; sys.exit(0 if json.load(sys.stdin).get('model_loaded') else 1)"; then
               echo "::notice title=Studio ready::the codespace setup finished and the studio loaded the model after ~$((2 * i)) s"; break
@@ -80,7 +82,7 @@ jobs:
               url = "http://127.0.0.1:8000/api/survey?use_samples=1&gps=synthetic&budget_minutes=2&boat_minutes=10" + q
               d = json.load(urllib.request.urlopen(urllib.request.Request(url, method="POST"), timeout=900))
               run = d.get("agent_run") or {}
-              print(f"::notice title=Survey of the 8 demo frames, 2 CPUs, compute budget {'20 s' if q else 'none'}::"
+              print(f"::notice title=Survey of the 8 demo frames on 2 CPUs with compute budget {'20 s' if q else 'none'}::"
                     f"{time.time() - t0:.1f} s wall, look {(run.get('mode') or {}).get('name')}, downgraded at "
                     f"{run.get('downgraded_at')}, {len(d.get('tracked') or [])} hazards")
           EOF
