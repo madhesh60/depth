@@ -71,8 +71,10 @@ class FeedbackStore:
         if len(bbox) != 4 or bbox[2] - bbox[0] < 2 or bbox[3] - bbox[1] < 2:
             raise ValueError("bbox must be [x1, y1, x2, y2] with a positive size")
         ref = rec.get("frame_ref") or {}
-        if not (ref.get("sample") or ref.get("upload")):
+        if not isinstance(ref, dict) or not (ref.get("sample") or ref.get("upload")):
             raise ValueError("frame_ref needs 'sample' or 'upload'")
+        if ref.get("sample") and self.image_path({"sample": ref["sample"]}) is None:
+            raise ValueError(f"unknown sample {str(ref['sample'])[:40]!r} - not in this server's sample catalogue")
         if d == "override" and rec.get("override_to") not in OVERRIDE_TO:
             raise ValueError(f"an override needs override_to in {OVERRIDE_TO}")
         out = {

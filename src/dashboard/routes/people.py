@@ -21,8 +21,11 @@ router = APIRouter()
 
 @router.post("/api/feedback")
 def feedback(rec: dict = Body(...)):
-    """One human decision (confirm / reject / missed) on a box → an append-only training label."""
+    """One human decision (confirm / reject / missed) on a box → an append-only training label. The frame must
+    be a sample in the catalogue or a recently analysed upload."""
     ref = rec.get("frame_ref") or S._frame_ref(str(rec.get("frame_id", "")))
+    if not isinstance(ref, dict):
+        raise HTTPException(400, "frame_ref must be an object: {\"sample\": <id>} or {\"upload\": <sha>}")
     rec["frame_ref"] = ref
     img = S._UPLOADS.get(ref.get("upload")) if ref.get("upload") else None
     if ref.get("upload") and img is None and S._FEEDBACK.image_path(ref) is None:

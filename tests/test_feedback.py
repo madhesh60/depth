@@ -22,7 +22,8 @@ def _rec(decision, bbox, ref, **kw):
 def test_validation(tmp_path):
     st = FeedbackStore(tmp_path)
     for bad in (_rec("maybe", [0, 0, 10, 10], {"sample": "s"}), _rec("confirm", [0, 0, 1, 1], {"sample": "s"}),
-                _rec("confirm", [0, 0, 10, 10], {})):
+                _rec("confirm", [0, 0, 10, 10], {}), _rec("confirm", [0, 0, 10, 10], "sample-02"),
+                _rec("confirm", [0, 0, 10, 10], {"sample": "no-such-sample"})):      # not in the catalogue
         try:
             st.add(bad)
             raise AssertionError("should have raised")
@@ -77,6 +78,21 @@ def test_api_feedback_roundtrip(tmp_path, monkeypatch):
     assert r.status_code == 200 and r.json()["saved"]["frame_ref"] == {"sample": "sample-02"}
     assert c.get("/api/feedback/stats").json()["missed"] == 1
     assert c.post("/api/feedback", json={"decision": "nope", "bbox": [0, 0, 9, 9], "frame_ref": {"sample": "x"}}).status_code == 400
+
+
+def test_api_refuses_labels_for_frames_it_does_not_know(tmp_path, monkeypatch):
+    """Judge audit 2026-10-22 (B4): a made-up sample id was stored as a label (HTTP 200)."""
+    from fastapi.testclient import TestClient
+    import src.dashboard.app as app_mod
+    import src.dashboard.service as service_mod
+    monkeypatch.setattr(service_mod, "_FEEDBACK", FeedbackStore(tmp_path))
+    c = TestClient(app_mod.app)
+    box = {"decision": "confirm", "bbox": [5, 5, 25, 25], "frame_id": "f"}
+    r = c.post("/api/feedback", json={**box, "frame_ref": {"sample": "x" * 300}})
+    assert r.status_code == 400 and "unknown sample" in r.json()["detail"]
+    assert c.post("/api/feedback", json={**box, "frame_ref": "sample-02"}).status_code == 400    # not an object: 400, not 500
+    assert c.post("/api/feedback", json={**box, "frame_ref": {"upload": "f" * 32}}).status_code == 410
+    assert FeedbackStore(tmp_path).stats()["decisions"] == 0
 
 
 def test_heldout_samples_never_reach_a_finetune_set(tmp_path):
