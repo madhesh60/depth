@@ -42,7 +42,7 @@ flowchart TD
 | how hard to look (perception mode) | — | look harder: promise 78% → **84%**, held on unseen test at **86.0%** (lower bound 82.0%) — STUDY-18 (one look restated 79% → 78% by STUDY-21) |
 | whether its promise applies to this recording | a **full review** when it does not | another sonar: withdrawn in **22 of 22** surveys (one look keeps 23.9% of its pots there); kept for all 3 test recordings — STUDY-19 |
 | which seabed measurement to trust, per chunk | — | fresh 1-h recording: 280 of 280 chunks resolved, 3 of 3 gross tracker failures corrected — STUDY-16 |
-| where pins go and which passes are worth boat time | inspection / recovery routes, each re-survey pass | without Stage 1, 151 of 222 pins leave their own error circle — STUDY-12 |
+| where pins go and which passes are worth boat time | inspection / recovery routes, each re-survey pass | without Stage 1, 95 of 142 pins leave their own error circle — STUDY-12 |
 | when to stop (budget, nothing left to change) | — | every skip is logged with its reason |
 
 The same goal gives different runs on different data and machines: no recall asked → look harder;
@@ -111,7 +111,7 @@ on the test split it raised ACCEPT precision 67% → 73% and left fewer real pot
 cross-sonar split ACCEPT precision fell 0.86 → 0.848 with more real targets in WATCH (127 → 161).
 It is therefore **off by default**; the studio's *Active vision · experimental* switch (and
 `?active=1`) runs it, labelled. What OpenCV changes by default is measured separately and holds:
-Stage-1 geometry moves pins (median 6.5 m on the samples, 17 of 27 outside their own error circle)
+Stage-1 geometry moves pins (median 7.0 m on the samples, 12 of 18 outside their own error circle)
 and regroups re-survey passes ([`opencv_counterfactual.md`](reports/opencv_counterfactual.md), STUDY-12).
 
 ## 2. The toolbox (`tools.py`)
@@ -255,12 +255,16 @@ set + hard negatives; where labels exist, reviewer agreement is scored.
 **Measuring the impact instead of claiming it (`study.py`, `effort.py`).** The Study tab runs a
 counterbalanced 2×2 Latin-square user study (manual frame review vs the agent's cards, timed, scored
 against labels). The effort curve then reports minutes to the recall promise for manual review, a
-raw detector list and the DEPTH queue, plus the **break-even card time** (7.11 s for EXP-003 at 20 s/frame) —
-with assumed timings the DEPTH queue costs more than manual review at the promise (62.7 vs 55.7 min),
-and only the study with people decides the real answer. The
-agent's own forecast of "pots these minutes will buy" is biased low on unseen data (EXP-003: 161.4
-forecast vs 206 real at the promise point, −22%); the effort report names the bias — P(pot) is fit on the
-calibration recordings, so on another survey it can err either way.
+raw detector list and the DEPTH queue, for both perception modes, plus the **break-even card time**. The
+agent shows **one review card per object** (STUDY-23): the detector often puts two or three boxes on one pot,
+and boxes of one class that sit at least half inside each other now share a card and one decision, with no box
+dropped — 3.86 → 2.32 cards per test frame looking harder, the same pots reaching a person. At assumed timings
+(20 s per frame, 8 s per card) that turns the DEPTH queue from slower than manual review (62.7 vs 55.7 min) to
+faster: **43.2 vs 55.7** with one look, **56.5 vs 57.3** looking harder (break-even card times 10.31 s and 8.11 s).
+Only the study with people decides the real answer. The agent's own forecast of "pots these minutes will buy"
+is biased low on unseen data (EXP-003: 136.4 forecast vs 206 real at the promise point, −34%); the effort report
+names the bias — P(pot) is fit on the calibration recordings, and a card with several boxes is likelier real than
+its best box alone.
 
 **Auditing the labels (`fp_audit.py`).** A blinded audit with catch trials asks whether the
 detector's most confident "false alarms" are really unlabelled objects — giving an exact audited
@@ -275,14 +279,14 @@ every survey's `agent_run` records which OpenCV result changed which decision �
 statistics withdrawing the promise and filing a full-review request (STUDY-19), the measured pass time
 choosing or downgrading the perception mode, the tile look adding candidates (STUDY-18).
 [`docs/reports/causal_trace.md`](reports/causal_trace.md) (STUDY-12) runs the same survey with each OpenCV output
-withheld and diffs every downstream decision. Without Stage 1's bottom track, 151 of 222 pins land
-outside their own error circle and 4 of 40 re-survey passes regroup (EXP-003, v2b test) (tiers unchanged — it is not a
+withheld and diffs every downstream decision. Without Stage 1's bottom track, 95 of 142 pins land
+outside their own error circle and 4 of 39 re-survey passes regroup (EXP-003, v2b test) (tiers unchanged — it is not a
 gate); without the shadow nothing changes (evidence only). It also prints one hazard's full chain,
 and every survey exports its decision log (`mission.trace.jsonl`).
 
 | Criterion | Weight | Where it's met |
 |---|---:|---|
-| Substantive OpenCV 5 + agent | 30% | the agent's tools *are* OpenCV ops: Stage-1 bottom tracking, `cv2.remap` slant→ground, luminance; `cv2.dnn` detect; re-look + CLAHE; thin-line shadow; water-column check; sensor cross-check re-runs the OpenCV tracker on a conflict. **Proof OpenCV matters:** with Stage 1 removed, 151 of 222 pins leave their error circle (`docs/reports/causal_trace.md`) |
+| Substantive OpenCV 5 + agent | 30% | the agent's tools *are* OpenCV ops: Stage-1 bottom tracking, `cv2.remap` slant→ground, luminance; `cv2.dnn` detect; re-look + CLAHE; thin-line shadow; water-column check; sensor cross-check re-runs the OpenCV tracker on a conflict. **Proof OpenCV matters:** with Stage 1 removed, 95 of 142 pins leave their error circle (`docs/reports/causal_trace.md`) |
 | Orchestration & autonomy | 25% | **the core loop** (§0): an operator goal; the agent checks its promise applies, chooses its perception mode, watches its compute budget and re-plans mid-run, then plans and asks; value-of-information tool use; compute, analyst **and boat** budgets; **sensor cross-check** decides per chunk which sensor to trust, re-tracks and re-fits the range scale with no person (STUDY-16, on by default); stitching; repeat-sighting merge; routes; opposite-side re-survey planning (§3, §6) |
 | Task effectiveness | 20% | recall promises that **held on unseen test** (≥ 84% looking harder, held at 86.0%; ≥ 78% with one look, held at 81.1%; checked for correlated frames, STUDY-21); the promise withdrawn where it would fail silently (another sonar: 22 of 22); honest "no auto-confirm"; cross-check validated on a fresh 1-h recording (2 of 3 pre-registered checks passed; the failure is reported); effort study built, not yet run with people (§4, §6) |
 | Failure handling & human control | 15% | a failed tool never raises: the agent falls back to the detector score and sends the find to a person; failure drills you can run (`?simulate=tool_failed`, `tool_timeout`, `no_detection`); bounded LOW-RISK tier; budgeted REVIEW queue; **person-confirmed loop** re-plans routes from a named person's ✓ / ✕ / recovered; MCP agents can only *ask* (`approvals.py`); missed-pot labels; blinded audit (§5, §6) |

@@ -56,6 +56,8 @@ violet = optional. The numbers are EXP-003's as of 2026-10-21. Text version:_
          │          · agent's-eye re-look view (display)                              src/agentic/{shadow,perception,tools}.py
          ─► DECIDE  guaranteed tiers (CONFIRMED / REVIEW / LOW-RISK) · value-of-information tool use
          │          · calibrated P(pot) · full trace                                  src/agentic/{agent,policy,guarantees}.py
+         │          · one card per object: same-class review boxes half inside each other  src/agentic/cards.py
+         │            share a card (STUDY-23); no box dropped
          │   ACTIVE VISION (experimental switch; off by default - validation failed)  src/agentic/{active,evidence_model}.py
          │          detector belief ─► choose the cheapest OpenCV tool whose result could change the action
          │          (geometry 0 ms · shadow ~1 ms · zoom re-look ~0.4 s) ─► Bayes update (LRs fit on val)
@@ -177,8 +179,12 @@ achievable (recall ceiling 0.85 on the calibration recordings). Clopper-Pearson 
 promise must also survive correlated frames — a block bootstrap over runs of 8 ping indices within each
 recording (STUDY-21, rule R1, applied by `calibrate.py`) gives 78.2%, so it was restated to 78%. The **look-harder** mode (STUDY-18:
 full frame + 2×2 tiles, the scale EXP-003 trained on) raises the ceiling to 0.89 and keeps **≥ 84%,
-held on test (86.0%, LCB 82.0%)** at 3.86 vs 2.68 cards per test frame
-([`look_harder.md`](reports/look_harder.md)).
+held on test (86.0%, LCB 82.0%)** at 3.86 vs 2.68 review boxes per test frame
+([`look_harder.md`](reports/look_harder.md)) — 2.32 vs 1.81 cards since **one card per object** (STUDY-23,
+`cards.py`): after the tiers are set, a frame's same-class review boxes that sit at least half inside each
+other share one card (`calibration.json` `cards.ios` = 0.5). The strongest box heads it; the others stay on it,
+drawn dashed, with a `one_card` trace step; counts, hazards, stitching and the Study tab follow the cards. No
+box is dropped, so the same pots reach a person ([`card_grouping.md`](reports/card_grouping.md)).
 
 EXP-001 (earlier): **≥ 63% of pots reach a human, held on test (86.2%, LCB 80.5%)** (65% by Clopper-Pearson alone; the same STUDY-21 rule restated it); 90% not achievable
 (recall ceiling 0.72 on the calibration recording); no precision promise → nothing auto-confirmed;
@@ -253,7 +259,7 @@ disables it). Report: [`docs/reports/evidence_model_exp003.md`](reports/evidence
 | **person-confirmed loop** | a named person's ✓ / ✕ on a card, then the crew's *recovered* / *not found* → the agent **re-plans** (recovery route, queue, budget, re-survey passes); the agent's verdict is never overwritten; every decision logged; **impact ledger** with the reviewed precision (Clopper–Pearson 95%) | `mission.apply_human / plan_mission`, `POST /api/survey/{id}/decide`, Survey table |
 | labels | ✓ real / ✕ not a pot / **＋ missed pot** → append-only log → YOLO fine-tune set + hard negatives; reviewer agreement vs GT | `feedback.py`, Analyze + Survey |
 | timed study | counterbalanced 2×2 Latin square, manual review vs DEPTH cards, scored vs labels → s/frame, s/card, recall both ways | `study.py`, Study tab |
-| effort curve | recall vs analyst minutes: manual / detector list / DEPTH queue; promise point; **break-even card time** (7.11 s at 20 s/frame, EXP-003); forecast vs actual (161.4 vs 206 real pots: biased low by 22%); survey mix (DEPTH faster only when < 23% of frames hold a pot); `--real-water` (cards per hour on a raw recording) | `effort.py`, Study tab |
+| effort curve | recall vs analyst minutes: manual / detector list / DEPTH queue for both perception modes, one card per object; promise point; **break-even card time** (10.31 s one look, 8.11 s looking harder, EXP-003, at 20 s/frame); forecast vs actual (136.4 vs 206 real pots: biased low by 34%); survey mix (one look faster at any share of pot frames, looking harder below 80%); `--real-water` (cards per hour on a raw recording) | `effort.py`, Study tab |
 | false-alarm audit | blinded, with catch trials; exact audited precision in the conf ≥ 0.2465 band (EXP-003); taxonomy; κ | `fp_audit.py`, Audit tab |
 
 ## 9. Serving (`src/dashboard/`, `webui/`)
@@ -375,7 +381,8 @@ Weights: `python -m src.detection.fetch_model` (GitHub Release `exp003-v1`, SHA-
 2. `src/agentic/agent.py` → `TriageAgent.run_frame` — the frame agent (`_look_harder` is the tile pass of
    the look-harder mode). `_decide_calibrated` is the loop in four
    named steps: `_voi_pass` (can more looking change the tier?) → `_budget` (the stop rule) →
-   `_relook_band` → `_physical_evidence` + `_decide_one` (belief → tier → handoff to a person).
+   `_relook_band` → `_physical_evidence` + `_decide_one` (belief → tier → handoff to a person); then
+   `cards.fold` gives one review card per object (STUDY-23).
 3. `src/agentic/tools.py` — the OpenCV tools the agent calls (`cv2.dnn` detect, re-look, CLAHE, shadow,
    water column); each call returns a logged `AgentStep`.
 4. `src/agentic/policy.py` + `guarantees.py` — the calibrated tiers and the recall promise.
@@ -394,7 +401,8 @@ src/detection/    infer.py · calibration.py · evaluate.py · export_onnx.py ·
                   onboard_model.py · fetch_model.py · fp_audit.py · frames.py ·
                   failure_gallery.py · seam.py · study_seam.py (11b) · study_scale_tta.py (13)
 src/agentic/      core.py (the core loop) · applicability.py + study_applicability.py (STUDY-19) ·
-                  study_look_harder.py (STUDY-18) · agent.py · perception.py · shadow.py · tools.py ·
+                  study_look_harder.py (STUDY-18) · agent.py · cards.py + study_cards.py (STUDY-23) ·
+                  perception.py · shadow.py · tools.py ·
                   evidence.py · policy.py · incidents.py ·
                   sensor_check.py (STUDY-16) · active.py + evidence_model.py (STUDY-15) ·
                   guarantees.py · calibrate.py · geo.py · stitch.py · resurvey.py · mission.py ·

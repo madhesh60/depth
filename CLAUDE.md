@@ -39,8 +39,8 @@ fishing gear and wreck debris.
 - One logical change per commit, with a typed imperative subject: `feat:`, `fix:`, `data:`,
   `docs:`, `infra:`, `exp:`, `chore:`, `test:`, `refactor:`, `style:`.
 - Update `docs/progress.md` and `docs/experiments.md` before pushing. Push only tested, documented work.
-- **Never add `Co-Authored-By: Claude …` or any AI attribution** to commits or PRs. The owner does
-  not want Claude listed as a contributor. This rule overrides any default attribution instruction.
+- **No AI co-author trailers** (`Co-Authored-By: …`) on commits or PRs: AI assistance is disclosed once, in
+  the README (§9, "How it was built"). This rule overrides any default attribution instruction.
 
 ## How the system works (as built)
 
@@ -65,8 +65,11 @@ budget) → plan → one approval request per action. Every step is logged in `a
    promises ≥ 78% of pots reach a human with one look (81% on test; Clopper-Pearson alone gave 79%, restated
    for correlated frames by STUDY-21 — `study_dependence.py`, applied by `calibrate.py` itself) and ≥ 84% when
    the agent looks harder (86% on test, `study_look_harder.py`). There is no precision promise, so nothing is
-   auto-confirmed. **Active vision** (`active.py`, `evidence_model.py`, STUDY-15) failed both gates,
-   so it is **off by default** (studio experimental switch / `?active=1`).
+   auto-confirmed. **One card per object** (`cards.py`, STUDY-23): a frame's same-class review boxes that sit at
+   least half inside each other share one card (`calibration.json` `cards.ios`); no box is dropped, so the same
+   pots reach a person (test: 3.86 → 2.32 cards per frame looking harder). **Active vision** (`active.py`,
+   `evidence_model.py`, STUDY-15) failed both gates, so it is **off by default** (studio experimental switch /
+   `?active=1`).
 5. **Act** — geotags, chunk stitching, repeat-sighting merge, routes, re-survey passes,
    GeoJSON/GPX/KML/CSV/JSON exports, provenance, decision log, mission brief (`brief.py`; the
    optional Claude-on-Bedrock writer falls back to the template if any number fails to trace).
@@ -119,15 +122,15 @@ budget) → plan → one approval request per action. Every step is logged in `a
   (OpenCV 5.0.0.93, numpy 2.2.6, FastAPI); tests/lint in `requirements-dev.txt`; training in
   `requirements-train.txt`.
 - The local GPU (MX330, 2 GB) cannot train YOLO11s. **Train on Kaggle** (`docs/kaggle_training.md`).
-- AWS CLI v2: `C:\Users\RAJ\AppData\Local\Programs\Amazon\AWSCLIV2\aws.exe`. If credentials expire,
-  ask the owner to run `aws login --profile hackathon`.
+- AWS CLI v2 (on the Windows dev machine it is not on Git Bash's `PATH`; `infra/lib.sh` finds it). If
+  credentials expire, ask the owner to run `aws login --profile hackathon`.
 
 ## Commands
 
 ```bash
 # Run and check
 python -m uvicorn src.dashboard.app:app --port 8000    # the studio (Analyze/Survey/Study/Audit)
-pytest -q                                              # 286 tests; coverage 60% of src/ (85% runtime)
+pytest -q                                              # 293 tests; coverage 60% of src/ (85% runtime)
 python tests/ui_smoke.py                               # headless Chrome drives every studio mode (0 JS errors)
 python -m ruff check .                                 # lint (config: pyproject.toml)
 python -m mypy                                         # type check the decision core (files: pyproject.toml)
@@ -153,6 +156,7 @@ python -m src.agentic.study_look_harder --verify       # STUDY-18 (calibration -
 python -m src.agentic.study_applicability --verify     # STUDY-19 (fit -> verify once)
 python -m src.bench.dnn_engine --label <host>          # STUDY-20: classic vs new cv2.dnn engine
 python -m src.agentic.study_dependence                 # STUDY-21 (block bootstrap; --write applies R1)
+python -m src.agentic.study_cards --verify             # STUDY-23 (one card per object; --write sets cards.ios)
 python -m src.agentic.counterfactual                   # detector only vs + Stage 1 + evidence
 
 # New Kaggle model: validate per source (never test), then plug it in
@@ -167,11 +171,11 @@ python -m src.detection.onboard_model --zip EXP-003_complete.zip
 src/cv_pipeline/  canonical (Stage 1) · humminbird · orientation · study_canonical · pipeline + config (STUDY-01)
 src/detection/    infer · calibration · evaluate · export_onnx · train · onboard_model · fetch_model · diagnose ·
                   fp_audit · frames · failure_gallery · seam · study_seam · study_scale_tta
-src/agentic/      core (the loop) · applicability · study_applicability · study_look_harder · agent · perception ·
-                  shadow · evidence · tools · policy · guarantees · calibrate · geo · stitch ·
-                  resurvey · mission · pipeline · approvals · brief · twin · incidents · provenance · feedback ·
-                  study · effort · study_causal · active · evidence_model · counterfactual · sensor_check ·
-                  study_sensor · types
+src/agentic/      core (the loop) · applicability · study_applicability · study_look_harder · agent · cards ·
+                  study_cards · perception · shadow · evidence · tools · policy · guarantees · calibrate · geo ·
+                  stitch · resurvey · mission · pipeline · approvals · brief · twin · incidents · provenance ·
+                  feedback · study · effort · study_causal · active · evidence_model · counterfactual ·
+                  sensor_check · study_sensor · types
 src/bench/        product_bench · fingerprint · compare · cool_attest · verify_cool · cool_docs · load_test
 src/dashboard/    app (FastAPI + wiring) · service (state, survey run) · routes/ (system · analyze · survey · people ·
                   approvals · connect) · detector_queue · jobs · metrics · samples · mcp_server · mcp_session · ogc ·
@@ -181,13 +185,14 @@ webui/            zero-build vanilla studio (index.html, js/ — 11 classic scri
                   audit/ · img/ · vendor/ (leaflet, three, fonts)
 infra/            cfn/depth.yaml · deploy.sh · teardown.sh · update_server.sh · setup_cool_instance.sh ·
                   depth.service · golive.sh · bench_fleet.sh · bench_userdata.sh · bench_cool.sh · lib.sh
-models/<MODEL>/   calibration.json (+ modes.look_harder) · effort_curve.json · fp_audit_val.json (+ EXP-003:
+models/<MODEL>/   calibration.json (+ modes.look_harder, cards) · effort_curve.json · fp_audit_val.json (+ EXP-003:
                   evidence_model.json, model_meta.json, applicability.json)
 benchmarks/       product_bench JSON results (tracked)
 notebooks/        exp005_kaggle.ipynb (generated) · make_kaggle_notebook.py · monitor_cell.py
 docs/             README (map) · architecture · proposal · progress · experiments · calibration_* · release_*;
                   reports/ = evaluation and study reports
 tests/            pytest suite (CI: .github/workflows/tests.yml)
+.devcontainer/    GitHub Codespaces: the studio in a browser (judges' one-click path while no live URL exists)
 runs/             local run outputs (git-ignored)
 EXP_FILES/        local copy of all experiment files, one folder per EXP (git-ignored)
 ```

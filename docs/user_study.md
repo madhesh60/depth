@@ -10,7 +10,8 @@ find each way. Built into the app: **Study** tab.
 2. Open **Study**, type the participant's initials, **Start session**.
 3. The participant does both tasks (the app times everything):
    - **Manual review** — a raw sonar frame; click every crab pot, then *Next* (Enter). Backspace undoes.
-   - **DEPTH cards** — the agent's review queue; *Y* real pot / *N* not a pot.
+   - **DEPTH cards** — the agent's review queue, one card per object (a card can carry several boxes on the
+     same pot, STUDY-23); *Y* real pot / *N* not a pot.
 4. Hand the laptop to the next person → **New session**. Aim for **3+ people** (the more, the tighter).
 
 ## Design (why the numbers are fair)
@@ -20,8 +21,8 @@ find each way. Built into the app: **Study** tab.
   goes to which task, and which task comes first, rotate with the session number — learning and
   fatigue effects cancel across sessions.
 - **Scored against the labels, server-side:** a manual click counts if it lands in a labelled pot
-  (+8 px); one click per pot; extra clicks are false marks. A card is real if it overlaps a labelled
-  pot at IoU ≥ 0.3.
+  (+8 px); one click per pot; extra clicks are false marks. A card is real if one of its boxes overlaps a
+  labelled pot at IoU ≥ 0.3.
 - **DEPTH-card recall counts every labelled pot in the card frames** — including pots the detector
   never proposed. It is bounded by the model, not the person.
 - Frames: the 8 shipped labelled samples (4 per task per person). For a larger study point

@@ -172,7 +172,7 @@
 
   <!-- OpenCV output drives where the boat goes -->
   <path d="M494,426 L494,438 L1158,438 L1158,430" stroke="#0e8fac" stroke-width="1.3" fill="none" stroke-dasharray="4 3" marker-end="url(#arc)"/>
-  <text x="508" y="453" class="note">Stage-1 geometry decides where every pin goes — without it 151 of 222 leave their own error circle (STUDY-12)</text>
+  <text x="508" y="453" class="note">Stage-1 geometry decides where every pin goes — without it 95 of 142 leave their own error circle (STUDY-12)</text>
 
   <!-- people and outputs -->
   <path d="M1040,426 L1040,466 L640,466 L640,476" class="flow"/>
