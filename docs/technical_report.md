@@ -30,7 +30,7 @@ Graviton + COOL**.
 | OpenCV output changes the agent's actions: without Stage 1, **95 of 142** pins leave their own error circle and 4 of 39 re-survey passes regroup (EXP-003, v2b test); the shadow changes no decision (evidence only) | [`causal_trace.md`](reports/causal_trace.md) |
 | **One review card per object** (STUDY-23): overlapping boxes on one pot share a card — 2.68 → 1.81 cards per frame (one look), 3.86 → 2.32 (looking harder); the same pots reach a person | [`card_grouping.md`](reports/card_grouping.md) |
 | Analyst effort at assumed timings: DEPTH reaches its promise in **43.2 vs 55.7** min (one look) and **56.5 vs 57.3** (looking harder) on the pot-dense test; 34 / 47 vs 56 min per survey-hour of empty seabed. Before one card per object it was slower in both modes | [`effort_curve.md`](reports/effort_curve.md) |
-| Product frame, standard look: **157 ms** (x86) / **197 ms** (Graviton4), 4 vCPU, stock OpenCV 5; looking harder (the default) costs ≈ 5×, about 0.8 s (estimated; the EC2 run is pending) | [`cool_benchmark.md`](reports/cool_benchmark.md) |
+| Product frame, standard look: **157 ms** (x86) / **197 ms** (Graviton4), 4 vCPU, stock OpenCV 5; looking harder (the default when time allows) costs ≈ 5×, about 0.8 s (estimated; the EC2 run is pending) | [`cool_benchmark.md`](reports/cool_benchmark.md) |
 | A **raw sonar recording with real GPS** is read directly and checked against physics (GPS speed vs the speed field r = 0.95; course vs heading 2.4°), with a **measured range scale** (2.03 cm/sample ± 10.2% after the agent cross-checks its seabed track against the depth sounder) → pins and heights in real metres | [`raw_recording.md`](reports/raw_recording.md) |
 | A person's decision makes the agent **re-plan** the recovery route, queue, budget and passes; an impact ledger measures the reviewed precision | [`agentic_vision.md`](agentic_vision.md) |
 
@@ -219,7 +219,7 @@ split (199 frames, 20 s per frame assumed for manual review, 8 s per card):
 | mode | promise | cards to the promise | DEPTH min | manual min | break-even card time |
 |---|--:|--:|--:|--:|--:|
 | one look | ≥ 78% | 324 | **43.2** | 55.7 | 10.31 s |
-| looking harder (the default) | ≥ 84% | 424 | **56.5** | 57.3 | 8.11 s |
+| looking harder (the default when time allows) | ≥ 84% | 424 | **56.5** | 57.3 | 8.11 s |
 
 Before one card per object the same table read 62.7 vs 55.7 (break-even 7.11 s) and 96.9 vs 57.3 (4.73 s):
 DEPTH was slower in both modes.

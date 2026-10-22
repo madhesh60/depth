@@ -78,6 +78,12 @@ only ask. Requests with unknown hazard or pass IDs are refused.
 4. The agent reads the outcome with `get_approval_status`. Approved requests are work orders for
    downstream consoles; DEPTH itself never dispatches.
 
+A request is decided **once**. If two people decide it at the same moment, one decision is recorded and the
+other gets HTTP 409 naming who decided first; the log's first decision always stands. The requests the agent
+files for its own survey plan are withdrawn, with the reason, when that survey is no longer in the server's
+memory (a restart, or the bounded survey memory), because a decision could no longer re-plan it; requests
+filed over MCP or the API stay open.
+
 A recorded run of exactly this chain on the real server (Streamable HTTP, a scripted client standing in
 for an LLM agent, a person approving with the PIN): [`reports/mcp_session.md`](reports/mcp_session.md) —
 regenerate it with `python -m src.dashboard.mcp_session`.

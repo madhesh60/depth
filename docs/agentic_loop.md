@@ -10,7 +10,8 @@ moves. Every failure is caught, contained and told to that person. This page is 
 ## The core loop · per survey (Survey → Agent → "How the agent decided")
 
 `core.py` (`SurveyAgent.run`) runs every survey toward the operator's goal (Survey → *Goal* selector,
-*Options → Compute budget*; API `recall=` / `compute_s=`; MCP `run_survey(recall=…)`):
+*Options → Compute budget*, 20 s by default in the studio; API `recall=` / `compute_s=`, no limit by default;
+MCP `run_survey(recall=…)`):
 
 | step (`agent_run.steps[].act`) | what the agent does | what can change it |
 |---|---|---|

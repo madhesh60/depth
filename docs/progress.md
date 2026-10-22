@@ -62,8 +62,10 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
   tiers (≥ 78% one look, ≥ 84% looking harder — both checked for correlated frames), **one review card per
   object** (STUDY-23), survey planning and person-approved actions — on the sample frames and on a raw
   Humminbird recording with real GPS and a per-ping dropout mask. `ruff check .` (with bugbear) and `mypy` (the
-  decision core) are clean, both in CI; the full suite passes (293, 2026-10-22; coverage 60% of `src/`).
-- **Judges can run it:** one click in GitHub Codespaces (`.devcontainer/`), or five commands on a laptop.
+  decision core) are clean, both in CI; the full suite passes (301, 2026-10-22; coverage 60% of `src/`).
+- **Judges can run it:** one click in GitHub Codespaces (`.devcontainer/`), or five commands on a laptop. CI runs
+  the codespace's own setup in its image on 2 CPUs and plays the guided demo to its last step
+  (`.github/workflows/codespaces.yml`); one real click in a codespace is still the owner's check.
 - **Waiting on AWS / the owner:** the Graviton + COOL runs (the Marketplace subscription needs a Visa or
   Mastercard), CloudFront (account verification) or the ready `PUBLIC_HTTPS=1` link, and the EC2 look-harder
   row + load-test re-run. The stock EC2 benchmarks and the first load test are done.
@@ -80,6 +82,49 @@ Current numbers, each with its split: README "At a glance" and
 ---
 
 ## 4. Session log
+
+### 2026-10-22 (sweep 72) — the round-3 audit's bugs, fixed with tests; the Codespaces path tested in CI
+
+The owner pasted the round-3 audit's list. Each item was checked against the code first; all six held.
+
+- **B1 — two decisions on one approval request were both accepted** (audit: 20 of 20; reproduced on the old
+  store: 19 of 20 races both "OK", 39 decision events for 20 requests; through the routes, 10 of 10). Cause:
+  `ApprovalStore.decide()` read the state, checked "pending" and appended with no lock across the three
+  (since `d618fb0`, 2026-09-26; the tests only decided twice in a row, never at once); card decisions had the
+  same gap with a tiny window. Fix: decide and withdraw check and write under one lock; the replay keeps the
+  **first** decision (a late write never replaces it; a write that lost to another process is refused); both
+  decide routes hold one lock across the decision and its re-plan; the loser gets **409 naming who decided
+  first**, and the studio shows it and disables a request's buttons while its decision is in flight. Tests:
+  `tests/test_approvals.py` (20 store races, decide vs withdraw, the replay rule, approve vs decline and
+  confirm vs reject through the routes: one 200 + one 409, one re-plan).
+- **B2 — a first survey took 28.9 s on the laptop** (no goal → look harder, 5 passes per frame). The studio's
+  survey now sends a **20-s compute budget** by default (*Options*; empty = no limit; the API's default is
+  unchanged). The agent prices both looks with its measured pace and takes the one that fits: in the UI test on
+  the laptop it started the closer look, measured its pace on the first frame and finished with the standard
+  look, 12.4 s end to end (laptop timing, noisy: the 8-frame survey took 6 to 21 s across runs that day). No
+  promise changed.
+- **B3 — the agent's pending requests outlived their survey** after a restart (and when a survey left the
+  24-survey memory), so a decision could not re-plan anything. They are now withdrawn at startup and on
+  eviction, with the reason ("re-run the survey and the agent files fresh requests"), which the inbox now
+  shows; requests filed over MCP or the API stay open (they are work orders in their own right).
+- **B4 — `/api/feedback` stored labels for made-up sample IDs** (HTTP 200). Now 400 "unknown sample …"; a
+  `frame_ref` that is not an object is a 400 (it was a 500).
+- **Codespaces had never been run:** a CI job (`.github/workflows/codespaces.yml`) runs the codespace's own
+  `postCreateCommand` and `postAttachCommand` (read from `devcontainer.json`) in the devcontainer image with
+  2 CPUs and 4 GB, then drives the studio in headless Chromium: Analyze, a survey with the default budget,
+  every mode, the guided demo to 7/7, 0 JS errors; it also times a survey with and without the budget.
+  `tests/ui_smoke.py` gained `--url` and `--full-demo`; the setup and the studio run as the codespace's user
+  (`vscode`). **Measured there (GitHub runner, 2 CPUs, 3 green runs on 2026-10-22):** setup 18 s, the studio
+  up ~4 s later; the guided demo to 7/7 in 64 s with 0 JS errors; a survey of the 8 demo frames **7.5–7.6 s
+  looking harder, with no budget and with the 20-s budget** (it fits, so the agent keeps the closer look).
+  The UI test's own survey shares those 2 CPUs with headless Chrome: once it kept the closer look (16.3 s),
+  once it measured a slower pace and took the standard look after frame 1 (6.9 s) — in a real codespace the
+  browser runs on the judge's computer. What only a real codespace shows (the forwarded port, the tab it
+  opens) still needs one click by the owner.
+- **Tests:** 301 passed (two halves), 0 failed; `tests/ui_smoke.py --full-demo` PASS (the demo 7/7 in 71 s,
+  0 JS errors); ruff and mypy clean. `fef1aa4` pushed with this batch.
+- **Not done here:** the EC2 look-harder row and the load-test re-run (the AWS login had expired); the real
+  Codespaces click.
 
 ### 2026-10-22 (sweep 71) — the third audit list: one card per object, a click-to-run path, the video's footage
 

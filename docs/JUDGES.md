@@ -10,7 +10,10 @@ person before anything is dispatched. Solo entry, Team Syndicate, OpenCV AI Comp
 ## Try it
 
 **In your browser, one click:** [Open in GitHub Codespaces](https://codespaces.new/madhesh60/depth?quickstart=1) —
-the real studio, ready in about 3 minutes, free with a GitHub account (the setup runs the same commands as below).
+the real studio, ready in about 3 minutes, free with a GitHub account (the setup runs the same commands as below;
+CI runs that setup in the codespace's own image as its user on 2 CPUs: the studio is up seconds after the setup,
+and the guided demo plays to its last step in about a minute with 0 JS errors —
+[`codespaces.yml`](../.github/workflows/codespaces.yml)).
 
 **On a laptop, 5 minutes, CPU only:**
 
@@ -30,6 +33,8 @@ Then three clicks:
    share a card), the agent's full trace, and which perception mode it chose and why ("How the agent decided").
 3. **Survey** → *Raw recording (real GPS)* → **Agent** tab — the core loop: the promise check (withdrawn on
    this river recording, with a full-review request), the seabed cross-check, the plan, the approval inbox.
+   A survey gets 20 s of compute by default (*Options*): on two cores the agent prices both looks and takes
+   the one that fits; clear the field to let it always look harder.
 
 A public URL is **not live yet**: CloudFront waits on AWS account verification (see "Not done" below), so
 Codespaces is the click-to-run path. On the deployed server, deciding needs the **approver PIN** (agents and API
@@ -49,7 +54,7 @@ clients can only ask); judges receive it with the submission, and the studio say
 | Against GhostVision (same split) | F1 **0.41** vs their reported 0.71–0.73 — **DEPTH's detector is weaker** | [`eval_exp003_test_official398.md`](reports/eval_exp003_test_official398.md) |
 | OpenCV 5's new DNN engine | loads by default; **634 of 634** detections identical to the classic engine, 0 tier flips; speed: within noise on the laptop | [`dnn_engine.md`](reports/dnn_engine.md) (STUDY-20) |
 | Product frame, standard look (stock OpenCV 5, 4 vCPU) | **157 ms** x86 (c8i.xlarge) · **197 ms** Graviton4 (c8g.xlarge) | [`cool_benchmark.md`](reports/cool_benchmark.md) |
-| Product frame, looking harder (the default) | **≈ 5×** the standard frame (laptop, interleaved: 406 → 2,110 ms) → about **0.8 s** on the same EC2 x86 (estimated; the EC2 run is pending) | `benchmarks/laptop_x86_modes*` |
+| Product frame, looking harder (the default when time allows) | **≈ 5×** the standard frame (laptop, interleaved: 406 → 2,110 ms) → about **0.8 s** on the same EC2 x86 (estimated; the EC2 run is pending) | `benchmarks/laptop_x86_modes*` |
 | One review card per object | cards per frame **2.68 → 1.81** (one look), **3.86 → 2.32** (looking harder); the **same pots** reach a person; 1 of 462 cards holds two pots | [`card_grouping.md`](reports/card_grouping.md) (STUDY-23) |
 | On one CPU core (on-board budget) | 599 ms/frame and 240 MB on one Graviton4 core → a survey-hour (280 frames) in ~168 s, **~21× faster than the sonar records** (no small board measured) | `benchmarks/graviton_stock_t1__product.json` × the real recording |
 | Analyst minutes (ASSUMED 20 s/frame, 8 s/card; one card per object) | pot-dense test: one look **43.2 vs 55.7** manual, looking harder **56.5 vs 57.3**; empty seabed 34 / 47 vs 56 min per survey-hour (before one card per object: 62.7 vs 55.7, **slower**) | [`effort_curve.md`](reports/effort_curve.md) |

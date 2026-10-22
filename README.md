@@ -1,6 +1,7 @@
 # DEPTH — side-scan sonar in, a cleanup plan a person approves out
 
 [![tests](https://github.com/madhesh60/depth/actions/workflows/tests.yml/badge.svg)](https://github.com/madhesh60/depth/actions/workflows/tests.yml)
+[![codespaces](https://github.com/madhesh60/depth/actions/workflows/codespaces.yml/badge.svg)](https://github.com/madhesh60/depth/actions/workflows/codespaces.yml)
 [![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/madhesh60/depth?quickstart=1)
 
 **DEPTH does not claim a better detector. It makes any detector dependable.** It finds lost crab pots
@@ -29,9 +30,9 @@ and **Best Use of COOL** · AGPL-3.0
 | **Knows when its promise does not apply** | withdrawn in **22 of 22** surveys on another sonar | STUDY-19 |
 | **One card per object** | review cards per frame, looking harder: **3.86 → 2.32**; the same pots reach a person | STUDY-23, test |
 | **Analyst minutes** (assumed timings) | DEPTH vs manual: one look **43.2 vs 55.7** · looking harder **56.5 vs 57.3** · empty seabed **34 / 47 vs 56** per hour | test · user study pending |
-| **Speed per frame** | one look **157 ms** · looking harder (the default) ≈ **5×**, about 0.8 s | EC2 x86, 4 vCPU · the 5× is the laptop's ratio |
+| **Speed per frame** | one look **157 ms** · looking harder (the default when time allows) ≈ **5×**, about 0.8 s | EC2 x86, 4 vCPU · the 5× is the laptop's ratio |
 | **Crab-pot detector**, AP@0.5 | **0.482**; weaker than GhostVision (F1 0.41 vs 0.71–0.73) | v2b test, 214 frames |
-| **Checks** | **293** tests · ruff · mypy · a headless-Chrome UI test, all in CI | 2026-10-22 |
+| **Checks** | **301** tests · ruff · mypy · a headless-Chrome UI test, all in CI; the Codespaces setup run in its own image on 2 CPUs, guided demo to the end | 2026-10-22 |
 
 ### Not done — said plainly
 
@@ -142,7 +143,10 @@ before the unseen data was scored):
 
 The same goal produces different runs: with no recall asked for, the agent looks harder (≥ 84%); asked for
 ≥ 78% it takes the cheaper single look; with a tight compute budget it drops to one look, mid-run if needed; on
-the raw river recordings it withdraws the promise and asks for a full review. A single analyze call has a 2-s
+the raw river recordings it withdraws the promise and asks for a full review. The studio's survey gives it
+**20 s of compute by default**: on a small machine (a laptop, a 2-core codespace) it prices both looks with its
+measured pace and takes the one that fits, switching mid-run if the pace says so; a fast server keeps the
+closer look. A single analyze call has a 2-s
 answer budget, so an idle server looks harder and a busy one takes the standard look. **Per-frame active
 vision** (below the dashed line) is built and tested, but it failed its own validation (log-loss 0.637 → 0.648
 on test; ACCEPT precision 0.86 → 0.848 on another sonar), so it stays off by default and labelled experimental
@@ -157,7 +161,8 @@ hazards also change action and the re-survey plan shrinks from 5 passes (13.7 bo
 
 Press **▶ Guided demo** in the top bar for a walk through everything below; **Terms** (top bar) explains the
 studio's words. In **Survey**, the *Goal* selector sets the recall the agent must keep (default: the strongest
-it can) and *Options → Compute budget* gives it a time limit; the **Agent** tab shows how it decided.
+it can) and *Options → Compute budget* gives it a time limit (20 s by default, so a first survey stays quick on
+two cores; empty = no limit); the **Agent** tab shows how it decided.
 
 * **Analyze** — pick a sample frame → *Analyze frame*: the tracked seabed, verdict-coloured boxes, one evidence
   card per object (tier promise, P(pot), shadow, relative height, the full agent trace), the agent's-eye
@@ -213,7 +218,7 @@ precision promise is supportable).
 | mode | promise | cards to the promise | DEPTH min | manual min | break-even card time | per survey-hour on empty seabed |
 |---|--:|--:|--:|--:|--:|--:|
 | one look | ≥ 78% | 324 | **43.2** | 55.7 | 10.3 s | 34 vs 56 min |
-| looking harder (the default) | ≥ 84% | 424 | **56.5** | 57.3 | 8.1 s | 47 vs 56 min |
+| looking harder (the default when time allows) | ≥ 84% | 424 | **56.5** | 57.3 | 8.1 s | 47 vs 56 min |
 
 <img src="docs/img/effort_curve.png" width="600" alt="Share of labelled pots found vs analyst minutes on the v2b test split: manual review, a raw detector list, and the DEPTH queue for both perception modes, at assumed timings">
 
@@ -223,7 +228,7 @@ precision promise is supportable).
 |---|---|--:|
 | one look (standard) | EC2 c8i.xlarge x86, 4 vCPU, stock OpenCV 5 | **157 ms** |
 | one look (standard) | EC2 c8g.xlarge Graviton4, 4 vCPU, stock OpenCV 5 | **197 ms** (stock Graviton is slower: the bar COOL must clear) |
-| looking harder (the default) | laptop x86, both modes interleaved | 406 → 2,110 ms (≈ 5×; 4.7–5.9× per repeat) |
+| looking harder (the default when time allows) | laptop x86, both modes interleaved | 406 → 2,110 ms (≈ 5×; 4.7–5.9× per repeat) |
 | looking harder | EC2 | ≈ 0.8 s estimated (5 × 157 ms) — the EC2 run is pending |
 | one look, one CPU core | EC2 Graviton4, 1 thread | 599 ms, 240 MB → a survey-hour in ~168 s, ~21× faster than the sonar records |
 
@@ -326,7 +331,8 @@ webui/            zero-build studio (+ three.js twin) · embed/depth-embed.js (d
 infra/            Graviton + COOL deploy (dry-run by default) + 3-way benchmark
 models/<MODEL>/   calibration.json + effort/audit data (weights: GitHub Release, fetch_model)
 benchmarks/       measured benchmark results (JSON): laptop and EC2
-tests/            the pytest suite, run by CI on every push (.github/workflows/tests.yml)
+tests/            the pytest suite, run by CI on every push (.github/workflows/tests.yml); the Codespaces
+                  path in its own image, guided demo to the end (.github/workflows/codespaces.yml)
 notebooks/        the Kaggle training notebook and its generator
 DATASET/scripts/  dataset builders (the data itself is git-ignored)
 docs/             technical report, architecture, cards, guides (MCP, integrations, training), project

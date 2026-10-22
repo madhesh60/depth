@@ -299,6 +299,11 @@ Promote each into the log below with full results as it runs.
   p50 per frame, 4.7–5.9× per repeat (`benchmarks/laptop_x86_modes*`); EC2 numbers to follow. The frame
   agent did not time the tile pass in any stage until that day (fixed: a `look_harder` stage).
   Report: [`docs/reports/look_harder.md`](reports/look_harder.md) · `python -m src.agentic.study_look_harder --verify`.
+- **2026-10-22 — when it runs in the studio:** the studio's survey now sends a 20-s compute budget by default
+  (the API's default stays "no limit"). With no recall goal the agent still keeps the strongest promise that
+  fits, so a fast server looks harder and a small machine takes the standard look, deciding up front or after
+  its first frame (judge audit round 3: a first survey of the 8 demo frames took 28.9 s on the laptop, all
+  looking harder). No promise changed: a downgraded run keeps the standard promise (≥ 78%).
 
 ### STUDY-17 — COOL on Graviton4 vs stock OpenCV vs x86: the product workload (REGISTERED 2026-10-19, not yet run)
 
