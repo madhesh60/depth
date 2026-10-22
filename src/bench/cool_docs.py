@@ -1,8 +1,14 @@
-"""cool_docs.py — write the measured COOL numbers into the technical report and the README.
+"""cool_docs.py — COOL's status in the docs: one sentence while it is pending, the measured numbers once it ran.
+
+**One COOL story.** :data:`PENDING_STATUS` is the only wording of COOL's status. Every document that states it
+(:data:`STATUS_DOCS`) holds it between ``<!-- cool:status -->`` and ``<!-- /cool:status -->``;
+``tests/test_cool_docs.py`` checks that every block says exactly this and that no other "COOL has not run"
+wording is left beside them.
 
 Run by `PHASE=cool ./infra/golive.sh` after the COOL benchmarks land, so switching to COOL needs no hand
-edits. It only fills the two places that say COOL is pending; every number comes from benchmarks/*.json
-(product workload, survey workload, load test) of runs whose provenance says COOL.
+edits: it fills the technical report's pending row, the README's COOL line and every status block. Every
+number comes from benchmarks/*.json (product workload, survey workload, load test) of runs whose provenance
+says COOL.
 
     python -m src.bench.cool_docs [--dir benchmarks] [--dry-run]
 """
@@ -15,10 +21,19 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 REPORT = ROOT / "docs" / "technical_report.md"
 README = ROOT / "README.md"
+JUDGES = ROOT / "docs" / "JUDGES.md"
 
-PENDING_ROW = "| **⏳ pending:** Graviton **COOL** (c8g.xlarge + c8g.large) | Marketplace subscription waiting on AWS | — | — | — |"
+PENDING_ROW = ("| **⏳ pending:** Graviton **COOL** (c8g.xlarge + c8g.large) | Marketplace subscription blocked on payment "
+               "| — | — | — |")
 PENDING_TARGET = "Graviton COOL pending. |"
 README_START, README_END = "<!-- cool:readme -->", "<!-- /cool:readme -->"
+STATUS_START, STATUS_END = "<!-- cool:status -->", "<!-- /cool:status -->"
+STATUS_DOCS = (README, JUDGES, REPORT)
+PENDING_STATUS = ("**COOL has not run yet.** The AWS Marketplace subscription to the COOL AMI is blocked on payment: "
+                  "the Marketplace does not accept the account's card (it needs a Visa or Mastercard), and an AWS "
+                  "Support case is open. Until then the demo server runs stock OpenCV 5 in rehearsal mode and says "
+                  "so. The COOL benchmark, the AWS-signed receipt and its verifier are built and run in one command "
+                  "once the subscription is active (`PHASE=cool ./infra/golive.sh`).")
 
 
 def _load(d: Path, name: str) -> dict | None:
@@ -89,26 +104,48 @@ def headline(c: dict) -> str:
         "receipt verified: [`docs/reports/cool_verification.md`](docs/reports/cool_verification.md))."
 
 
+def status_blocks(text: str) -> list[str]:
+    """What each ``cool:status`` block of a document says, in order."""
+    return [part.split(STATUS_END, 1)[0] for part in text.split(STATUS_START)[1:] if STATUS_END in part]
+
+
+def swap_status(text: str, line: str) -> str:
+    """Every ``cool:status`` block of a document -> ``line`` (the markers stay, so it can be swapped again)."""
+    out, rest = [], text
+    while STATUS_START in rest and STATUS_END in rest.split(STATUS_START, 1)[1]:
+        before, rest = rest.split(STATUS_START, 1)
+        rest = rest.split(STATUS_END, 1)[1]
+        out.append(f"{before}{STATUS_START}{line}{STATUS_END}")
+    return "".join(out) + rest
+
+
+def status_done(c: dict, doc: Path) -> str:
+    """What the status blocks say once a COOL run is in benchmarks/ (its links relative to ``doc``)."""
+    h = headline(c)
+    if doc.parent != ROOT:                                     # docs/*.md link to reports/ beside them
+        h = h.replace("](docs/", "](")
+    return f"**COOL ran.** {h}"
+
+
 def apply(c: dict, dry: bool = False) -> list[str]:
-    changed = []
-    rep = REPORT.read_text(encoding="utf-8")
-    if PENDING_ROW in rep:
-        rep = rep.replace(PENDING_ROW, "\n".join(report_rows(c)))
+    old = {p: p.read_text(encoding="utf-8") for p in (REPORT, README, *STATUS_DOCS)}
+    new = dict(old)
+    if PENDING_ROW in new[REPORT]:
+        rep = new[REPORT].replace(PENDING_ROW, "\n".join(report_rows(c)))
         cool = c["runs"]["graviton_cool"] or c["runs"]["graviton_cool_large"]
-        rep = rep.replace(PENDING_TARGET, f"Graviton COOL: {_p50(cool):.0f} ms ({_itype(cool)}). |")
-        changed.append(REPORT.relative_to(ROOT).as_posix())
-        if not dry:
-            REPORT.write_text(rep, encoding="utf-8")
-    rd = README.read_text(encoding="utf-8")
+        new[REPORT] = rep.replace(PENDING_TARGET, f"Graviton COOL: {_p50(cool):.0f} ms ({_itype(cool)}). |")
+    rd = new[README]
     if README_START in rd and README_END in rd:
         a, rest = rd.split(README_START, 1)
         _, b = rest.split(README_END, 1)
-        rd = f"{a}{README_START}\n{headline(c)}\n{README_END}{b}"
-        rd = rd.replace(", and the Graviton **COOL** runs (the Marketplace subscription is with AWS Support).", ".")
-        changed.append(README.relative_to(ROOT).as_posix())
-        if not dry:
-            README.write_text(rd, encoding="utf-8")
-    return changed
+        new[README] = f"{a}{README_START}\n{headline(c)}\n{README_END}{b}"
+    for doc in STATUS_DOCS:
+        new[doc] = swap_status(new[doc], status_done(c, doc))
+    changed = [p for p in old if new[p] != old[p]]
+    if not dry:
+        for p in changed:
+            p.write_text(new[p], encoding="utf-8")
+    return [p.relative_to(ROOT).as_posix() for p in changed]
 
 
 def main():

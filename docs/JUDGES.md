@@ -63,9 +63,7 @@ clients can only ask); judges receive it with the submission, and the studio say
 
 ## Not done — said plainly
 
-- **COOL has not run yet.** The Marketplace subscription is still pending (an AWS Support case is open);
-  the benchmark, receipt verifier and report are built and run the moment it is active
-  (`PHASE=cool ./infra/golive.sh`).
+- <!-- cool:status -->**COOL has not run yet.** The AWS Marketplace subscription to the COOL AMI is blocked on payment: the Marketplace does not accept the account's card (it needs a Visa or Mastercard), and an AWS Support case is open. Until then the demo server runs stock OpenCV 5 in rehearsal mode and says so. The COOL benchmark, the AWS-signed receipt and its verifier are built and run in one command once the subscription is active (`PHASE=cool ./infra/golive.sh`).<!-- /cool:status -->
 - **No public URL yet** (CloudFront account verification). The server is deployed in rehearsal mode.
 - **No human study and no blinded audit with people**: analyst minutes and audited precision are not
   measured; the timings above are assumptions, labelled as such (including that a card with several boxes on one

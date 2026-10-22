@@ -279,7 +279,7 @@ known crab pots.
 | **on-board budget: one core** (EC2, 2026-10-20) | c8g.xlarge Graviton4, 1 thread, 240 MB peak | 599 ms | 1.7 | ~168 s (280 frames/h, derived) → ~21× real time |
 | real 1-h recording end to end (EC2) | c8i.xlarge x86 / c8g.xlarge Graviton4, stock | — | — | RTF 0.0135 / 0.0171 |
 | load test, 4 clients + 1 survey, 120 s | c8g.large demo server (stock, rehearsal) | p95 2.0 s (mark 3 s) | 291/291 ok | **passed — before the look-harder mode existed; re-run pending** |
-| **⏳ pending:** Graviton **COOL** (c8g.xlarge + c8g.large) | Marketplace subscription waiting on AWS | — | — | — |
+| **⏳ pending:** Graviton **COOL** (c8g.xlarge + c8g.large) | Marketplace subscription blocked on payment | — | — | — |
 
 **Proposal targets vs delivered.** Stated plainly, because judges compare the two:
 
@@ -316,6 +316,8 @@ One CloudFormation stack (`infra/cfn/depth.yaml`):
   arm64) and the OpenCV libraries mapped into the server process; `python -m src.bench.verify_cool <url>` checks it.
 
 `infra/deploy.sh` is a dry run by default (it prints the change set); `infra/teardown.sh` removes everything.
+
+<!-- cool:status -->**COOL has not run yet.** The AWS Marketplace subscription to the COOL AMI is blocked on payment: the Marketplace does not accept the account's card (it needs a Visa or Mastercard), and an AWS Support case is open. Until then the demo server runs stock OpenCV 5 in rehearsal mode and says so. The COOL benchmark, the AWS-signed receipt and its verifier are built and run in one command once the subscription is active (`PHASE=cool ./infra/golive.sh`).<!-- /cool:status -->
 
 **Optional, not deployed:** Amazon Bedrock (Claude) can rewrite the mission brief. It writes, never decides:
 its text is shown only if every number and ID traces back to the survey, otherwise the template is served

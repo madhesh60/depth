@@ -36,8 +36,7 @@ and **Best Use of COOL** · AGPL-3.0
 
 ### Not done — said plainly
 
-- **COOL has not run.** The AWS Marketplace subscription is waiting on a payment method. The benchmark, the
-  AWS-signed receipt and its verifier are built, and run in one command once it is active.
+- <!-- cool:status -->**COOL has not run yet.** The AWS Marketplace subscription to the COOL AMI is blocked on payment: the Marketplace does not accept the account's card (it needs a Visa or Mastercard), and an AWS Support case is open. Until then the demo server runs stock OpenCV 5 in rehearsal mode and says so. The COOL benchmark, the AWS-signed receipt and its verifier are built and run in one command once the subscription is active (`PHASE=cool ./infra/golive.sh`).<!-- /cool:status -->
 - **No live link yet** (CloudFront account verification). Codespaces or the five commands run the same studio.
 - **No field proof.** No recording has both real pots and real GPS: the pot frames carry synthetic GPS
   (labelled on screen), and the real-GPS river recordings hold no known pots.
@@ -265,8 +264,8 @@ Both are another sonar, so the core loop withdraws its promise there and asks fo
   header carries no attitude. Data dropouts are **flagged, not repaired**: a pot inside a dropout cannot be found.
 - **Boxes, not pixel masks** (the brief allows either; the crab-pot labels are boxes).
 - **No small board measured** (Raspberry Pi / Jetson): the on-board figure is one core of a server CPU.
-- **Not deployed yet**: COOL (Marketplace subscription), a public URL (CloudFront account verification), the
-  optional Bedrock brief writer. Active vision is built but off: it failed its own validation.
+- **Not deployed yet**: a public URL (CloudFront account verification) and the optional Bedrock brief writer;
+  COOL's status is under *Not done* at the top. Active vision is built but off: it failed its own validation.
 
 ## 6. How it works
 

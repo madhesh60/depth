@@ -34,4 +34,27 @@ def test_rows_and_headline(tmp_path):
     assert len(rows) == 2 and all("**COOL**" in r for r in rows)
     h = cool_docs.headline(c)
     assert "1.00× stock Graviton" in h and "cool_verification.md" in h
-    assert cool_docs.apply(c, dry=True) == ["docs/technical_report.md", "README.md"]
+    assert cool_docs.apply(c, dry=True) == ["docs/technical_report.md", "README.md", "docs/JUDGES.md"]
+
+
+def test_every_document_tells_the_same_cool_story():
+    """One wording of COOL's status: every block says PENDING_STATUS, and no other 'not run' wording is left."""
+    for doc in cool_docs.STATUS_DOCS:
+        text = doc.read_text(encoding="utf-8")
+        blocks = cool_docs.status_blocks(text)
+        assert blocks and all(b == cool_docs.PENDING_STATUS for b in blocks), doc.name
+        outside = cool_docs.swap_status(text, "")
+        assert "COOL has not run" not in outside and "waiting on a payment method" not in outside, doc.name
+
+
+def test_a_cool_run_replaces_every_status_block(tmp_path):
+    for f in BENCH.glob("*__*.json"):
+        shutil.copy(f, tmp_path)
+    _fake_cool(tmp_path, "graviton_stock", "graviton_cool")
+    c = cool_docs.collect(tmp_path)
+    for doc in cool_docs.STATUS_DOCS:
+        done = cool_docs.swap_status(doc.read_text(encoding="utf-8"), cool_docs.status_done(c, doc))
+        blocks = cool_docs.status_blocks(done)
+        assert blocks and all(b.startswith("**COOL ran.**") for b in blocks) and cool_docs.PENDING_STATUS not in done
+        if doc.parent.name == "docs":                       # links stay relative to the document
+            assert "](docs/" not in "".join(blocks) and "](reports/cool_benchmark.md)" in blocks[0]

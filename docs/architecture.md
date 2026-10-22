@@ -29,7 +29,7 @@ torch-free on **OpenCV 5**, CPU-only, on **AWS Graviton with COOL**.
 ![DEPTH architecture](img/architecture.svg)
 
 _Solid = built and tested (dark frame = the core loop, on by default); dashed amber = AWS, one stack applied
-2026-10-19 with CloudFront (account verification) and COOL (Marketplace subscription) still pending; dashed
+2026-10-19 with CloudFront (account verification) and COOL (Marketplace subscription blocked on payment) still pending; dashed
 violet = optional. The numbers are EXP-003's as of 2026-10-21. Text version:_
 
 ```
