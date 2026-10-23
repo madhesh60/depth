@@ -6,10 +6,11 @@ brief only *says* it. Two writers, one contract:
 
 * :func:`template_brief` — deterministic markdown from :func:`facts`. Always available, reproducible,
   part of every survey's report set (``/api/report/brief``).
-* :func:`llm_brief` — optional: Claude on **Amazon Bedrock** rewrites the same facts for readability
-  (``DEPTH_BRIEF_LLM=bedrock``; AWS credentials from the instance role). The model **writes, never
-  decides**: it sees only the compact facts JSON, and its text is accepted only if :func:`check`
-  passes —
+* :func:`llm_brief` — optional: an LLM on **Amazon Bedrock** rewrites the same facts for readability
+  (``DEPTH_BRIEF_LLM=bedrock``; AWS credentials from the instance role; ``DEPTH_BRIEF_MODEL`` = a Claude ID
+  through the Mantle client, or any other Bedrock model - e.g. an Amazon Nova inference profile - through
+  the Converse API). The model **writes, never decides**: it sees only the compact facts JSON, and its
+  text is accepted only if :func:`check` passes —
 
   - every number in it is a fact (as given, rounded, or a 0–1 share written as a percentage);
   - every hazard / pass ID it names exists;
@@ -289,11 +290,43 @@ def _client():
     return cls(aws_region=os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION") or "us-east-1")
 
 
+def _converse_client():
+    import boto3                                       # Amazon Bedrock's Converse API (on the server: pydeps)
+    from botocore.config import Config
+    return boto3.client("bedrock-runtime",
+                        region_name=os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION") or "us-east-1",
+                        config=Config(retries={"max_attempts": 3, "mode": "adaptive"}, read_timeout=60))
+
+
+def converse_brief(F: dict, model: str, client=None) -> str:
+    """The same contract through Bedrock's Converse API - any non-Anthropic model, e.g. Amazon Nova (a first-party
+    model: no Marketplace agreement). Raises on any failure (the caller falls back to the template)."""
+    client = client or _converse_client()
+    resp = client.converse(
+        modelId=model, system=[{"text": SYSTEM}],
+        messages=[{"role": "user", "content": [{"text": "Facts (JSON):\n" + json.dumps(F, indent=1)}]}],
+        inferenceConfig={"maxTokens": 1500, "temperature": 0.2})   # maxTokens always explicit (quota reservation)
+    stop = resp.get("stopReason")
+    if stop in ("content_filtered", "guardrail_intervened"):
+        raise RuntimeError(f"the model declined to write the brief ({stop})")
+    if stop == "max_tokens":
+        raise RuntimeError("the brief was truncated")
+    blocks = ((resp.get("output") or {}).get("message") or {}).get("content") or []
+    text = "".join(b.get("text", "") for b in blocks).strip()
+    if not text:
+        raise RuntimeError("empty brief")
+    return text + "\n"
+
+
 def llm_brief(F: dict, client=None, model: Optional[str] = None) -> str:
-    """Claude rewrites the facts. Raises on any failure (the caller falls back to the template)."""
+    """An LLM rewrites the facts: Claude through the Mantle client, any other Bedrock model (e.g. Amazon Nova)
+    through Converse. Raises on any failure (the caller falls back to the template)."""
+    model = model or os.environ.get("DEPTH_BRIEF_MODEL", DEFAULT_MODEL)
+    if "anthropic." not in model:                      # anthropic.claude-* or a us./global. profile of one
+        return converse_brief(F, model, client=client)
     client = client or _client()
     msg = client.messages.create(
-        model=model or os.environ.get("DEPTH_BRIEF_MODEL", DEFAULT_MODEL),
+        model=model,
         max_tokens=16000, system=SYSTEM,
         messages=[{"role": "user", "content": "Facts (JSON):\n" + json.dumps(F, indent=1)}])
     if msg.stop_reason == "refusal":

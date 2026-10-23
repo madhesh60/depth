@@ -109,6 +109,34 @@ def test_llm_brief_used_only_when_grounded():
     assert r["writer"] == "template" and "grounding" in r["fallback_reason"] and r["rejected"]["grounding"]["unsupported_numbers"] == ["9"]
 
 
+class _FakeConverse:
+    """bedrock-runtime's Converse API (Amazon Nova and other non-Anthropic models)."""
+    def __init__(self, text="", stop="end_turn"):
+        self.text, self.stop, self.calls = text, stop, []
+
+    def converse(self, **kw):
+        self.calls.append(kw)
+        return {"stopReason": self.stop, "output": {"message": {"role": "assistant", "content": [{"text": self.text}]}}}
+
+
+def test_a_nova_model_writes_through_converse_under_the_same_check(monkeypatch):
+    monkeypatch.setenv("DEPTH_BRIEF_MODEL", "us.amazon.nova-lite-v1:0")
+    d = _survey().to_dict()
+    good = ("## Bottom line\n4 possible hazards, 4 for review. Nothing is dispatched without human approval.\n"
+            "## Caveats\nSynthetic demo GPS. The 8 s card time is assumed.\n")
+    c = _FakeConverse(good)
+    r = brief.write(d, PROV, writer="llm", client=c)
+    assert r["writer"] == "llm" and r["model"] == "us.amazon.nova-lite-v1:0" and r["grounding"]["ok"]
+    kw = c.calls[0]
+    assert kw["modelId"] == "us.amazon.nova-lite-v1:0" and kw["inferenceConfig"]["maxTokens"] == 1500
+    assert kw["system"][0]["text"] == brief.SYSTEM and '"survey_id": "s-test"' in kw["messages"][0]["content"][0]["text"]
+    assert "37.8" not in kw["messages"][0]["content"][0]["text"]          # never coordinates
+    for bad in (_FakeConverse(good, stop="content_filtered"), _FakeConverse(good, stop="max_tokens"),
+                _FakeConverse(good.replace("4 possible", "9 possible"))):
+        r = brief.write(d, PROV, writer="llm", client=bad)
+        assert r["writer"] == "template" and r["fallback_reason"]
+
+
 def test_llm_failures_fall_back_to_the_template():
     d = _survey().to_dict()
     for c in (_FakeClient("x", stop="refusal"), _FakeClient("x", stop="max_tokens"),
