@@ -134,7 +134,7 @@ validation recordings and verifies on test. Training runs on Kaggle; the runtime
 | stage | OpenCV 5 operations | what the result changes |
 |---|---|---|
 | Stage 1 | `cvtColor`, `medianBlur` / `blur` + per-ping reductions for the bottom track, `remap` (slant → ground), `resize` | geotags, error radii, relative heights, water-column flags, re-survey geometry (§4.3) |
-| See | `dnn.readNetFromONNX` on OpenCV 5's **new engine** (loaded explicitly, recorded in provenance; STUDY-20), `blobFromImage`, `dnn.NMSBoxesBatched` | candidates, tiers, P(pot), the queue |
+| See | `dnn.readNetFromONNX` on the faster of OpenCV 5's two engines, measured when the server starts (the **classic** one on Graviton; recorded in provenance; STUDY-20), `blobFromImage`, `dnn.NMSBoxesBatched` | candidates, tiers, P(pot), the queue |
 | Prove | crops + upscales for the re-look, `createCLAHE`, thin-line shadow statistics on the canonical view | card evidence; the re-look is spent only where it can change a tier or queue position |
 | Act | (plain geometry on Stage-1 output: ground range → metres → lat/lon — not an OpenCV call) | routes, passes, exports |
 | Training data | `seamlessClone` for sonar-aware copy-paste (`build_tiles.py --paste`) | EXP-002 training set |
