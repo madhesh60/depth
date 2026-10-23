@@ -38,9 +38,14 @@ flowchart LR
     S3B[(S3: jobs · exports · benchmarks)]
     CW[CloudWatch logs · metrics<br/>dashboard · 4 alarms]
     SNS[SNS alert email]
-    SSM[SSM: secrets · shell · no SSH]
+    SNA[SNS approval email<br/>to the person who decides<br/>one per survey · never the PIN]
+    SSM[SSM: Session Manager · Run Command<br/>Parameter Store: PIN + tokens SecureString]
+    EVB[EventBridge rules<br/>server stopped · AWS Health]
     SCH[EventBridge Scheduler<br/>auto-stop 2026-11-10]
-    BED[Bedrock Claude<br/>optional brief writer]
+    DLM[Data Lifecycle Manager<br/>daily disk snapshot · 7 kept]
+    COST[Budgets $40 + Cost Anomaly Detection<br/>alerts only · project cost tag]
+    R53[Route 53 health check<br/>3 regions · while public]
+    BED[Bedrock: Claude or Amazon Nova<br/>optional brief writer]
   end
 
   subgraph HUM[Human loop]
@@ -61,8 +66,12 @@ flowchart LR
   CF --> EC2
   EC2 --> S3B
   EC2 --> CW --> SNS
+  EVB --> SNS
+  R53 --> CW
   SSM --> EC2
   SCH --> EC2
+  DLM --> EC2
+  ASK --> SNA --> PPL
   S5 -.-> BED
   PER --> S0
   ASK --> STU --> PPL --> S5

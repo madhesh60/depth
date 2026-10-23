@@ -26,13 +26,39 @@ judge ─HTTPS─► CloudFront (all edges, free tier) ── http :8000, X-Orig
                 │                                           systemd `depth` → COOL's python →
                 │                                           STAGE 1 → SEE (cv2.dnn) → PROVE → DECIDE → ACT
                 ▼                                           /api/cool = AWS-signed COOL receipt
- CloudWatch: per-stage latency (log metric filters), CPU/memory, dashboard, 4 alarms → SNS email
- S3 (versioned, TLS-only): results/ (30 d) · uploads/ (7 d) · bench/            SSM: shell + updates
- EventBridge Scheduler: stops the instance 2026-11-10 · account Budget $40/month (outside the stack)
+ CloudWatch: per-stage latency (log metric filters), CPU/memory, dashboard, alarms, saved Logs Insights queries
+ S3 (versioned, TLS-only): results/ (30 d) · uploads/ (7 d) · bench/     SSM: Session Manager, Run Command,
+ EventBridge: instance stopped/terminated + AWS Health → alert email       Parameter Store (/depth/<stack>/:
+ EventBridge Scheduler: stops the instance 2026-11-10                       PIN + tokens SecureString, app-config)
+ SNS: alerts → owner · approvals → the person who decides (one email per survey, capped, never the PIN)
+ Data Lifecycle Manager: daily encrypted snapshot of the server disk, 7 kept
+ Cost Anomaly Detection (daily email) + account Budget $40/month + `project` cost-allocation tag
+ Route 53 health check: HTTPS /api/health from 3 regions while the demo is public → alarm email (down/up)
 
  bench_fleet.sh ──► 4 self-terminating machines (c8i.xlarge x86 · c8g.xlarge stock · c8g.xlarge COOL ·
                     c8g.large COOL) → results + receipts in S3 → benchmarks/ → src.bench.compare
 ```
+
+**Every AWS service has a job** (and a price; the owner's rule: free tier or cents, and alerts by email - nothing
+stops the demo automatically before the scheduled stop):
+
+| service | its job in DEPTH | cost |
+|---|---|---|
+| EC2 Graviton4 c8g.large (COOL AMI) + EBS gp3 + Elastic IP | runs the whole agent on COOL's OpenCV 5 | ≈ $2.1/day |
+| AWS Marketplace (COOL) | the Cloud Optimized OpenCV AMI | $0.01/h after the 7-day trial |
+| CloudFront | free HTTPS, edge cache for the static studio (waits on account verification) | free tier |
+| S3 | survey results, uploads, benchmark JSONs + receipts | cents |
+| SSM Session Manager · Run Command · **Parameter Store** | shell and updates without SSH; the PIN and tokens (SecureString) survive a server swap, the owner reads the PIN with `infra/secrets.sh pin` | free |
+| IAM (customer-managed policies) | least privilege per role: server, benchmark fleet, scheduled stop, snapshots | free |
+| CloudWatch Logs · metrics · alarms · dashboard · saved queries | per-stage latency from the server's JSON lines; status-check recovery and reboot; approval emails counted | free tier |
+| **EventBridge** rules + Scheduler | email when the server stops or AWS plans maintenance; the stop after judging | free |
+| SNS (2 topics) | alarms to the owner; **approval requests to the person who decides** (`src/dashboard/sns_notify.py`) | free tier |
+| **Data Lifecycle Manager** | daily snapshot of the server disk (results, approvals, people's labels), 7 kept | ≈ $0.3/month |
+| **Cost Anomaly Detection** + Budgets + cost-allocation tag | spend anomalies ≥ $3 and 25/50/100 % of $40 by email; the bill per `project` tag | free |
+| **Route 53 health check** (only while public) | outside-in uptime from 3 regions during judging | ≈ $1.50/month |
+| Resource Groups | every `project=depth` resource in one console view | free |
+| Price List API | every benchmark row carries its machine's on-demand price | free |
+| Bedrock (optional) | the mission-brief writer, every number checked (Claude via Mantle, or Amazon Nova via Converse) | cents |
 
 Scaling story (described, not built): survey jobs → SQS → an Auto Scaling group of the same COOL AMI
 (Spot) → S3. Same code, more workers; the job store already persists results.
@@ -48,7 +74,8 @@ Scaling story (described, not built): survey jobs → SQS → an Auto Scaling gr
 | [`update_server.sh`](update_server.sh) | New commit on the live server through SSM Run Command (no SSH, no replacement). On a rehearsal server it runs the setup with the stock interpreter and without the COOL check, as the template does. |
 | [`bench_fleet.sh`](bench_fleet.sh) + [`bench_userdata.sh`](bench_userdata.sh) | The whole COOL benchmark as one command (see below). |
 | [`bench_cool.sh`](bench_cool.sh) | The benchmark on one machine (the fleet runs it; it also runs by hand). |
-| [`teardown.sh`](teardown.sh) | Removes everything (stack, retained bucket with every version, parameter) and lists leftovers. |
+| [`teardown.sh`](teardown.sh) | Removes everything (stack, retained bucket with every version, the SSM parameters, the backup snapshots) and lists leftovers. |
+| [`secrets.sh`](secrets.sh) | Prints one secret from Parameter Store for the owner: `pin` (put it in the submission form), `mcp`, `admin`. |
 | [`lib.sh`](lib.sh) | Shared helpers: AWS CLI detection (Linux, CloudShell, Git Bash on Windows), Price List API lookup, `ssm_run` (a root command on the server over SSM). |
 
 ## Verified COOL — anyone can check it
@@ -123,11 +150,12 @@ then `sudo systemctl restart depth` (over SSM).
 | network | origin port 8000 open only to CloudFront's origin-facing prefix list; no port 22; egress 443/80 only. `PublicHttps=true` (no CloudFront yet) opens 443 to Caddy and nothing else |
 | origin bypass | CloudFront adds `X-Origin-Verify`; the app refuses requests without it (`origin_guard.py`); the value lives in an SSM parameter, never in the template |
 | access | SSM Session Manager only (no key pair); IMDSv2 required, hop limit 1 |
-| identity | instance role: this bucket, this log group, this stack's signal, one parameter; the fleet role may only write `bench/` |
+| secrets | the approver PIN, MCP and admin tokens are SecureString parameters (AWS-managed key); `deploy.sh` creates them without a command-line argument, the server reads them at setup into root-only files, emails never carry them |
+| identity | customer-managed policies: the server may use this bucket, this log group, this stack's signal, its own `/depth/<stack>/` parameters and the approvals topic; the fleet may only write `bench/`; the scheduled stop may only stop this instance |
 | data | S3 encrypted, TLS-only, public access blocked, versioned; uploads expire in 7 days, results in 30; EBS encrypted |
 | abuse | per-client rate limits keyed on the **last** `X-Forwarded-For` hop (the one CloudFront appends); survey queue cap; security headers at the edge |
-| failures | system check → automatic recovery; instance check → reboot; CPU > 85 % and edge 5xx > 5 % → email |
-| cost | account Budget ($40/month, 25/50/100 % + forecast alerts); scheduled stop 2026-11-10; `teardown.sh` removes everything; every resource tagged `project=depth` |
+| failures | system check → automatic recovery; instance check → reboot; CPU > 85 %, edge 5xx > 5 %, the server stopping, an AWS Health event, the public health check failing → email; daily disk snapshots (7 kept) |
+| cost | account Budget ($40/month, 25/50/100 % + forecast alerts) and Cost Anomaly Detection (≥ $3, daily email) - alerts only, by the owner's choice; scheduled stop 2026-11-10; `teardown.sh` removes everything; every resource tagged `project=depth` (an active cost-allocation tag) |
 | deliberate omissions | WAF ($5+/month — the app rate-limits), customer KMS keys ($1/month each — AWS-managed encryption at rest instead), CloudFront access logs (metrics + origin JSON logs instead); each recorded in the template |
 
 ## Cost (us-east-1, on-demand, as planned — the measured bill goes in the report)
@@ -137,7 +165,9 @@ then `sudo systemctl restart depth` (over SSM).
 | c8g.large | ≈ $0.08/h | ≈ $40 |
 | public IPv4 (Elastic IP) | $0.005/h | ≈ $2.5 |
 | 20 GB gp3 | $0.08/GB-month | ≈ $1.1 |
-| CloudFront, S3, CloudWatch (6 custom metrics, 4 alarms, 1 dashboard), SNS, Scheduler, SSM | free tier | ≈ $0 |
+| CloudFront, S3, CloudWatch (log and agent metrics, alarms, 1 dashboard, saved queries), SNS, EventBridge, Scheduler, SSM, Cost Anomaly Detection, Resource Groups | free tier | ≈ $0 |
+| daily EBS snapshots (7 kept, incremental, ~5 GB used) | $0.05/GB-month | ≈ $0.2 |
+| Route 53 HTTPS health check (only while the demo is public) | ≈ $1.50/month | ≈ $0.8 |
 | COOL software fee (Marketplace, card) | $0.01/h after the 7-day trial | ≈ $3.5 |
 | benchmark fleet (4 machines, ~40 min) | — | < $1 |
 
@@ -148,8 +178,11 @@ test, no COOL needed), then `PHASE=cool APPLY=1 ./infra/golive.sh` the moment th
 through (COOL AMI → verified receipt → benchmarks C + D → load test → `docs/reports/cool_benchmark.md`).
 
 1. `aws login --profile hackathon`; subscribe to the COOL Graviton4 listing in AWS Marketplace.
-2. `ALERT_EMAIL=… ./infra/deploy.sh` → read the change set → `APPLY=1 ALERT_EMAIL=… ./infra/deploy.sh`.
-3. Confirm the SNS email. `python -m src.bench.verify_cool https://<demo>` → VERIFIED.
+2. `ALERT_EMAIL=… ./infra/deploy.sh` → read the change set → `APPLY=1 ALERT_EMAIL=… ./infra/deploy.sh`. An update of a
+   running stack: `ROLLBACK=1 APPLY=1 ./infra/deploy.sh`, then `APPLY=1 ./infra/update_server.sh` (the server re-reads
+   its secrets and settings from Parameter Store).
+3. Confirm the two SNS emails (alerts; approvals - `APPROVER_EMAIL=…` sends those to someone else). Read the PIN for
+   the submission form: `./infra/secrets.sh pin`. `python -m src.bench.verify_cool https://<demo>` → VERIFIED.
 4. `APPLY=1 ./infra/bench_fleet.sh` → `python -m src.bench.compare`; the load test; commit `benchmarks/`.
 5. After judging: the instance stops itself on 2026-11-10; then `APPLY=1 ./infra/teardown.sh` and cancel the
    COOL subscription.

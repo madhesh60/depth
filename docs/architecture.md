@@ -73,7 +73,8 @@ violet = optional. The numbers are EXP-003's as of 2026-10-21. Text version:_
              blinded false-alarm audit ─► audited precision src/detection/fp_audit.py
  SERVE   FastAPI (jobs, limits, rate limits, metrics) + zero-build studio (Analyze · Survey · Study · Audit · Connect)
          + MCP (/mcp) · OGC API – Features (/ogc) · signed webhooks · <depth-hazards> embed   src/dashboard/, webui/
- CLOUD   CloudFront ─► EC2 c8g (Graviton4) · COOL AMI · systemd ─► S3 · CloudWatch · Budgets · SSM   infra/
+ CLOUD   CloudFront ─► EC2 c8g (Graviton4) · COOL AMI · systemd ─► S3 · CloudWatch · SSM (Parameter Store)   infra/
+         EventBridge · SNS (alerts, approval emails) · DLM snapshots · Cost Anomaly Detection · Budgets · Route 53
 ```
 
 ## 3. Stage 1 — sonar canonicalisation (`src/cv_pipeline/canonical.py`)
@@ -275,7 +276,7 @@ disables it). Report: [`docs/reports/evidence_model_exp003.md`](reports/evidence
 
 | endpoint | purpose |
 |---|---|
-| `GET /api/health` | OpenCV version + `cv2.__file__` (COOL provenance), model state, calibration summary, limits, jobs |
+| `GET /api/health` | OpenCV version + `cv2.__file__` (COOL provenance), model state, calibration summary, limits, jobs, the `cv2.dnn` engine choice, approval-email counts |
 | `GET /api/metrics` | rolling per-stage p50/p95 on this host + arch / EC2 type / COOL |
 | `POST /api/analyze` | one frame → Stage 1 + evidence cards + traces (+ `frame_ref` for labels) |
 | `POST /api/jobs/survey`, `GET /api/jobs/{id}` | background survey jobs (no proxy timeouts) with progress; `gps=synthetic \| none \| recording` (the raw recording with real GPS) |
@@ -344,8 +345,19 @@ unit running the app with the COOL interpreter (web deps via `pip --target`; the
 modified), an Elastic IP, behind **CloudFront** (HTTPS, static UI cached at the edge; the origin accepts
 only CloudFront's origin-facing prefix list **and** our secret `X-Origin-Verify` header; no SSH — SSM),
 **S3** (versioned, TLS-only: results 30 d, uploads 7 d, benchmarks), **CloudWatch** (per-stage latency from
-the JSON frame log, CPU/memory, a dashboard, 4 alarms → SNS email, auto-recover/reboot), an **EventBridge
-Scheduler** stop after judging, and the account **Budget**. `GET /api/cool` serves the **COOL execution
+the JSON frame log, CPU/memory, a dashboard, alarms → SNS email, auto-recover/reboot, saved Logs Insights
+queries), an **EventBridge Scheduler** stop after judging, and the account **Budget**. Operating it
+(2026-10-23, every service with a job, free tier or cents): the approver PIN and tokens are **SSM Parameter
+Store** SecureStrings, so a replaced server keeps them (`infra/secrets.sh pin`); the stack's settings reach the
+server as an SSM String (`/etc/depth/aws.env`) without touching UserData; **EventBridge** rules email when the
+server stops or AWS plans maintenance; **SNS** emails the person who decides when the agent asks for an approval
+(`src/dashboard/sns_notify.py`: one email per survey, at most 6 an hour, never the PIN, a token or a position);
+**Data Lifecycle Manager** keeps 7 daily disk snapshots; **Cost Anomaly Detection** and a `project`
+cost-allocation tag keep spend visible (alerts only - the owner chose that nothing stops the demo early);
+a **Route 53** HTTPS health check from 3 regions alarms while the demo is public; IAM permissions are
+customer-managed policies per role (cfn-lint 1.58.0 and cfn-guard 3.2.1 with AWS's Well-Architected rule
+sets: 0 findings). Optional: the brief writer on **Bedrock** (Claude via Mantle, or Amazon Nova via
+Converse). `GET /api/cool` serves the **COOL execution
 receipt** — the AWS-signed instance identity (AMI, Marketplace product code, arm64) plus the OpenCV
 libraries the process mapped — and `python -m src.bench.verify_cool <url>` checks it from anywhere.
 `infra/bench_fleet.sh` runs the **equal-size benchmark** (c8i.xlarge x86 stock · c8g.xlarge stock ·

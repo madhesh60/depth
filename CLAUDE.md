@@ -110,7 +110,15 @@ budget) → plan → one approval request per action. Every step is logged in `a
 ## Cloud (AWS, us-east-1, profile `hackathon`)
 
 - One CloudFormation stack: `infra/cfn/depth.yaml` (EC2 c8g.large from the COOL AMI, OpenCV 5 under
-  `/opt/cool`, Elastic IP, CloudFront, S3, CloudWatch, SSM, scheduled stop 2026-11-10).
+  `/opt/cool`, Elastic IP, CloudFront, S3, CloudWatch + saved queries, SSM, EventBridge rules + a scheduled stop
+  2026-11-10, SNS alerts + approval emails, DLM daily snapshots, Cost Anomaly Detection, a Route 53 health check
+  while public, a Resource Group). Every service needs a job and must stay free tier or cents; the owner chose
+  **alerts only** - nothing may stop the demo automatically before the scheduled stop.
+- Secrets (approver PIN, MCP and admin tokens) are SSM SecureStrings under `/depth/<stack>/` (`deploy.sh` creates
+  them; `infra/secrets.sh pin` reads the PIN). Settings reach the server through `/depth/<stack>/app-config` +
+  `update_server.sh` - never edit the Instance's UserData or the launch template (that stops or replaces it).
+- Validate template changes with cfn-lint 1.58.0 and cfn-guard 3.2.1 (AWS Well-Architected rule sets, installed in
+  `C:/Users/RAJ/tools/`): 0 findings; keep it under 51,200 bytes (`deploy.sh` checks).
 - State: first applied 2026-10-19. CloudFront awaits AWS account verification (`ENABLE_CDN=0`);
   the COOL Marketplace subscription is blocked on payment - it needs a Visa or Mastercard (`REHEARSAL=1`).
 - Never modify the COOL venv (install web deps with `pip --target`). A benchmark counts as COOL only
