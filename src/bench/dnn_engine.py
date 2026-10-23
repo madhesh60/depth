@@ -138,6 +138,11 @@ def time_engines(nets: dict, frames: list[dict], rounds: int, n: int, threads: i
     return out
 
 
+def _winner(sep: str) -> Optional[str]:
+    """The faster engine named by a :func:`separation` verdict (classic vs new), or None within noise."""
+    return {"round ranges separate": "new", "round ranges separate (slower)": "classic"}.get(sep)
+
+
 def separation(slow: list[float], fast: list[float]) -> str:
     """STUDY-17's claim rule on per-round values (``compare.separation``)."""
     if len(slow) < 2 or len(fast) < 2:
@@ -364,8 +369,16 @@ def report(runs: list[dict]) -> str:
                      f"{-s['saved_ms']} ms saved per forward; round ranges separate)")
         else:
             speed = f"classic ÷ new is {s['pooled']}×, but the rounds overlap: **no speed claim on this machine**"
+        flips = []                                              # the winner at another thread count, when it differs
+        for t in r["timing"]:
+            w = _winner(t["classic_over_new"]["separation"])
+            if t is not best and w and w != _winner(s["separation"]):
+                flips.append(f"at {t['threads']} thread(s) the **{w}** engine is faster ({t['engines']['classic']['median_ms']}"
+                             f" classic vs {t['engines']['new']['median_ms']} ms new), so the winner depends on the "
+                             "thread count too")
         L.append(f"- `{r['label']}` ({_machine(r)}, {best['threads']} threads): ENGINE_AUTO loads the "
                  f"**{i['auto_equals']}** engine; {speed}" + (f"; the forward is {share}" if share else "")
+                 + "".join(f"; {x}" for x in flips)
                  + f". Answers: {p['match']} of {p['ref']} detections identical, {p['tier_flips']} tier flip(s).")
     L += ["- The look-harder mode runs 5 forwards per frame, so the per-forward saving counts five times there.",
           "- Where the parity table shows 0 tier flips, the calibrated promise does not depend on the engine: "
