@@ -16,8 +16,8 @@ finish() {
   local st=$1
   aws s3 cp --region "$REGION" --only-show-errors /var/log/depth-bench.log "$DEST/bench.log" || true
   if [ -d /opt/depth/benchmarks ]; then
-    aws s3 cp --region "$REGION" --only-show-errors --recursive /opt/depth/benchmarks/ "$DEST/" \
-      --exclude "*" --include "${LABEL}*.json" || true
+    aws s3 cp --region "$REGION" --only-show-errors --recursive /opt/depth/benchmarks/ "$DEST/" --exclude "*" \
+      --include "${LABEL}__*.json" --include "${LABEL}_lh__*.json" --include "${LABEL}_t1__*.json" || true
   fi
   date -u +%FT%TZ > /tmp/depth-status
   aws s3 cp --region "$REGION" --only-show-errors /tmp/depth-status "$DEST/$st" || true
@@ -34,6 +34,9 @@ apt-get -o DPkg::Lock::Timeout=300 install -y git python3-venv
 git clone -q https://github.com/madhesh60/depth.git /opt/depth
 cd /opt/depth
 git checkout -q "$REF"
+# the clone carries the committed results: drop them, so only what this machine measures can be uploaded (a failed
+# workload must not ship last week's file under today's run, nor another label that shares this prefix)
+rm -f benchmarks/*.json
 
 if [ "$FLAVOR" = cool ]; then
   PY=$(ls -d /opt/cool/venvs/python_3.1*/bin/python | sort -V | tail -1)       # COOL's interpreter, as-is
