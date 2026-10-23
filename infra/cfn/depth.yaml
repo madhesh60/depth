@@ -1,10 +1,12 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Description: >-
-  DEPTH live demo on AWS Graviton4 + COOL (OpenCV AI Competition 2026). One c8g instance launched from the
-  COOL Marketplace AMI runs the whole See-Prove-Decide-Act agent (OpenCV 5 from /opt/cool) behind CloudFront
-  HTTPS. Origin locked to our distribution (CloudFront prefix list + secret header), SSM-only access (no SSH),
-  encrypted storage, least-privilege IAM, CloudWatch logs/metrics/dashboard/alarms with email, a scheduled stop
-  after judging, and an equal-size benchmark fleet profile. Deploy: infra/deploy.sh. Remove: infra/teardown.sh.
+  DEPTH live demo on AWS Graviton4 + COOL (OpenCV AI Competition 2026). One c8g instance from the COOL
+  Marketplace AMI runs the whole See-Prove-Decide-Act agent (OpenCV 5 from /opt/cool) behind CloudFront HTTPS.
+  Origin locked to our distribution, SSM-only access (no SSH), secrets in SSM Parameter Store, encrypted storage,
+  least-privilege managed IAM policies, CloudWatch logs/metrics/dashboard/alarms/saved queries, EventBridge
+  instance and AWS Health alerts, daily EBS snapshots, SNS approval emails to the person who decides, a cost
+  anomaly monitor, a scheduled stop after judging and an equal-size benchmark fleet profile.
+  Deploy: infra/deploy.sh. Remove: infra/teardown.sh.
 
 Metadata:
   AWSToolsMetrics:
@@ -13,8 +15,10 @@ Metadata:
     why: >-
       The competition's Best Use of COOL award requires COOL to execute the claimed core workload on
       Graviton; the cheapest COOL-capable size (c8g.large) serves the demo, CloudFront gives free HTTPS,
-      and everything else is free-tier or cents. Budget guard: the account budget (depth-monthly, outside
-      this stack) plus the scheduled stop.
+      and everything else is free-tier or cents. Cost guard: the account budget (depth-monthly, outside this
+      stack, email at 25/50/100% + forecast), the cost anomaly monitor and the scheduled stop. Every service
+      added must have a job in the product or its operation and stay free-tier or cents (owner, 2026-10-23:
+      email alerts only - nothing stops the demo automatically before the scheduled stop).
     must:
       - The instance MUST boot the COOL Marketplace AMI; the receipt at /api/cool proves it (AWS-signed).
       - The origin MUST stay reachable only through this distribution (prefix list + X-Origin-Verify). The one
@@ -27,7 +31,7 @@ Metadata:
       - Label: {default: Network}
         Parameters: [VpcId, SubnetId, CloudFrontPrefixListId, OriginSecretParam, EnableCdn, PublicHttps]
       - Label: {default: Operations}
-        Parameters: [AlertEmail, StopAt, Rehearsal]
+        Parameters: [AlertEmail, ApproverEmail, CostMonitorArn, StopAt, Rehearsal]
 
 Parameters:
   CoolAmiId:
@@ -73,6 +77,20 @@ Parameters:
     Type: String
     AllowedPattern: ^[^@\s]+@[^@\s]+\.[^@\s]+$
     Description: Receives alarm emails (confirm the SNS subscription mail once).
+  ApproverEmail:
+    Type: String
+    Default: ""
+    AllowedPattern: ^$|^[^@\s]+@[^@\s]+\.[^@\s]+$
+    Description: >-
+      The person who decides: emailed when the agent asks for an approval (empty = AlertEmail). Confirm the SNS
+      subscription mail once. The PIN is never in the email.
+  CostMonitorArn:
+    Type: String
+    Default: ""
+    AllowedPattern: ^$|^arn:aws:ce::\d{12}:anomalymonitor/[0-9a-f-]+$
+    Description: >-
+      The account's existing AWS-services cost anomaly monitor (an account may hold only one; deploy.sh finds it).
+      Empty = this stack creates it.
   StopAt:
     Type: String
     Default: "2026-11-10T06:30:00"
@@ -106,7 +124,10 @@ Conditions:
   IsUsEast1: !Equals [!Ref "AWS::Region", us-east-1]
   CdnOn: !Equals [!Ref EnableCdn, "true"]
   HttpsOn: !Equals [!Ref PublicHttps, "true"]
+  PublicOn: !Or [!Condition CdnOn, !Condition HttpsOn]
   EdgeAlarmOn: !And [!Condition IsUsEast1, !Condition CdnOn]
+  HasApproverEmail: !Not [!Equals [!Ref ApproverEmail, ""]]
+  NewCostMonitor: !Equals [!Ref CostMonitorArn, ""]
 
 Resources:
   # ---------------------------------------------------------------- storage
@@ -158,6 +179,11 @@ Resources:
 
   DataBucketPolicy:
     Type: AWS::S3::BucketPolicy
+    Metadata:
+      guard:
+        SuppressedRules:
+          - S3_BUCKET_SSL_REQUESTS_ONLY  # the TLS deny is below (Sid DenyInsecureTransport); the rule matches one literal
+                                         # statement with Resource "*", which a bucket policy cannot use
     Properties:
       Bucket: !Ref DataBucket
       PolicyDocument:
@@ -186,13 +212,62 @@ Resources:
       RetentionInDays: 14
 
   # ---------------------------------------------------------------- identity
+  ServerPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: >-
+          The COOL server's permissions as a customer-managed policy (versioned, reviewable on its own); the role
+          lists it in ManagedPolicyArns, so a stack update attaches it in the same step that drops the old inline policy.
+        must:
+          - Least privilege - this bucket, this log group, this stack's signal, this stack's parameters, this topic.
+    Properties:
+      Description: DEPTH demo server - results bucket, app logs, readiness signal, its own SSM parameters, approval emails
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: BucketObjects
+            Effect: Allow
+            Action: [s3:GetObject, s3:PutObject]
+            Resource: !Sub "${DataBucket.Arn}/*"
+          - Sid: BucketList
+            Effect: Allow
+            Action: s3:ListBucket
+            Resource: !GetAtt DataBucket.Arn
+          - Sid: AppLogs
+            Effect: Allow
+            Action: [logs:CreateLogStream, logs:PutLogEvents, logs:DescribeLogStreams]
+            Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${AppLogGroup}:*
+          - Sid: AgentMetrics
+            Effect: Allow
+            Action: cloudwatch:PutMetricData
+            Resource: "*"                  # PutMetricData has no resource ARN; scoped by the namespace condition
+            Condition:
+              StringEquals: {cloudwatch:namespace: CWAgent}
+          - Sid: SignalReady
+            Effect: Allow
+            Action: cloudformation:SignalResource
+            Resource: !Ref AWS::StackId
+          - Sid: OriginSecret
+            Effect: Allow
+            Action: ssm:GetParameter
+            Resource: !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter${OriginSecretParam}
+          - Sid: StackParameters        # SecureString secrets (aws/ssm key) + the app config, written by deploy.sh / below
+            Effect: Allow
+            Action: [ssm:GetParameter, ssm:GetParameters]
+            Resource: !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/depth/${AWS::StackName}/*
+          - Sid: ApprovalEmails
+            Effect: Allow
+            Action: sns:Publish
+            Resource: !Ref ApprovalTopic
+
   InstanceRole:
     Type: AWS::IAM::Role
     Metadata:
       com.aws.cloudformation.Context:
         why: The COOL server's only credentials (IMDSv2, no keys on disk).
         must:
-          - Least privilege - this bucket, this log group, this stack's signal, this one parameter.
+          - Least privilege - SSM core for Session Manager + ServerPolicy, nothing else.
     Properties:
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
@@ -202,37 +277,7 @@ Resources:
             Action: sts:AssumeRole
       ManagedPolicyArns:
         - !Sub arn:${AWS::Partition}:iam::aws:policy/AmazonSSMManagedInstanceCore
-      Policies:
-        - PolicyName: depth-server
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              - Sid: BucketObjects
-                Effect: Allow
-                Action: [s3:GetObject, s3:PutObject]
-                Resource: !Sub "${DataBucket.Arn}/*"
-              - Sid: BucketList
-                Effect: Allow
-                Action: s3:ListBucket
-                Resource: !GetAtt DataBucket.Arn
-              - Sid: AppLogs
-                Effect: Allow
-                Action: [logs:CreateLogStream, logs:PutLogEvents, logs:DescribeLogStreams]
-                Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${AppLogGroup}:*
-              - Sid: AgentMetrics
-                Effect: Allow
-                Action: cloudwatch:PutMetricData
-                Resource: "*"
-                Condition:
-                  StringEquals: {cloudwatch:namespace: CWAgent}
-              - Sid: SignalReady
-                Effect: Allow
-                Action: cloudformation:SignalResource
-                Resource: !Ref AWS::StackId
-              - Sid: OriginSecret
-                Effect: Allow
-                Action: ssm:GetParameter
-                Resource: !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter${OriginSecretParam}
+        - !Ref ServerPolicy
       Tags:
         - {Key: project, Value: depth}
 
@@ -240,6 +285,18 @@ Resources:
     Type: AWS::IAM::InstanceProfile
     Properties:
       Roles: [!Ref InstanceRole]
+
+  BenchPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      Description: DEPTH benchmark fleet - may only write results under bench/
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: WriteResults
+            Effect: Allow
+            Action: s3:PutObject
+            Resource: !Sub "${DataBucket.Arn}/bench/*"
 
   BenchRole:
     Type: AWS::IAM::Role
@@ -255,15 +312,7 @@ Resources:
             Action: sts:AssumeRole
       ManagedPolicyArns:
         - !Sub arn:${AWS::Partition}:iam::aws:policy/AmazonSSMManagedInstanceCore
-      Policies:
-        - PolicyName: depth-bench
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              - Sid: WriteResults
-                Effect: Allow
-                Action: s3:PutObject
-                Resource: !Sub "${DataBucket.Arn}/bench/*"
+        - !Ref BenchPolicy
       Tags:
         - {Key: project, Value: depth}
 
@@ -447,6 +496,7 @@ Resources:
 
   Instance:
     Type: AWS::EC2::Instance
+    DependsOn: AppConfigParam            # a new server reads its settings during setup (ordering only)
     CreationPolicy:
       ResourceSignal:
         Count: 1
@@ -458,6 +508,13 @@ Resources:
           from /opt/cool, so CREATE_COMPLETE means the agent is serving on COOL.
         must:
           - ImageId must be the COOL Marketplace AMI (changing it replaces the instance).
+          - Never edit UserData or LaunchTemplate data in place - either change stops or replaces the live server;
+            settings reach it through SSM parameters (setup_cool_instance.sh) and update_server.sh instead.
+      guard:
+        SuppressedRules:
+          - EC2_INSTANCES_IN_VPC                     # in the VPC: its subnet is set on the launch template's interface
+          - EBS_OPTIMIZED_INSTANCE                   # c8g (Nitro) is EBS-optimized by default; setting the flag would stop the server
+          - EC2_INSTANCE_DETAILED_MONITORING_ENABLED # $2+/month; the status-check alarms already get free 1-minute data
     Properties:
       ImageId: !Ref CoolAmiId
       InstanceType: !Ref InstanceType
@@ -528,6 +585,226 @@ Resources:
         - {Protocol: email, Endpoint: !Ref AlertEmail}
       Tags:
         - {Key: project, Value: depth}
+
+  AlertTopicPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: The alarms (CloudWatch) and the EventBridge rules below publish here; this account only.
+        must:
+          - Keep the cloudwatch.amazonaws.com grant - the alarms' emails depend on it.
+    Properties:
+      Topics: [!Ref AlertTopic]
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: ThisAccount
+            Effect: Allow
+            Principal: {AWS: !Sub "arn:${AWS::Partition}:iam::${AWS::AccountId}:root"}
+            Action: [sns:Publish, sns:GetTopicAttributes, sns:Subscribe, sns:ListSubscriptionsByTopic]
+            Resource: !Ref AlertTopic
+          - Sid: AlarmsAndEvents
+            Effect: Allow
+            Principal: {Service: [cloudwatch.amazonaws.com, events.amazonaws.com]}
+            Action: sns:Publish
+            Resource: !Ref AlertTopic
+            Condition:
+              StringEquals: {aws:SourceAccount: !Ref AWS::AccountId}
+
+  ApprovalTopic:
+    Type: AWS::SNS::Topic
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: >-
+          The human in the loop is told: when the agent or an MCP client asks for an approval, the server emails the
+          person who decides (src/dashboard/sns_notify.py - one email per survey, capped per hour); they decide in the studio.
+        must:
+          - Never carry the approver PIN or any token.
+    Properties:
+      DisplayName: DEPTH approvals
+      KmsMasterKeyId: alias/aws/sns
+      Subscription:
+        - Protocol: email
+          Endpoint: !If [HasApproverEmail, !Ref ApproverEmail, !Ref AlertEmail]
+      Tags:
+        - {Key: project, Value: depth}
+
+  AppConfigParam:
+    Type: AWS::SSM::Parameter
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: >-
+          Non-secret server settings from this stack; setup_cool_instance.sh writes them to /etc/depth/aws.env, so new
+          AWS settings reach the live server without touching UserData. Secrets live beside it as SecureString (deploy.sh).
+    Properties:
+      Name: !Sub /depth/${AWS::StackName}/app-config
+      Type: String
+      Description: DEPTH server settings (JSON env map) - read by infra/setup_cool_instance.sh
+      Value: !Sub '{"DEPTH_SNS_APPROVALS_TOPIC": "${ApprovalTopic}", "AWS_REGION": "${AWS::Region}", "AWS_DEFAULT_REGION": "${AWS::Region}"}'
+      Tags: {project: depth}
+
+  ServerStateRule:
+    Type: AWS::Events::Rule
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: Email the owner the moment the demo server stops or terminates - the scheduled stop, a person, or AWS.
+    Properties:
+      Description: DEPTH demo server state change -> alert email
+      State: ENABLED
+      EventPattern:
+        source: [aws.ec2]
+        detail-type: [EC2 Instance State-change Notification]
+        detail:
+          instance-id: [!Ref Instance]
+          state: [stopping, stopped, shutting-down, terminated]
+      Targets:
+        - Id: alert-email
+          Arn: !Ref AlertTopic
+          InputTransformer:
+            InputPathsMap: {state: $.detail.state, id: $.detail.instance-id, time: $.time}
+            InputTemplate: >-
+              "DEPTH demo server <id> is <state> (<time>). If this was not planned, start it again:
+              aws ec2 start-instances --instance-ids <id>"
+
+  HealthEventRule:
+    Type: AWS::Events::Rule
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: AWS-scheduled maintenance or retirement of the server (EC2/EBS Health events) reaches the owner before judges notice.
+    Properties:
+      Description: AWS Health events for EC2 / EBS in this account -> alert email
+      State: ENABLED
+      EventPattern:
+        source: [aws.health]
+        detail-type: [AWS Health Event]
+        detail:
+          service: [EC2, EBS]
+      Targets:
+        - Id: alert-email
+          Arn: !Ref AlertTopic
+
+  SnapshotRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Description: Data Lifecycle Manager - snapshots of the DEPTH demo disk
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: {Service: dlm.amazonaws.com}
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub arn:${AWS::Partition}:iam::aws:policy/service-role/AWSDataLifecycleManagerServiceRole
+      Tags:
+        - {Key: project, Value: depth}
+
+  DailySnapshots:
+    Type: AWS::DLM::LifecyclePolicy
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: >-
+          Backup of the server's state (survey results, approvals and people's labels under runs/, the CloudWatch
+          agent config): one encrypted snapshot a day, the last 7 kept - cents a month. Restore = a volume from a snapshot.
+        must:
+          - Target only the demo root volume (tag Name=<stack>-root from the launch template), never the benchmark fleet.
+    Properties:
+      Description: DEPTH demo server disk - daily snapshot - keep 7
+      State: ENABLED
+      ExecutionRoleArn: !GetAtt SnapshotRole.Arn
+      PolicyDetails:
+        PolicyType: EBS_SNAPSHOT_MANAGEMENT
+        ResourceTypes: [VOLUME]
+        TargetTags:
+          - {Key: Name, Value: !Sub "${AWS::StackName}-root"}
+        Schedules:
+          - Name: daily-keep-7
+            CreateRule: {Interval: 24, IntervalUnit: HOURS, Times: ["03:30"]}
+            RetainRule: {Count: 7}
+            CopyTags: true
+            TagsToAdd:
+              - {Key: project, Value: depth}
+              - {Key: role, Value: backup}
+      Tags:
+        - {Key: project, Value: depth}
+
+  CostMonitor:
+    Type: AWS::CE::AnomalyMonitor
+    Condition: NewCostMonitor
+    Properties:
+      MonitorName: !Sub ${AWS::StackName}-services
+      MonitorType: DIMENSIONAL
+      MonitorDimension: SERVICE
+
+  CostAnomalyAlert:
+    Type: AWS::CE::AnomalySubscription
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: >-
+          Cost always in control without stopping anything (owner's choice): AWS's ML spend model emails the owner a daily
+          summary of any spend anomaly of $3 or more, on top of the depth-monthly budget emails.
+    Properties:
+      SubscriptionName: !Sub ${AWS::StackName}-spend-anomalies
+      Frequency: DAILY
+      MonitorArnList: [!If [NewCostMonitor, !Ref CostMonitor, !Ref CostMonitorArn]]
+      Subscribers:
+        - {Type: EMAIL, Address: !Ref AlertEmail}
+      ThresholdExpression: '{"Dimensions": {"Key": "ANOMALY_TOTAL_IMPACT_ABSOLUTE", "MatchOptions": ["GREATER_THAN_OR_EQUAL"], "Values": ["3"]}}'
+
+  ResourceGroup:
+    Type: AWS::ResourceGroups::Group
+    Properties:
+      Name: !Sub ${AWS::StackName}-all
+      Description: Every AWS resource tagged project depth - this stack and its snapshots and the benchmark fleet
+      ResourceQuery:
+        Type: TAG_FILTERS_1_0
+        Query:
+          ResourceTypeFilters: [AWS::AllSupported]
+          TagFilters:
+            - {Key: project, Values: [depth]}
+      Tags:
+        - {Key: project, Value: depth}
+
+  DemoHealthCheck:
+    Type: AWS::Route53::HealthCheck
+    Condition: PublicOn
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: >-
+          Outside-in uptime while judges use the public demo: HTTPS GET /api/health from three AWS regions every 30 s,
+          an alarm emails on failure and again on recovery. Exists only while the demo is public.
+    Properties:
+      HealthCheckConfig:
+        Type: HTTPS
+        FullyQualifiedDomainName: !If
+          - CdnOn
+          - !GetAtt Distribution.DomainName
+          - !Sub ["${Dashed}.sslip.io", {Dashed: !Join ["-", !Split [".", !Ref ElasticIp]]}]
+        Port: 443
+        ResourcePath: /api/health
+        RequestInterval: 30
+        FailureThreshold: 3
+        EnableSNI: true
+        Regions: [us-east-1, eu-west-1, ap-southeast-1]
+      HealthCheckTags:
+        - {Key: project, Value: depth}
+        - {Key: Name, Value: !Sub "${AWS::StackName}-public-demo"}
+
+  DemoDownAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: PublicOn
+    Properties:
+      AlarmDescription: The public demo failed its HTTPS health check for 3 minutes - email (and again when it is back).
+      Namespace: AWS/Route53
+      MetricName: HealthCheckStatus
+      Dimensions: [{Name: HealthCheckId, Value: !Ref DemoHealthCheck}]
+      Statistic: Minimum
+      Period: 60
+      EvaluationPeriods: 3
+      Threshold: 1
+      ComparisonOperator: LessThanThreshold
+      TreatMissingData: breaching
+      AlarmActions: [!Ref AlertTopic]
+      OKActions: [!Ref AlertTopic]
 
   SystemCheckAlarm:
     Type: AWS::CloudWatch::Alarm
@@ -630,6 +907,52 @@ Resources:
       MetricTransformations:
         - {MetricNamespace: DEPTH, MetricName: analyze_wall_ms, MetricValue: $.ms.wall, Unit: Milliseconds}
 
+  ApprovalEmailMetric:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref AppLogGroup
+      FilterPattern: '{ $.evt = "notify" && $.status = "sent" }'
+      MetricTransformations:
+        - {MetricNamespace: DEPTH, MetricName: approval_emails, MetricValue: "1", Unit: Count}
+
+  # Saved CloudWatch Logs Insights queries (console: Logs Insights > Saved queries > DEPTH) - one click for the questions
+  # an operator asks during judging. Free; they read the server's JSON lines (src/dashboard/metrics.py, sns_notify.py).
+  QueryAnalyzeLatency:
+    Type: AWS::Logs::QueryDefinition
+    Properties:
+      Name: !Sub DEPTH/${AWS::StackName}/analyze-latency-p50-p95
+      LogGroupNames: [!Ref AppLogGroup]
+      QueryString: >-
+        filter evt = 'frame' and kind = 'analyze'
+        | stats count() as frames, pct(ms.wall, 50) as p50_ms, pct(ms.wall, 95) as p95_ms by bin(15m)
+
+  QueryStageTime:
+    Type: AWS::Logs::QueryDefinition
+    Properties:
+      Name: !Sub DEPTH/${AWS::StackName}/time-per-stage
+      LogGroupNames: [!Ref AppLogGroup]
+      QueryString: >-
+        filter evt = 'frame'
+        | stats count() as frames, pct(ms.stage1, 50) as stage1_p50, pct(ms.see, 50) as see_p50,
+        pct(ms.look_harder, 50) as look_harder_p50, pct(ms.prove_decide, 50) as decide_p50 by kind
+
+  QueryApprovalEmails:
+    Type: AWS::Logs::QueryDefinition
+    Properties:
+      Name: !Sub DEPTH/${AWS::StackName}/approval-emails
+      LogGroupNames: [!Ref AppLogGroup]
+      QueryString: >-
+        filter evt = 'notify' | stats count() as emails by status, event | sort emails desc
+
+  QueryErrors:
+    Type: AWS::Logs::QueryDefinition
+    Properties:
+      Name: !Sub DEPTH/${AWS::StackName}/errors
+      LogGroupNames: [!Ref AppLogGroup]
+      QueryString: >-
+        fields @timestamp, @message | filter @message like /(?i)(error|exception|traceback)/
+        | sort @timestamp desc | limit 50
+
   Dashboard:
     Type: AWS::CloudWatch::Dashboard
     Properties:
@@ -663,6 +986,17 @@ Resources:
             - "CloudFront off (EnableCdn=false) - the origin is closed to the internet; checks run on the box over SSM"
           DistributionId: !If [CdnOn, !Ref Distribution, none]
 
+  StopSchedulePolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      Description: DEPTH scheduled stop - may stop the demo instance and nothing else
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action: ec2:StopInstances
+            Resource: !Sub arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:instance/${Instance}
+
   StopScheduleRole:
     Type: AWS::IAM::Role
     Properties:
@@ -674,14 +1008,7 @@ Resources:
             Action: sts:AssumeRole
             Condition:
               StringEquals: {aws:SourceAccount: !Ref AWS::AccountId}
-      Policies:
-        - PolicyName: stop-demo-instance
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              - Effect: Allow
-                Action: ec2:StopInstances
-                Resource: !Sub arn:${AWS::Partition}:ec2:${AWS::Region}:${AWS::AccountId}:instance/${Instance}
+      ManagedPolicyArns: [!Ref StopSchedulePolicy]
       Tags:
         - {Key: project, Value: depth}
 
@@ -745,3 +1072,16 @@ Outputs:
   SubnetId:
     Description: Subnet the stack uses (the fleet launches here too)
     Value: !Ref SubnetId
+  ParamPrefix:
+    Description: SSM Parameter Store path of this stack's secrets (SecureString) and app config - read the PIN with infra/secrets.sh
+    Value: !Sub /depth/${AWS::StackName}
+  ApprovalTopicArn:
+    Description: SNS topic that emails the person who decides when the agent asks for an approval
+    Value: !Ref ApprovalTopic
+  ResourceGroupName:
+    Description: Every resource tagged project=depth (console - Resource Groups & Tag Editor)
+    Value: !Ref ResourceGroup
+  HealthCheckId:
+    Condition: PublicOn
+    Description: Route 53 HTTPS health check of the public demo
+    Value: !Ref DemoHealthCheck
