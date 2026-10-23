@@ -1,0 +1,153 @@
+{
+ "label": "graviton_stock_large",
+ "created": "2026-10-23T14:22:24",
+ "workload": "dnn_engine",
+ "fingerprint": {
+  "opencv": {
+   "version": "5.0.0",
+   "cv2_file": "/opt/stock-opencv/lib/python3.12/site-packages/cv2/__init__.py",
+   "is_cool_path": false,
+   "threads": 2,
+   "build_flags": {
+    "KleidiCV": true,
+    "NEON": true,
+    "IPP": false,
+    "TBB": false,
+    "OpenMP": false
+   }
+  },
+  "host": {
+   "machine": "aarch64",
+   "system": "Linux",
+   "python": "3.12.3",
+   "vcpus": 2,
+   "cpu_model": "0xd4f"
+  },
+  "ec2": {
+   "instance-type": "c8g.large",
+   "ami-id": "ami-0d0f26d09ffd9af92",
+   "region": "us-east-1"
+  },
+  "cool": {
+   "attestation": {
+    "document_sha256": "d94319ae9c0287a4917677bda39ccbbc047c4f5ce19991cf3561be98025f85b2",
+    "architecture": "arm64",
+    "instance_type": "c8g.large",
+    "image_id": "ami-0d0f26d09ffd9af92",
+    "marketplace_product_codes": [],
+    "billing_products": null,
+    "region": "us-east-1",
+    "availability_zone": "us-east-1a",
+    "instance_id": "i-0428039faebccea5e",
+    "pending_time": "2026-10-19T14:20:18Z"
+   }
+  },
+  "git_commit": "058de0e",
+  "model_sha256": "71339e99ad2b4b29f8d516967ce02e1fb5895434bf6f483cb517efe6750ba2f2",
+  "calibration_sha256": "ee337f0b216d2c0dccabd9e2c68646294d814ebc3fc9b71effb9b12fb6e37199"
+ },
+ "config": {
+  "model": "EXP-003",
+  "onnx": "models/EXP-003/best.onnx",
+  "onnx_sha256": "71339e99ad2b4b29f8d516967ce02e1fb5895434bf6f483cb517efe6750ba2f2",
+  "imgsz": 640,
+  "timing_frames": "webui/samples",
+  "n_timing_frames": 8,
+  "rounds": 5,
+  "n_per_round": 20,
+  "threads": "0"
+ },
+ "load_s_median": {
+  "classic": 0.028,
+  "new": 0.043,
+  "auto": 0.037
+ },
+ "identification": {
+  "auto_equals": "new",
+  "frames": 8,
+  "auto_bit_identical": {
+   "new": true,
+   "classic": false
+  },
+  "new_vs_classic_max_abs_output": 0.002808,
+  "layers": {
+   "classic": 250,
+   "new": 212,
+   "auto": 212
+  }
+ },
+ "parity": {
+  "frames": 8,
+  "ref": 31,
+  "other": 31,
+  "match": 31,
+  "differ": 0,
+  "missing": 0,
+  "extra": 0,
+  "tier_flips": 0,
+  "max_dscore": 0.0,
+  "max_abs_output": 0.002808,
+  "ref_engine": "new",
+  "other_engine": "classic",
+  "rule": {
+   "iou": 0.9,
+   "dscore": 0.01
+  },
+  "mismatches": [],
+  "split": "webui/samples (the timing frames)"
+ },
+ "timing": [
+  {
+   "threads": 2,
+   "rounds": 5,
+   "n_per_round": 20,
+   "engines": {
+    "classic": {
+     "median_ms": 255.4,
+     "p90_ms": 255.9,
+     "mean_ms": 255.5,
+     "round_medians_ms": [
+      255.4,
+      255.5,
+      255.3,
+      255.3,
+      255.5
+     ]
+    },
+    "new": {
+     "median_ms": 376.5,
+     "p90_ms": 377.2,
+     "mean_ms": 376.6,
+     "round_medians_ms": [
+      376.6,
+      376.4,
+      376.4,
+      376.7,
+      376.3
+     ]
+    },
+    "auto": {
+     "median_ms": 376.7,
+     "p90_ms": 377.6,
+     "mean_ms": 376.8,
+     "round_medians_ms": [
+      376.7,
+      376.8,
+      376.6,
+      376.4,
+      376.8
+     ]
+    }
+   },
+   "classic_over_new": {
+    "pooled": 0.678,
+    "per_round": [
+     0.678,
+     0.679
+    ],
+    "saved_ms": -121.1,
+    "separation": "round ranges separate (slower)"
+   }
+  }
+ ]
+}
