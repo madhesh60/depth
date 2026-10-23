@@ -47,6 +47,7 @@ from .detector_queue import DetectorQueue
 from .integrations import Webhooks
 from .jobs import JobStore, PUBLIC_FORMATS, REPORT_FORMATS
 from .metrics import Metrics
+from .sns_notify import SnsNotifier
 
 log = logging.getLogger("depth.api")
 REPO = Path(__file__).resolve().parents[2]
@@ -77,6 +78,7 @@ _PIN_GUARD = PinGuard()                         # wrong-PIN lockout per client
 _DECIDE_LOCK = threading.Lock()                 # a person's decision + the re-plan it causes, one at a time
 _WEBHOOKS = Webhooks()
 PUBLIC_URL = os.environ.get("DEPTH_PUBLIC_URL", "").rstrip("/")     # e.g. https://<cloudfront-domain>
+_SNS = SnsNotifier(public_url=PUBLIC_URL)        # approval emails (off unless DEPTH_SNS_APPROVALS_TOPIC is set)
 _STUDY: "OrderedDict[str, dict]" = OrderedDict()          # active study sessions (plan + the cards shown)
 _UPLOADS: "OrderedDict[str, np.ndarray]" = OrderedDict()     # recent uploaded frames (feedback persists them)
 MAX_UPLOAD_CACHE = 64
@@ -132,6 +134,10 @@ def _notify(event: str, payload: dict) -> None:
         log.info("event %s %s -> %d webhook(s)", event, payload.get("id") or payload.get("survey_id"), n)
     except Exception:                                   # integrations never break the product
         log.exception("webhook emit failed")
+    try:
+        _SNS.notify(event, payload)                     # the approver's email (approval.requested only)
+    except Exception:
+        log.exception("approval email failed")
 
 
 def _survey_event(d: dict) -> dict:

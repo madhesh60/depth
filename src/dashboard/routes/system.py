@@ -42,6 +42,7 @@ def health():
         "approver_pin_required": pin_required(),
         # where a person finds the PIN, e.g. "judges: the PIN is in the submission form" (never the PIN itself)
         "approver_pin_hint": os.environ.get("DEPTH_APPROVER_HINT", "")[:120] or None,
+        "approval_email": S._SNS.status(),          # SNS emails to the approver: on/off and counts (no topic ARN)
         "modes": [m.to_dict() for m in calibrated_modes(cal)],
         "ms_per_pass": S._PIPELINE.ms_per_pass() if S._PIPELINE is not None else None,
         "interactive_s": S.INTERACTIVE_S,
