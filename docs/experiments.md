@@ -223,7 +223,7 @@ Promote each into the log below with full results as it runs.
   headline says *promise* and names its assumption (exchangeable with the calibration pots; a pooled rate,
   not a per-survey guarantee), with the per-recording spread next to it.
 
-### STUDY-20 — OpenCV 5's new DNN engine on the detector: which one loads, speed, same answers (DONE on the laptop; EC2 rows pending)
+### STUDY-20 — OpenCV 5's new DNN engine on the detector: which one loads, speed, same answers (laptop + EC2 Graviton; the server now measures and picks)
 
 - **Why.** OpenCV 5 has two ONNX engines (`ENGINE_CLASSIC`, `ENGINE_NEW`); DEPTH asked for `ENGINE_AUTO`, and
   every benchmark JSON said `"engine": "auto"` — the engine that actually ran was never known (judge audit).
@@ -243,6 +243,19 @@ Promote each into the log below with full results as it runs.
   on every result (`opencv.dnn_engine`) and every benchmark JSON. `infra/bench_cool.sh` runs the study on every
   EC2 machine, so the next fleet run adds x86, Graviton and COOL rows on quiet hardware.
   Report: [`docs/reports/dnn_engine.md`](reports/dnn_engine.md) · `python -m src.bench.dnn_engine --label <host>`.
+- **EC2 result (2026-10-23, the demo server: c8g.large Graviton4, stock OpenCV 5.0.0, 2 threads, same protocol):**
+  the **classic engine is faster** — **255.4 vs 376.5 ms** per forward (1.47×; per-round medians 255.3–255.5 vs
+  376.3–376.7 ms, the ranges separate), and ENGINE_AUTO loads the slower one. Same answers on the server's 8 timing
+  frames: 31 of 31 detections identical, 0 tier flips (the calibration split is not on the server; the 634-of-634
+  parity is the laptop's). The forward is 97% of the 388-ms product frame there.
+- **Shipped (2026-10-23): the server measures, it does not assume.** `DEPTH_DNN_ENGINE=fastest` loads both engines
+  when the server starts, checks they give the same raw output on a fixed input (≤ 1 px per box coordinate,
+  ≤ 0.01 per class score), times them in 3 interleaved rounds and keeps the classic engine only if it was faster
+  in every round (`infer.faster_engine`; otherwise the new one, ENGINE_AUTO's pick). It is the EC2 server's
+  setting (`infra/depth.service`) and the benchmark's (`bench_cool.sh`), so it also decides on a COOL machine;
+  `/api/health` → `runtime.engine_choice` shows the rounds and the reason. On the laptop it keeps the new engine
+  (new faster in every round, 217–239 vs 246–266 ms, 8 threads); the measurement adds ~4 s to the model load.
+  Everything else keeps `auto`.
 
 ### STUDY-19 — Does the promise apply to this recording? The applicability check (SHIPPED — on by default)
 

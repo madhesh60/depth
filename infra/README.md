@@ -43,8 +43,8 @@ Scaling story (described, not built): survey jobs → SQS → an Auto Scaling gr
 | [`cfn/depth.yaml`](cfn/depth.yaml) | The whole demo as one stack (design reasons recorded per resource in `Metadata`). |
 | [`deploy.sh`](deploy.sh) | Resolves the COOL AMI (checks arm64 + Marketplace product code + the subscription), an AZ that offers every type, the CloudFront prefix list; validates; prints the change set. `APPLY=1` deploys and verifies the live receipt. `REHEARSAL=1` / `ENABLE_CDN=0`: see the checklist. |
 | [`setup_cool_instance.sh`](setup_cool_instance.sh) | On the instance: exact commit, SHA-256-checked model, web deps into `/opt/depth/pydeps` (**the COOL venv is never modified**), CloudWatch agent, systemd. Fails unless `/api/health` shows the model warm **and** `cv2` from `/opt/cool` — so the CloudFormation signal means "serving on COOL". |
-| [`depth.service`](depth.service) | systemd unit: COOL interpreter, threads = vCPUs, restart on failure, log file for the agent. |
-| [`update_server.sh`](update_server.sh) | New commit on the live server through SSM Run Command (no SSH, no replacement). |
+| [`depth.service`](depth.service) | systemd unit: COOL interpreter, threads = vCPUs, the `cv2.dnn` engine measured on the machine at load (`DEPTH_DNN_ENGINE=fastest`, STUDY-20), restart on failure, log file for the agent. |
+| [`update_server.sh`](update_server.sh) | New commit on the live server through SSM Run Command (no SSH, no replacement). On a rehearsal server it runs the setup with the stock interpreter and without the COOL check, as the template does. |
 | [`bench_fleet.sh`](bench_fleet.sh) + [`bench_userdata.sh`](bench_userdata.sh) | The whole COOL benchmark as one command (see below). |
 | [`bench_cool.sh`](bench_cool.sh) | The benchmark on one machine (the fleet runs it; it also runs by hand). |
 | [`teardown.sh`](teardown.sh) | Removes everything (stack, retained bucket with every version, parameter) and lists leftovers. |

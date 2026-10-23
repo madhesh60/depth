@@ -83,6 +83,26 @@ Current numbers, each with its split: README "At a glance" and
 
 ## 4. Session log
 
+### 2026-10-23 (sweep 75) — the AWS items in our hands: the server updated, the engine measured, look harder on EC2
+
+COOL still waits on AWS (the Marketplace payment case); everything else that needed AWS ran today.
+
+- **The live server was four days behind.** It still ran `339b722` (19 Oct: the 79% promise, no look-harder
+  mode) because `update_server.sh` had never worked on a rehearsal server: the setup script looks for the COOL
+  interpreter, finds none on stock Ubuntu and exits 2 under `set -e` before printing anything. Fixed: the update
+  reads `/etc/depth/rehearsal.env` on the box and passes the stock interpreter and `DEPTH_REQUIRE_COOL=0`, as the
+  template's rehearsal branch does. The server now runs `058de0e`; the approver hint is set (`/etc/depth/approver.env`).
+- **Look harder, measured on EC2** (the demo server, c8g.large, stock OpenCV 5, 2 vCPU, idle, interleaved,
+  40 frames × 3 repeats): standard look **388 ms** p50, looking harder **1,904 ms** p50 (5 forwards) —
+  `benchmarks/graviton_stock_large*`.
+- **STUDY-20 on Graviton: the classic `cv2.dnn` engine is 1.47× faster** there (255.4 vs 376.5 ms per forward,
+  rounds separate, 31 of 31 detections identical), and ENGINE_AUTO loads the slower one. On the laptop the
+  rounds overlap. So the server now **measures both engines when it starts** and keeps the faster one only if
+  the answers match and it wins every round (`DEPTH_DNN_ENGINE=fastest`, `infer.faster_engine`, in
+  `infra/depth.service` and `bench_cool.sh`; `/api/health` → `runtime.engine_choice`). Tests added.
+- `bench_cool.sh` now measures both perception modes on every machine (`product,product_lh,cv,survey`), so the
+  COOL rows will carry look harder too.
+
 ### 2026-10-22 (sweep 74) — the independent review's findings, a real-LLM session, two honest notes
 
 An independent review of sweep 73 (four reviewers, each finding checked by a skeptic) confirmed these; all fixed:
