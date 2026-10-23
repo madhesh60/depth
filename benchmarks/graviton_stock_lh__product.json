@@ -1,0 +1,243 @@
+{
+  "label": "graviton_stock_lh",
+  "created": "2026-10-23T14:40:06",
+  "fingerprint": {
+    "opencv": {
+      "version": "5.0.0",
+      "cv2_file": "/opt/benchvenv/lib/python3.12/site-packages/cv2/__init__.py",
+      "is_cool_path": false,
+      "threads": 4,
+      "build_flags": {
+        "KleidiCV": true,
+        "NEON": true,
+        "IPP": false,
+        "TBB": false,
+        "OpenMP": false
+      }
+    },
+    "host": {
+      "machine": "aarch64",
+      "system": "Linux",
+      "python": "3.12.3",
+      "vcpus": 4,
+      "cpu_model": "0xd4f"
+    },
+    "ec2": {
+      "instance-type": "c8g.xlarge",
+      "ami-id": "ami-09a93d801db0bafae",
+      "region": "us-east-1"
+    },
+    "cool": {
+      "attestation": {
+        "document_sha256": "68317bbd0229c4974982a0093adf424d3532f3983bb0e48fc526e06f56a06797",
+        "architecture": "arm64",
+        "instance_type": "c8g.xlarge",
+        "image_id": "ami-09a93d801db0bafae",
+        "marketplace_product_codes": [],
+        "billing_products": null,
+        "region": "us-east-1",
+        "availability_zone": "us-east-1a",
+        "instance_id": "i-00c2271c4d8163763",
+        "pending_time": "2026-10-23T14:32:07Z"
+      }
+    },
+    "git_commit": "7b881a5",
+    "model_sha256": "71339e99ad2b4b29f8d516967ce02e1fb5895434bf6f483cb517efe6750ba2f2",
+    "calibration_sha256": "ee337f0b216d2c0dccabd9e2c68646294d814ebc3fc9b71effb9b12fb6e37199"
+  },
+  "runtime": {
+    "threads": 4,
+    "engine": "classic",
+    "engine_requested": "fastest",
+    "engine_fallback": null,
+    "engine_choice": {
+      "picked": "classic",
+      "why": "classic faster in every round, same answers",
+      "round_ms": {
+        "new": [
+          187.3,
+          188.6,
+          188.4
+        ],
+        "classic": [
+          129.3,
+          128.1,
+          130.7
+        ]
+      },
+      "threads": 4,
+      "same_answers": true,
+      "max_box_gap_px": 0.0007,
+      "max_score_gap": 0.0,
+      "input": "seeded noise 640x640",
+      "rule": "src.detection.infer.faster_engine"
+    }
+  },
+  "workload": "product",
+  "config": {
+    "n": 120,
+    "repeats": 3,
+    "warmup": 5,
+    "threads_requested": 0,
+    "frames_dir": "webui/samples",
+    "unique_frames": 8,
+    "input_manifest_sha256": "25376f6e21f70bb04798ac04da927e48544d3889f2672f8e0ce6045e141f8264",
+    "perception_mode": "look_harder"
+  },
+  "stages_ms": {
+    "decode": {
+      "p50": 1.72,
+      "p95": 1.75,
+      "mean": 1.71
+    },
+    "stage1": {
+      "p50": 2.85,
+      "p95": 2.91,
+      "mean": 2.85
+    },
+    "see": {
+      "p50": 128.65,
+      "p95": 132.25,
+      "mean": 129.14
+    },
+    "look_harder": {
+      "p50": 514.27,
+      "p95": 517.36,
+      "mean": 514.66
+    },
+    "prove_decide": {
+      "p50": 5.41,
+      "p95": 8.84,
+      "mean": 5.11
+    },
+    "render": {
+      "p50": 1.8,
+      "p95": 1.85,
+      "mean": 1.79
+    },
+    "dnn_pre": {
+      "p50": 4.14,
+      "p95": 4.25,
+      "mean": 4.16
+    },
+    "dnn_forward": {
+      "p50": 637.18,
+      "p95": 642.62,
+      "mean": 637.83
+    },
+    "dnn_post": {
+      "p50": 1.24,
+      "p95": 1.37,
+      "mean": 1.23
+    },
+    "evidence": {
+      "p50": 5.97,
+      "p95": 9.45,
+      "mean": 5.69
+    },
+    "total": {
+      "p50": 655.0,
+      "p95": 661.75,
+      "mean": 655.26
+    }
+  },
+  "ops_ms": {
+    "decode": {
+      "p50": 1.72,
+      "p95": 1.75,
+      "mean": 1.71
+    },
+    "stage1": {
+      "p50": 2.85,
+      "p95": 2.91,
+      "mean": 2.85
+    },
+    "dnn_pre": {
+      "p50": 4.14,
+      "p95": 4.25,
+      "mean": 4.16
+    },
+    "dnn_forward": {
+      "p50": 637.18,
+      "p95": 642.62,
+      "mean": 637.83
+    },
+    "dnn_post": {
+      "p50": 1.24,
+      "p95": 1.37,
+      "mean": 1.23
+    },
+    "evidence": {
+      "p50": 5.97,
+      "p95": 9.45,
+      "mean": 5.69
+    },
+    "render": {
+      "p50": 1.8,
+      "p95": 1.85,
+      "mean": 1.79
+    }
+  },
+  "forwards_per_frame": 5.0,
+  "repeats": [
+    {
+      "repeat": 1,
+      "wall_s": 78.74,
+      "fps": 1.52,
+      "cpu_util": 0.979,
+      "peak_rss_mb": 513.2,
+      "total_ms": {
+        "p50": 655.87,
+        "p95": 663.35,
+        "mean": 655.98
+      }
+    },
+    {
+      "repeat": 2,
+      "wall_s": 78.65,
+      "fps": 1.53,
+      "cpu_util": 0.98,
+      "peak_rss_mb": 954.9,
+      "total_ms": {
+        "p50": 654.5,
+        "p95": 661.51,
+        "mean": 655.15
+      }
+    },
+    {
+      "repeat": 3,
+      "wall_s": 78.58,
+      "fps": 1.53,
+      "cpu_util": 0.98,
+      "peak_rss_mb": 956.0,
+      "total_ms": {
+        "p50": 654.32,
+        "p95": 659.3,
+        "mean": 654.64
+      }
+    }
+  ],
+  "throughput_fps": 1.53,
+  "throughput_fps_range": [
+    1.52,
+    1.53
+  ],
+  "cpu_util": 0.98,
+  "peak_rss_mb": 513.2,
+  "cost": {
+    "price_hour_usd": 0.15952,
+    "price_source": "AWS Price List API 2026-10-23 (c8g.xlarge on-demand Linux us-east-1)",
+    "usd_per_1k_frames": 0.029035,
+    "survey_hour": {
+      "frames": 168.8,
+      "compute_s": 110.58,
+      "real_time_factor": 0.03072,
+      "usd": 0.0049
+    },
+    "assumptions": {
+      "ping_rate_hz": 15.0,
+      "pings_per_frame": 640,
+      "channels": 2
+    }
+  }
+}

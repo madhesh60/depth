@@ -1,6 +1,6 @@
 {
   "label": "baseline_x86_t1",
-  "created": "2026-10-20T05:51:11",
+  "created": "2026-10-23T14:41:05",
   "fingerprint": {
     "opencv": {
       "version": "5.0.0",
@@ -24,30 +24,54 @@
     },
     "ec2": {
       "instance-type": "c8i.xlarge",
-      "ami-id": "ami-02a9cdd4e98bc3c78",
+      "ami-id": "ami-0d6dd9e8265d48906",
       "region": "us-east-1"
     },
     "cool": {
       "attestation": {
-        "document_sha256": "09454ba9bfae6ffc7cd0d5177b9c4f25ddf2493eb7ef2e3b8e0a36432e1d5e8a",
+        "document_sha256": "e452f512c2856aacfec87c89ebb24c5621ad3915566af5b327a09d773f655949",
         "architecture": "x86_64",
         "instance_type": "c8i.xlarge",
-        "image_id": "ami-02a9cdd4e98bc3c78",
+        "image_id": "ami-0d6dd9e8265d48906",
         "marketplace_product_codes": [],
         "billing_products": null,
         "region": "us-east-1",
         "availability_zone": "us-east-1a",
-        "instance_id": "i-0693946dcc3686b1b",
-        "pending_time": "2026-10-20T05:46:09Z"
+        "instance_id": "i-0e7065bc3f72fdd19",
+        "pending_time": "2026-10-23T14:31:55Z"
       }
     },
-    "git_commit": "9c190b3",
+    "git_commit": "7b881a5",
     "model_sha256": "71339e99ad2b4b29f8d516967ce02e1fb5895434bf6f483cb517efe6750ba2f2",
-    "calibration_sha256": "84d4933eb9f6bfa9b6c9f9a30a29b6f889ca2c3d6f1304faf503fa3d800f4281"
+    "calibration_sha256": "ee337f0b216d2c0dccabd9e2c68646294d814ebc3fc9b71effb9b12fb6e37199"
   },
   "runtime": {
     "threads": 1,
-    "engine": "auto"
+    "engine": "new",
+    "engine_requested": "fastest",
+    "engine_fallback": null,
+    "engine_choice": {
+      "picked": "new",
+      "why": "new faster in every round, same answers",
+      "round_ms": {
+        "new": [
+          296.5,
+          294.6,
+          296.5
+        ],
+        "classic": [
+          343.3,
+          341.2,
+          341.9
+        ]
+      },
+      "threads": 1,
+      "same_answers": true,
+      "max_box_gap_px": 0.0007,
+      "max_score_gap": 0.0,
+      "input": "seeded noise 640x640",
+      "rule": "src.detection.infer.faster_engine"
+    }
   },
   "workload": "product",
   "config": {
@@ -57,152 +81,158 @@
     "threads_requested": 1,
     "frames_dir": "webui/samples",
     "unique_frames": 8,
-    "input_manifest_sha256": "25376f6e21f70bb04798ac04da927e48544d3889f2672f8e0ce6045e141f8264"
+    "input_manifest_sha256": "25376f6e21f70bb04798ac04da927e48544d3889f2672f8e0ce6045e141f8264",
+    "perception_mode": "standard"
   },
   "stages_ms": {
     "decode": {
-      "p50": 1.68,
-      "p95": 1.73,
-      "mean": 1.68
-    },
-    "stage1": {
       "p50": 1.8,
-      "p95": 1.86,
+      "p95": 1.84,
       "mean": 1.79
     },
+    "stage1": {
+      "p50": 1.92,
+      "p95": 2.0,
+      "mean": 1.92
+    },
     "see": {
-      "p50": 292.46,
-      "p95": 295.27,
-      "mean": 292.65
+      "p50": 296.48,
+      "p95": 299.42,
+      "mean": 296.72
+    },
+    "look_harder": {
+      "p50": 0.05,
+      "p95": 0.05,
+      "mean": 0.05
     },
     "prove_decide": {
-      "p50": 3.9,
-      "p95": 7.4,
-      "mean": 3.96
+      "p50": 4.07,
+      "p95": 7.82,
+      "mean": 4.14
     },
     "render": {
-      "p50": 1.56,
-      "p95": 1.61,
-      "mean": 1.56
+      "p50": 1.64,
+      "p95": 1.68,
+      "mean": 1.63
     },
     "dnn_pre": {
-      "p50": 1.53,
-      "p95": 1.84,
-      "mean": 1.54
+      "p50": 1.62,
+      "p95": 2.07,
+      "mean": 1.65
     },
     "dnn_forward": {
-      "p50": 290.32,
-      "p95": 293.1,
-      "mean": 290.45
+      "p50": 294.14,
+      "p95": 296.94,
+      "mean": 294.33
     },
     "dnn_post": {
-      "p50": 0.35,
-      "p95": 0.41,
-      "mean": 0.35
+      "p50": 0.38,
+      "p95": 0.44,
+      "mean": 0.38
     },
     "evidence": {
-      "p50": 4.22,
-      "p95": 7.7,
-      "mean": 4.27
+      "p50": 4.48,
+      "p95": 8.23,
+      "mean": 4.55
     },
     "total": {
-      "p50": 301.26,
-      "p95": 305.84,
-      "mean": 301.64
+      "p50": 306.11,
+      "p95": 310.81,
+      "mean": 306.26
     }
   },
   "ops_ms": {
     "decode": {
-      "p50": 1.68,
-      "p95": 1.73,
-      "mean": 1.68
-    },
-    "stage1": {
       "p50": 1.8,
-      "p95": 1.86,
+      "p95": 1.84,
       "mean": 1.79
     },
+    "stage1": {
+      "p50": 1.92,
+      "p95": 2.0,
+      "mean": 1.92
+    },
     "dnn_pre": {
-      "p50": 1.53,
-      "p95": 1.84,
-      "mean": 1.54
+      "p50": 1.62,
+      "p95": 2.07,
+      "mean": 1.65
     },
     "dnn_forward": {
-      "p50": 290.32,
-      "p95": 293.1,
-      "mean": 290.45
+      "p50": 294.14,
+      "p95": 296.94,
+      "mean": 294.33
     },
     "dnn_post": {
-      "p50": 0.35,
-      "p95": 0.41,
-      "mean": 0.35
+      "p50": 0.38,
+      "p95": 0.44,
+      "mean": 0.38
     },
     "evidence": {
-      "p50": 4.22,
-      "p95": 7.7,
-      "mean": 4.27
+      "p50": 4.48,
+      "p95": 8.23,
+      "mean": 4.55
     },
     "render": {
-      "p50": 1.56,
-      "p95": 1.61,
-      "mean": 1.56
+      "p50": 1.64,
+      "p95": 1.68,
+      "mean": 1.63
     }
   },
   "forwards_per_frame": 1.0,
   "repeats": [
     {
       "repeat": 1,
-      "wall_s": 14.48,
-      "fps": 3.32,
+      "wall_s": 14.67,
+      "fps": 3.27,
       "cpu_util": 0.25,
-      "peak_rss_mb": 266.9,
+      "peak_rss_mb": 436.8,
       "total_ms": {
-        "p50": 301.23,
-        "p95": 305.5,
-        "mean": 301.38
+        "p50": 305.59,
+        "p95": 309.48,
+        "mean": 305.46
       }
     },
     {
       "repeat": 2,
-      "wall_s": 14.46,
-      "fps": 3.32,
+      "wall_s": 14.66,
+      "fps": 3.27,
       "cpu_util": 0.25,
-      "peak_rss_mb": 266.9,
+      "peak_rss_mb": 436.8,
       "total_ms": {
-        "p50": 300.62,
-        "p95": 305.72,
-        "mean": 301.02
+        "p50": 304.78,
+        "p95": 308.78,
+        "mean": 305.18
       }
     },
     {
       "repeat": 3,
-      "wall_s": 14.53,
-      "fps": 3.3,
+      "wall_s": 14.8,
+      "fps": 3.24,
       "cpu_util": 0.25,
-      "peak_rss_mb": 267.0,
+      "peak_rss_mb": 436.8,
       "total_ms": {
-        "p50": 302.98,
-        "p95": 306.8,
-        "mean": 302.51
+        "p50": 307.98,
+        "p95": 311.73,
+        "mean": 308.13
       }
     }
   ],
-  "throughput_fps": 3.32,
+  "throughput_fps": 3.27,
   "throughput_fps_range": [
-    3.3,
-    3.32
+    3.24,
+    3.27
   ],
   "cpu_util": 0.25,
-  "peak_rss_mb": 266.9,
+  "peak_rss_mb": 436.8,
   "cost": {
     "price_hour_usd": 0.18742,
-    "price_source": "AWS Price List API 2026-10-20 (c8i.xlarge on-demand Linux us-east-1)",
-    "usd_per_1k_frames": 0.015704,
+    "price_source": "AWS Price List API 2026-10-23 (c8i.xlarge on-demand Linux us-east-1)",
+    "usd_per_1k_frames": 0.015944,
     "survey_hour": {
       "frames": 168.8,
-      "compute_s": 50.9,
-      "real_time_factor": 0.01414,
-      "usd": 0.00265
+      "compute_s": 51.68,
+      "real_time_factor": 0.01436,
+      "usd": 0.002691
     },
     "assumptions": {
       "ping_rate_hz": 15.0,

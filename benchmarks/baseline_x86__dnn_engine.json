@@ -1,0 +1,205 @@
+{
+ "label": "baseline_x86",
+ "created": "2026-10-23T14:43:32",
+ "workload": "dnn_engine",
+ "fingerprint": {
+  "opencv": {
+   "version": "5.0.0",
+   "cv2_file": "/opt/benchvenv/lib/python3.12/site-packages/cv2/__init__.py",
+   "is_cool_path": false,
+   "threads": 1,
+   "build_flags": {
+    "KleidiCV": false,
+    "NEON": false,
+    "IPP": true,
+    "TBB": false,
+    "OpenMP": false
+   }
+  },
+  "host": {
+   "machine": "x86_64",
+   "system": "Linux",
+   "python": "3.12.3",
+   "vcpus": 4,
+   "cpu_model": "Intel(R) Xeon(R) 6975P-C"
+  },
+  "ec2": {
+   "instance-type": "c8i.xlarge",
+   "ami-id": "ami-0d6dd9e8265d48906",
+   "region": "us-east-1"
+  },
+  "cool": {
+   "attestation": {
+    "document_sha256": "e452f512c2856aacfec87c89ebb24c5621ad3915566af5b327a09d773f655949",
+    "architecture": "x86_64",
+    "instance_type": "c8i.xlarge",
+    "image_id": "ami-0d6dd9e8265d48906",
+    "marketplace_product_codes": [],
+    "billing_products": null,
+    "region": "us-east-1",
+    "availability_zone": "us-east-1a",
+    "instance_id": "i-0e7065bc3f72fdd19",
+    "pending_time": "2026-10-23T14:31:55Z"
+   }
+  },
+  "git_commit": "7b881a5",
+  "model_sha256": "71339e99ad2b4b29f8d516967ce02e1fb5895434bf6f483cb517efe6750ba2f2",
+  "calibration_sha256": "ee337f0b216d2c0dccabd9e2c68646294d814ebc3fc9b71effb9b12fb6e37199"
+ },
+ "config": {
+  "model": "EXP-003",
+  "onnx": "models/EXP-003/best.onnx",
+  "onnx_sha256": "71339e99ad2b4b29f8d516967ce02e1fb5895434bf6f483cb517efe6750ba2f2",
+  "imgsz": 640,
+  "timing_frames": "webui/samples",
+  "n_timing_frames": 8,
+  "rounds": 5,
+  "n_per_round": 20,
+  "threads": "0,1"
+ },
+ "load_s_median": {
+  "classic": 0.031,
+  "new": 0.049,
+  "auto": 0.041
+ },
+ "identification": {
+  "auto_equals": "new",
+  "frames": 8,
+  "auto_bit_identical": {
+   "new": true,
+   "classic": false
+  },
+  "new_vs_classic_max_abs_output": 0.004303,
+  "layers": {
+   "classic": 250,
+   "new": 212,
+   "auto": 212
+  }
+ },
+ "parity": {
+  "frames": 8,
+  "ref": 31,
+  "other": 31,
+  "match": 31,
+  "differ": 0,
+  "missing": 0,
+  "extra": 0,
+  "tier_flips": 0,
+  "max_dscore": 0.0,
+  "max_abs_output": 0.004303,
+  "ref_engine": "new",
+  "other_engine": "classic",
+  "rule": {
+   "iou": 0.9,
+   "dscore": 0.01
+  },
+  "mismatches": [],
+  "split": "webui/samples (the timing frames)"
+ },
+ "timing": [
+  {
+   "threads": 4,
+   "rounds": 5,
+   "n_per_round": 20,
+   "engines": {
+    "classic": {
+     "median_ms": 133.9,
+     "p90_ms": 134.6,
+     "mean_ms": 133.9,
+     "round_medians_ms": [
+      133.9,
+      133.8,
+      133.8,
+      134.0,
+      134.0
+     ]
+    },
+    "new": {
+     "median_ms": 148.9,
+     "p90_ms": 150.1,
+     "mean_ms": 149.0,
+     "round_medians_ms": [
+      149.2,
+      149.0,
+      149.0,
+      148.8,
+      148.8
+     ]
+    },
+    "auto": {
+     "median_ms": 148.8,
+     "p90_ms": 149.8,
+     "mean_ms": 148.7,
+     "round_medians_ms": [
+      148.8,
+      148.7,
+      148.4,
+      149.0,
+      148.7
+     ]
+    }
+   },
+   "classic_over_new": {
+    "pooled": 0.899,
+    "per_round": [
+     0.897,
+     0.901
+    ],
+    "saved_ms": -15.0,
+    "separation": "round ranges separate (slower)"
+   }
+  },
+  {
+   "threads": 1,
+   "rounds": 5,
+   "n_per_round": 20,
+   "engines": {
+    "classic": {
+     "median_ms": 341.8,
+     "p90_ms": 343.3,
+     "mean_ms": 341.7,
+     "round_medians_ms": [
+      342.3,
+      342.3,
+      342.5,
+      339.5,
+      340.8
+     ]
+    },
+    "new": {
+     "median_ms": 291.7,
+     "p90_ms": 293.2,
+     "mean_ms": 291.4,
+     "round_medians_ms": [
+      292.2,
+      292.4,
+      291.3,
+      290.3,
+      291.1
+     ]
+    },
+    "auto": {
+     "median_ms": 291.2,
+     "p90_ms": 292.6,
+     "mean_ms": 291.3,
+     "round_medians_ms": [
+      291.5,
+      291.6,
+      291.6,
+      290.4,
+      290.8
+     ]
+    }
+   },
+   "classic_over_new": {
+    "pooled": 1.172,
+    "per_round": [
+     1.169,
+     1.176
+    ],
+    "saved_ms": 50.1,
+    "separation": "round ranges separate"
+   }
+  }
+ ]
+}

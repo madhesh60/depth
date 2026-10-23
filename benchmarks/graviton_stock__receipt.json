@@ -1,28 +1,28 @@
 {
   "what": "COOL execution receipt - check it: python -m src.bench.verify_cool <this server's URL>",
-  "created_utc": "2026-10-20T05:51:30Z",
+  "created_utc": "2026-10-23T14:40:06Z",
   "rehearsal": false,
   "on_ec2": true,
   "aws_signed_identity": {
-    "document": "{\n  \"accountId\" : \"202226602740\",\n  \"architecture\" : \"arm64\",\n  \"availabilityZone\" : \"us-east-1a\",\n  \"billingProducts\" : null,\n  \"devpayProductCodes\" : null,\n  \"marketplaceProductCodes\" : null,\n  \"imageId\" : \"ami-0d0f26d09ffd9af92\",\n  \"instanceId\" : \"i-01a77d58622610ecb\",\n  \"instanceType\" : \"c8g.xlarge\",\n  \"kernelId\" : null,\n  \"pendingTime\" : \"2026-10-20T05:46:21Z\",\n  \"privateIp\" : \"172.31.0.45\",\n  \"ramdiskId\" : null,\n  \"region\" : \"us-east-1\",\n  \"version\" : \"2017-09-30\"\n}",
-    "signature": "DeAt085dH2jpH2eX+vzdINCuiNuM1s/XjtYOgLqfXT2ZkQhIB561P2iKJNtTm0qri15ao61u7gG8\nGiWnlN2IYaVpfnyQo560cXsfJMvx/CnkhYN5tMsAVxz4Ox2LkgE4AelU4cjaZxblp+EswFyA8sac\nqDbYSiX44T3SmTDEZKg=",
-    "rsa2048": "MIAGCSqGSIb3DQEHAqCAMIACAQExDTALBglghkgBZQMEAgEwgAYJKoZIhvcNAQcBoIAkgASCAdx7\nCiAgImFjY291bnRJZCIgOiAiMjAyMjI2NjAyNzQwIiwKICAiYXJjaGl0ZWN0dXJlIiA6ICJhcm02\nNCIsCiAgImF2YWlsYWJpbGl0eVpvbmUiIDogInVzLWVhc3QtMWEiLAogICJiaWxsaW5nUHJvZHVj\ndHMiIDogbnVsbCwKICAiZGV2cGF5UHJvZHVjdENvZGVzIiA6IG51bGwsCiAgIm1hcmtldHBsYWNl\nUHJvZHVjdENvZGVzIiA6IG51bGwsCiAgImltYWdlSWQiIDogImFtaS0wZDBmMjZkMDlmZmQ5YWY5\nMiIsCiAgImluc3RhbmNlSWQiIDogImktMDFhNzdkNTg2MjI2MTBlY2IiLAogICJpbnN0YW5jZVR5\ncGUiIDogImM4Zy54bGFyZ2UiLAogICJrZXJuZWxJZCIgOiBudWxsLAogICJwZW5kaW5nVGltZSIg\nOiAiMjAyNi0xMC0yMFQwNTo0NjoyMVoiLAogICJwcml2YXRlSXAiIDogIjE3Mi4zMS4wLjQ1IiwK\nICAicmFtZGlza0lkIiA6IG51bGwsCiAgInJlZ2lvbiIgOiAidXMtZWFzdC0xIiwKICAidmVyc2lv\nbiIgOiAiMjAxNy0wOS0zMCIKfQAAAAAAADGCAiswggInAgEBMGkwXDELMAkGA1UEBhMCVVMxGTAX\nBgNVBAgTEFdhc2hpbmd0b24gU3RhdGUxEDAOBgNVBAcTB1NlYXR0bGUxIDAeBgNVBAoTF0FtYXpv\nbiBXZWIgU2VydmljZXMgTExDAgkAsWnMQBVZpBkwCwYJYIZIAWUDBAIBoIGWMBgGCSqGSIb3DQEJ\nAzELBgkqhkiG9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTI2MTAyMDA1NDYyMlowKwYJKoZIhvcNAQk0\nMR4wHDALBglghkgBZQMEAgGhDQYJKoZIhvcNAQELBQAwLwYJKoZIhvcNAQkEMSIEIEJQP3JHla9W\nwmAEglZtCCZLxFzClq8tI0OkTlU0pqcxMA0GCSqGSIb3DQEBCwUABIIBAEbTqJvayS9WB2EYlKnC\nmtADFxsyMn4OI1NxwZP+d4Fn/cvVsYhs1oh8SMyAUVwI27e0CbDNBsrwbcV/VMh5Gf9hgFTJFGBO\nK/hOJ5ZKnLU4CzFj8wOFNqYLNUmP7fmqdjCRObHVMt0ngtBqzSzGKZ6T8XZtiv7Dzej2lQItzqzv\nh2Dc2jE6ncCVHpfP1L5fI8qHk4YsRJ7agxfj1FonDyZB1Hok+9604ZAt4sC8IyJlyIeQr82Q6UT7\nNCP1NOCJ/BDAcAMFBoCkVfFp9G9EOBn9UZxSxiZR8lN1Qhe2HI3MWx4h7yF1hkDFCTqdU3OBrm7g\nEtgaBkAtuRWSNkNI05kAAAAAAAA=",
-    "document_sha256": "42503f724795af56c2600482566d08264bc45cc296af2d2343a44e5534a6a731",
+    "document": "{\n  \"accountId\" : \"202226602740\",\n  \"architecture\" : \"arm64\",\n  \"availabilityZone\" : \"us-east-1a\",\n  \"billingProducts\" : null,\n  \"devpayProductCodes\" : null,\n  \"marketplaceProductCodes\" : null,\n  \"imageId\" : \"ami-09a93d801db0bafae\",\n  \"instanceId\" : \"i-00c2271c4d8163763\",\n  \"instanceType\" : \"c8g.xlarge\",\n  \"kernelId\" : null,\n  \"pendingTime\" : \"2026-10-23T14:32:07Z\",\n  \"privateIp\" : \"172.31.2.31\",\n  \"ramdiskId\" : null,\n  \"region\" : \"us-east-1\",\n  \"version\" : \"2017-09-30\"\n}",
+    "signature": "Sw5fr5jAk0bpRBjLuv0Vw7HLmSRVHQ+HhFAr01TztnITIJeXyNUbwf2HG8j0Eoz/sepPTjeaNi8X\nThRrdLBNGkmrLuthm/Om3oAW/OSej8/YZ2yGiIYr27nQ070V26CQGYghLq0Tx15nHVxARNPB0vIW\nHlLKATh2TaCE/bY2XsU=",
+    "rsa2048": "MIAGCSqGSIb3DQEHAqCAMIACAQExDTALBglghkgBZQMEAgEwgAYJKoZIhvcNAQcBoIAkgASCAdx7\nCiAgImFjY291bnRJZCIgOiAiMjAyMjI2NjAyNzQwIiwKICAiYXJjaGl0ZWN0dXJlIiA6ICJhcm02\nNCIsCiAgImF2YWlsYWJpbGl0eVpvbmUiIDogInVzLWVhc3QtMWEiLAogICJiaWxsaW5nUHJvZHVj\ndHMiIDogbnVsbCwKICAiZGV2cGF5UHJvZHVjdENvZGVzIiA6IG51bGwsCiAgIm1hcmtldHBsYWNl\nUHJvZHVjdENvZGVzIiA6IG51bGwsCiAgImltYWdlSWQiIDogImFtaS0wOWE5M2Q4MDFkYjBiYWZh\nZSIsCiAgImluc3RhbmNlSWQiIDogImktMDBjMjI3MWM0ZDgxNjM3NjMiLAogICJpbnN0YW5jZVR5\ncGUiIDogImM4Zy54bGFyZ2UiLAogICJrZXJuZWxJZCIgOiBudWxsLAogICJwZW5kaW5nVGltZSIg\nOiAiMjAyNi0xMC0yM1QxNDozMjowN1oiLAogICJwcml2YXRlSXAiIDogIjE3Mi4zMS4yLjMxIiwK\nICAicmFtZGlza0lkIiA6IG51bGwsCiAgInJlZ2lvbiIgOiAidXMtZWFzdC0xIiwKICAidmVyc2lv\nbiIgOiAiMjAxNy0wOS0zMCIKfQAAAAAAADGCAiswggInAgEBMGkwXDELMAkGA1UEBhMCVVMxGTAX\nBgNVBAgTEFdhc2hpbmd0b24gU3RhdGUxEDAOBgNVBAcTB1NlYXR0bGUxIDAeBgNVBAoTF0FtYXpv\nbiBXZWIgU2VydmljZXMgTExDAgkAsWnMQBVZpBkwCwYJYIZIAWUDBAIBoIGWMBgGCSqGSIb3DQEJ\nAzELBgkqhkiG9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTI2MTAyMzE0MzIwOFowKwYJKoZIhvcNAQk0\nMR4wHDALBglghkgBZQMEAgGhDQYJKoZIhvcNAQELBQAwLwYJKoZIhvcNAQkEMSIEIGgxe70CKcSX\nSYKgCTrfQk01MvOYO7Dkj8Um4G9WoGeXMA0GCSqGSIb3DQEBCwUABIIBACB3vmLsdrcEql0fWDQI\n0txohJyJWwlgq2h3UPn+QoTq4QFvXdR77t4EEwN0VSKu6+sYofgPv+hjEOKqqgnMI7Mpl/eYZu01\nVEl7yImidIEmIYTDKcR53PjN0LU9w0hOGL7pFPx/7DXAUXKw5z/DyvXGt6HhBxpzGogIfZWHy1jf\nvfGRstIFNohpiFA3d1h3HEy2E6GEgfMgP6NVrUM2Gti6tj6U0X8CHsywDTfRhbyINDskwT5kUy7F\nPEC9DTCVbe8SCm+Ib4tThj0/tpxenby/xtdEWgw4y2zMqK1Dt7Voyy+zk1bxyNuCJhr3iajiBsGY\n0io649dJ76JH/Zx8YvsAAAAAAAA=",
+    "document_sha256": "68317bbd0229c4974982a0093adf424d3532f3983bb0e48fc526e06f56a06797",
     "how_to_verify": "RSA-SHA256 'signature' or PKCS7 'rsa2048' against AWS's published certificate for the region (EC2 User Guide: verify-iid)"
   },
   "claims": {
     "architecture": "arm64",
     "instance_type": "c8g.xlarge",
-    "image_id": "ami-0d0f26d09ffd9af92",
+    "image_id": "ami-09a93d801db0bafae",
     "marketplace_product_codes": [],
     "billing_products": null,
     "region": "us-east-1",
     "availability_zone": "us-east-1a",
-    "instance_id": "i-01a77d58622610ecb",
-    "pending_time": "2026-10-20T05:46:21Z"
+    "instance_id": "i-00c2271c4d8163763",
+    "pending_time": "2026-10-23T14:32:07Z"
   },
   "process": {
-    "pid": 1898,
+    "pid": 1852,
     "python": "/opt/benchvenv/bin/python",
     "cv2_file": "/opt/benchvenv/lib/python3.12/site-packages/cv2/__init__.py",
     "cv2_from_cool": false,
@@ -64,7 +64,7 @@
     ],
     "all_opencv_from_cool": false,
     "cool_tree_libs": [],
-    "shared_objects_mapped": 41
+    "shared_objects_mapped": 50
   },
   "cool_build": {
     "cool_root_exists": false,

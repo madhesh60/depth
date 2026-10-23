@@ -1,6 +1,6 @@
 {
   "label": "graviton_stock",
-  "created": "2026-10-20T05:51:30",
+  "created": "2026-10-23T14:40:06",
   "fingerprint": {
     "opencv": {
       "version": "5.0.0",
@@ -24,30 +24,54 @@
     },
     "ec2": {
       "instance-type": "c8g.xlarge",
-      "ami-id": "ami-0d0f26d09ffd9af92",
+      "ami-id": "ami-09a93d801db0bafae",
       "region": "us-east-1"
     },
     "cool": {
       "attestation": {
-        "document_sha256": "42503f724795af56c2600482566d08264bc45cc296af2d2343a44e5534a6a731",
+        "document_sha256": "68317bbd0229c4974982a0093adf424d3532f3983bb0e48fc526e06f56a06797",
         "architecture": "arm64",
         "instance_type": "c8g.xlarge",
-        "image_id": "ami-0d0f26d09ffd9af92",
+        "image_id": "ami-09a93d801db0bafae",
         "marketplace_product_codes": [],
         "billing_products": null,
         "region": "us-east-1",
         "availability_zone": "us-east-1a",
-        "instance_id": "i-01a77d58622610ecb",
-        "pending_time": "2026-10-20T05:46:21Z"
+        "instance_id": "i-00c2271c4d8163763",
+        "pending_time": "2026-10-23T14:32:07Z"
       }
     },
-    "git_commit": "9c190b3",
+    "git_commit": "7b881a5",
     "model_sha256": "71339e99ad2b4b29f8d516967ce02e1fb5895434bf6f483cb517efe6750ba2f2",
-    "calibration_sha256": "84d4933eb9f6bfa9b6c9f9a30a29b6f889ca2c3d6f1304faf503fa3d800f4281"
+    "calibration_sha256": "ee337f0b216d2c0dccabd9e2c68646294d814ebc3fc9b71effb9b12fb6e37199"
   },
   "runtime": {
     "threads": 4,
-    "engine": "auto"
+    "engine": "classic",
+    "engine_requested": "fastest",
+    "engine_fallback": null,
+    "engine_choice": {
+      "picked": "classic",
+      "why": "classic faster in every round, same answers",
+      "round_ms": {
+        "new": [
+          187.3,
+          188.6,
+          188.4
+        ],
+        "classic": [
+          129.3,
+          128.1,
+          130.7
+        ]
+      },
+      "threads": 4,
+      "same_answers": true,
+      "max_box_gap_px": 0.0007,
+      "max_score_gap": 0.0,
+      "input": "seeded noise 640x640",
+      "rule": "src.detection.infer.faster_engine"
+    }
   },
   "workload": "cv",
   "config": {
@@ -57,33 +81,34 @@
     "threads_requested": 0,
     "frames_dir": "webui/samples",
     "unique_frames": 8,
-    "input_manifest_sha256": "25376f6e21f70bb04798ac04da927e48544d3889f2672f8e0ce6045e141f8264"
+    "input_manifest_sha256": "25376f6e21f70bb04798ac04da927e48544d3889f2672f8e0ce6045e141f8264",
+    "perception_mode": null
   },
   "stages_ms": {
     "decode": {
-      "p50": 1.69,
-      "p95": 1.72,
-      "mean": 1.68
+      "p50": 1.71,
+      "p95": 1.74,
+      "mean": 1.7
     },
     "stage1": {
-      "p50": 5.45,
-      "p95": 5.56,
-      "mean": 5.4
+      "p50": 5.58,
+      "p95": 5.75,
+      "mean": 5.54
     },
     "dnn_pre": {
-      "p50": 0.58,
-      "p95": 0.6,
-      "mean": 0.58
+      "p50": 0.62,
+      "p95": 0.68,
+      "mean": 0.63
     },
     "render": {
-      "p50": 1.62,
-      "p95": 1.65,
-      "mean": 1.62
+      "p50": 1.65,
+      "p95": 1.68,
+      "mean": 1.64
     },
     "total": {
-      "p50": 9.32,
-      "p95": 9.45,
-      "mean": 9.28
+      "p50": 9.52,
+      "p95": 9.76,
+      "mean": 9.51
     }
   },
   "ops_ms": null,
@@ -91,57 +116,57 @@
   "repeats": [
     {
       "repeat": 1,
-      "wall_s": 1.11,
-      "fps": 107.64,
-      "cpu_util": 0.298,
-      "peak_rss_mb": 378.8,
+      "wall_s": 1.14,
+      "fps": 105.23,
+      "cpu_util": 0.297,
+      "peak_rss_mb": 513.2,
       "total_ms": {
-        "p50": 9.32,
-        "p95": 9.46,
-        "mean": 9.28
+        "p50": 9.5,
+        "p95": 9.72,
+        "mean": 9.49
       }
     },
     {
       "repeat": 2,
-      "wall_s": 1.11,
-      "fps": 107.71,
-      "cpu_util": 0.298,
-      "peak_rss_mb": 860.4,
+      "wall_s": 1.15,
+      "fps": 104.41,
+      "cpu_util": 0.296,
+      "peak_rss_mb": 954.9,
       "total_ms": {
-        "p50": 9.32,
-        "p95": 9.45,
-        "mean": 9.27
+        "p50": 9.57,
+        "p95": 9.81,
+        "mean": 9.56
       }
     },
     {
       "repeat": 3,
-      "wall_s": 1.11,
-      "fps": 107.66,
-      "cpu_util": 0.298,
-      "peak_rss_mb": 861.2,
+      "wall_s": 1.14,
+      "fps": 105.25,
+      "cpu_util": 0.297,
+      "peak_rss_mb": 956.0,
       "total_ms": {
-        "p50": 9.32,
-        "p95": 9.45,
-        "mean": 9.28
+        "p50": 9.49,
+        "p95": 9.73,
+        "mean": 9.49
       }
     }
   ],
-  "throughput_fps": 107.66,
+  "throughput_fps": 105.23,
   "throughput_fps_range": [
-    107.64,
-    107.71
+    104.41,
+    105.25
   ],
-  "cpu_util": 0.298,
-  "peak_rss_mb": 378.8,
+  "cpu_util": 0.297,
+  "peak_rss_mb": 513.2,
   "cost": {
     "price_hour_usd": 0.15952,
-    "price_source": "AWS Price List API 2026-10-20 (c8g.xlarge on-demand Linux us-east-1)",
-    "usd_per_1k_frames": 0.000411,
+    "price_source": "AWS Price List API 2026-10-23 (c8g.xlarge on-demand Linux us-east-1)",
+    "usd_per_1k_frames": 0.000421,
     "survey_hour": {
       "frames": 168.8,
-      "compute_s": 1.57,
-      "real_time_factor": 0.00044,
-      "usd": 6.9e-05
+      "compute_s": 1.6,
+      "real_time_factor": 0.00045,
+      "usd": 7.1e-05
     },
     "assumptions": {
       "ping_rate_hz": 15.0,

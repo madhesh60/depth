@@ -1,6 +1,6 @@
 {
   "label": "graviton_stock",
-  "created": "2026-10-20T05:51:30",
+  "created": "2026-10-23T14:40:06",
   "fingerprint": {
     "opencv": {
       "version": "5.0.0",
@@ -24,30 +24,54 @@
     },
     "ec2": {
       "instance-type": "c8g.xlarge",
-      "ami-id": "ami-0d0f26d09ffd9af92",
+      "ami-id": "ami-09a93d801db0bafae",
       "region": "us-east-1"
     },
     "cool": {
       "attestation": {
-        "document_sha256": "42503f724795af56c2600482566d08264bc45cc296af2d2343a44e5534a6a731",
+        "document_sha256": "68317bbd0229c4974982a0093adf424d3532f3983bb0e48fc526e06f56a06797",
         "architecture": "arm64",
         "instance_type": "c8g.xlarge",
-        "image_id": "ami-0d0f26d09ffd9af92",
+        "image_id": "ami-09a93d801db0bafae",
         "marketplace_product_codes": [],
         "billing_products": null,
         "region": "us-east-1",
         "availability_zone": "us-east-1a",
-        "instance_id": "i-01a77d58622610ecb",
-        "pending_time": "2026-10-20T05:46:21Z"
+        "instance_id": "i-00c2271c4d8163763",
+        "pending_time": "2026-10-23T14:32:07Z"
       }
     },
-    "git_commit": "9c190b3",
+    "git_commit": "7b881a5",
     "model_sha256": "71339e99ad2b4b29f8d516967ce02e1fb5895434bf6f483cb517efe6750ba2f2",
-    "calibration_sha256": "84d4933eb9f6bfa9b6c9f9a30a29b6f889ca2c3d6f1304faf503fa3d800f4281"
+    "calibration_sha256": "ee337f0b216d2c0dccabd9e2c68646294d814ebc3fc9b71effb9b12fb6e37199"
   },
   "runtime": {
     "threads": 4,
-    "engine": "auto"
+    "engine": "classic",
+    "engine_requested": "fastest",
+    "engine_fallback": null,
+    "engine_choice": {
+      "picked": "classic",
+      "why": "classic faster in every round, same answers",
+      "round_ms": {
+        "new": [
+          187.3,
+          188.6,
+          188.4
+        ],
+        "classic": [
+          129.3,
+          128.1,
+          130.7
+        ]
+      },
+      "threads": 4,
+      "same_answers": true,
+      "max_box_gap_px": 0.0007,
+      "max_score_gap": 0.0,
+      "input": "seeded noise 640x640",
+      "rule": "src.detection.infer.faster_engine"
+    }
   },
   "workload": "survey",
   "config": {
@@ -59,63 +83,63 @@
   },
   "stages_ms": {
     "read": {
-      "p50": 1843.25,
-      "p95": 1862.28,
-      "mean": 1839.32
+      "p50": 1822.22,
+      "p95": 1864.89,
+      "mean": 1832.98
     },
     "sonogram_crosscheck": {
-      "p50": 5677.4,
-      "p95": 5739.98,
-      "mean": 5698.98
+      "p50": 6177.06,
+      "p95": 6249.99,
+      "mean": 6192.7
     },
     "agent_plan": {
-      "p50": 54171.18,
-      "p95": 54204.05,
-      "mean": 54177.67
+      "p50": 37893.89,
+      "p95": 37965.27,
+      "mean": 37909.61
     },
     "total": {
-      "p50": 61723.57,
-      "p95": 61776.61,
-      "mean": 61715.98
+      "p50": 45957.34,
+      "p95": 46015.18,
+      "mean": 45935.28
     }
   },
   "repeats": [
     {
       "repeat": 1,
-      "wall_s": 61.82,
-      "cpu_util": 0.885,
-      "peak_rss_mb": 860.4,
-      "real_time_factor": 0.01713,
-      "read_ms": 1864.4,
-      "sonogram_crosscheck_ms": 5746.9,
-      "agent_plan_ms": 54171.2,
-      "total_ms": 61782.5,
+      "wall_s": 46.06,
+      "cpu_util": 0.832,
+      "peak_rss_mb": 954.9,
+      "real_time_factor": 0.01276,
+      "read_ms": 1869.6,
+      "sonogram_crosscheck_ms": 6258.1,
+      "agent_plan_ms": 37893.9,
+      "total_ms": 46021.6,
       "frames": 280,
       "hazards": 64
     },
     {
       "repeat": 2,
-      "wall_s": 61.68,
-      "cpu_util": 0.886,
-      "peak_rss_mb": 861.2,
-      "real_time_factor": 0.01709,
-      "read_ms": 1810.3,
-      "sonogram_crosscheck_ms": 5677.4,
-      "agent_plan_ms": 54154.1,
-      "total_ms": 61641.8,
+      "wall_s": 45.86,
+      "cpu_util": 0.834,
+      "peak_rss_mb": 956.0,
+      "real_time_factor": 0.01271,
+      "read_ms": 1822.2,
+      "sonogram_crosscheck_ms": 6142.9,
+      "agent_plan_ms": 37861.7,
+      "total_ms": 45826.9,
       "frames": 280,
       "hazards": 64
     },
     {
       "repeat": 3,
-      "wall_s": 61.76,
-      "cpu_util": 0.885,
-      "peak_rss_mb": 913.5,
-      "real_time_factor": 0.01711,
-      "read_ms": 1843.2,
-      "sonogram_crosscheck_ms": 5672.6,
-      "agent_plan_ms": 54207.7,
-      "total_ms": 61723.6,
+      "wall_s": 45.99,
+      "cpu_util": 0.835,
+      "peak_rss_mb": 956.7,
+      "real_time_factor": 0.01274,
+      "read_ms": 1807.1,
+      "sonogram_crosscheck_ms": 6177.1,
+      "agent_plan_ms": 37973.2,
+      "total_ms": 45957.3,
       "frames": 280,
       "hazards": 64
     }
@@ -123,16 +147,16 @@
   "survey": {
     "sonar_duration_s": 3606.9,
     "frames": 280,
-    "real_time_factor_median": 0.01711,
+    "real_time_factor_median": 0.01274,
     "real_time_factor_range": [
-      0.01709,
-      0.01713
+      0.01271,
+      0.01276
     ],
-    "compute_s_per_survey_hour": 61.6,
-    "usd_per_survey_hour": 0.002729
+    "compute_s_per_survey_hour": 45.9,
+    "usd_per_survey_hour": 0.002032
   },
   "cost": {
     "price_hour_usd": 0.15952,
-    "price_source": "AWS Price List API 2026-10-20 (c8g.xlarge on-demand Linux us-east-1)"
+    "price_source": "AWS Price List API 2026-10-23 (c8g.xlarge on-demand Linux us-east-1)"
   }
 }
