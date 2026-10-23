@@ -56,7 +56,13 @@ async function loadHealth() {
     md.title = h.model_error || (h.warmup_ms != null ? `warm-up ${h.warmup_ms} ms` : "");
     if (h.is_cool_path) { cv.textContent += " · COOL"; cv.title = h.cv2_file; }
     const rc = $("#regCv"), rm = $("#regModel");
-    if (rc) rc.textContent = h.opencv + (h.is_cool_path ? " (COOL /opt/cool)" : "");
+    const rt = h.runtime || {}, ch = rt.engine_choice;   // the cv2.dnn engine; `fastest` measured it at load
+    if (rc) {
+      rc.textContent = h.opencv + (h.is_cool_path ? " (COOL /opt/cool)" : "") + (rt.engine ? ` · dnn ${rt.engine}` : "");
+      rc.title = ch ? `cv2.dnn engine measured on this machine at load: ${ch.picked} (${ch.why}). ms per forward, ` +
+        `${ch.round_ms.new.length} rounds: new ${ch.round_ms.new.join(" / ")} · classic ${ch.round_ms.classic.join(" / ")}`
+        : rt.engine ? `cv2.dnn engine: ${rt.engine} (DEPTH_DNN_ENGINE=${rt.engine_requested || "auto"})` : "";
+    }
     if (rm) rm.textContent = h.model_loaded ? "Loaded and warm" : "Loading";
     state.calibration = h.calibration || null;
     const cal = h.calibration || {};
