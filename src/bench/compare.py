@@ -61,8 +61,10 @@ def _machine(r: dict) -> str:
 
 
 def _ocv(r: dict) -> str:
+    """OpenCV version, COOL or stock, and the cv2.dnn engine the run used (when the JSON records one)."""
     o = r["fingerprint"]["opencv"]
-    return f"{o['version']} {'**COOL**' if o['is_cool_path'] else 'stock'}"
+    eng = (r.get("runtime") or {}).get("engine")
+    return f"{o['version']} {'**COOL**' if o['is_cool_path'] else 'stock'}" + (f" · {eng}" if eng else "")
 
 
 def _row(r: dict) -> str:
@@ -226,7 +228,7 @@ def _parity_rows(par: dict[str, dict]) -> list[str]:
 def _machines(runs: list[dict], d: Path) -> list[str]:
     rows, seen = [], set()
     for r in runs:
-        if r["label"] in seen:
+        if r["label"] in seen or r["label"].removesuffix("_lh") in seen:   # a look-harder row: the same machine
             continue
         seen.add(r["label"])
         fp = r["fingerprint"]
@@ -255,7 +257,10 @@ def report(runs: list[dict], par: dict[str, dict] | None = None, d: Path | None 
          "OpenCV image ops without the network. `survey` = a raw sonar recording end to end (read → sonogram → "
          "seabed cross-check → frame agent → plan). A run counts as **COOL** "
          "only if `cv2.__file__` is under `/opt/cool` (provenance, not \"KleidiCV in the build\", which the "
-         "stock Arm wheel also reports).",
+         "stock Arm wheel also reports). The OpenCV column also names the `cv2.dnn` engine the run used: `auto` "
+         "in runs from before STUDY-20 recorded it (ENGINE_AUTO, identified as the new engine), `new` / `classic` "
+         "after; since 2026-10-23 the server and the benchmark measure both engines on the machine and keep the "
+         "faster one with the same answers (`DEPTH_DNN_ENGINE=fastest`, [`dnn_engine.md`](dnn_engine.md)).",
          "",
          "| run | workload | machine | OpenCV | threads | total ms p50 / p95 | fps (range over repeats) | repeats | CPU | peak RSS | $ / 1k frames | modelled survey-hour: compute · $ |",
          "|---|---|---|---|--:|--:|--:|--:|--:|--:|--:|---|"]
