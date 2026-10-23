@@ -119,8 +119,12 @@ reader for Humminbird `.DAT` + `B00x.SON/IDX` (9xx/11xx/Helix and Solix):
 
 ## 4. See — the detector (`src/detection/infer.py`, `calibration.py`)
 
-YOLO11s exported to ONNX and run by **`cv2.dnn`** (OpenCV 5 new engine with fallback), letterbox →
-decode → class-aware `NMSBoxesBatched`. Everything model-specific comes from
+YOLO11s exported to ONNX and run by **`cv2.dnn`**, letterbox → decode → class-aware `NMSBoxesBatched`. The engine
+is `$DEPTH_DNN_ENGINE`: `auto` (default: OpenCV 5's new engine, the classic one as the fallback) or `fastest` (the
+EC2 server and the benchmark): both engines load, give the same raw output on a fixed input or the new one is kept,
+and the classic one replaces it only if it was faster in every one of 3 interleaved rounds (`infer.faster_engine`;
+STUDY-20: on Graviton it is, 1.41–1.47×). The engine that ran is recorded in `/api/health` and every result.
+Everything model-specific comes from
 `models/<MODEL>/calibration.json` (`$DEPTH_MODEL`, default EXP-003 since 2026-10-06): class names, input size,
 per-class floors, the guaranteed class, detector input, tiers. Weights resolve from `$DEPTH_ONNX` →
 `models/<MODEL>/best.onnx` → `runs/<MODEL>/weights/best.onnx`. Threads: `$DEPTH_THREADS`.

@@ -59,7 +59,9 @@ budget) → plan → one approval request per action. Every step is logged in `a
 1. **Stage 1 — canonicalisation** (`src/cv_pipeline/canonical.py`): palette→luminance, orientation by
    source rule (never guessed), bottom tracking, slant→ground, water-column mask. It measures
    geometry. It is **not** an ROI gate (STUDY-01 retired that).
-2. **See** — YOLO11 ONNX via `cv2.dnn` (`src/detection/infer.py`), class-aware NMS.
+2. **See** — YOLO11 ONNX via `cv2.dnn` (`src/detection/infer.py`), class-aware NMS. The EC2 server and the benchmark
+   run `DEPTH_DNN_ENGINE=fastest`: both OpenCV 5 engines are timed at load and the faster one with the same answers is
+   kept (STUDY-20: the classic engine on Graviton, 1.41–1.47×); everything else uses `auto` (the new engine).
 3. **Prove** — shadow, relative height, water-column check. This is evidence, never a silent gate.
 4. **Decide** — guaranteed tiers fit on held-out recordings (`src/agentic/calibrate.py`). EXP-003
    promises ≥ 78% of pots reach a human with one look (81% on test; Clopper-Pearson alone gave 79%, restated
