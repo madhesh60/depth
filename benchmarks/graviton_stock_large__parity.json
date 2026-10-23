@@ -1,6 +1,6 @@
 {
   "label": "graviton_stock_large",
-  "created": "2026-10-23T14:20:23",
+  "created": "2026-10-23T14:34:56",
   "fingerprint": {
     "opencv": {
       "version": "5.0.0",
@@ -41,15 +41,37 @@
         "pending_time": "2026-10-19T14:20:18Z"
       }
     },
-    "git_commit": "058de0e",
+    "git_commit": "7b881a5",
     "model_sha256": "71339e99ad2b4b29f8d516967ce02e1fb5895434bf6f483cb517efe6750ba2f2",
     "calibration_sha256": "ee337f0b216d2c0dccabd9e2c68646294d814ebc3fc9b71effb9b12fb6e37199"
   },
   "runtime": {
     "threads": 2,
-    "engine": "new",
-    "engine_requested": "auto",
-    "engine_fallback": null
+    "engine": "classic",
+    "engine_requested": "fastest",
+    "engine_fallback": null,
+    "engine_choice": {
+      "picked": "classic",
+      "why": "classic faster in every round, same answers",
+      "round_ms": {
+        "new": [
+          377.7,
+          377.1,
+          376.7
+        ],
+        "classic": [
+          256.4,
+          254.8,
+          254.9
+        ]
+      },
+      "threads": 2,
+      "same_answers": true,
+      "max_box_gap_px": 0.0007,
+      "max_score_gap": 0.0,
+      "input": "seeded noise 640x640",
+      "rule": "src.detection.infer.faster_engine"
+    }
   },
   "workload": "parity",
   "input_manifest_sha256": "25376f6e21f70bb04798ac04da927e48544d3889f2672f8e0ce6045e141f8264",

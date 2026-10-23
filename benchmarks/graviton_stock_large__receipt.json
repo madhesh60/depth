@@ -1,6 +1,6 @@
 {
   "what": "COOL execution receipt - check it: python -m src.bench.verify_cool <this server's URL>",
-  "created_utc": "2026-10-23T14:20:23Z",
+  "created_utc": "2026-10-23T14:34:56Z",
   "rehearsal": false,
   "on_ec2": true,
   "aws_signed_identity": {
@@ -22,7 +22,7 @@
     "pending_time": "2026-10-19T14:20:18Z"
   },
   "process": {
-    "pid": 29670,
+    "pid": 31760,
     "python": "/opt/stock-opencv/bin/python",
     "cv2_file": "/opt/stock-opencv/lib/python3.12/site-packages/cv2/__init__.py",
     "cv2_from_cool": false,
@@ -64,7 +64,7 @@
     ],
     "all_opencv_from_cool": false,
     "cool_tree_libs": [],
-    "shared_objects_mapped": 41
+    "shared_objects_mapped": 50
   },
   "cool_build": {
     "cool_root_exists": false,

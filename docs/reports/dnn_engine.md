@@ -17,7 +17,7 @@ Interleaved rounds, rotated engine order, the same frames for every engine. Medi
 
 | run | threads | classic | new | auto (default) | classic ÷ new | saved per forward | per-round ratio | claim |
 |---|--:|--:|--:|--:|--:|--:|---|---|
-| `graviton_stock_large` | 2 | 255.4 (255.9) ms | **376.5** (377.2) ms | 376.7 ms | **0.678×** | -121.1 ms | 0.678–0.679× | round ranges separate (slower) |
+| `graviton_stock_large` | 2 | 255.5 (256.1) ms | **376.7** (377.4) ms | 376.3 ms | **0.678×** | -121.2 ms | 0.678–0.679× | round ranges separate (slower) |
 | `laptop_x86` | 8 | 411.3 (512.7) ms | **373.8** (519.8) ms | 359.8 ms | **1.1×** | 37.5 ms | 1.014–1.137× | round ranges overlap - within noise, no claim |
 | `laptop_x86` | 1 | 764.9 (1196.2) ms | **886.0** (1380.8) ms | 1137.6 ms | **0.863×** | -121.1 ms | 0.622–1.429× | round ranges overlap - within noise, no claim |
 
@@ -40,7 +40,7 @@ Both engines' outputs through the product's decoder at the calibrated thresholds
 
 ## What it means for DEPTH
 
-- `graviton_stock_large` (aarch64 · c8g.large, 2 threads): ENGINE_AUTO loads the **new** engine; the **classic** engine is faster here: 255.4 vs 376.5 ms per forward (**1.47×**, 121.1 ms saved per forward; round ranges separate); the forward is 97% of the 388-ms product frame (`graviton_stock_large__product.json`). Answers: 31 of 31 detections identical, 0 tier flip(s).
+- `graviton_stock_large` (aarch64 · c8g.large, 2 threads): ENGINE_AUTO loads the **new** engine; the **classic** engine is faster here: 255.5 vs 376.7 ms per forward (**1.47×**, 121.2 ms saved per forward; round ranges separate); the forward is 96% of the 268-ms product frame (`graviton_stock_large__product.json`). Answers: 31 of 31 detections identical, 0 tier flip(s).
 - `laptop_x86` (AMD64 · Intel64 Family 6 Model 140 Ste, 8 threads): ENGINE_AUTO loads the **new** engine; classic ÷ new is 1.1×, but the rounds overlap: **no speed claim on this machine**. Answers: 634 of 634 detections identical, 0 tier flip(s).
 - The look-harder mode runs 5 forwards per frame, so the per-forward saving counts five times there.
 - Where the parity table shows 0 tier flips, the calibrated promise does not depend on the engine: forcing the classic one (`DEPTH_DNN_ENGINE=classic`) changes no decision on those frames.
