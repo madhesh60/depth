@@ -81,33 +81,67 @@ fi
 # (mcp declares pyjwt[crypto]; the server path imports neither jwt nor cryptography - checked locally)
 PYTHONPATH="$APP:$APP/pydeps" "$COOL_PY" -c "import fastapi, uvicorn, cv2, numpy, boto3, mcp.server.fastmcp; print('deps ok | cv2', cv2.__version__, cv2.__file__)"
 
-# MCP bearer token (remote agents connect to https://<cloudfront>/mcp with it). Generated once,
-# root-only, never in the unit file or the repo. Read it later with: sudo cat /etc/depth/mcp.env
+# Secrets and settings. Deployed by the stack, they come from SSM Parameter Store under DEPTH_PARAM_PREFIX
+# (/depth/<stack>; derived from the log group /depth/<stack>/app when unset): SecureString approver-pin, mcp-token,
+# admin-token (deploy.sh creates them) and the String app-config (the stack's settings, a JSON env map). So a
+# replaced server (rehearsal -> COOL) keeps the same PIN and tokens, and the owner reads the PIN with
+# ./infra/secrets.sh pin. Anywhere else they are generated once here, root-only. Never in the unit or the repo.
 install -d -m 700 /etc/depth
-if [ ! -s /etc/depth/mcp.env ]; then
-  ( umask 077; printf 'DEPTH_MCP_TOKEN=%s\n' "$(head -c 24 /dev/urandom | od -An -tx1 | tr -d ' \n')" > /etc/depth/mcp.env )
+PREFIX="${DEPTH_PARAM_PREFIX:-}"
+case "${DEPTH_LOG_GROUP:-}" in /depth/*/app) [ -n "$PREFIX" ] || PREFIX="${DEPTH_LOG_GROUP%/app}" ;; esac
+REGION="${AWS_REGION:-${AWS_DEFAULT_REGION:-}}"
+if [ -n "$PREFIX" ] && [ -z "$REGION" ]; then                   # the instance's own region (IMDSv2)
+  T=$(curl -fsS -m 3 -X PUT http://169.254.169.254/latest/api/token -H "X-aws-ec2-metadata-token-ttl-seconds: 60" || true)
+  REGION=$(curl -fsS -m 3 -H "X-aws-ec2-metadata-token: $T" http://169.254.169.254/latest/meta-data/placement/region || true)
+fi
+ssm_get() {   # ssm_get <name>: the decrypted value, or nothing (no prefix, missing parameter, no permission)
+  [ -n "$PREFIX" ] && [ -n "$REGION" ] || return 0
+  aws ssm get-parameter --region "$REGION" --name "$PREFIX/$1" --with-decryption \
+    --query Parameter.Value --output text 2>/dev/null | grep -v '^None$' || true
+}
+rand_hex() { head -c 24 /dev/urandom | od -An -tx1 | tr -d ' \n'; }
+MCP=$(ssm_get mcp-token); PIN=$(ssm_get approver-pin); ADMIN=$(ssm_get admin-token); CFG=$(ssm_get app-config)
+echo "   settings: ${PREFIX:-local} (SSM: pin $([ -n "$PIN" ] && echo yes || echo no), tokens $([ -n "$MCP$ADMIN" ] && echo yes || echo no), config $([ -n "$CFG" ] && echo yes || echo no))"
+# MCP bearer token (remote agents connect to https://<demo>/mcp with it)
+if [ -n "$MCP" ] || [ ! -s /etc/depth/mcp.env ]; then
+  ( umask 077; printf 'DEPTH_MCP_TOKEN=%s\n' "${MCP:-$(rand_hex)}" > /etc/depth/mcp.env )
 fi
 chmod 600 /etc/depth/mcp.env
-# Approver PIN: only people holding it can approve / decline / confirm (agents and API-token holders
-# can only ASK). Generated once, root-only; hand it to the judges privately with the submission.
-# DEPTH_APPROVALS_OPEN=1 opens approvals on purpose instead (the studio then says they are open to anyone;
-# the server refuses to start in public mode with neither a PIN nor this explicit choice).
-if [ ! -s /etc/depth/approver.env ]; then
+# Approver PIN: only people holding it can approve / decline / confirm (agents and API-token holders can only
+# ASK); hand it to the judges privately with the submission. The hint (shown under the studio's PIN field) says
+# where to find it, never the PIN. DEPTH_APPROVALS_OPEN=1 opens approvals on purpose instead (the studio then
+# says they are open to anyone; the server refuses to start in public mode with neither a PIN nor this choice).
+HINT="${DEPTH_APPROVER_HINT:-Judges: the approver PIN is in the submission form.}"
+if [ -n "$PIN" ]; then
+  ( umask 077; printf 'DEPTH_APPROVER_PIN=%s\nDEPTH_APPROVER_HINT=%s\n' "$PIN" "$HINT" > /etc/depth/approver.env )
+elif [ ! -s /etc/depth/approver.env ]; then
   if [ "${DEPTH_APPROVALS_OPEN:-0}" = "1" ]; then
     ( umask 077; printf 'DEPTH_APPROVALS_OPEN=1\n' > /etc/depth/approver.env )
   else
-    # the hint tells a person where to find the PIN (the studio shows it under the PIN field), never the PIN
     ( umask 077; printf 'DEPTH_APPROVER_PIN=%s\nDEPTH_APPROVER_HINT=%s\n' \
-        "$(od -An -N4 -tu4 /dev/urandom | tr -d ' \n' | tail -c 6)" \
-        "${DEPTH_APPROVER_HINT:-Judges: the approver PIN is in the submission form.}" > /etc/depth/approver.env )
+        "$(od -An -N4 -tu4 /dev/urandom | tr -d ' \n' | tail -c 6)" "$HINT" > /etc/depth/approver.env )
   fi
 fi
 [ -f /etc/depth/approver.env ] && chmod 600 /etc/depth/approver.env
 # Admin token for webhook management and the operator load test (same handling).
-if [ ! -s /etc/depth/admin.env ]; then
-  ( umask 077; printf 'DEPTH_ADMIN_TOKEN=%s\n' "$(head -c 24 /dev/urandom | od -An -tx1 | tr -d ' \n')" > /etc/depth/admin.env )
+if [ -n "$ADMIN" ] || [ ! -s /etc/depth/admin.env ]; then
+  ( umask 077; printf 'DEPTH_ADMIN_TOKEN=%s\n' "${ADMIN:-$(rand_hex)}" > /etc/depth/admin.env )
 fi
 chmod 600 /etc/depth/admin.env
+# The stack's non-secret settings (e.g. the approvals topic) -> /etc/depth/aws.env; only DEPTH_* / AWS_*REGION
+# keys with plain values pass, so nothing else can reach the service's environment.
+if [ -n "$CFG" ]; then
+  if printf '%s' "$CFG" | "$COOL_PY" -c 'import json, re, sys
+d = json.load(sys.stdin)
+for k, v in sorted(d.items()):
+    if re.fullmatch(r"DEPTH_[A-Z0-9_]+|AWS_REGION|AWS_DEFAULT_REGION", k) and re.fullmatch(r"[A-Za-z0-9:/._@+=,-]*", str(v)):
+        print(f"{k}={v}")' > /etc/depth/aws.env.tmp; then
+    mv -f /etc/depth/aws.env.tmp /etc/depth/aws.env && chmod 644 /etc/depth/aws.env
+    echo "   /etc/depth/aws.env: $(cut -d= -f1 /etc/depth/aws.env | tr '\n' ' ')"
+  else
+    rm -f /etc/depth/aws.env.tmp; echo "   note: app-config is not a JSON object - /etc/depth/aws.env unchanged"
+  fi
+fi
 mkdir -p "$APP/runs/jobs" /var/log/depth
 chown -R depth:depth "$APP/runs" /var/log/depth
 

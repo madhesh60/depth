@@ -33,6 +33,8 @@ EnvironmentFile=-/etc/depth/origin.env
 EnvironmentFile=-/etc/depth/public.env
 # present only on a stock-Ubuntu dress rehearsal (Rehearsal=true): every COOL claim says "rehearsal"
 EnvironmentFile=-/etc/depth/rehearsal.env
+# the stack's non-secret settings from SSM (/depth/<stack>/app-config): the approvals topic, the region
+EnvironmentFile=-/etc/depth/aws.env
 # behind CloudFront: the viewer's address is the LAST X-Forwarded-For hop, the one CloudFront appends
 # (per-client rate limits; the first hop is whatever the visitor sent)
 Environment=DEPTH_TRUST_PROXY=1

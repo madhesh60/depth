@@ -137,9 +137,50 @@ else
   [ -n "${ENABLE_CDN:-}" ] && PARAMS+=(EnableCdn="$CDN")
   [ -n "${HTTPS:-}" ] && PARAMS+=(PublicHttps="$HTTPS")
 fi
+[ -n "${APPROVER_EMAIL:-}" ] && PARAMS+=(ApproverEmail="$APPROVER_EMAIL")
+
+# cost anomaly monitor: an account holds one AWS-services monitor (AWS makes one for new accounts) - reuse it. Asked
+# only while the stack does not carry the parameter yet, so a later run never swaps the stack's own monitor away.
+HAS_CM=0
+[ "$STATUS" != NONE ] && HAS_CM=$(awsq cloudformation describe-stacks --stack-name "$STACK" \
+  --query "length(Stacks[0].Parameters[?ParameterKey=='CostMonitorArn'])" --output text)
+if [ "$HAS_CM" = 0 ]; then
+  CM=$(awsq ce get-anomaly-monitors --output text --query \
+    "AnomalyMonitors[?MonitorType=='DIMENSIONAL' && MonitorDimension=='SERVICE' && MonitorName!='$STACK-services'].MonitorArn | [0]" \
+    2>/dev/null || true)
+  [ "$CM" = None ] && CM=""
+  echo "cost anomaly monitor: ${CM:-none yet - the stack creates one}"
+  PARAMS+=(CostMonitorArn="$CM")
+fi
+
+# secrets the server reads at setup: SecureString (AWS-managed key aws/ssm), created once, never printed; the value
+# goes through stdin into a root-only file that is deleted right after (never on a command line)
+ensure_secrets() {
+  local name desc f
+  for name in approver-pin mcp-token admin-token; do
+    if awsq ssm get-parameter --name "/depth/$STACK/$name" --query Parameter.Name --output text >/dev/null 2>&1; then
+      echo "   /depth/$STACK/$name: exists"; continue
+    fi
+    case "$name" in
+      approver-pin) desc="DEPTH approver PIN - people decide with it, agents can only ask" ;;
+      mcp-token)    desc="DEPTH MCP bearer token - remote agents" ;;
+      admin-token)  desc="DEPTH admin token - webhooks and the load test" ;;
+    esac
+    f="$WORK/param-$name.json"
+    { [ "$name" = approver-pin ] && python -I -c 'import secrets; print(f"{secrets.randbelow(10**6):06d}", end="")' \
+      || rand_hex 24; } | ( umask 077; python -I -c 'import json, sys
+json.dump({"Name": sys.argv[1], "Value": sys.stdin.read(), "Type": "SecureString", "Description": sys.argv[2],
+           "Tags": [{"Key": "project", "Value": "depth"}]}, open(sys.argv[3], "w"))' "/depth/$STACK/$name" "$desc" "$f" )
+    awsq ssm put-parameter --cli-input-json "file://$f" >/dev/null; rm -f "$f"
+    echo "   /depth/$STACK/$name: created"
+  done
+}
 
 say "template"
+SIZE=$(wc -c < "$TEMPLATE" | tr -d ' ')
+[ "$SIZE" -le 51200 ] || die "$TEMPLATE is $SIZE bytes - over CloudFormation's 51,200-byte inline limit: trim Metadata text"
 awsq cloudformation validate-template --template-body "file://$TEMPLATE" --query 'Description' --output text | cut -c1-120
+echo "$SIZE bytes"
 
 DEPLOY=(cloudformation deploy --stack-name "$STACK" --template-file "$TEMPLATE" --capabilities CAPABILITY_IAM
         --tags project=depth --no-fail-on-empty-changeset)
@@ -159,8 +200,18 @@ if [ "$APPLY" != "1" ]; then
   exit 0
 fi
 
+say "secrets (SSM SecureString under /depth/$STACK/ - read the PIN with ./infra/secrets.sh pin)"
+ensure_secrets
+
+say "cost allocation tag 'project' (the bill per project in Cost Explorer; free)"
+awsq ce update-cost-allocation-tags-status --cost-allocation-tags-status TagKey=project,Status=Active >/dev/null 2>&1 \
+  && echo "active" || echo "not yet - a tag can be activated up to 24 h after it first appears on a bill; re-run later"
+
+# ROLLBACK=1: a failed update rolls back (safer for operations changes); the default keeps a failed instance
+# alive for debugging its bootstrap, as before
+ROLLBACK_FLAG=(--disable-rollback); [ "${ROLLBACK:-0}" = "1" ] && ROLLBACK_FLAG=()
 say "deploying (the instance signals only once DEPTH serves; ~15-25 min)"
-"$AWS_CLI" "${DEPLOY[@]}" --disable-rollback | tr -d '\r'
+"$AWS_CLI" "${DEPLOY[@]}" "${ROLLBACK_FLAG[@]}" | tr -d '\r'
 URL=$(stack_output "$STACK" Url)                  # empty while CloudFront is off
 IID=$(stack_output "$STACK" InstanceId)
 echo "instance $IID · dashboard: $(stack_output "$STACK" DashboardUrl)"
@@ -214,4 +265,5 @@ else
   echo "receipt saved: $WORK/receipt.json · add CloudFront once AWS verifies the account: ENABLE_CDN=1 APPLY=1 ./infra/deploy.sh"
 fi
 echo "shell (no SSH): aws ssm start-session --target $IID"
-echo "SNS: confirm the subscription email sent to the alert address"
+echo "SNS: confirm the two subscription emails (alerts, approvals) - AWS sends each once"
+[ "$STATUS" = NONE ] || echo "next: APPLY=1 ./infra/update_server.sh - the running server re-reads its secrets and settings from SSM"

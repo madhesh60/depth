@@ -19,7 +19,8 @@ LG=$(stack_output "$STACK" LogGroup)
 # a rehearsal server (stock Ubuntu until the COOL AMI swaps in) has no /opt/cool: the setup runs with the stock
 # interpreter its user-data installed and without the COOL check - the template's rehearsal exports, read on the box
 REH="if [ -s /etc/depth/rehearsal.env ]; then export COOL_PY=/opt/stock-opencv/bin/python DEPTH_REQUIRE_COOL=0; fi"
-CMD="cd /opt/depth && $REH && git fetch -q origin $GIT_REF && git reset -q --hard FETCH_HEAD && DEPTH_GIT_REF=$GIT_REF DEPTH_S3_BUCKET=$B DEPTH_LOG_GROUP=$LG bash infra/setup_cool_instance.sh"
+# the server reads its secrets and settings from SSM under /depth/<stack> (deploy.sh writes them)
+CMD="cd /opt/depth && $REH && git fetch -q origin $GIT_REF && git reset -q --hard FETCH_HEAD && DEPTH_GIT_REF=$GIT_REF DEPTH_S3_BUCKET=$B DEPTH_LOG_GROUP=$LG DEPTH_PARAM_PREFIX=/depth/$STACK AWS_REGION=$AWS_REGION bash infra/setup_cool_instance.sh"
 echo "instance $IID -> commit ${GIT_REF:0:12}"
 echo "+ $CMD"
 [ "$APPLY" = "1" ] || { echo "(dry run) APPLY=1 to run it"; exit 0; }
