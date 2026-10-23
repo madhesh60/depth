@@ -44,7 +44,7 @@ log — start at [`JUDGES.md`](JUDGES.md) (one page) or the [README](../README.m
 | Reporting engine | ✅ Done | `src/agentic/{geo,mission}.py`: honest geotag + GeoJSON/GPX/KML/CSV/JSON exports. |
 | Dashboard | ✅ Done | Zero-build static web app (`webui/`), served by FastAPI; hardened (job queue, per-frame model lock, upload limits, shipped samples, vendored Leaflet). See→Prove→Decide→Act stepper, evidence cards (conf→relook), agent trace, Leaflet hazard map + recovery route, downloads, honesty banners. Verified under uvicorn. |
 | AWS deployment | 🟡 Partly run | One stack, `infra/cfn/depth.yaml` via `infra/deploy.sh` (dry run by default): c8g COOL AMI + CloudFront + S3 + alarms. 2026-10-19: everything except CloudFront created (the account needs AWS Support verification first, so `EnableCdn=false` for now). The COOL subscription is still pending, so a rehearsal runs on stock Ubuntu. 2026-10-22: a public HTTPS link without CloudFront is ready (`PUBLIC_HTTPS=1`, Caddy + Let's Encrypt on the Elastic IP) and waits for the owner's go-ahead; meanwhile judges get GitHub Codespaces (`.devcontainer/`). |
-| **COOL benchmark (Arm vs x86)** | 🟡 Stock EC2 done, COOL pending | Product-workload benchmark (`src/bench/`, `infra/golive.sh`): per stage, threads pinned, $/survey-hour, COOL provenance. 2026-10-20, stock OpenCV 5, 4 threads: c8i.xlarge x86 **157 ms/frame**, c8g.xlarge Graviton4 **197 ms**. The COOL runs wait on the Marketplace subscription (`PHASE=cool ./infra/golive.sh`). |
+| **COOL benchmark (Arm vs x86)** | 🟡 Stock EC2 done, COOL pending | Product-workload benchmark (`src/bench/`, `infra/golive.sh`): per stage, threads pinned, $/survey-hour, COOL provenance. 2026-10-23, stock OpenCV 5, 4 threads, each on its measured `cv2.dnn` engine: c8g.xlarge Graviton4 **138.5 ms/frame**, c8i.xlarge x86 **145.8 ms** (2026-10-20 on ENGINE_AUTO: 197 / 157 ms); looking harder 655 / 693 ms. The COOL runs wait on the Marketplace subscription (`PHASE=cool ./infra/golive.sh`). |
 | Agentic loop (See→Prove→Decide→Act) | ✅ Done | **Primary Agentic-Vision entry.** Guaranteed tiers (recall promise ≥ 78% with one look, held at 81.1% on test — Clopper-Pearson's 79% restated for correlated frames, STUDY-21; ≥ 84% looking harder, held at 86.0%; nothing auto-confirmed), the goal-driven core loop with the applicability check (STUDY-19), value-of-information agent, sensor cross-check (STUDY-16), opposite-side re-survey passes, person-confirmed loop, MCP / OGC / webhooks. Active vision is built but off by default: its validation failed (STUDY-15). |
 | One card per object (STUDY-23) | ✅ Done | Overlapping same-class review boxes in a frame share one card; the same pots reach a person. Test: 2.68 → 1.81 cards per frame (one look), 3.86 → 2.32 (looking harder). At assumed timings DEPTH now beats manual review: 43.2 vs 55.7 min (one look), 56.5 vs 57.3 (looking harder). |
 | Human studies | ⬜ Needs people | The timed user study (Study tab) and the blinded false-alarm audit (Audit tab) are built; neither has run with people yet. |
@@ -54,21 +54,22 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ---
 
-## 3. Current state (2026-10-22)
+## 3. Current state (2026-10-23)
 
 - **Working end to end:** the studio and the agent on CPU with OpenCV 5 — the goal-driven core loop
   (`core.py`: check the promise applies → choose how hard to look → perceive with a compute-budget watch →
-  plan → ask), Stage 1, the EXP-003 detector through `cv2.dnn` (new engine, recorded), evidence, calibrated
+  plan → ask), Stage 1, the EXP-003 detector through `cv2.dnn` (on the EC2 server, the faster of OpenCV 5's two engines, measured at load), evidence, calibrated
   tiers (≥ 78% one look, ≥ 84% looking harder — both checked for correlated frames), **one review card per
   object** (STUDY-23), survey planning and person-approved actions — on the sample frames and on a raw
   Humminbird recording with real GPS and a per-ping dropout mask. `ruff check .` (with bugbear) and `mypy` (the
-  decision core) are clean, both in CI; the full suite passes (312, 2026-10-22; coverage 60% of `src/`).
+  decision core) are clean, both in CI; the full suite passes (314, 2026-10-23; coverage 60% of `src/`).
 - **Judges can run it:** one click in GitHub Codespaces (`.devcontainer/`), or five commands on a laptop. CI runs
   the codespace's own setup in its image on 2 CPUs and plays the guided demo to its last step
   (`.github/workflows/codespaces.yml`); one real click in a codespace is still the owner's check.
 - **Waiting on AWS / the owner:** the Graviton + COOL runs (the Marketplace subscription needs a Visa or
-  Mastercard), CloudFront (account verification) or the ready `PUBLIC_HTTPS=1` link, and the EC2 look-harder
-  row + load-test re-run. The stock EC2 benchmarks and the first load test are done.
+  Mastercard) and a public link: CloudFront (account verification) or `PUBLIC_HTTPS=1 APPLY=1 ./infra/deploy.sh`,
+  which the owner runs (opening port 443 is the owner's call). The stock EC2 benchmarks in both modes, the
+  measured engine choice and the load-test re-run are done (2026-10-23).
 - **Needs people:** the timed user study and the blinded false-alarm audit.
 - **Left for submission:** the COOL numbers (or the plain "not run" line), the narrated video (footage:
   `python tests/ui_video.py`), the Lucidchart diagram. The GitHub description and topics are set (2026-10-22).
@@ -102,6 +103,31 @@ COOL still waits on AWS (the Marketplace payment case); everything else that nee
   `infra/depth.service` and `bench_cool.sh`; `/api/health` → `runtime.engine_choice`). Tests added.
 - `bench_cool.sh` now measures both perception modes on every machine (`product,product_lh,cv,survey`), so the
   COOL rows will carry look harder too.
+- **With the measured engine** the demo server (c8g.large) runs a frame in **268 ms** (was 388) and looks harder in
+  **1.30 s** (was 1.90) — under the 300-ms target, inside the studio's 2-s budget. **Load test re-run: passed** —
+  383 / 383, analyze p95 2.44 s (mark 3 s), 190 analyses a minute (was 144); under load the agent took the standard
+  look 382 of 383 times, as designed.
+- **Fleet A + B re-run** (c8i.xlarge x86, c8g.xlarge Graviton4, 4 vCPU, both modes, ~$0.35): Graviton **138.5 ms**
+  (was 197.0) vs x86 **145.8 ms** (was 156.9), looking harder 655 / 693 ms — stock Graviton is now the faster and
+  15% cheaper machine; the 1-h recording RTF 0.0127 on both; 31 of 31 detections match. STUDY-20 on the fleet:
+  classic faster on Graviton at 4 threads (1.47×) and 1 thread (1.41×); on x86 classic at 4 threads (1.11×), new at 1 (1.17×).
+  STUDY-17 now carries the stock results (and discloses the engine and look-harder change, made before any COOL run).
+- **Cost of measuring:** both engines are loaded while the server compares them, so the peak memory rises ~170 MB
+  (one core: 409 MB vs 240 MB) and the model load takes ~4 s longer. Stated where the numbers are.
+- **Fleet bug fixed:** each benchmark machine uploaded every `<label>*.json` in its clone, so the committed
+  `graviton_stock_large*` files came back with B's results (caught: they were restored from git before anything
+  used them). The user data now deletes the clone's committed results and uploads only `<label>__*`, `_lh__*`,
+  `_t1__*` — a failed workload can no longer ship an old file under a new run.
+- Reports: `cool_benchmark.md` names the engine of every run; `dnn_engine.md` says when the winner flips with the
+  thread count; the studio's Model panel shows the engine and, on hover, the rounds that chose it.
+- **Blocked, said plainly:** (1) the real-LLM session on Bedrock — every Claude model reports
+  `agreementAvailability: NOT_AVAILABLE` for this account (Claude on Bedrock is a Marketplace product: the same
+  payment block as COOL); it needs a Claude API key instead. (2) `PUBLIC_HTTPS=1 APPLY=1 ./infra/deploy.sh` —
+  the dry run is clean (adds `PublicHttpsIngress`, modifies the security group in place, no instance change), but
+  opening 443 to the internet is the owner's step to run. (3) An AWS CLI `aws login` session broke once when a
+  background poller and a foreground command refreshed it at the same moment: AWS commands now run one at a time.
+- Local tooling: `anthropic[bedrock]` 2.2.0 and `botocore[crt]` installed for `llm_session`; `httpcore` → 1.0.9 to
+  match the upgraded `h11` (the separate `aider-chat` tool pins older versions).
 
 ### 2026-10-22 (sweep 74) — the independent review's findings, a real-LLM session, two honest notes
 

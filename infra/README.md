@@ -7,11 +7,12 @@ full agent on **one EC2 Graviton4 instance launched from the COOL Marketplace AM
 The earlier Lambda / API Gateway / DynamoDB / Amplify / SageMaker plan stays **retired**: COOL ships as an
 AMI, so only EC2 can run the product on COOL.
 
-_Status (2026-10-20): written, linted (cfn-lint 1.57.2, 0 findings) and dry-run checked. Applied on 2026-10-19
+_Status (2026-10-23): written, linted (cfn-lint 1.57.2, 0 findings) and dry-run checked. Applied on 2026-10-19
 without CloudFront (`ENABLE_CDN=0`, AWS account verification pending) and in rehearsal mode (stock OpenCV 5:
 the COOL Marketplace subscription is blocked on payment - the Marketplace needs a Visa or Mastercard). Stock
-x86 + Graviton benchmarks and the demo-server load test ran on 2026-10-20
-([`cool_benchmark.md`](../docs/reports/cool_benchmark.md)); the COOL runs wait on the subscription._
+x86 + Graviton benchmarks (both perception modes, each on its measured `cv2.dnn` engine) and the demo-server
+load test re-ran on 2026-10-23 ([`cool_benchmark.md`](../docs/reports/cool_benchmark.md)); the server runs the
+pushed code (`update_server.sh`); the COOL runs wait on the subscription. `PUBLIC_HTTPS=1` is ready, not applied._
 
 ## Architecture
 
@@ -102,9 +103,11 @@ Every machine runs the same commit, frames, model and recordings (all SHA-256 pi
 
 Load test (pass mark fixed in the code before any run — 0 errors, analyze p95 ≤ 3 s with 4 clients back
 to back + 1 survey, health p95 ≤ 1 s): `python -m src.bench.load_test https://<demo> --label c8g_large`.
-The 2026-10-20 pass (p95 2.0 s) ran **before** the look-harder mode became the analyze default (5 forward
-passes on an idle server); analyze now takes the compute already queued for the network (and the measured
-rest of an answer) off its 2-s budget, so a busy server gets the standard look. Re-run the load test after the next deploy.
+Analyze takes the compute already queued for the network (and the measured rest of an answer) off its 2-s
+budget, so a busy server gets the standard look. Re-run on 2026-10-23 with the look-harder default and the measured
+`cv2.dnn` engine (c8g.large, rehearsal): **passed** — 383 / 383, analyze p95 2.44 s, health p95 0.01 s, 190 analyses
+a minute; under load the agent took the standard look for 382 of 383 (2026-10-20, before look harder: 291 / 291,
+p95 2.0 s). The script runs it on the box over SSM: the `load_test` step of `golive.sh`.
 
 The server refuses to start in public mode (behind the proxy) without `DEPTH_MCP_TOKEN`,
 `DEPTH_ADMIN_TOKEN` and `DEPTH_APPROVER_PIN` (or `DEPTH_APPROVALS_OPEN=1`); `setup_cool_instance.sh`

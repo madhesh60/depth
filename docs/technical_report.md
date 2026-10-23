@@ -25,12 +25,12 @@ Graviton + COOL**.
 | **The promises survive correlated frames**: a block bootstrap within recordings supports 78.2% for one look — so Clopper-Pearson's 79% was restated to 78% — and 84.3% looking harder (stands). A pooled rate: per recording, one look held on 5 of 6 | [`dependence.md`](reports/dependence.md) (STUDY-21) |
 | **The agent withdraws its promise where it does not apply**: on another sonar in 22 of 22 surveys (one look keeps 23.9% of the pots there), never on the 3 test recordings | [`applicability.md`](reports/applicability.md) |
 | **A goal-driven core loop** chooses how hard to look from the operator's goal and compute budget, and re-plans mid-run on its measured pace or a failed closer look; a single analyze call prices its look against the server's queue | [`core.py`](../src/agentic/core.py) · §2 |
-| **OpenCV 5's new DNN engine** is the one that loads, recorded in every result's provenance; it gives the same answers as the classic engine (634 of 634 detections, 0 tier flips) | [`dnn_engine.md`](reports/dnn_engine.md) (STUDY-20) |
+| **OpenCV 5's two DNN engines give the same answers** (634 of 634 detections on the calibration frames, 31 of 31 on each EC2 machine, 0 tier flips), but not the same speed: on Graviton the classic one is **1.47×** faster per forward while ENGINE_AUTO loads the new one. The server measures both at start and keeps the faster (`DEPTH_DNN_ENGINE=fastest`); the engine that ran is in every result's provenance | [`dnn_engine.md`](reports/dnn_engine.md) (STUDY-20) |
 | Stage 1 measures the sonar's altitude without labels; port and starboard agree to **1.6 px** (random pairs 5.3 px) | [`stage1_canonical.md`](reports/stage1_canonical.md) |
 | OpenCV output changes the agent's actions: without Stage 1, **95 of 142** pins leave their own error circle and 4 of 39 re-survey passes regroup (EXP-003, v2b test); the shadow changes no decision (evidence only) | [`causal_trace.md`](reports/causal_trace.md) |
 | **One review card per object** (STUDY-23): overlapping boxes on one pot share a card — 2.68 → 1.81 cards per frame (one look), 3.86 → 2.32 (looking harder); the same pots reach a person | [`card_grouping.md`](reports/card_grouping.md) |
 | Analyst effort at assumed timings: DEPTH reaches its promise in **43.2 vs 55.7** min (one look) and **56.5 vs 57.3** (looking harder) on the pot-dense test; 34 / 47 vs 56 min per survey-hour of empty seabed. Before one card per object it was slower in both modes | [`effort_curve.md`](reports/effort_curve.md) |
-| Product frame, standard look: **157 ms** (x86) / **197 ms** (Graviton4), 4 vCPU, stock OpenCV 5; looking harder (the default when time allows) costs ≈ 5×, about 0.8 s (estimated; the EC2 run is pending) | [`cool_benchmark.md`](reports/cool_benchmark.md) |
+| Product frame, standard look: **138.5 ms** (Graviton4) / **145.8 ms** (x86), 4 vCPU, stock OpenCV 5, each on its measured engine; looking harder (the default when time allows) **655 / 693 ms** (4.7×); the 2-vCPU demo server 268 ms / 1.30 s | [`cool_benchmark.md`](reports/cool_benchmark.md) |
 | A **raw sonar recording with real GPS** is read directly and checked against physics (GPS speed vs the speed field r = 0.95; course vs heading 2.4°), with a **measured range scale** (2.03 cm/sample ± 10.2% after the agent cross-checks its seabed track against the depth sounder) → pins and heights in real metres | [`raw_recording.md`](reports/raw_recording.md) |
 | A person's decision makes the agent **re-plan** the recovery route, queue, budget and passes; an impact ledger measures the reviewed precision | [`agentic_vision.md`](agentic_vision.md) |
 
@@ -272,13 +272,17 @@ known crab pots.
 | full product path (EXP-003) | laptop x86, stock OpenCV 5, 8 threads | 252 ms | 3.3 | 51 s (RTF 0.014) |
 | OpenCV-only stages (decode, Stage 1, evidence, render) | laptop x86 | 25 ms | 40 | 4 s |
 | full product path, 1 thread (EXP-001) | laptop x86 | 523 ms | 1.9 | 89 s |
-| full product path, 4 threads (EC2, 2026-10-20) | c8i.xlarge x86, stock OpenCV 5 | 157 ms | 6.4 | 26.5 s · $0.0014 |
-| full product path, 4 threads (EC2, 2026-10-20) | c8g.xlarge Graviton4, stock OpenCV 5 | 197 ms | 5.1 | 33.3 s · $0.0015 |
-| standard vs **look harder** (5 passes), interleaved, 2026-10-21 | laptop x86, stock OpenCV 5, 8 threads | 406 → 2,110 ms | 2.5 → 0.47 | ≈ 5× |
-| `cv2.dnn` forward, classic vs new engine (STUDY-20) | laptop x86, 8 threads / 1 thread | 411 vs 374 ms / 765 vs 886 ms | — | within noise — no claim |
-| **on-board budget: one core** (EC2, 2026-10-20) | c8g.xlarge Graviton4, 1 thread, 240 MB peak | 599 ms | 1.7 | ~168 s (280 frames/h, derived) → ~21× real time |
-| real 1-h recording end to end (EC2) | c8i.xlarge x86 / c8g.xlarge Graviton4, stock | — | — | RTF 0.0135 / 0.0171 |
-| load test, 4 clients + 1 survey, 120 s | c8g.large demo server (stock, rehearsal) | p95 2.0 s (mark 3 s) | 291/291 ok | **passed — before the look-harder mode existed; re-run pending** |
+| full product path, 4 threads (EC2, 2026-10-23, measured engine: classic) | c8g.xlarge Graviton4, stock OpenCV 5 | **138.5 ms** | 7.2 | 23.4 s · $0.0010 |
+| full product path, 4 threads (EC2, 2026-10-23, measured engine: classic) | c8i.xlarge x86, stock OpenCV 5 | 145.8 ms | 6.8 | 24.6 s · $0.0013 |
+| standard → **look harder** (5 passes), interleaved, 4 threads (EC2, 2026-10-23) | c8g.xlarge Graviton4 / c8i.xlarge x86 | 138.5 → 655 ms / 145.8 → 693 ms | 7.2 → 1.5 / 6.8 → 1.4 | 4.7× |
+| standard → look harder, the demo server's size, 2 threads (EC2, 2026-10-23) | c8g.large Graviton4, stock OpenCV 5 | 268 → 1,300 ms | 3.7 → 0.8 | 4.9× |
+| same, before the engine choice (ENGINE_AUTO = new), 2026-10-20 / 10-23 | c8i.xlarge / c8g.xlarge / c8g.large | 157 / 197 / 388 ms | 6.4 / 5.1 / 2.6 | — |
+| `cv2.dnn` forward, classic vs new engine (STUDY-20), 4 threads / 1 thread | c8g.xlarge Graviton4 | 127.4 vs 187.3 ms / 430.5 vs 608.9 ms | — | classic **1.47×** / 1.41× (rounds separate) |
+| `cv2.dnn` forward, classic vs new engine (STUDY-20), 4 threads / 1 thread | c8i.xlarge x86 | 133.9 vs 148.9 ms / 341.8 vs 291.7 ms | — | classic 1.11× / new 1.17× (rounds separate) |
+| `cv2.dnn` forward, classic vs new engine (STUDY-20), 8 threads / 1 thread | laptop x86 | 411 vs 374 ms / 765 vs 886 ms | — | within noise — no claim |
+| **on-board budget: one core** (EC2, 2026-10-23) | c8g.xlarge Graviton4, 1 thread, 409 MB peak (both engines loaded to measure them; 240 MB with one on 2026-10-20) | 435 ms | 2.3 | ~122 s (280 frames/h, derived) → ~30× real time |
+| real 1-h recording end to end (EC2, 2026-10-23) | c8i.xlarge x86 / c8g.xlarge Graviton4, stock | — | — | RTF 0.0127 / 0.0127 (46 s per survey-hour; $0.0024 / $0.0020) |
+| load test, 4 clients back to back + 1 survey, 120 s (2026-10-23, look-harder default, measured engine) | c8g.large demo server (stock, rehearsal) | p95 2.44 s (mark 3 s) | 383/383 ok | **passed**; under load the agent took the standard look 382 of 383 times (2026-10-20, before look harder: p95 2.0 s, 291/291) |
 | **⏳ pending:** Graviton **COOL** (c8g.xlarge + c8g.large) | Marketplace subscription blocked on payment | — | — | — |
 
 **Proposal targets vs delivered.** Stated plainly, because judges compare the two:
@@ -286,8 +290,8 @@ known crab pots.
 | proposal target | delivered | reading |
 |---|---|---|
 | mAP@0.5 ≥ 0.70 | **0.319** (both classes); **crab pots 0.482** (v2b test) | **not met.** Six clean training runs did not close it; the diagnosis points at the data. The recall promise below makes the shortfall safe to use: every pot the promise covers reaches a person. |
-| < 300 ms per frame | 157 ms (x86) / 197 ms (Graviton stock) p50 on EC2, 4 threads; laptop 252 / 530 ms | **met on EC2** at p50 and p95 in the standard look. Looking harder (5 passes, the default when the goal and budgets allow) is ≈ 5× — about 0.8 s estimated — and does **not** meet it; a sonar frame arrives every ~13–21 s, so it still keeps up with the boat. The 4 tile passes cannot be batched: the published ONNX has batch size 1. Graviton COOL pending. |
-| ≥ 5 FPS | 6.4 FPS (x86) / 5.1 FPS (Graviton stock) on EC2; 3.3 on the laptop | met on EC2. It is also the wrong yardstick for side-scan: one frame per ~21 s of sonar arrives from the boat. What matters is survey-hours processed: **51 s of compute per hour of sonar (70× faster than real time)**. |
+| < 300 ms per frame | 138.5 ms (Graviton stock) / 145.8 ms (x86) p50 on EC2, 4 threads; 268 ms on the 2-vCPU demo server; laptop 252 / 530 ms | **met on EC2** at p50 and p95 in the standard look, on every size measured. Looking harder (5 passes, the default when the goal and budgets allow) is 655 / 693 ms (4 vCPU) and 1.3 s (demo server) and does **not** meet it; a sonar frame arrives every ~13–21 s, so it still keeps up with the boat. The 4 tile passes cannot be batched: the published ONNX has batch size 1. Graviton COOL pending. |
+| ≥ 5 FPS | 7.2 FPS (Graviton stock) / 6.8 FPS (x86) on EC2, 4 vCPU; 3.7 on the 2-vCPU demo server; 3.3 on the laptop | met on EC2 at 4 vCPU. It is also the wrong yardstick for side-scan: one frame per ~21 s of sonar arrives from the boat. What matters is survey-hours processed: **46 s of compute per hour of sonar on EC2 (78× faster than real time)**. |
 | (not in the proposal) | ≥ 78% of pots reach a person (≥ 84% looking harder), verified on unseen data (81% / 86%), checked for correlated frames | added: a promise instead of an average |
 
 The 3-way benchmark ([`infra/README.md`](../infra/README.md)) uses the same code, the same frames and

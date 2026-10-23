@@ -52,11 +52,12 @@ clients can only ask); judges receive it with the submission, and the studio say
 | The agent knows when its promise does not apply | another sonar: withdrawn in **22 of 22** surveys (one look keeps 23.9% of pots there) | [`applicability.md`](reports/applicability.md) (STUDY-19) |
 | Crab-pot detector AP@0.5 | **0.482** (95% CI 0.43–0.55) — mAP@0.5 0.319 **misses the 0.70 target** | [`eval_exp003_test.md`](reports/eval_exp003_test.md) |
 | Against GhostVision (same split) | F1 **0.41** vs their reported 0.71–0.73 — **DEPTH's detector is weaker** | [`eval_exp003_test_official398.md`](reports/eval_exp003_test_official398.md) |
-| OpenCV 5's new DNN engine | loads by default; **634 of 634** detections identical to the classic engine, 0 tier flips; speed: within noise on the laptop | [`dnn_engine.md`](reports/dnn_engine.md) (STUDY-20) |
-| Product frame, standard look (stock OpenCV 5, 4 vCPU) | **157 ms** x86 (c8i.xlarge) · **197 ms** Graviton4 (c8g.xlarge) | [`cool_benchmark.md`](reports/cool_benchmark.md) |
-| Product frame, looking harder (the default when time allows) | **≈ 5×** the standard frame (laptop, interleaved: 406 → 2,110 ms) → about **0.8 s** on the same EC2 x86 (estimated; the EC2 run is pending) | `benchmarks/laptop_x86_modes*` |
+| OpenCV 5's two DNN engines | same answers: **634 of 634** detections on the calibration frames, 31 of 31 on each EC2 machine, 0 tier flips. On Graviton the **classic** engine is **1.41–1.47×** faster per forward at every thread count measured, 1 to 4 (ENGINE_AUTO loads the slower new one); on x86 classic wins at 4 threads (1.11×), new at 1 (1.17×). The server times both at start and keeps the faster (`DEPTH_DNN_ENGINE=fastest`) | [`dnn_engine.md`](reports/dnn_engine.md) (STUDY-20) |
+| Product frame, standard look (stock OpenCV 5, 4 vCPU) | **138.5 ms** Graviton4 (c8g.xlarge) · **145.8 ms** x86 (c8i.xlarge), each on its measured engine (before the engine choice, 2026-10-20: 197 / 157 ms) | [`cool_benchmark.md`](reports/cool_benchmark.md) |
+| Product frame, looking harder (the default when time allows) | **655 ms** Graviton4 · **693 ms** x86 (4 vCPU, interleaved with the one look: 4.7×) · **1.30 s** on the 2-vCPU demo server (c8g.large; one look 268 ms) | same |
+| The demo server under load (c8g.large, 4 clients back to back + 1 survey, 120 s) | **383 / 383** ok, analyze p95 **2.44 s** (mark 3 s), 190 analyses a minute; under load the agent took the standard look 382 of 383 times | `benchmarks/load/load_test__c8g_large_rehearsal.json` |
 | One review card per object | cards per frame **2.68 → 1.81** (one look), **3.86 → 2.32** (looking harder); the **same pots** reach a person; 1 of 462 cards holds two pots | [`card_grouping.md`](reports/card_grouping.md) (STUDY-23) |
-| On one CPU core (on-board budget) | 599 ms/frame and 240 MB on one Graviton4 core → a survey-hour (280 frames) in ~168 s, **~21× faster than the sonar records** (no small board measured) | `benchmarks/graviton_stock_t1__product.json` × the real recording |
+| On one CPU core (on-board budget) | 435 ms/frame on one Graviton4 core → a survey-hour (280 frames) in ~122 s, **~30× faster than the sonar records**; 409 MB peak (both engines loaded while the server measures them; 240 MB with one engine on 2026-10-20) (no small board measured) | `benchmarks/graviton_stock_t1__product.json` × the real recording |
 | Analyst minutes (ASSUMED 20 s/frame, 8 s/card; one card per object) | pot-dense test: one look **43.2 vs 55.7** manual, looking harder **56.5 vs 57.3**; empty seabed 34 / 47 vs 56 min per survey-hour (before one card per object: 62.7 vs 55.7, **slower**) | [`effort_curve.md`](reports/effort_curve.md) |
 | Real 1-h recording (another sonar, promise withdrawn) | **48 review cards per hour** of sonar (54 before one card per object) | same |
 | Seabed measurement moves the boat | without Stage 1, 95 of 142 pins leave their own error circle | [`causal_trace.md`](reports/causal_trace.md) (STUDY-12) |
@@ -67,15 +68,13 @@ clients can only ask); judges receive it with the submission, and the studio say
 - **The test split is not fresh any more.** Each study scored it once, but STUDY-18, 19, 21 and 23 all used the same 199 test frames, and STUDY-23 was started because of a test-split result. Treat the test numbers as checked, not untouched.
 - **The 8 demo frames all come from one test recording (Rec9)** — the one where the one-look promise fell short (74.7% against 78%). They show the product working, not a best case.
 - **No real LLM run recorded yet.** The recorded MCP session (`mcp_session.md`) uses a scripted client; `python -m src.dashboard.llm_session`
-  lets Claude drive DEPTH for real (tested with a stand-in model) and needs an API key to record.
+  lets Claude drive DEPTH for real (tested with a stand-in model). Recording it on Bedrock failed on 2026-10-23: the account cannot accept the Claude Marketplace agreement (`agreementAvailability: NOT_AVAILABLE` for every Claude model — the same payment block as COOL), so it needs a Claude API key.
 - **No public URL yet** (CloudFront account verification). The server is deployed in rehearsal mode.
 - **No human study and no blinded audit with people**: analyst minutes and audited precision are not
   measured; the timings above are assumptions, labelled as such (including that a card with several boxes on one
   object takes as long as a one-box card).
 - **No field proof**: no recording has both real pots and real GPS. The pot frames carry synthetic GPS (labelled
   on screen); the real-GPS river recordings hold no known pots.
-- The c8g.large **load test** (passed, p95 2.0 s) ran before the look-harder mode existed; the analyze
-  agent now counts the server queue and takes the standard look when busy — the re-run is pending.
 - **Boxes, not masks** (the brief allows either); **pitch and roll** are not corrected (not recorded by
   the sonar); the optional Bedrock brief writer is **not deployed** on the demo server.
 

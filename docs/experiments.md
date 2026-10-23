@@ -248,6 +248,11 @@ Promote each into the log below with full results as it runs.
   376.3–376.7 ms, the ranges separate), and ENGINE_AUTO loads the slower one. Same answers on the server's 8 timing
   frames: 31 of 31 detections identical, 0 tier flips (the calibration split is not on the server; the 634-of-634
   parity is the laptop's). The forward is 97% of the 388-ms product frame there.
+- **EC2 fleet (2026-10-23, c8g.xlarge Graviton4 and c8i.xlarge x86, 4 vCPU and 1 thread, same protocol):**
+  Graviton: classic faster at both — **127.4 vs 187.3 ms** (1.47×) at 4 threads, 430.5 vs 608.9 ms (1.41×) at 1.
+  x86: classic faster at 4 threads (133.9 vs 148.9 ms, 1.11×), **new faster at 1 thread** (291.7 vs 341.8 ms,
+  1.17×) — the winner depends on the thread count too. Every per-round range separates; 31 of 31 detections
+  identical on each machine. ENGINE_AUTO loads the new engine everywhere.
 - **Shipped (2026-10-23): the server measures, it does not assume.** `DEPTH_DNN_ENGINE=fastest` loads both engines
   when the server starts, checks they give the same raw output on a fixed input (≤ 1 px per box coordinate,
   ≤ 0.01 per class score), times them in 3 interleaved rounds and keeps the classic engine only if it was faster
@@ -333,7 +338,7 @@ Promote each into the log below with full results as it runs.
   its first frame (judge audit round 3: a first survey of the 8 demo frames took 28.9 s on the laptop, all
   looking harder). No promise changed: a downgraded run keeps the standard promise (≥ 78%).
 
-### STUDY-17 — COOL on Graviton4 vs stock OpenCV vs x86: the product workload (REGISTERED 2026-10-19, not yet run)
+### STUDY-17 — COOL on Graviton4 vs stock OpenCV vs x86: the product workload (REGISTERED 2026-10-19; stock rows run; the COOL rows wait on the subscription)
 
 - **Why.** The Best-Use-of-COOL award asks for COOL executing the core workload on Graviton, with
   reproducible measurements against a baseline. Registered before any AWS number exists, so the claims
@@ -358,6 +363,17 @@ Promote each into the log below with full results as it runs.
     back + 1 survey, health p95 ≤ 1 s); fail ⇒ tune threads and re-test before any upsizing.
 - **Laptop reference (x86, stock OpenCV 5.0.0, not a criterion):** product frame 566 ms mean, of which
   `cv2.dnn` forward 497 ms (88%); 1-h recording → plan in 246 s (real-time factor 0.068, peak 714 MB).
+- **Stock rows A and B** (run 2026-10-20, re-run 2026-10-23; C and D wait on the COOL subscription). Changed
+  before any COOL number exists (disclosed): since 2026-10-23 every machine also runs the look-harder mode
+  (`product_lh`), and the product runs on the `cv2.dnn` engine the server measures as faster on that machine
+  (`DEPTH_DNN_ENGINE=fastest`, STUDY-20), so C and D will be measured the same way. At commit `7b881a5`, 4 vCPU:
+  A **145.8 ms** p50 · B **138.5 ms** (both on the classic engine); looking harder 692.6 / 655.0 ms; the 1-h
+  recording RTF 0.0127 / 0.0127 ($0.0024 / $0.0020 per survey-hour); **P1** B vs A: 31 of 31 detections match.
+  On 2026-10-20 (ENGINE_AUTO = the new engine): 156.9 / 197.0 ms, RTF 0.0135 / 0.0171.
+- **S1 on stock:** the demo size (c8g.large, 2 vCPU) meets < 300 ms p95 (271 ms) but not ≥ 5 fps (3.73); the
+  cheapest measured size that meets both is c8g.xlarge (142.6 ms p95, 7.18 fps). D (COOL c8g.large) is pending.
+- **L1 on stock:** passed 2026-10-23 on the rehearsal server (383 / 383, analyze p95 2.44 s, health p95 0.01 s;
+  2026-10-20: 291 / 291, p95 2.0 s); to be repeated on COOL.
 
 ### STUDY-16 — The agent cross-checks OpenCV's seabed track against the depth sounder (ON by default for recordings)
 
