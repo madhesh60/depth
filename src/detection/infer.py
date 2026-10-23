@@ -53,7 +53,12 @@ DEFAULT_IOU_NMS = _CAL.iou_nms
 _ENGINES = {"auto": "ENGINE_AUTO", "new": "ENGINE_NEW", "classic": "ENGINE_CLASSIC"}
 # The cv2.dnn engine the last network actually loaded with: a Net cannot be asked which engine built it,
 # so _read_net records it (provenance, /api/health, benchmarks; STUDY-20 measures what it is worth).
-ENGINE: dict = {"requested": None, "loaded": None, "fallback": None}
+# ``choice`` is the evidence when DEPTH_DNN_ENGINE=fastest measured the engines on this machine.
+ENGINE: dict = {"requested": None, "loaded": None, "fallback": None, "choice": None}
+# DEPTH_DNN_ENGINE=fastest: which engine is faster depends on the machine (STUDY-20: on a Graviton c8g.large the
+# classic one, 255 vs 377 ms per forward; on the laptop within noise), so the server measures it at load.
+# Same answers = raw outputs within 1 px per box coordinate and 0.01 per class score (STUDY-17's |Δscore|).
+_FASTEST = {"rounds": 3, "n": 2, "box_px": 1.0, "score": 0.01}
 
 
 def configure_runtime(threads: Optional[int] = None) -> dict:
@@ -69,20 +74,64 @@ def runtime_info() -> dict:
     """Threads, and the DNN engine asked for vs the one that loaded (None until a network is loaded)."""
     return {"threads": cv2.getNumThreads(), "engine": ENGINE["loaded"],
             "engine_requested": os.environ.get("DEPTH_DNN_ENGINE", "auto").lower(),
-            "engine_fallback": ENGINE["fallback"]}
+            "engine_fallback": ENGINE["fallback"], "engine_choice": ENGINE["choice"]}
 
 
-def _read_net(onnx_path: Path):
-    """``cv2.dnn.readNetFromONNX`` with the engine from ``$DEPTH_DNN_ENGINE`` (auto|new|classic).
+def faster_engine(rounds_ms: dict[str, list[float]], same_answers: bool) -> tuple[str, str]:
+    """The rule behind ``fastest``: the classic engine replaces the new one (ENGINE_AUTO's pick) only when both
+    give the same answers and the classic one was faster in EVERY interleaved round (STUDY-17's separation rule:
+    the per-round ranges do not overlap). Returns (engine, why)."""
+    new, classic = rounds_ms["new"], rounds_ms["classic"]
+    if not same_answers:
+        return "new", "the answers differ - kept the new engine"
+    if max(classic) < min(new):
+        return "classic", "classic faster in every round, same answers"
+    if max(new) < min(classic):
+        return "new", "new faster in every round, same answers"
+    return "new", "rounds overlap (within noise) - kept the new engine"
+
+
+def _pick_fastest(nets: dict, imgsz: int) -> tuple[str, dict]:
+    """Both engines on one fixed input (seeded noise: the forward's cost does not depend on the pixels; the full
+    answer parity on real frames is STUDY-20's): same answers?, then ``rounds`` interleaved rounds (rotated
+    order) of ``n`` timed forwards each, and :func:`faster_engine`. Returns (engine, the evidence)."""
+    canvas = np.random.default_rng(0).integers(0, 256, (imgsz, imgsz, 3), dtype=np.uint8)
+    blob = cv2.dnn.blobFromImage(canvas, 1 / 255.0, (imgsz, imgsz), swapRB=True)
+    out = {}
+    for e, net in nets.items():                               # untimed first forward: allocations + the outputs
+        net.setInput(blob)
+        out[e] = np.array(net.forward(), copy=True)[0]        # (4+nc, N)
+    gap_box = float(np.abs(out["new"][:4] - out["classic"][:4]).max())
+    gap_score = float(np.abs(out["new"][4:] - out["classic"][4:]).max())
+    same = gap_box <= _FASTEST["box_px"] and gap_score <= _FASTEST["score"]
+    names, ms = list(nets), {e: [] for e in nets}
+    for r in range(_FASTEST["rounds"]):
+        for e in names[r % 2:] + names[:r % 2]:
+            t: list[float] = []
+            for _ in range(_FASTEST["n"]):
+                t0 = time.perf_counter()
+                nets[e].setInput(blob)
+                nets[e].forward()
+                t.append((time.perf_counter() - t0) * 1000)
+            ms[e].append(round(float(np.median(t)), 1))
+    pick, why = faster_engine(ms, same)
+    return pick, {"picked": pick, "why": why, "round_ms": ms, "threads": cv2.getNumThreads(),
+                  "same_answers": same, "max_box_gap_px": round(gap_box, 4), "max_score_gap": round(gap_score, 5),
+                  "input": f"seeded noise {imgsz}x{imgsz}", "rule": "src.detection.infer.faster_engine"}
+
+
+def _read_net(onnx_path: Path, imgsz: int = 640):
+    """``cv2.dnn.readNetFromONNX`` with the engine from ``$DEPTH_DNN_ENGINE`` (auto|new|classic|fastest).
     ``auto`` (default) does what ENGINE_AUTO does — OpenCV 5's new engine first, the classic one if
     the new one cannot load the model — but explicitly, so the engine that loaded is known
-    (:data:`ENGINE`). On EXP-003 ENGINE_AUTO's output is bit-identical to ENGINE_NEW's."""
+    (:data:`ENGINE`). On EXP-003 ENGINE_AUTO's output is bit-identical to ENGINE_NEW's. ``fastest`` loads
+    both, measures them on this machine (:func:`_pick_fastest`, a few seconds) and keeps the winner."""
     want = os.environ.get("DEPTH_DNN_ENGINE", "auto").lower()
     if not hasattr(cv2.dnn, "ENGINE_NEW"):                     # an OpenCV without the engine switch
-        ENGINE.update(requested=want, loaded="default", fallback=None)
+        ENGINE.update(requested=want, loaded="default", fallback=None, choice=None)
         return cv2.dnn.readNetFromONNX(str(onnx_path))
     forced = os.environ.get("OPENCV_FORCE_DNN_ENGINE")       # OpenCV's own override wins over ours
-    errors = []
+    errors, nets = [], {}
     for name in {"new": ("new",), "classic": ("classic",)}.get(want, ("new", "classic")):
         try:
             net = cv2.dnn.readNetFromONNX(str(onnx_path), getattr(cv2.dnn, _ENGINES[name]))
@@ -92,10 +141,17 @@ def _read_net(onnx_path: Path):
         if net.empty():
             errors.append(f"{name}: empty network")
             continue
-        ENGINE.update(requested=want, loaded=name if not forced else f"forced:{forced}",
-                      fallback="; ".join(errors) or None)
-        return net
-    raise RuntimeError(f"cv2.dnn could not load {onnx_path.name}: " + "; ".join(errors))
+        nets[name] = net
+        if want != "fastest" or forced:
+            break
+    if not nets:
+        raise RuntimeError(f"cv2.dnn could not load {onnx_path.name}: " + "; ".join(errors))
+    name, choice = next(iter(nets)), None
+    if len(nets) == 2:
+        name, choice = _pick_fastest(nets, imgsz)
+    ENGINE.update(requested=want, loaded=name if not forced else f"forced:{forced}",
+                  fallback="; ".join(errors) or None, choice=choice)
+    return nets[name]
 
 
 @dataclass
@@ -143,12 +199,12 @@ class YoloOnnxDetector:
                 f"Get them: python -m src.detection.fetch_model (the published, hash-checked release), "
                 f"or export a training run: python -m src.detection.export_onnx"
             )
-        self.net = _read_net(onnx_path)
+        self.imgsz = int(imgsz or _CAL.imgsz)          # EXP-001 640; EXP-002 1024 (calibration.json)
+        self.net = _read_net(onnx_path, self.imgsz)
         self.engine = ENGINE["loaded"]
         self._onnx_path = str(onnx_path)
         self.names = list(names)
         self.class_aware_nms = class_aware_nms
-        self.imgsz = int(imgsz or _CAL.imgsz)          # EXP-001 640; EXP-002 1024 (calibration.json)
         self.iou_thres = iou_thres
         # per-class confidence thresholds → array aligned to `names`; `conf_floor` is the min
         # used for the initial keep + NMS, then each detection is filtered by its class threshold.

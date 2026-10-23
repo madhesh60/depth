@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from src.agentic.policy import GuaranteedTiers
 from src.bench.dnn_engine import compare_answers, separation
 from src.detection.calibration import load_calibration
-from src.detection.infer import DEFAULT_ONNX, ENGINE, Detection, YoloOnnxDetector, runtime_info
+from src.detection.infer import DEFAULT_ONNX, ENGINE, Detection, YoloOnnxDetector, faster_engine, runtime_info
 
 _TIERS = GuaranteedTiers.from_calibration(load_calibration())
 _G = _TIERS.guaranteed_class
@@ -57,7 +57,28 @@ def test_speedup_is_claimed_only_when_rounds_separate():
 
 def test_runtime_info_names_the_requested_and_the_loaded_engine():
     r = runtime_info()
-    assert {"threads", "engine", "engine_requested", "engine_fallback"} <= set(r)
+    assert {"threads", "engine", "engine_requested", "engine_fallback", "engine_choice"} <= set(r)
+
+
+def test_fastest_switches_engine_only_when_faster_in_every_round_with_the_same_answers():
+    new, classic = [377.0, 376.4, 376.7], [255.4, 255.5, 255.3]          # the c8g.large rounds (STUDY-20)
+    assert faster_engine({"new": new, "classic": classic}, True) == ("classic", "classic faster in every round, same answers")
+    assert faster_engine({"new": new, "classic": [255.4, 380.0, 255.3]}, True)[0] == "new"   # one round overlaps
+    assert faster_engine({"new": new, "classic": classic}, False)[0] == "new"                # the answers differ
+    assert faster_engine({"new": classic, "classic": new}, True)[0] == "new"
+
+
+@pytest.mark.skipif(not DEFAULT_ONNX.exists(), reason="model weights absent (python -m src.detection.fetch_model)")
+def test_fastest_measures_both_engines_on_this_machine_and_says_why(monkeypatch):
+    monkeypatch.setenv("DEPTH_DNN_ENGINE", "fastest")
+    det = YoloOnnxDetector(DEFAULT_ONNX)
+    ch = runtime_info()["engine_choice"]
+    assert det.engine == ch["picked"] in ("new", "classic") and runtime_info()["engine_requested"] == "fastest"
+    assert ch["same_answers"] and ch["max_score_gap"] <= 0.01 and ch["max_box_gap_px"] <= 1.0
+    assert len(ch["round_ms"]["new"]) == len(ch["round_ms"]["classic"]) == 3 and ch["why"]
+    monkeypatch.setenv("DEPTH_DNN_ENGINE", "auto")
+    YoloOnnxDetector(DEFAULT_ONNX)
+    assert runtime_info()["engine_choice"] is None                         # only `fastest` measures
 
 
 @pytest.mark.skipif(not DEFAULT_ONNX.exists(), reason="model weights absent (python -m src.detection.fetch_model)")
