@@ -8,8 +8,11 @@
 # (B) → (C) isolates COOL on identical hardware; (A) → (C) is the x86 → Graviton + COOL latency and cost story.
 #
 # What a run records:
-#   * all vCPUs: product + cv + survey (a real 1-h sonar recording end to end), 3 interleaved repeats,
+#   * all vCPUs: product in both perception modes (the standard look; looking harder = + the 2x2 tile pass,
+#     `<label>_lh`) + cv + survey (a real 1-h sonar recording end to end), 3 interleaved repeats,
 #     the parity record (every detection per frame), CPU use, peak memory;
+#   * the product runs with the cv2.dnn engine the server would pick on this machine (DEPTH_DNN_ENGINE=fastest,
+#     as in infra/depth.service; the JSON records which one and why);
 #   * 1 thread: product + cv (per-core comparison - an Intel vCPU is a hyper-thread, a Graviton vCPU a core);
 #   * STUDY-20: OpenCV 5's two DNN engines (classic vs new) on this machine - speed + same answers;
 #   * provenance: COOL only if cv2 loads from /opt/cool (refuses to mislabel); on EC2 the machine's
@@ -26,7 +29,7 @@ PRICE_SOURCE="${PRICE_SOURCE:-}"
 N="${N:-120}"; N1="${N1:-48}"
 REPEATS="${REPEATS:-3}"
 THREADS="${THREADS:-0 1}"
-WORKLOADS="${WORKLOADS:-product,cv,survey}"
+WORKLOADS="${WORKLOADS:-product,product_lh,cv,survey}"
 WORKLOADS_1T="${WORKLOADS_1T:-product,cv}"
 FRAMES="${FRAMES:-webui/samples}"
 OPENCV_PIN="${OPENCV_PIN:-5.0.0.93}"
@@ -71,7 +74,7 @@ M="${DEPTH_MODEL:-EXP-003}"
 for T in $THREADS; do
   if [ "$T" = "0" ]; then L="$LABEL"; W="$WORKLOADS"; NN="$N"; EXTRA=(--parity)
   else L="${LABEL}_t${T}"; W="$WORKLOADS_1T"; NN="$N1"; EXTRA=(); fi
-  "$PY" -m src.bench.product_bench --label "$L" --workloads "$W" --threads "$T" --n "$NN" --repeats "$REPEATS" \
+  DEPTH_DNN_ENGINE="${DEPTH_DNN_ENGINE:-fastest}" "$PY" -m src.bench.product_bench --label "$L" --workloads "$W" --threads "$T" --n "$NN" --repeats "$REPEATS" \
     --frames "$FRAMES" --price-hour "$PRICE_HOUR" --price-source "$PRICE_SOURCE" --out benchmarks "${EXTRA[@]}"
 done
 # STUDY-20: which cv2.dnn engine loads, what it is worth here, and whether the answers match
