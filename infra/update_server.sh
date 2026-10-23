@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # update_server.sh — move the live server to a new commit without SSH and without replacing anything:
 # SSM Run Command checks out GIT_REF and re-runs the idempotent setup script, which restarts DEPTH and
-# fails unless the server comes back healthy on COOL.
+# fails unless the server comes back healthy on COOL (a rehearsal server: healthy on its stock OpenCV 5).
 #
 #   ./infra/update_server.sh               # dry run: prints the command
 #   APPLY=1 ./infra/update_server.sh       # GIT_REF defaults to the pushed HEAD
@@ -16,7 +16,10 @@ git branch -r --contains "$GIT_REF" 2>/dev/null | grep -q . || die "commit $GIT_
 IID=$(stack_output "$STACK" InstanceId)
 B=$(stack_output "$STACK" BucketName)
 LG=$(stack_output "$STACK" LogGroup)
-CMD="cd /opt/depth && git fetch -q origin $GIT_REF && git reset -q --hard FETCH_HEAD && DEPTH_GIT_REF=$GIT_REF DEPTH_S3_BUCKET=$B DEPTH_LOG_GROUP=$LG bash infra/setup_cool_instance.sh"
+# a rehearsal server (stock Ubuntu until the COOL AMI swaps in) has no /opt/cool: the setup runs with the stock
+# interpreter its user-data installed and without the COOL check - the template's rehearsal exports, read on the box
+REH="if [ -s /etc/depth/rehearsal.env ]; then export COOL_PY=/opt/stock-opencv/bin/python DEPTH_REQUIRE_COOL=0; fi"
+CMD="cd /opt/depth && $REH && git fetch -q origin $GIT_REF && git reset -q --hard FETCH_HEAD && DEPTH_GIT_REF=$GIT_REF DEPTH_S3_BUCKET=$B DEPTH_LOG_GROUP=$LG bash infra/setup_cool_instance.sh"
 echo "instance $IID -> commit ${GIT_REF:0:12}"
 echo "+ $CMD"
 [ "$APPLY" = "1" ] || { echo "(dry run) APPLY=1 to run it"; exit 0; }
