@@ -62,7 +62,7 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
   tiers (≥ 78% one look, ≥ 84% looking harder — both checked for correlated frames), **one review card per
   object** (STUDY-23), survey planning and person-approved actions — on the sample frames and on a raw
   Humminbird recording with real GPS and a per-ping dropout mask. `ruff check .` (with bugbear) and `mypy` (the
-  decision core) are clean, both in CI; the full suite passes (314, 2026-10-23; coverage 60% of `src/`).
+  decision core) are clean, both in CI; the full suite passes (315, 2026-10-24; coverage 60% of `src/`).
 - **Judges can run it:** one click in GitHub Codespaces (`.devcontainer/`), or five commands on a laptop. CI runs
   the codespace's own setup in its image on 2 CPUs and plays the guided demo to its last step
   (`.github/workflows/codespaces.yml`); one real click in a codespace is still the owner's check.
@@ -83,6 +83,29 @@ Current numbers, each with its split: README "At a glance" and
 ---
 
 ## 4. Session log
+
+### 2026-10-24 (sweep 76) — a formal README and judges' guide; a For judges tab in the studio
+
+- **`README.md`** rewritten in a formal register with a table of contents and numbered sections: at a glance, project
+  status (first, so no reader has to discover what is missing), overview and capabilities, the criteria map, the agent,
+  architecture with a stage-by-module table, getting started, results (detector, promise, effort, runtime, real
+  recordings), the AWS deployment, limitations, reproducibility, repository structure, a documentation index, and
+  responsible use, development and licence. No number changed; every relative link and in-page anchor was checked.
+- **`docs/JUDGES.md`** rewritten as an evaluation guide: summary, access (with status), a ten-minute evaluation path,
+  evidence by criterion (overall, Agentic Vision, Best Use of COOL), the principal measurements with their splits, the
+  submission deliverables with status, outstanding items and limitations, verification commands, glossary and further
+  reading. The COOL line keeps its `cool:status` marker (the docs test passes).
+- **The studio's For judges tab** (after Connect; deep link `?mode=judges`): live facts from the running server (model,
+  recall promises, OpenCV build and whether it is COOL, the DNN engine, host, code commit with a link, how approvals
+  work), shortcuts (guided demo, analyze a sample, survey the real recording, connect an agent, repository), and the
+  guide itself — `GET /api/judges` serves `docs/JUDGES.md`, so the tab and the file never disagree. A small renderer in
+  `webui/js/judges.js` escapes all text, drops HTML comments and keeps only http(s), in-page and relative links
+  (relative ones resolve to the docs on GitHub); checked against script tags, `javascript:` links and injected
+  attributes with an HTML parser.
+- **Tests:** `tests/test_api.py` checks the endpoint serves the file on disk with the server's facts; `tests/ui_smoke.py`
+  opens the tab (10 sections, 7 facts, no raw Markdown) and uses a shortcut. 314 passed, 1 skipped (315); ruff and mypy
+  clean; the UI test passes every step and plays the guided demo to 7/7. Checked by hand at 1400 px and 390 px (no
+  horizontal scroll) and with the real-recording shortcut (Survey, real GPS, Agent tab, promise withdrawn).
 
 ### 2026-10-23 (sweep 75) — the AWS items in our hands: the server updated, the engine measured, look harder on EC2
 
