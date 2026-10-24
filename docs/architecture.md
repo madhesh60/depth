@@ -71,7 +71,7 @@ violet = optional. The numbers are EXP-003's as of 2026-10-21. Text version:_
  HUMAN LOOP  labels (✓ / ✕ / ＋missed) ─► fine-tune set     src/agentic/feedback.py
              timed study (manual vs cards) ─► effort curve  src/agentic/{study,effort}.py
              blinded false-alarm audit ─► audited precision src/detection/fp_audit.py
- SERVE   FastAPI (jobs, limits, rate limits, metrics) + zero-build studio (Analyze · Survey · Study · Audit · Connect)
+ SERVE   FastAPI (jobs, limits, rate limits, metrics) + zero-build studio (Analyze · Survey · Study · Audit · Connect · For judges)
          + MCP (/mcp) · OGC API – Features (/ogc) · signed webhooks · <depth-hazards> embed   src/dashboard/, webui/
  CLOUD   CloudFront ─► EC2 c8g (Graviton4) · COOL AMI · systemd ─► S3 · CloudWatch · Budgets · SSM   infra/
 ```
@@ -301,7 +301,7 @@ Hardening:
 * **Startup:** the model is warmed at startup.
 * **Map:** Leaflet vendored (SRI-checked); keyless basemaps with an offline grid fallback.
 
-UI: a zero-build studio with five modes (Analyze · Survey · Study · Audit · Connect)
+UI: a zero-build studio with six modes (Analyze · Survey · Study · Audit · Connect · For judges)
 (`webui/styles.css`, `webui/js/`).
 
 - **Look:** Apple-style dark materials in deep-ocean tones: three floating glass layers over
@@ -422,7 +422,7 @@ src/dashboard/    app.py (the app + wiring) · service.py (state, survey run) ·
                   survey · people · approvals · connect) · detector_queue.py · jobs.py · metrics.py · samples.py ·
                   mcp_server.py · mcp_session.py · ogc.py · integrations.py · ratelimit.py · origin_guard.py
 webui/            index.html · js/ (core · trace · panels · viewer · analyze · survey · connect · decisions ·
-                  study · twin-panel · demo — classic scripts, one scope, no build) · twin3d.js (three.js twin) ·
+                  study · twin-panel · demo · judges — classic scripts, one scope, no build) · twin3d.js (three.js twin) ·
                   styles.css · embed/depth-embed.js ·
                   samples/ (8 CC-BY-SA frames) · audit/ · vendor/leaflet · vendor/three
 infra/            cfn/depth.yaml · deploy.sh · setup_cool_instance.sh · depth.service · update_server.sh ·

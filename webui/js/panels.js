@@ -192,6 +192,7 @@ function wireModes() {
     if (b.dataset.mode === "study") { loadStudySummary(); }
     if (b.dataset.mode === "audit") { loadAuditSummary(); }
     if (b.dataset.mode === "connect") { Connect.load(); }
+    if (b.dataset.mode === "judges") { Judges.load(); }
   });
   const m0 = new URLSearchParams(location.search).get("mode");   // deep link: ?mode=survey
   if (m0) setTimeout(() => setMode(m0), 0);

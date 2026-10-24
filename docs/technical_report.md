@@ -103,13 +103,14 @@ The **runtime** processes each frame through five stages, all OpenCV 5 on CPU:
    - GeoJSON / GPX / KML / CSV / JSON exports with a **provenance stamp**, an agent **decision log** (JSONL) and a **mission brief**.
 
 **Serving.** FastAPI with a background job queue, upload limits, per-client rate limits and per-stage
-metrics. A zero-build web studio has five modes:
+metrics. A zero-build web studio has six modes:
 
 - **Analyze:** one frame with its evidence and the agent's-eye view.
 - **Survey:** the shipped samples (synthetic GPS) or a **raw recording with real per-ping GPS**; map, routes, re-survey passes, the "without Stage 1" counterfactual, the person-confirmed recovery route, approvals, the mission brief, and the **3D digital twin** (three.js: seabed in true ground range, the sonar at its tracked altitude, the acoustic triangle each height is measured from).
 - **Study:** timed user study.
 - **Audit:** blinded false-alarm audit.
 - **Connect:** MCP, OGC API – Features, signed webhooks and the drop-in panel, with live URLs.
+- **For judges:** the evaluation guide (`docs/JUDGES.md`, served by `GET /api/judges` and rendered in the studio) beside live facts from the running server, with shortcuts into the demonstration.
 
 A guided 60-second demo walks through the whole path.
 

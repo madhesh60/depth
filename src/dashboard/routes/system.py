@@ -1,5 +1,5 @@
 """
-routes/system.py — health, the COOL receipt, metrics, the sample frames and the failure catalogue.
+routes/system.py — health, the COOL receipt, metrics, the sample frames, the failure catalogue and the judges' guide.
 """
 from __future__ import annotations
 
@@ -13,12 +13,15 @@ from .. import samples as samples_mod
 from src.agentic.approvals import pin_required
 from src.agentic.core import calibrated_modes
 from src.agentic.incidents import DRILLS, catalogue as incident_catalogue
+from src.agentic.provenance import stamp as provenance_stamp
 from src.bench import cool_attest
 from src.detection.calibration import load_calibration
 from src.detection.infer import DEFAULT_ONNX, runtime_info
 from .. import service as S
 
 router = APIRouter()
+JUDGES_MD = S.REPO / "docs" / "JUDGES.md"
+REPO_URL = "https://github.com/madhesh60/depth"
 
 
 # ---- API ---------------------------------------------------------------------------------------
@@ -93,3 +96,20 @@ def sample_thumb(sample_id: str, size: int = Query(220, ge=32, le=640)):
 def incidents_catalogue():
     """The failure modes DEPTH handles (fallback + human action) and the drills the studio can run."""
     return {"catalogue": incident_catalogue(), "drills": list(DRILLS)}
+
+
+@router.get("/api/judges")
+def judges_guide():
+    """The judges' guide for the studio's For judges tab: ``docs/JUDGES.md`` itself (one source, so the tab and the
+    file never disagree), where its relative links point on GitHub, and what this server is running."""
+    try:
+        text = JUDGES_MD.read_text(encoding="utf-8")
+    except OSError as e:
+        raise HTTPException(404, f"docs/JUDGES.md not found: {type(e).__name__}") from e
+    prov = provenance_stamp()
+    return {"markdown": text, "source": "docs/JUDGES.md", "repo": REPO_URL,
+            "docs_base": f"{REPO_URL}/blob/main/docs/",
+            "server": {"code_commit": prov.get("code_commit"), "model": prov.get("model"),
+                       "opencv": (prov.get("opencv") or {}).get("version"),
+                       "is_cool_path": bool((prov.get("opencv") or {}).get("is_cool_path")),
+                       "host": prov.get("host")}}

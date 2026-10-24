@@ -34,6 +34,7 @@
       <button class="mode-btn" data-mode="study" role="tab" title="timed user study: manual review vs DEPTH cards">Study</button>
       <button class="mode-btn" data-mode="audit" role="tab" title="blinded audit: are the detector's false alarms really false?">Audit</button>
       <button class="mode-btn" data-mode="connect" role="tab" title="connect AI agents (MCP), GIS / operations consoles (OGC API), webhooks, embeds">Connect</button>
+      <button class="mode-btn mode-judges" data-mode="judges" role="tab" title="the evaluation guide: access, a ten-minute path, evidence by criterion, deliverables, limitations - with live facts from this server">For judges</button>
     </nav>
 
     <div class="top-actions">
@@ -363,6 +364,29 @@
           </section>
         </div>
       </div>
+      <!-- for judges: the evaluation guide (docs/JUDGES.md, served by this server and rendered here) beside live facts -->
+      <div class="judges scrollable" data-when="judges" id="judgesPage">
+        <header class="jg-head">
+          <p class="jg-kicker">OpenCV AI Competition 2026 · Agentic Vision · Best Use of COOL · Team Syndicate</p>
+          <h2>For judges</h2>
+          <p class="jg-lead">Everything needed to evaluate DEPTH in one place: how to run it, a ten-minute path through the
+            studio, the evidence for each judging criterion with the split behind every number, the deliverables, and what
+            is not finished. The facts below are read from this server as it runs; the guide is
+            <code>docs/JUDGES.md</code>, the same file as in the repository.</p>
+          <div class="jg-facts" id="jgFacts" aria-label="this server"></div>
+          <div class="jg-actions">
+            <button class="btn btn-primary" data-jg="demo" title="a 60-second walk through one frame and one survey">Start the guided demo</button>
+            <button class="btn" data-jg="analyze" title="analyze the first sample frame">Analyze a sample frame</button>
+            <button class="btn" data-jg="recording" title="survey the raw Humminbird recording with real GPS">Survey the real recording</button>
+            <button class="btn" data-jg="connect" title="MCP, OGC API, webhooks, the drop-in panel">Connect an AI agent</button>
+            <a class="btn" id="jgRepo" href="https://github.com/madhesh60/depth" target="_blank" rel="noopener">Repository ↗</a>
+          </div>
+        </header>
+        <div class="jg-layout">
+          <nav class="jg-toc" id="jgToc" aria-label="sections of the guide"></nav>
+          <article class="jg-doc" id="jgDoc"><p class="empty-hint">Loading the judges' guide…</p></article>
+        </div>
+      </div>
     </main>
 
     <!-- ---------------- RIGHT INSPECTOR ---------------- -->
@@ -495,5 +519,6 @@
 <script src="js/study.js"></script>
 <script src="js/twin-panel.js"></script>
 <script src="js/demo.js"></script>
+<script src="js/judges.js"></script>
 </body>
 </html>

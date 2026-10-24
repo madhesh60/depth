@@ -132,7 +132,7 @@ budget) → plan → one approval request per action. Every step is logged in `a
 ```bash
 # Run and check
 python -m uvicorn src.dashboard.app:app --port 8000    # the studio (Analyze/Survey/Study/Audit)
-pytest -q                                              # 314 tests; coverage 60% of src/ (85% runtime)
+pytest -q                                              # 315 tests; coverage 60% of src/ (85% runtime)
 python tests/ui_smoke.py                               # headless Chrome drives every studio mode (0 JS errors)
 python tests/ui_smoke.py --full-demo                   # ... and plays the guided demo to its last step
 python tests/ui_video.py                               # a captioned walkthrough MP4 of the studio (runs/video/)
@@ -185,7 +185,7 @@ src/bench/        product_bench · fingerprint · compare · cool_attest · veri
 src/dashboard/    app (FastAPI + wiring) · service (state, survey run) · routes/ (system · analyze · survey · people ·
                   approvals · connect) · detector_queue · jobs · metrics · samples · mcp_server · mcp_session · llm_session · ogc ·
                   integrations · ratelimit · origin_guard
-webui/            zero-build vanilla studio (index.html, js/ — 11 classic scripts in load order, styles.css,
+webui/            zero-build vanilla studio (index.html, js/ — 12 classic scripts in load order, styles.css,
                   twin3d.js) · embed/ · samples/ ·
                   audit/ · img/ · vendor/ (leaflet, three, fonts)
 infra/            cfn/depth.yaml · deploy.sh · teardown.sh · update_server.sh · setup_cool_instance.sh ·

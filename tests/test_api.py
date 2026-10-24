@@ -38,6 +38,15 @@ def test_samples_endpoint():
     assert "samples" in j and isinstance(j["samples"], list)
 
 
+def test_the_judges_guide_is_served_with_the_server_facts():
+    """The For judges tab renders docs/JUDGES.md itself (one source) beside what this server runs."""
+    j = client.get("/api/judges").json()
+    on_disk = (Path(__file__).resolve().parents[1] / "docs" / "JUDGES.md").read_text(encoding="utf-8")
+    assert j["markdown"] == on_disk and j["source"] == "docs/JUDGES.md"
+    assert j["docs_base"].startswith("https://github.com/") and j["docs_base"].endswith("/docs/")
+    assert j["server"]["model"] and j["server"]["opencv"] and isinstance(j["server"]["is_cool_path"], bool)
+
+
 def test_analyze_requires_input():
     assert client.post("/api/analyze").status_code == 400
 
