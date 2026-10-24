@@ -110,7 +110,7 @@ metrics. A zero-build web studio has six modes:
 - **Study:** timed user study (built; not yet run with participants).
 - **Audit:** blinded false-alarm audit (built; not yet run with auditors).
 - **Connect:** MCP, OGC API – Features, signed webhooks and the drop-in panel, with live URLs.
-- **For judges:** the evaluation guide (`docs/JUDGES.md`, served by `GET /api/judges` and rendered in the studio) beside live facts from the running server, with shortcuts into the demonstration.
+- **For judges:** the evaluation guide (`JUDGES.md`, served by `GET /api/judges` and rendered in the studio) beside live facts from the running server, with shortcuts into the demonstration.
 
 A guided 60-second demo walks through the whole path.
 

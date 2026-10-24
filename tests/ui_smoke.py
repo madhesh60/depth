@@ -56,7 +56,7 @@ STEPS = [
     *[(m, f"(async () => {{ setMode('{m}'); await new Promise(r => setTimeout(r, 1500)); "
           f"const a = document.querySelector('.mode-btn.is-active'); return {{mode: a && a.dataset.mode}}; }})()")
       for m in ("connect", "study", "audit")],
-    # the judges' guide: docs/JUDGES.md rendered with the server's live facts; a shortcut runs Analyze
+    # the judges' guide: JUDGES.md rendered with the server's live facts; a shortcut runs Analyze
     ("judges", "(async () => { setMode('judges'); for (let k = 0; k < 40 && !document.querySelector('#jgDoc h2'); k++) "
                "await new Promise(r => setTimeout(r, 250)); const doc = document.querySelector('#jgDoc'); "
                "const sections = doc.querySelectorAll('h2').length, facts = document.querySelectorAll('.jg-fact').length, "

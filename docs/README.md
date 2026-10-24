@@ -8,7 +8,7 @@ Every number in these documents names its split and the command that regenerates
 
 | read | for |
 |---|---|
-| [`JUDGES.md`](JUDGES.md) | the evaluation guide: access, a ten-minute path, evidence by judging criterion, every number with its split, deliverables, limitations, a glossary — also in the studio under **For judges** |
+| [`JUDGES.md`](../JUDGES.md) | the evaluation guide: access, a ten-minute path, evidence by judging criterion, every number with its split, deliverables, limitations, a glossary — also in the studio under **For judges** |
 | [`technical_report.md`](technical_report.md) | the whole system, its evaluation and its limits, in one document |
 | [`agentic_vision.md`](agentic_vision.md) | the Agentic Vision entry: how perception changes the agent's next action |
 | [`agentic_loop.md`](agentic_loop.md) | the loop step by step: SEE → PROVE → DECIDE → ACT, with a person in charge |

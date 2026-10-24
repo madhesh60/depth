@@ -1,4 +1,4 @@
-/* DEPTH studio — For judges: the evaluation guide (docs/JUDGES.md, served by GET /api/judges) rendered beside live
+/* DEPTH studio — For judges: the evaluation guide (JUDGES.md, served by GET /api/judges) rendered beside live
    facts from this server (GET /api/health), with shortcuts into the demonstration.
    Zero-build: index.html loads webui/js/*.js in order as classic scripts sharing one global scope;
    the boot runs on DOMContentLoaded (core.js), after every file has loaded. API: src/dashboard/routes/. */
@@ -13,7 +13,7 @@ const Judges = {
     try {
       [g, h] = await Promise.all([fetch(`${API}/api/judges`).then(r => r.json()), fetch(`${API}/api/health`).then(r => r.json())]);
     } catch (e) {
-      $("#jgDoc").innerHTML = `<p class="empty-hint">The guide could not be loaded (${escapeHtml(e.message)}). It is also in the repository: docs/JUDGES.md.</p>`;
+      $("#jgDoc").innerHTML = `<p class="empty-hint">The guide could not be loaded (${escapeHtml(e.message)}). It is also in the repository: JUDGES.md.</p>`;
       return;
     }
     $("#jgFacts").innerHTML = this.facts(g.server || {}, h || {}, g.repo || "");

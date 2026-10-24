@@ -21,7 +21,7 @@ budget, re-plans when its own measurements require it, and asks a person before 
 
 | Access | Link | Status |
 |---|---|---|
-| **For judges** | [`docs/JUDGES.md`](docs/JUDGES.md), also in the studio under **For judges** | Available |
+| **For judges** | [`JUDGES.md`](JUDGES.md), also in the studio under **For judges** | Available |
 | **Try it in a browser** | [Open in GitHub Codespaces](https://codespaces.new/madhesh60/depth?quickstart=1) (about three minutes, free with a GitHub account) | Available |
 | **Run it on a laptop** | [Five commands, CPU only](#61-run-it-locally) | Available |
 | **Public deployment** | — | Pending (AWS account verification) |
@@ -442,7 +442,7 @@ docs/             judges' guide, technical report, architecture, cards, guides (
 
 | Document | Purpose |
 |---|---|
-| [`docs/JUDGES.md`](docs/JUDGES.md) | The evaluation guide: access, a ten-minute path, evidence by criterion, deliverables, limitations |
+| [`JUDGES.md`](JUDGES.md) | The evaluation guide: access, a ten-minute path, evidence by criterion, deliverables, limitations |
 | [`docs/technical_report.md`](docs/technical_report.md) | The whole system, its evaluation and its limits in one document |
 | [`docs/architecture.md`](docs/architecture.md) | The as-built design, module by module |
 | [`docs/agentic_vision.md`](docs/agentic_vision.md) · [`docs/agentic_loop.md`](docs/agentic_loop.md) | The Agentic Vision entry and the loop step by step |

@@ -84,6 +84,10 @@ Current numbers, each with its split: README "At a glance" and
 
 ## 4. Session log
 
+### 2026-10-24 (sweep 78) — the judges' guide moves to the repository root
+
+- `docs/JUDGES.md` → `JUDGES.md`, its links rewritten and checked; README, docs map, studio tab (`/api/judges`, links now resolve against `blob/main/`), `cool_docs`, `golive.sh`, Codespaces and tests follow. Suite: 314 passed; UI smoke: no failed steps.
+
 ### 2026-10-24 (sweep 77) — every document says only what is true today
 
 A sweep of every Markdown file (and the architecture diagram) for claims of work that is not done. Each one now says

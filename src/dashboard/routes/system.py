@@ -20,7 +20,7 @@ from src.detection.infer import DEFAULT_ONNX, runtime_info
 from .. import service as S
 
 router = APIRouter()
-JUDGES_MD = S.REPO / "docs" / "JUDGES.md"
+JUDGES_MD = S.REPO / "JUDGES.md"
 REPO_URL = "https://github.com/madhesh60/depth"
 
 
@@ -100,15 +100,15 @@ def incidents_catalogue():
 
 @router.get("/api/judges")
 def judges_guide():
-    """The judges' guide for the studio's For judges tab: ``docs/JUDGES.md`` itself (one source, so the tab and the
+    """The judges' guide for the studio's For judges tab: ``JUDGES.md`` itself (one source, so the tab and the
     file never disagree), where its relative links point on GitHub, and what this server is running."""
     try:
         text = JUDGES_MD.read_text(encoding="utf-8")
     except OSError as e:
-        raise HTTPException(404, f"docs/JUDGES.md not found: {type(e).__name__}") from e
+        raise HTTPException(404, f"JUDGES.md not found: {type(e).__name__}") from e
     prov = provenance_stamp()
-    return {"markdown": text, "source": "docs/JUDGES.md", "repo": REPO_URL,
-            "docs_base": f"{REPO_URL}/blob/main/docs/",
+    return {"markdown": text, "source": "JUDGES.md", "repo": REPO_URL,
+            "docs_base": f"{REPO_URL}/blob/main/",
             "server": {"code_commit": prov.get("code_commit"), "model": prov.get("model"),
                        "opencv": (prov.get("opencv") or {}).get("version"),
                        "is_cool_path": bool((prov.get("opencv") or {}).get("is_cool_path")),

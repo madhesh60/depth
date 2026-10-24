@@ -39,11 +39,11 @@ def test_samples_endpoint():
 
 
 def test_the_judges_guide_is_served_with_the_server_facts():
-    """The For judges tab renders docs/JUDGES.md itself (one source) beside what this server runs."""
+    """The For judges tab renders JUDGES.md itself (one source) beside what this server runs."""
     j = client.get("/api/judges").json()
-    on_disk = (Path(__file__).resolve().parents[1] / "docs" / "JUDGES.md").read_text(encoding="utf-8")
-    assert j["markdown"] == on_disk and j["source"] == "docs/JUDGES.md"
-    assert j["docs_base"].startswith("https://github.com/") and j["docs_base"].endswith("/docs/")
+    on_disk = (Path(__file__).resolve().parents[1] / "JUDGES.md").read_text(encoding="utf-8")
+    assert j["markdown"] == on_disk and j["source"] == "JUDGES.md"
+    assert j["docs_base"].startswith("https://github.com/") and j["docs_base"].endswith("/blob/main/")
     assert j["server"]["model"] and j["server"]["opencv"] and isinstance(j["server"]["is_cool_path"], bool)
 
 
