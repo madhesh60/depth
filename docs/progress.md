@@ -84,6 +84,10 @@ Current numbers, each with its split: README "At a glance" and
 
 ## 4. Session log
 
+### 2026-10-24 (sweep 79) — limitations: short, honest, one place each
+
+- README §2/§9, JUDGES §7 (also the For judges tab) and technical report §6 cut to one line per item; the single COOL status sentence (`cool_docs.PENDING_STATUS`) shortened everywhere. Nothing removed that is unfinished. Suite: 314 passed.
+
 ### 2026-10-24 (sweep 78) — the judges' guide moves to the repository root
 
 - `docs/JUDGES.md` → `JUDGES.md`, its links rewritten and checked; README, docs map, studio tab (`/api/judges`, links now resolve against `blob/main/`), `cool_docs`, `golive.sh`, Codespaces and tests follow. Suite: 314 passed; UI smoke: no failed steps.

@@ -150,33 +150,21 @@ The route below takes about ten minutes and touches every part of the system.
 
 ## 7. Outstanding items and limitations
 
-### 7.1 Outstanding items
+**Not finished yet**
 
-- **COOL:** <!-- cool:status -->has not run yet. The AWS Marketplace subscription to the COOL AMI is blocked on payment: the Marketplace does not accept the account's card (it needs a Visa or Mastercard), and an AWS Support case is open. Until then the demo server runs stock OpenCV 5 in rehearsal mode and says so. The COOL benchmark, the AWS-signed receipt and its verifier are built and run in one command once the subscription is active (`PHASE=cool ./infra/golive.sh`).<!-- /cool:status -->
-- **Public URL.** The server is deployed in rehearsal mode; CloudFront awaits AWS account verification, and the
-  alternative HTTPS route on the server's own address is prepared (dry run clean) and awaits the owner's run.
-- **Demonstration video.** Not yet recorded; `python tests/ui_video.py` produces the captioned footage.
-- **A session with a real language model.** The recorded MCP session ([`mcp_session.md`](docs/reports/mcp_session.md))
-  uses a scripted client. `python -m src.dashboard.llm_session` lets Claude drive DEPTH and is tested with a
-  stand-in model; the recording on Amazon Bedrock failed on 2026-10-23 because the account cannot accept the
-  Claude Marketplace agreement (the same payment block as COOL), so it requires a Claude API key.
-- **Human study and blinded audit.** Analyst minutes and audited precision are not yet measured; the timings in
-  §5 are assumptions and are labelled as such, including that a card with several boxes on one object takes as
-  long as a card with one box.
+- **COOL:** <!-- cool:status -->has not run yet: the AWS Marketplace subscription is blocked on payment. The demo server runs stock OpenCV 5 and says so; the COOL benchmark and its signed receipt run in one command once it is active.<!-- /cool:status -->
+- **Public URL** — waiting on AWS account verification; Codespaces runs the same studio.
+- **Demonstration video** — not yet recorded (`python tests/ui_video.py` produces the footage).
+- **Human study and blinded audit** — analyst minutes use assumed timings, labelled as such.
+- **Real language-model session** — built and tested with a stand-in model; recording it needs a Claude API key.
 
-### 7.2 Limitations of the evidence
+**Limits of the evidence**
 
-- **The detector is weak** (mAP@0.5 0.319 against the 0.70 target). DEPTH makes it usable, not accurate.
-- **The test split is not fresh.** Each study scored it once, but STUDY-18, 19, 21 and 23 all used the same 199 test
-  frames, and STUDY-23 was started because of a test-split result. The test figures are checked, not untouched.
-- **The eight demo frames all come from one test recording (Rec9)**, the one on which the standard promise fell
-  short (74.7% against 78%). They demonstrate the product working, not a best case.
-- **No field proof.** No recording has both real pots and real GPS: the pot frames carry synthetic GPS (labelled
-  on screen), and the real-GPS river recordings contain no known pots.
-- **A promise is a pooled rate**, fit on three recordings and verified on three others, not a per-survey guarantee.
-  The applicability check detects another sonar or rendering, not subtle drift within one.
-- **Boxes, not masks** (the brief allows either); pitch and roll are not corrected (the sonar does not record
-  them); the optional Bedrock brief writer is not deployed on the demo server.
+- The detector is modest (mAP@0.5 0.319); DEPTH makes it usable, not accurate.
+- The test split was used by four studies, so its figures are checked, not untouched.
+- A promise is a pooled rate, not a per-survey guarantee; no recording yet has both real pots and real GPS.
+
+Full detail: [`technical_report.md`](docs/technical_report.md) §6.
 
 ## 8. Verifying the claims
 

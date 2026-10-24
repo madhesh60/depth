@@ -63,23 +63,12 @@ Every number names the split on which it was measured.
 
 ## 2. Project status
 
-The following items are not complete. They are stated here so that no reader has to discover them.
+Not finished yet:
 
-- **COOL:** <!-- cool:status -->has not run yet. The AWS Marketplace subscription to the COOL AMI is blocked on payment: the Marketplace does not accept the account's card (it needs a Visa or Mastercard), and an AWS Support case is open. Until then the demo server runs stock OpenCV 5 in rehearsal mode and says so. The COOL benchmark, the AWS-signed receipt and its verifier are built and run in one command once the subscription is active (`PHASE=cool ./infra/golive.sh`).<!-- /cool:status -->
-- **Public URL.** Not live yet (CloudFront awaits AWS account verification). Codespaces and the local install run
-  the same studio.
-- **A session with a real language model.** The recorded MCP session uses a scripted client;
-  `python -m src.dashboard.llm_session` lets Claude drive DEPTH and is tested with a stand-in model. Recording it on
-  Amazon Bedrock failed on 2026-10-23 (the account cannot accept the Claude Marketplace agreement, the same payment
-  block as COOL), so it requires a Claude API key.
-- **Analyst time is not measured.** The minutes above use assumed timings until three to five people complete the
-  Study tab.
-- **No field proof.** No recording has both real pots and real GPS: the pot frames carry synthetic GPS (labelled on
-  screen), and the real-GPS river recordings contain no known pots.
-- **The detector is weak** (mAP@0.5 0.319 against the 0.70 target). DEPTH makes it usable, not accurate.
-- **Evidence caveats.** The test split was used by four studies (STUDY-18, 19, 21 and 23), so its figures are
-  checked rather than untouched; the eight demo frames all come from one test recording (Rec9), the one on which
-  the standard promise fell short (74.7% against 78%).
+- **COOL:** <!-- cool:status -->has not run yet: the AWS Marketplace subscription is blocked on payment. The demo server runs stock OpenCV 5 and says so; the COOL benchmark and its signed receipt run in one command once it is active.<!-- /cool:status -->
+- **Public URL** — waiting on AWS account verification; Codespaces runs the same studio today.
+- **Human study and blinded audit** — analyst minutes use assumed timings until people run them.
+- **Real language-model session** — built and tested; the recording needs a Claude API key.
 
 ## 3. Overview
 
@@ -357,23 +346,14 @@ runs are done; the COOL runs are not). Details, costs and the teardown procedure
 
 ## 9. Limitations
 
-- **The detector is weak.** mAP@0.5 0.319 against the proposal's 0.70; crab-pot AP@0.5 0.482; wreck 0.156; on the
-  official split F1 0.41 against GhostVision's reported 0.71–0.73; cross-sonar recall 0.11 at the validation
-  threshold. DEPTH's promises make *this* detector usable; they do not make it accurate.
-- **A promise is a pooled rate**, fit on 3 recordings and verified on 3 others, not a per-survey guarantee (one test
-  recording reached 74.7% against the 78% promise). The applicability check catches another sonar or rendering, not
-  subtle site or gain drift.
-- **No field proof.** No recording has both real pots and real GPS; the river recordings contain no known pots.
-- **No human study and no blinded audit yet.** Analyst minutes and audited precision are assumptions until people run
-  them (Study and Audit tabs). A card with several boxes is assumed to take as long as a one-box card.
-- **Looking harder costs 4.7–4.9× the compute** (four tile passes after the full frame): 655 ms on a 4-vCPU Graviton
-  and 1.3 s on the 2-vCPU demo server — over the 300-ms target, inside the studio's 2-s budget.
-- **Vehicle motion.** Stage 1 tracks the seabed per ping (heave); **pitch and roll are not corrected**, because the
-  ping header carries no attitude. Data dropouts are **flagged, not repaired**: a pot inside a dropout cannot be found.
-- **Boxes, not pixel masks** (the brief allows either; the crab-pot labels are boxes).
-- **No small board measured** (Raspberry Pi, Jetson): the on-board figure is one core of a server CPU.
-- **Not deployed yet:** a public URL (CloudFront account verification) and the optional Bedrock brief writer; COOL's
-  status is given in §2. Active vision is built but off: it failed its own validation.
+- **The detector is modest** (mAP@0.5 0.319, crab-pot AP 0.482). DEPTH's promises make it usable; they do not make
+  it accurate.
+- **A promise is a pooled rate** over recordings, not a per-survey guarantee.
+- **No field proof yet:** no recording has both real pots and real GPS (synthetic GPS is labelled).
+- **One sonar family.** Another sonar needs re-calibration; the agent detects this and withdraws its promise.
+- **Boxes, not masks;** pitch and roll are not corrected (the sonar does not record them).
+
+Full detail: [`docs/technical_report.md`](docs/technical_report.md) §6.
 
 ## 10. Reproducibility
 
