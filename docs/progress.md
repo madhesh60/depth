@@ -3,7 +3,7 @@
 **Team Syndicate · OpenCV AI Competition 2026**
 This is the living status of the project. Update it at the end of every working session:
 what moved, what's blocked, what's next. Newest entries at the top of §4. **Judges: this is the working
-log — start at [`JUDGES.md`](JUDGES.md) (one page) or the [README](../README.md).**
+log — start at [`JUDGES.md`](../JUDGES.md) (one page) or the [README](../README.md).**
 
 **Related:** [`README.md`](../README.md) · [`architecture.md`](architecture.md) ·
 [`experiments.md`](experiments.md)
@@ -77,12 +77,25 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
   tests and lint in `requirements-dev.txt`; training on Kaggle (`requirements-train.txt`). AWS CLI v2,
   profile `hackathon`, us-east-1.
 
-Current numbers, each with its split: README "At a glance" and
-[`docs/technical_report.md`](technical_report.md).
+Current numbers, each with its split: [`JUDGES.md`](../JUDGES.md) "Key Numbers", the README's "Evaluation
+Metrics" and [`docs/technical_report.md`](technical_report.md).
 
 ---
 
 ## 4. Session log
+
+### 2026-10-24 — the README and the judges' page, restructured
+
+- **README:** the owner's new opening (problem, current practice, what DEPTH builds) tightened, plus the sections
+  a judge looks for: architecture stage table, the agentic workflow with human approval and a **failure-handling**
+  table, **model and training** (recipe, process, how EXP-003 was chosen over the other runs), **dataset sources** with licences,
+  evaluation metrics, an **experimental studies / ablations** table (STUDY-01 to 23), performance against the
+  targets, a fairer competitive table (GhostVision's stronger detector stated), AWS + OpenCV 5, installation and
+  reproduction, limitations, documentation, attribution and licence. The `cool:status` / `cool:readme` blocks
+  stay, so `cool_docs.py` still fills them.
+- **`JUDGES.md` moved to the repo root** (`git mv`): try it, see the agent decide (six runs to trigger), key
+  numbers, a criteria map for the three awards, not done, glossary. `cool_docs.py`, its test, `golive.sh`, the
+  devcontainer and the docs map follow the new path.
 
 ### 2026-10-23 (sweep 75) — the AWS items in our hands: the server updated, the engine measured, look harder on EC2
 

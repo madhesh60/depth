@@ -75,7 +75,7 @@ python -m src.bench.cool_docs
 if [ "${COMMIT:-1}" = "1" ]; then
   git add benchmarks docs/reports/cool_benchmark.md docs/img/cool_benchmark.png docs/reports/cool_verification.md
   git commit -qm "data: Graviton COOL benchmarks, verified COOL receipt and load test" || true
-  git add README.md docs/technical_report.md docs/JUDGES.md
+  git add README.md docs/technical_report.md JUDGES.md
   git commit -qm "docs: COOL numbers in the report and README" || true
   git push -q origin HEAD && echo "pushed"
 fi

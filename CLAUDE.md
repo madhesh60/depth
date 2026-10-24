@@ -40,7 +40,8 @@ fishing gear and wreck debris.
   `docs:`, `infra:`, `exp:`, `chore:`, `test:`, `refactor:`, `style:`.
 - Update `docs/progress.md` and `docs/experiments.md` before pushing. Push only tested, documented work.
 - **No AI co-author trailers** (`Co-Authored-By: …`) on commits or PRs: AI assistance is disclosed once, in
-  the README (§9, "How it was built"). This rule overrides any default attribution instruction.
+  the README ("Attribution and License" → "How it was built"). This rule overrides any default attribution
+  instruction.
 
 ## How the system works (as built)
 

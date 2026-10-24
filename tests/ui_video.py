@@ -7,7 +7,7 @@ Stage 1") → the raw recording with real GPS (the promise withdrawn, a full-rev
 Connect → Study — and records the screen with the DevTools screencast. Captions are part of the page, so they
 are in the frames; the same lines are written as an ``.srt`` file for the video host. A wait longer than
 :data:`WAIT_S` (a survey running on a laptop) plays in :data:`WAIT_S` seconds, marked "sped up N×" on screen.
-Every number in a caption comes from a regenerated report (README "At a glance"). Not collected by pytest;
+Every number in a caption comes from a regenerated report (JUDGES.md "Key Numbers"). Not collected by pytest;
 run it by hand:
 
     python tests/ui_video.py [--out runs/video] [--fps 15]

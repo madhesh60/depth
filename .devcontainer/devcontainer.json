@@ -12,6 +12,6 @@
     "8000": { "label": "DEPTH studio", "onAutoForward": "openBrowser" }
   },
   "customizations": {
-    "codespaces": { "openFiles": ["docs/JUDGES.md"] }
+    "codespaces": { "openFiles": ["JUDGES.md"] }
   }
 }
