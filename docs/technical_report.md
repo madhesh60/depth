@@ -16,8 +16,8 @@ A sonar debris detector alone is not a tool a cleanup crew can rely on: it misse
 its false alarms cost boat time. DEPTH wraps one in an **OpenCV 5 agent** that measures the sonar
 itself, proves or doubts each find with physical evidence, sorts finds into **tiers with calibrated
 statistical promises**, and turns them into routes, second-look passes and reports. A human approves
-everything that leaves the machine. It runs torch-free on CPU (OpenCV 5 `cv2.dnn`), built for **AWS
-Graviton + COOL**.
+everything that leaves the machine. It runs torch-free on CPU (OpenCV 5 `cv2.dnn`), designed for **AWS
+Graviton with COOL**; the runtime numbers below are on stock OpenCV 5, and COOL's status is given in §5.
 
 | claim | evidence |
 |---|---|
@@ -107,8 +107,8 @@ metrics. A zero-build web studio has six modes:
 
 - **Analyze:** one frame with its evidence and the agent's-eye view.
 - **Survey:** the shipped samples (synthetic GPS) or a **raw recording with real per-ping GPS**; map, routes, re-survey passes, the "without Stage 1" counterfactual, the person-confirmed recovery route, approvals, the mission brief, and the **3D digital twin** (three.js: seabed in true ground range, the sonar at its tracked altitude, the acoustic triangle each height is measured from).
-- **Study:** timed user study.
-- **Audit:** blinded false-alarm audit.
+- **Study:** timed user study (built; not yet run with participants).
+- **Audit:** blinded false-alarm audit (built; not yet run with auditors).
 - **Connect:** MCP, OGC API – Features, signed webhooks and the drop-in panel, with live URLs.
 - **For judges:** the evaluation guide (`docs/JUDGES.md`, served by `GET /api/judges` and rendered in the studio) beside live facts from the running server, with shortcuts into the demonstration.
 
@@ -304,20 +304,21 @@ CV-only workload that isolates where COOL acts.
 
 ## 5. AWS deployment
 
-The deployment is scripted, dry-run checked, and executed on the AWS day:
+The deployment is scripted and dry-run checked. It is applied in rehearsal mode (stock Ubuntu and stock OpenCV 5, no public address yet); the COOL items below are built but have not run:
 
 One CloudFormation stack (`infra/cfn/depth.yaml`):
 
-- **EC2 c8g.large** (Graviton4) launched from the **COOL Marketplace AMI**, running `depth.service` under systemd
-  with the COOL interpreter; web dependencies via `pip --target` — **the COOL venv is never modified**.
-- **CloudFront** provides HTTPS and caches the static UI; the origin accepts only CloudFront's origin-facing
+- **EC2 c8g.large** (Graviton4), designed to launch from the **COOL Marketplace AMI** and run `depth.service` under
+  systemd with the COOL interpreter, web dependencies via `pip --target` (the COOL venv is never modified). Today it
+  runs stock Ubuntu 24.04 with stock OpenCV 5.
+- **CloudFront** (not yet created: it awaits AWS account verification) is to provide HTTPS and cache the static UI; the origin accepts only CloudFront's origin-facing
   prefix list and our secret `X-Origin-Verify` header.
 - **S3** (versioned, TLS-only) holds survey results (30-day lifecycle), uploads (7-day) and benchmark results.
 - **CloudWatch**: per-stage latency from the server's JSON frame log, CPU/memory, a dashboard, and alarms
   (recover, reboot, CPU, edge 5xx) that email through SNS.
 - Access goes through **SSM** only (no SSH port, no key pair), IMDSv2, least-privilege **IAM** roles.
 - An **EventBridge Scheduler** stops the instance after judging; the account **Budget** alerts at 25/50/100% + forecast.
-- **Verified COOL:** `GET /api/cool` serves the AWS-signed instance identity (AMI, Marketplace product code,
+- **COOL verification (built, not yet run on COOL):** `GET /api/cool` serves the AWS-signed instance identity (AMI, Marketplace product code,
   arm64) and the OpenCV libraries mapped into the server process; `python -m src.bench.verify_cool <url>` checks it.
 
 `infra/deploy.sh` is a dry run by default (it prints the change set); `infra/teardown.sh` removes everything.

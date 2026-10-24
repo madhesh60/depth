@@ -109,8 +109,8 @@ budget) → plan → one approval request per action. Every step is logged in `a
 
 ## Cloud (AWS, us-east-1, profile `hackathon`)
 
-- One CloudFormation stack: `infra/cfn/depth.yaml` (EC2 c8g.large from the COOL AMI, OpenCV 5 under
-  `/opt/cool`, Elastic IP, CloudFront, S3, CloudWatch, SSM, scheduled stop 2026-11-10).
+- One CloudFormation stack: `infra/cfn/depth.yaml`, designed for EC2 c8g.large from the COOL AMI (OpenCV 5 under
+  `/opt/cool`; today stock Ubuntu + stock OpenCV 5 in rehearsal), Elastic IP, CloudFront, S3, CloudWatch, SSM, scheduled stop 2026-11-10).
 - State: first applied 2026-10-19. CloudFront awaits AWS account verification (`ENABLE_CDN=0`);
   the COOL Marketplace subscription is blocked on payment - it needs a Visa or Mastercard (`REHEARSAL=1`).
 - Never modify the COOL venv (install web deps with `pip --target`). A benchmark counts as COOL only

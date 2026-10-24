@@ -1,8 +1,9 @@
-# infra/ — DEPTH on AWS Graviton4 + COOL: deploy it, prove it, measure it, remove it
+# infra/ — DEPTH on AWS Graviton4 (COOL built, not yet run): deploy it, prove it, measure it, remove it
 
-**One product, one deploy target.** The live demo is the FastAPI app (`src/dashboard/app.py`) running the
+**One product, one deploy target.** The demo is designed as the FastAPI app (`src/dashboard/app.py`) running the
 full agent on **one EC2 Graviton4 instance launched from the COOL Marketplace AMI** (OpenCV 5 under
-`/opt/cool`), behind CloudFront for HTTPS. Everything is one CloudFormation stack
+`/opt/cool`), behind CloudFront for HTTPS. **Today** it runs in rehearsal mode on stock Ubuntu and stock OpenCV 5,
+without CloudFront and without a public address (status below). Everything is one CloudFormation stack
 ([`cfn/depth.yaml`](cfn/depth.yaml)); the benchmark is one command that launches self-terminating machines.
 The earlier Lambda / API Gateway / DynamoDB / Amplify / SageMaker plan stays **retired**: COOL ships as an
 AMI, so only EC2 can run the product on COOL.
@@ -51,9 +52,9 @@ Scaling story (described, not built): survey jobs → SQS → an Auto Scaling gr
 | [`teardown.sh`](teardown.sh) | Removes everything (stack, retained bucket with every version, parameter) and lists leftovers. |
 | [`lib.sh`](lib.sh) | Shared helpers: AWS CLI detection (Linux, CloudShell, Git Bash on Windows), Price List API lookup, `ssm_run` (a root command on the server over SSM). |
 
-## Verified COOL — anyone can check it
+## Verified COOL — how anyone will check it (built; not yet run on COOL)
 
-`GET https://<demo>/api/cool` returns the **COOL execution receipt** (`src/bench/cool_attest.py`):
+Once the server runs on the COOL AMI, `GET https://<demo>/api/cool` returns the **COOL execution receipt** (`src/bench/cool_attest.py`):
 
 1. the **AWS-signed instance identity document** exactly as IMDSv2 serves it: AMI id, **Marketplace product
    code** (the COOL listing), `architecture: arm64`, instance type, region. AWS signs it; the server cannot

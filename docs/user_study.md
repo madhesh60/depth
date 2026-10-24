@@ -6,7 +6,7 @@ find each way. Built into the app: **Study** tab.
 
 ## Run it
 
-1. Start the app (`python -m uvicorn src.dashboard.app:app --port 8000`) or use the live link.
+1. Start the app (`python -m uvicorn src.dashboard.app:app --port 8000`) or open it in GitHub Codespaces (there is no public link yet).
 2. Open **Study**, type the participant's initials, **Start session**.
 3. The participant does both tasks (the app times everything):
    - **Manual review** — a raw sonar frame; click every crab pot, then *Next* (Enter). Backspace undoes.

@@ -16,7 +16,7 @@ budget, re-plans when its own measurements require it, and asks a person before 
 |---|---|
 | **Competition** | OpenCV AI Competition 2026 — tracks: **Agentic Vision** and **Best Use of COOL** |
 | **Team** | Team Syndicate (solo entrant: Madhesh) |
-| **Stack** | OpenCV 5 (`cv2.dnn`) on CPU, torch-free · FastAPI · AWS EC2 Graviton4 + COOL |
+| **Stack** | OpenCV 5 (`cv2.dnn`) on CPU, torch-free · FastAPI · AWS EC2 Graviton4 with stock OpenCV 5 (COOL integration built, not yet run) |
 | **Licence** | AGPL-3.0 |
 
 | Access | Link | Status |
@@ -36,7 +36,7 @@ budget, re-plans when its own measurements require it, and asks a person before 
 5. [Architecture](#5-architecture)
 6. [Getting started](#6-getting-started)
 7. [Results](#7-results)
-8. [Deployment on AWS Graviton and COOL](#8-deployment-on-aws-graviton-and-cool)
+8. [Deployment on AWS Graviton](#8-deployment-on-aws-graviton)
 9. [Limitations](#9-limitations)
 10. [Reproducibility](#10-reproducibility)
 11. [Repository structure](#11-repository-structure)
@@ -108,7 +108,7 @@ DEPTH wraps an imperfect detector in **promises that can be checked** and **meas
 | **Connects to consoles and agents** | OGC API – Features (QGIS, ArcGIS), signed webhooks, a drop-in `<depth-hazards>` web component, and an MCP server (13 tools; the only write is *asking* a person). | [`integrations.md`](docs/integrations.md) · [`mcp.md`](docs/mcp.md) |
 | **A language model that writes, never decides** | An optional Claude-on-Bedrock rewrite of the crew's mission brief is shown only if every number and identifier traces back to the survey; otherwise the template is served. Not deployed on the demo server. | Survey tab · `GET /api/brief` |
 | **Measures the machine it runs on** | OpenCV 5 has two `cv2.dnn` engines; the server times both at start-up and keeps the faster one only if the answers match. ENGINE_AUTO loads the slower one on Graviton, where the classic engine is **1.47×** faster per forward; this took the Graviton frame from 197 to **138.5 ms**. | [`dnn_engine.md`](docs/reports/dnn_engine.md) (STUDY-20) |
-| **COOL, proven by provenance** | A run counts as COOL only if `cv2` loads from `/opt/cool`; `/api/cool` returns an AWS-signed instance identity receipt, checked offline by `verify_cool`. | [`infra/README.md`](infra/README.md) |
+| **A COOL check, built but not yet used** | A run is to count as COOL only if `cv2` loads from `/opt/cool`; `/api/cool` returns an AWS-signed instance identity receipt, checked offline by `verify_cool`. The check is implemented and tested, but no COOL run exists yet (§2). | [`infra/README.md`](infra/README.md) |
 
 Negative results are published as well: a classical ROI gate (STUDY-01), the acoustic shadow as a filter
 (STUDY-03/04), re-look against plain confidence (STUDY-07), range-gain detector input (STUDY-08), seam inference
@@ -184,7 +184,7 @@ Stage 1 moves the median pin **7.0 m** and **12 of 18** pins leave their own err
 
 ## 5. Architecture
 
-![DEPTH architecture: the core loop (goal → inspect → check the promise applies → choose how hard to look → perceive → plan and ask) over the OpenCV 5 stages (Stage 1 → See → Prove → Decide → Act) on EC2 Graviton and COOL, with people deciding, the outputs and the AWS services](docs/img/architecture.svg)
+![DEPTH architecture: the core loop (goal → inspect → check the promise applies → choose how hard to look → perceive → plan and ask) over the OpenCV 5 stages (Stage 1 → See → Prove → Decide → Act) on EC2 Graviton (COOL shown as planned, not yet run), with people deciding, the outputs and the AWS services](docs/img/architecture.svg)
 
 ```
 frame ─► Stage 1 canonicalise ─► See (YOLO11 · cv2.dnn) ─► Prove (evidence) ─► Decide (guaranteed tiers) ─► one card per object
@@ -233,8 +233,8 @@ can), and *Options → Compute budget* gives it a time limit (20 s by default; e
 | **Analyze** | One frame: the tracked seabed, verdict-coloured boxes, one evidence card per object (tier promise, P(pot), shadow, relative height, the full agent trace) and the agent's-eye re-look view. Label finds, or draw a missed pot (`M`). An uploaded frame asks which edge the sonar is on. |
 | **Survey** | All samples (synthetic GPS) or the raw recording (real GPS) as a background job: hazards on a map with error radii, the inspection route, re-survey passes, analyst and boat budgets, the approvals inbox, the mission brief, and GeoJSON, GPX, KML, CSV and JSON exports. |
 | **3D twin** | The seabed in true ground-range geometry, the sonar at its tracked altitude, finds with shadow-derived heights, and a replay of the boat sweeping its sonar. |
-| **Study** | The timed user study (manual review against DEPTH cards) and the live effort curve for both modes. |
-| **Audit** | The blinded false-alarm audit. |
+| **Study** | The timed user study (manual review against DEPTH cards; built, not yet run with participants) and the effort curve for both modes. |
+| **Audit** | The blinded false-alarm audit (built, not yet run with auditors). |
 | **Connect** | MCP, OGC API, signed webhooks and the drop-in panel. |
 | **For judges** | This project's evaluation guide, with live facts from the running server and shortcuts to each part of the demonstration. |
 
@@ -334,24 +334,26 @@ after the sensor cross-check; the full agent in 3–4 s on a laptop; **1 review 
 24 cards per hour on water with no known pots. The 1-hour Solix recording (Pearl River) gives **48 cards per hour**.
 Both come from another sonar, so the core loop withdraws its promise there and asks for a full review.
 
-## 8. Deployment on AWS Graviton and COOL
+## 8. Deployment on AWS Graviton
 
-The live demonstration is one EC2 Graviton4 instance launched from the COOL Marketplace AMI, defined as a single
-CloudFormation stack ([`infra/cfn/depth.yaml`](infra/cfn/depth.yaml)) and deployed by [`infra/deploy.sh`](infra/deploy.sh),
-which is a dry run by default.
+The deployment is one CloudFormation stack ([`infra/cfn/depth.yaml`](infra/cfn/depth.yaml)), deployed by
+[`infra/deploy.sh`](infra/deploy.sh), which is a dry run by default. It is designed to run on one EC2 Graviton4 instance
+launched from the COOL Marketplace AMI. **Today it runs in rehearsal mode:** the instance runs stock Ubuntu 24.04 with
+stock OpenCV 5, because the COOL subscription is blocked (§2), and it has no public address yet.
 
 | Component | Role |
 |---|---|
-| EC2 c8g.large (Graviton4) | Runs the studio and the agent under systemd; the COOL virtual environment is never modified |
-| Elastic IP · CloudFront (pending verification) or Caddy HTTPS | The public address |
+| EC2 c8g.large (Graviton4) | Runs the studio and the agent under systemd (today on stock OpenCV 5; on the COOL AMI the COOL virtual environment is never modified) |
+| Elastic IP · CloudFront or Caddy HTTPS | The public address — not live yet (CloudFront awaits account verification; the Caddy route is prepared, not applied) |
 | S3 (versioned, TLS-only) | Survey results, uploads, benchmark results |
 | CloudWatch and SNS | Per-stage latency, CPU and memory, a dashboard and four alarms |
 | SSM | The only access path: no SSH port, no key pair, IMDSv2 |
 | EventBridge Scheduler · AWS Budgets (outside the stack) | A scheduled stop after judging; spending alerts |
 
-`GET /api/cool` serves the AWS-signed instance identity document and the OpenCV libraries mapped into the server
-process; `python -m src.bench.verify_cool <url>` checks the signature offline. `infra/bench_fleet.sh` measures x86,
-stock Graviton and COOL Graviton in one run. Details, costs and the teardown procedure: [`infra/README.md`](infra/README.md).
+Built for the COOL run, not yet used on COOL: `GET /api/cool` serves the AWS-signed instance identity document and the
+OpenCV libraries mapped into the server process, and `python -m src.bench.verify_cool <url>` checks the signature
+offline; `infra/bench_fleet.sh` measures x86, stock Graviton and COOL Graviton in one run (the x86 and stock Graviton
+runs are done; the COOL runs are not). Details, costs and the teardown procedure: [`infra/README.md`](infra/README.md).
 
 ## 9. Limitations
 
@@ -420,11 +422,11 @@ src/agentic/      the core loop (core.py: goal -> check the promise -> choose ho
                   plan -> ask), the frame agent, one card per object (cards.py, STUDY-23), applicability
                   (STUDY-19), look harder (STUDY-18), sensor cross-check (STUDY-16), active vision, guarantees,
                   geo, routes, re-survey, approvals, mission brief, 3D twin, provenance, labels, study, effort
-src/bench/        COOL benchmark (product workload, provenance, comparison, COOL receipt)
+src/bench/        benchmark tooling (product workload, provenance, comparison, the COOL receipt - not yet run on COOL)
 src/dashboard/    FastAPI service: app.py (wiring) · service.py (state) · routes/ (one router per area) ·
                   jobs, limits, rate limits, metrics · MCP server + recorded sessions · OGC API · webhooks
 webui/            zero-build studio (+ three.js twin) · embed/depth-embed.js (drop-in panel) · 8 sample frames
-infra/            Graviton + COOL deployment (dry-run by default) + 3-way benchmark
+infra/            Graviton deployment (dry-run by default; COOL path built, not yet run) + 3-way benchmark
 models/<MODEL>/   calibration.json + effort/audit data (weights: GitHub Release, fetch_model)
 benchmarks/       measured benchmark results (JSON): laptop and EC2
 tests/            the pytest suite, run by CI on every push (.github/workflows/tests.yml); the Codespaces

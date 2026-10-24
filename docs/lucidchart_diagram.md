@@ -17,7 +17,7 @@ flowchart LR
 
   subgraph AWS[AWS us-east-1 · one CloudFormation stack]
     CF[CloudFront HTTPS<br/>X-Origin-Verify header<br/><i>pending account verification</i>]
-    subgraph EC2[EC2 c8g.large Graviton4 · COOL AMI · Elastic IP · systemd]
+    subgraph EC2[EC2 c8g.large Graviton4 · COOL AMI planned, stock OpenCV 5 today · Elastic IP · systemd]
       direction TB
       subgraph LOOP[Core loop · every survey · core.py]
         direction LR
@@ -29,7 +29,7 @@ flowchart LR
       end
       S0[Sensor cross-check<br/>seabed track vs depth sounder]
       S1[Stage 1 canonicalise<br/>bottom track · slant→ground]
-      S2[See: YOLO11 ONNX<br/>cv2.dnn · OpenCV 5 /opt/cool]
+      S2[See: YOLO11 ONNX<br/>cv2.dnn · OpenCV 5]
       S3[Prove: shadow · height · water column]
       S4[Decide: calibrated tiers<br/>≥78% of pots reach a person · ≥84% looking harder<br/>one review card per object]
       S5[Act: geotag · stitch · routes<br/>re-survey passes · mission brief]

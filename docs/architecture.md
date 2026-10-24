@@ -7,7 +7,8 @@
 DEPTH turns side-scan sonar frames into a **human-approved cleanup plan** for derelict fishing gear
 (ghost pots) and wreck debris. Every find comes with evidence; the agent's tiers carry **calibrated
 statistical promises**; every human decision is kept as a training label; and the whole thing runs
-torch-free on **OpenCV 5**, CPU-only, on **AWS Graviton with COOL**.
+torch-free on **OpenCV 5**, CPU-only, designed for **AWS Graviton with COOL** (today the server runs stock OpenCV 5;
+COOL has not run yet).
 
 ## 1. Principles
 
@@ -22,7 +23,7 @@ torch-free on **OpenCV 5**, CPU-only, on **AWS Graviton with COOL**.
 4. **Publish what didn't work.** STUDY-01 (classical ROI gate), STUDY-03/04 (shadow as a filter),
    STUDY-07 (re-look vs confidence), STUDY-08 (range-gain input) are negative results kept in the
    record.
-5. **One product, one deploy target.** The same FastAPI app runs locally and on the COOL server.
+5. **One product, one deploy target.** The same FastAPI app runs locally and on the EC2 server (stock OpenCV 5 today; the COOL AMI once its subscription is active).
 
 ## 2. System at a glance
 
@@ -73,7 +74,7 @@ violet = optional. The numbers are EXP-003's as of 2026-10-21. Text version:_
              blinded false-alarm audit ─► audited precision src/detection/fp_audit.py
  SERVE   FastAPI (jobs, limits, rate limits, metrics) + zero-build studio (Analyze · Survey · Study · Audit · Connect · For judges)
          + MCP (/mcp) · OGC API – Features (/ogc) · signed webhooks · <depth-hazards> embed   src/dashboard/, webui/
- CLOUD   CloudFront ─► EC2 c8g (Graviton4) · COOL AMI · systemd ─► S3 · CloudWatch · Budgets · SSM   infra/
+ CLOUD   (CloudFront, pending) ─► EC2 c8g (Graviton4) · stock OpenCV 5 today, COOL AMI planned · systemd ─► S3 · CloudWatch · SSM   infra/
 ```
 
 ## 3. Stage 1 — sonar canonicalisation (`src/cv_pipeline/canonical.py`)
@@ -336,9 +337,12 @@ UI: a zero-build studio with six modes (Analyze · Survey · Study · Audit · C
   - fallbacks are provided for `prefers-reduced-motion`, `prefers-reduced-transparency` and missing
     `backdrop-filter`.
 
-## 10. Cloud + COOL (`infra/`)
+## 10. Cloud and COOL (`infra/`)
 
-One CloudFormation stack (`infra/cfn/depth.yaml`, deployed by `infra/deploy.sh`, dry-run by default):
+**Status:** applied in rehearsal mode (stock Ubuntu 24.04 and stock OpenCV 5, no CloudFront, no public address);
+the COOL items below are built and tested but have not run, because the COOL subscription is blocked on payment.
+
+One CloudFormation stack (`infra/cfn/depth.yaml`, deployed by `infra/deploy.sh`, dry-run by default), designed for:
 EC2 **c8g.large** (Graviton4) from the **COOL Marketplace AMI** (OpenCV 5 under `/opt/cool`), `systemd`
 unit running the app with the COOL interpreter (web deps via `pip --target`; the COOL venv is never
 modified), an Elastic IP, behind **CloudFront** (HTTPS, static UI cached at the edge; the origin accepts
@@ -349,7 +353,7 @@ Scheduler** stop after judging, and the account **Budget**. `GET /api/cool` serv
 receipt** — the AWS-signed instance identity (AMI, Marketplace product code, arm64) plus the OpenCV
 libraries the process mapped — and `python -m src.bench.verify_cool <url>` checks it from anywhere.
 `infra/bench_fleet.sh` runs the **equal-size benchmark** (c8i.xlarge x86 stock · c8g.xlarge stock ·
-c8g.xlarge COOL · c8g.large COOL) on self-terminating machines: product per stage and per op, a real
+c8g.xlarge COOL · c8g.large COOL — the two COOL machines not yet run) on self-terminating machines: product per stage and per op, a real
 1-h recording end to end (measured real-time factor and $ per survey-hour), 3 interleaved repeats, CPU
 and memory, output parity, prices from the AWS Price List API; a run is labelled COOL only if `cv2`
 loads from `/opt/cool`. Local x86 reference:

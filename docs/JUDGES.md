@@ -37,7 +37,7 @@ dispatched. Its contribution is not a better detector but a **dependable** one. 
 | Problem | Reviewing side-scan sonar for lost fishing gear by hand is slow, and an uncalibrated detector cannot be relied on to plan a recovery trip. |
 | Approach | OpenCV 5 sonar geometry (Stage 1) → YOLO11 detection through `cv2.dnn` → physical evidence → statistically calibrated review tiers → survey planning → human approval. |
 | Agent | A goal-driven loop ([`core.py`](../src/agentic/core.py)): check applicability, choose a perception mode, monitor the compute budget, plan, and request approval. |
-| Runtime | CPU-only and torch-free, OpenCV 5.0.0.93; deployed on AWS EC2 Graviton4 (c8g.large). |
+| Runtime | CPU-only and torch-free, OpenCV 5.0.0.93. A server on AWS EC2 Graviton4 (c8g.large) runs it with stock OpenCV 5, in rehearsal mode, without a public address yet. |
 | Licence | AGPL-3.0 |
 
 ## 2. Access
@@ -109,10 +109,10 @@ The route below takes about ten minutes and touches every part of the system.
 | Criterion | Evidence | Status |
 |---|---|---|
 | Verified COOL execution | `GET /api/cool` returns the AWS-signed instance identity document and the OpenCV libraries mapped into the server process; `python -m src.bench.verify_cool <url>` checks the signature offline. | **Not yet run** (§7.1) |
-| Architecture | One CloudFormation stack: EC2 Graviton4 from the COOL AMI, Elastic IP, S3, CloudWatch alarms, SSM-only access, a scheduled stop ([`infra/README.md`](../infra/README.md)). | Deployed in rehearsal mode (stock OpenCV 5) |
+| Architecture | One CloudFormation stack designed for EC2 Graviton4 from the COOL AMI, with an Elastic IP, S3, CloudWatch alarms, SSM-only access and a scheduled stop ([`infra/README.md`](../infra/README.md)). | Deployed in rehearsal mode on stock Ubuntu and stock OpenCV 5; not yet on the COOL AMI |
 | Measured value against a baseline | Stock OpenCV 5, 4 vCPU: Graviton4 **138.5 ms** per frame against x86 **145.8 ms**, at a 15% lower hourly price; identical detections (31 of 31) ([`cool_benchmark.md`](reports/cool_benchmark.md)). | Stock measured; COOL comparison scripted |
-| Innovation | The server times both OpenCV 5 DNN engines at start-up and keeps the faster one only if the answers match (STUDY-20); every result carries a provenance stamp naming the OpenCV build. | Shipped |
-| Reproducibility | `infra/bench_fleet.sh` measures x86, stock Graviton and COOL Graviton in one command, with pinned commit, frames and model. | Shipped |
+| Innovation | The server times both OpenCV 5 DNN engines at start-up and keeps the faster one only if the answers match (STUDY-20); every result carries a provenance stamp naming the OpenCV build. | Shipped (on stock OpenCV 5) |
+| Reproducibility | `infra/bench_fleet.sh` measures x86, stock Graviton and COOL Graviton in one command, with pinned commit, frames and model. | x86 and stock Graviton runs done; COOL runs not yet run |
 
 ## 5. Principal measurements
 

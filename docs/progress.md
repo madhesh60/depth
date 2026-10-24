@@ -84,6 +84,28 @@ Current numbers, each with its split: README "At a glance" and
 
 ## 4. Session log
 
+### 2026-10-24 (sweep 77) — every document says only what is true today
+
+A sweep of every Markdown file (and the architecture diagram) for claims of work that is not done. Each one now says
+what exists and what has not run:
+
+- **COOL:** no document says or implies that COOL runs, is deployed or is proven. The README's stack row, section 8
+  (now "Deployment on AWS Graviton"), the capability row (now "a COOL check, built but not yet used"), the repository
+  structure; the judges' guide (runtime, architecture and reproducibility rows); the technical report (§5: applied in
+  rehearsal mode; the EC2 row "designed to launch from the COOL AMI"; "COOL verification (built, not yet run on COOL)";
+  CloudFront "not yet created"); the architecture doc (intro, deploy target, the cloud line, §10 with a status
+  paragraph); `infra/README.md` (title, intro, "how anyone will check it"); the docs map; the Lucidchart source; the
+  video narration; `CLAUDE.md`; and the SVG (title, subtitle and the EC2 box: "COOL AMI planned — runs stock OpenCV 5
+  today"). The automatic status lines (`cool:status`, `cool:readme`, the technical report's pending row) are unchanged.
+- **Other unfinished work:** the Study and Audit tabs are "built, not yet run" with people in the README, the technical
+  report and the Agentic Vision doc (no audited precision exists); "live demo" / "live link" wording now points to
+  Codespaces and says there is no public URL yet.
+- **When COOL truly runs:** `PHASE=cool ./infra/golive.sh` updates the status lines; these hand-written lines must then
+  be updated too: README stack row, §8 intro and table, the capability row; JUDGES §4.3 and the runtime row; technical
+  report §5; architecture intro, deploy target, cloud line and §10 status; `infra/README.md` title and intro; the SVG.
+- Checks: every relative link and anchor in the edited docs resolves; 314 passed, 1 skipped; the UI test passes every
+  step (the judges tab renders the updated guide).
+
 ### 2026-10-24 (sweep 76) — a formal README and judges' guide; a For judges tab in the studio
 
 - **`README.md`** rewritten in a formal register with a table of contents and numbered sections: at a glance, project

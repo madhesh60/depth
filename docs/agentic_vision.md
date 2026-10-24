@@ -10,7 +10,7 @@
 > and every promise is calibrated on held-out recordings and verified once on unseen ones.
 
 Code: [`src/agentic/core.py`](../src/agentic/core.py) (the core loop) and [`src/agentic/`](../src/agentic) ·
-Live demo: the web app (`webui/`, served by `src/dashboard/app.py`) · Evidence:
+Demo: the web app (`webui/`, served by `src/dashboard/app.py`; run it locally or in Codespaces — no public URL yet) · Evidence:
 [`calibration_exp003.md`](calibration_exp003.md), [`look_harder.md`](reports/look_harder.md),
 [`applicability.md`](reports/applicability.md), [`sensor_check.md`](reports/sensor_check.md),
 [`causal_trace.md`](reports/causal_trace.md).
@@ -253,7 +253,7 @@ a **missed pot** the detector never proposed — a positive label exactly where 
 set + hard negatives; where labels exist, reviewer agreement is scored.
 
 **Measuring the impact instead of claiming it (`study.py`, `effort.py`).** The Study tab runs a
-counterbalanced 2×2 Latin-square user study (manual frame review vs the agent's cards, timed, scored
+counterbalanced 2×2 Latin-square user study (built; **not yet run with participants**) (manual frame review vs the agent's cards, timed, scored
 against labels). The effort curve then reports minutes to the recall promise for manual review, a
 raw detector list and the DEPTH queue, for both perception modes, plus the **break-even card time**. The
 agent shows **one review card per object** (STUDY-23): the detector often puts two or three boxes on one pot,
@@ -267,8 +267,9 @@ names the bias — P(pot) is fit on the calibration recordings, and a card with 
 its best box alone.
 
 **Auditing the labels (`fp_audit.py`).** A blinded audit with catch trials asks whether the
-detector's most confident "false alarms" are really unlabelled objects — giving an exact audited
-precision in that confidence band, with the auditors' own reliability measured.
+detector's most confident "false alarms" are really unlabelled objects — designed to give an exact audited
+precision in that confidence band, with the auditors' own reliability measured. It is built and **has not yet been
+run with auditors**, so no audited precision exists.
 
 ---
 
