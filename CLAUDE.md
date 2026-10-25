@@ -110,11 +110,11 @@ budget) → plan → one approval request per action. Every step is logged in `a
 
 ## Cloud (AWS, us-east-1, profile `hackathon`)
 
-- One CloudFormation stack: `infra/cfn/depth.yaml` (EC2 c8g.large from the COOL AMI, OpenCV 5 under
-  `/opt/cool`, Elastic IP, CloudFront, S3, CloudWatch + saved queries, SSM, EventBridge rules + a scheduled stop
-  2026-11-10, SNS alerts + approval emails, DLM daily snapshots, Cost Anomaly Detection, a Route 53 health check
-  while public, a Resource Group). Every service needs a job and must stay free tier or cents; the owner chose
-  **alerts only** - nothing may stop the demo automatically before the scheduled stop.
+- One CloudFormation stack: `infra/cfn/depth.yaml` (designed for EC2 c8g.large from the COOL AMI, OpenCV 5 under
+  `/opt/cool`; today stock Ubuntu + stock OpenCV 5 in rehearsal; Elastic IP, CloudFront, S3, CloudWatch + saved queries,
+  SSM, EventBridge rules + a scheduled stop 2026-11-10, SNS alerts + approval emails, DLM daily snapshots, Cost Anomaly
+  Detection, a Route 53 health check while public, a Resource Group). Every service needs a job and must stay free tier
+  or cents; the owner chose **alerts only** - nothing may stop the demo automatically before the scheduled stop.
 - Secrets (approver PIN, MCP and admin tokens) are SSM SecureStrings under `/depth/<stack>/` (`deploy.sh` creates
   them; `infra/secrets.sh pin` reads the PIN). Settings reach the server through `/depth/<stack>/app-config` +
   `update_server.sh` - never edit the Instance's UserData or the launch template (that stops or replaces it).
@@ -141,7 +141,10 @@ budget) → plan → one approval request per action. Every step is logged in `a
 ```bash
 # Run and check
 python -m uvicorn src.dashboard.app:app --port 8000    # the studio (Analyze/Survey/Study/Audit)
-pytest -q                                              # 314 tests; coverage 60% of src/ (85% runtime)
+pytest -q                                              # 319 tests; coverage 60% of src/ (85% runtime)
+docker compose up --build                              # the same server in a container (docs/containers.md)
+kubectl apply -k infra/k8s                             # ... on Kubernetes (one replica: surveys are in memory)
+python tests/container_smoke.py --url http://localhost:8000   # real work in a running container
 python tests/ui_smoke.py                               # headless Chrome drives every studio mode (0 JS errors)
 python tests/ui_smoke.py --full-demo                   # ... and plays the guided demo to its last step
 python tests/ui_video.py                               # a captioned walkthrough MP4 of the studio (runs/video/)
@@ -194,11 +197,12 @@ src/bench/        product_bench · fingerprint · compare · cool_attest · veri
 src/dashboard/    app (FastAPI + wiring) · service (state, survey run) · routes/ (system · analyze · survey · people ·
                   approvals · connect) · detector_queue · jobs · metrics · samples · mcp_server · mcp_session · llm_session · ogc ·
                   integrations · ratelimit · origin_guard
-webui/            zero-build vanilla studio (index.html, js/ — 11 classic scripts in load order, styles.css,
+webui/            zero-build vanilla studio (index.html, js/ — 12 classic scripts in load order, styles.css,
                   twin3d.js) · embed/ · samples/ ·
                   audit/ · img/ · vendor/ (leaflet, three, fonts)
 infra/            cfn/depth.yaml · deploy.sh · teardown.sh · update_server.sh · setup_cool_instance.sh ·
-                  depth.service · golive.sh · bench_fleet.sh · bench_userdata.sh · bench_cool.sh · lib.sh
+                  depth.service · golive.sh · bench_fleet.sh · bench_userdata.sh · bench_cool.sh · lib.sh ·
+                  k8s/ (Kustomize base); Dockerfile + compose.yaml at the root (docs/containers.md)
 models/<MODEL>/   calibration.json (+ modes.look_harder, cards) · effort_curve.json · fp_audit_val.json (+ EXP-003:
                   evidence_model.json, model_meta.json, applicability.json)
 benchmarks/       product_bench JSON results (tracked)

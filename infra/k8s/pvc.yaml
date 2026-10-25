@@ -1,0 +1,10 @@
+# runs/ -> /data: jobs, approvals, feedback, study results, audit tags, webhooks survive a restart
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: depth-data
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 2Gi

@@ -1,0 +1,180 @@
+%%{init: {"theme": "base", "flowchart": {"curve": "basis", "nodeSpacing": 28, "rankSpacing": 46, "padding": 12, "htmlLabels": true}, "themeVariables": {"fontFamily": "Inter, Arial, sans-serif", "fontSize": "13px", "primaryColor": "#FFFFFF", "primaryBorderColor": "#334155", "lineColor": "#334155", "clusterBkg": "#FFFFFF"}}}%%
+flowchart LR
+
+  %% ============================ HEADER ============================
+  HDR["<b style='font-size:30px;color:#0B2545'>≋ DEPTH</b>&nbsp;&nbsp;<b style='font-size:18px'>— Derelict Fishing Gear Detection from Side-Scan Sonar</b><br/><span style='font-size:13px'>Agentic Vision · OpenCV 5 on AWS Graviton + COOL · a named person approves every action</span><br/><span style='font-size:12px;color:#475569'>AWS Cloud Architecture &nbsp;|&nbsp; Detect · Evidence · Prove · Triage · Hazard-map</span>"]:::header
+
+  %% ============================ A · PEOPLE ============================
+  subgraph A["👥 People"]
+    direction TB
+    A1["🧑‍💻 <b>Operator / analyst</b><br/>studio in a browser"]
+    A2["🔐 <b>Named approver</b><br/>name + PIN"]
+    A3["🤖 <b>External AI agents</b><br/>MCP · <i>can only ask</i>"]
+    A4["🗺️ <b>GIS users</b><br/>QGIS / ArcGIS"]
+  end
+
+  %% ============================ B · INPUTS ============================
+  subgraph B["🌊 Inputs — side-scan sonar only"]
+    direction TB
+    B1["🖼️ <b>Sonogram images</b><br/>side-scan frames (PNG / JPG)"]
+    B2["📼 <b>Raw Humminbird recording</b><br/>.DAT · .SON · .IDX<br/>real per-ping GPS · heading · depth"]
+    BN["no optical images"]:::note
+  end
+
+  %% ============================ C · EDGE ============================
+  subgraph C["🛡️ Edge & access"]
+    direction TB
+    C1["☁️ <b>Amazon CloudFront</b><br/>HTTPS · origin-verify header"]
+    C1T["PENDING · account verification"]:::pending
+    C2["📍 <b>Elastic IP</b><br/>current demo path"]
+    C3["public mode needs MCP token,<br/>admin token and approver PIN"]:::note
+  end
+
+  %% ============================ D · AWS STACK ============================
+  subgraph D["☁️ AWS us-east-1 — one CloudFormation stack"]
+    direction TB
+
+    subgraph E["🖥️ EC2 c8g.large Graviton4 — DEPTH server · COOL AMI (/opt/cool) · systemd · IMDSv2 · no SSH"]
+      direction TB
+      ET["COOL PENDING · rehearsal on stock OpenCV 5"]:::pending
+
+      subgraph L["🧠 Core agent loop — every survey (core.py)"]
+        direction LR
+        L1["🎯 <b>Goal</b><br/>recall · compute ·<br/>analyst · boat min"]
+        L2{"<b>Promise<br/>applies?</b><br/>OpenCV stats vs<br/>calibration"}
+        L2N["⛔ <b>Withdraw promise</b><br/>cheapest look ·<br/>full-review request"]:::warn
+        L3["👁️ <b>Choose the look</b><br/>standard ≥ 78%<br/>look harder ≥ 84%"]
+        L4["⚙️ <b>Perceive</b><br/>every frame<br/><i>overrun → re-plan</i>"]
+        L5["🧭 <b>Plan</b><br/>queue · routes ·<br/>re-survey passes"]
+        L6["✋ <b>Ask</b><br/>one approval<br/>request per action"]
+        L1 --> L2
+        L2 -- "yes" --> L3 --> L4 --> L5 --> L6
+        L2 -- "no" --> L2N
+      end
+
+      subgraph P["🔬 OpenCV 5 pipeline — per frame"]
+        direction LR
+        P0["📏 <b>Sensor cross-check</b><br/>seabed track vs<br/>depth sounder"]
+        P1["🧭 <b>Stage 1 Canonicalise</b><br/>bottom track ·<br/>slant → ground"]
+        P2["🎯 <b>See</b><br/>YOLO11s ONNX · cv2.dnn<br/>faster engine measured"]
+        P3["🌗 <b>Prove</b><br/>shadow · rel. height ·<br/>water column"]
+        P4["⚖️ <b>Decide</b><br/>calibrated tiers ·<br/>one card per object"]
+        P5["📌 <b>Act</b><br/>geotag · stitch · routes ·<br/>mission brief"]
+        P0 --> P1 --> P2 --> P3 --> P4 --> P5
+      end
+      PM["MEASURED · 138.5 ms/frame (c8g.xlarge, stock OpenCV 5)"]:::measured
+      PV["VERIFIED ON TEST · ≥ 78% held 81.1% · ≥ 84% held 86.0%"]:::verified
+      EC["FastAPI studio · job queue · incidents + failure drills · audit log · provenance stamp"]:::chip
+    end
+
+    D1[("🪣 <b>Amazon S3</b> (one bucket)<br/>results/ 30 d · uploads/ 7 d · bench/<br/>encrypted · versioned · TLS-only")]
+    D2["🔑 <b>Systems Manager</b><br/>Parameter Store: PIN + tokens (SecureString)<br/>Session Manager · Run Command"]
+    D3["✉️ <b>Amazon SNS — approval email</b><br/>one per survey · never the PIN"]
+    D4["🤖 <b>Amazon Bedrock</b><br/>brief writer · Claude or Nova<br/>shown only if every number traces"]
+    D4T["OPTIONAL · NOT DEPLOYED"]:::optional
+  end
+
+  %% ============================ F · OPERATIONS ============================
+  subgraph F["📊 Operations & cost"]
+    direction TB
+    F1["📈 <b>CloudWatch</b><br/>logs · metrics · dashboard ·<br/>alarms · saved queries"]
+    F2["🔔 <b>SNS — alert email</b>"]
+    F3["⏰ <b>EventBridge</b><br/>rules: server stopped · AWS Health<br/>Scheduler: auto-stop 2026-11-10"]
+    F4["💾 <b>Data Lifecycle Manager</b><br/>daily snapshot · 7 kept"]
+    F5["💲 <b>Budgets $40 +<br/>Cost Anomaly Detection</b><br/>alerts only"]
+    F6["🩺 <b>Route 53 health check</b><br/>while public"]
+    F7["🗂️ <b>Resource Group</b><br/>one view of the stack"]
+  end
+
+  %% ============================ G · HUMAN LOOP ============================
+  subgraph G["🙋 Human loop"]
+    direction TB
+    G1["🖥️ <b>Studio</b><br/>Analyze · Survey · 3D twin ·<br/>Study · Audit"]
+    G2["✅ <b>Approvals inbox</b><br/>approve / decline · name + PIN<br/>5 wrong PINs → 15-min lockout"]
+    G3["🃏 <b>Card decisions</b><br/>✓ / ✕ · recovered / not found"]
+    G4["EVERY DECISION → AGENT RE-PLANS"]:::warn
+  end
+
+  %% ============================ H · CONNECT ============================
+  subgraph H["🔗 Connect & outputs"]
+    direction TB
+    H1["🧩 <b>MCP server</b> /mcp<br/>13 tools · ask-only"]
+    H2["🌐 <b>OGC API – Features</b><br/>QGIS / ArcGIS"]
+    H3["🪝 <b>HMAC-signed webhooks</b>"]
+    H4["🧱 <b>&lt;depth-hazards&gt;</b><br/>web component"]
+    H5["📦 <b>Exports</b><br/>GeoJSON · GPX · KML · CSV · JSON"]
+    H6["🗺️ <b>Mission brief + hazard map</b>"]
+  end
+
+  %% ============================ FOOTER ============================
+  FTR["One CloudFormation stack (infra/cfn/depth.yaml) · cfn-lint + cfn-guard: 0 findings · dry-run by default · teardown.sh removes everything · CPU-only, torch-free · sonar only · boxes, not masks"]:::footer
+
+  %% ============================ NUMBERED FLOWS ============================
+  HDR ~~~ A
+  A1 -- "① open studio (HTTPS)" --> C1
+  B1 -- "② upload sonar" --> C2
+  B2 -- "② recording" --> C2
+  C1 -- "③ origin request" --> L1
+  C2 -- "③" --> L1
+  L4 -- "④ per frame" --> P0
+  P5 -- "⑤ hazards" --> L5
+  E <-- "⑥ results · uploads" --> D1
+  D2 -- "⑦ secrets · settings" --> E
+  L6 -- "⑧ approval needed" --> D3
+  D3 -- "⑧" --> A2
+  A2 -- "⑨ decide (name + PIN)" --> G2
+  G2 == "⑩ RE-PLAN" ==> L5
+  G3 == "⑩ RE-PLAN" ==> L5
+  E -- "⑪ logs · alarms" --> F1
+  F1 --> F2
+  F3 -- "⑫ alerts · auto-stop" --> E
+  F4 -- "⑬ snapshot" --> E
+  P5 -- "⑭ publish" --> H1
+  P5 --> H2 & H3 & H4 & H5 & H6
+  A3 -. "⑮ ask only — ✕ cannot approve" .-> H1
+  A4 --> H2
+  P5 -. "⑯ optional brief" .-> D4
+  A1 --> G1
+  H6 ~~~ FTR
+
+  %% ============================ STYLES ============================
+  classDef header   fill:#FFFFFF,stroke:#FFFFFF,color:#0B2545,font-size:16px;
+  classDef footer   fill:#F1F5F9,stroke:#CBD5E1,color:#334155,font-size:11px;
+  classDef note     fill:#FFFFFF,stroke:#CBD5E1,stroke-dasharray:3 3,color:#64748B,font-size:10px;
+  classDef chip     fill:#F8FAFC,stroke:#CBD5E1,color:#475569,font-size:10px;
+  classDef pending  fill:#FFEDD5,stroke:#EA580C,color:#9A3412,font-weight:bold,font-size:10px;
+  classDef optional fill:#F1F5F9,stroke:#94A3B8,color:#475569,font-weight:bold,font-size:10px;
+  classDef measured fill:#DBEAFE,stroke:#2563EB,color:#1E3A8A,font-weight:bold,font-size:10px;
+  classDef verified fill:#DCFCE7,stroke:#16A34A,color:#14532D,font-weight:bold,font-size:10px;
+  classDef warn     fill:#FEE2E2,stroke:#DC2626,color:#7F1D1D,font-weight:bold;
+
+  classDef pA fill:#FFFFFF,stroke:#2E6BD8,color:#0F172A;
+  classDef pB fill:#FFFFFF,stroke:#13A89E,color:#0F172A;
+  classDef pC fill:#FFFFFF,stroke:#7B3FE4,color:#0F172A;
+  classDef pD fill:#FFFFFF,stroke:#2E9E44,color:#0F172A;
+  classDef pE fill:#FFFFFF,stroke:#E8730C,color:#0F172A;
+  classDef pF fill:#FFFFFF,stroke:#D6336C,color:#0F172A;
+  classDef pG fill:#FFFFFF,stroke:#D93D3D,color:#0F172A;
+  classDef pH fill:#FFFFFF,stroke:#4B4FD8,color:#0F172A;
+
+  class A1,A2,A3,A4 pA;
+  class B1,B2 pB;
+  class C1,C2 pC;
+  class D1,D2,D3,D4 pD;
+  class L1,L2,L3,L4,L5,L6,P0,P1,P2,P3,P4,P5 pE;
+  class F1,F2,F3,F4,F5,F6,F7 pF;
+  class G1,G2,G3 pG;
+  class H1,H2,H3,H4,H5,H6 pH;
+
+  style A fill:#EAF1FD,stroke:#2E6BD8,stroke-width:2px,stroke-dasharray:6 4,color:#1E3A8A
+  style B fill:#E6F7F5,stroke:#13A89E,stroke-width:2px,stroke-dasharray:6 4,color:#115E59
+  style C fill:#F2ECFD,stroke:#7B3FE4,stroke-width:2px,stroke-dasharray:6 4,color:#4C1D95
+  style D fill:#EEF8EF,stroke:#2E9E44,stroke-width:2px,stroke-dasharray:6 4,color:#14532D
+  style E fill:#FFF4EA,stroke:#E8730C,stroke-width:2px,stroke-dasharray:6 4,color:#7C2D12
+  style L fill:#FFE8D1,stroke:#E8730C,stroke-width:1px,color:#7C2D12
+  style P fill:#FFFFFF,stroke:#E8730C,stroke-width:1px,color:#7C2D12
+  style F fill:#FDEEF3,stroke:#D6336C,stroke-width:2px,stroke-dasharray:6 4,color:#831843
+  style G fill:#FDEDED,stroke:#D93D3D,stroke-width:2px,stroke-dasharray:6 4,color:#7F1D1D
+  style H fill:#EEEFFC,stroke:#4B4FD8,stroke-width:2px,stroke-dasharray:6 4,color:#312E81
+
+  linkStyle default stroke:#334155,stroke-width:1.5px

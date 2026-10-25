@@ -1,0 +1,14 @@
+# Weekly update PRs; each one runs the full CI (tests, the container build and the Kubernetes deploy).
+# Runtime pins in requirements.txt stay exact: a bump is a PR, never a silent change.
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /
+    schedule: {interval: weekly}
+    open-pull-requests-limit: 5
+  - package-ecosystem: docker
+    directory: /
+    schedule: {interval: weekly}
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: {interval: weekly}

@@ -3,7 +3,7 @@ ui_smoke.py — the studio in a real headless Chrome: every mode driven, every J
 
 Starts the server on a free local port (fresh approvals log), opens the studio in headless Chrome over the
 DevTools protocol and drives it: boot → the Terms glossary → Analyze a sample → a Survey → the Agent tab → Connect → Study →
-Audit → the 3D twin (or, without WebGL, its plain message) → an upload with its sonar edge set → a picture that is not
+Audit → For judges (the guide, live facts, a shortcut) → the 3D twin (or, without WebGL, its plain message) → an upload with its sonar edge set → a picture that is not
 sonar (the promise withdrawn) → the guided demo. It records every JS exception, console error and failed or 4xx/5xx
 request, and exits 1 if there was any. Needs the model (``python -m src.detection.fetch_model``), Chrome or
 Chromium (``$CHROME`` or on the usual paths) and ``websockets`` (requirements-dev.txt). Not collected by
@@ -56,6 +56,14 @@ STEPS = [
     *[(m, f"(async () => {{ setMode('{m}'); await new Promise(r => setTimeout(r, 1500)); "
           f"const a = document.querySelector('.mode-btn.is-active'); return {{mode: a && a.dataset.mode}}; }})()")
       for m in ("connect", "study", "audit")],
+    # the judges' guide: JUDGES.md rendered with the server's live facts; a shortcut runs Analyze
+    ("judges", "(async () => { setMode('judges'); for (let k = 0; k < 40 && !document.querySelector('#jgDoc h2'); k++) "
+               "await new Promise(r => setTimeout(r, 250)); const doc = document.querySelector('#jgDoc'); "
+               "const sections = doc.querySelectorAll('h2').length, facts = document.querySelectorAll('.jg-fact').length, "
+               "raw = /\\*\\*|\\]\\(|cool:status/.test(doc.textContent); await Judges.go('analyze'); "
+               "await new Promise(r => setTimeout(r, 600)); return {sections, facts, raw, "
+               "toc: document.querySelectorAll('#jgToc a').length, mode: document.querySelector('.mode-btn.is-active').dataset.mode, "
+               "analyze_cards: document.querySelectorAll('.ev-card').length}; })()"),
     ("twin", "(async () => { setMode('analyze'); await new Promise(r => setTimeout(r, 400)); "
              "const b = document.querySelector('.dim-btn[data-dim=\"3d\"]'); if (b) b.click(); "
              "await new Promise(r => setTimeout(r, 2500)); const e = document.querySelector('#twinFrameWrap .twin-empty'); "
@@ -94,6 +102,8 @@ FULL_DEMO = ("demo", "(async () => { document.querySelector('#demoBtn').click();
 EXPECT = {"boot": lambda v: v["samples"] > 0, "terms": lambda v: v["terms"] >= 8, "analyze": lambda v: v["cards"] > 0, "survey": lambda v: v["hazards"] > 0,
           "agent_tab": lambda v: v["clicked"], "connect": lambda v: v["mode"] == "connect",
           "study": lambda v: v["mode"] == "study", "audit": lambda v: v["mode"] == "audit",
+          "judges": lambda v: v["sections"] >= 10 and v["facts"] >= 6 and not v["raw"] and v["toc"] >= 10
+          and v["mode"] == "analyze" and v["analyze_cards"] > 0,
           "twin": lambda v: v["canvas"] > 0 or v["no_webgl"],        # no WebGL here: the plain message, no crash
           "upload": lambda v: v["picker_shown"] and v["nadir_source"] == "user" and v["seabed"] and v["cards"] > 0,
           "not_sonar": lambda v: v["promise_applies"] is False and v["recall_promise"] is None

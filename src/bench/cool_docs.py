@@ -30,11 +30,9 @@ PENDING_TARGET = "Graviton COOL pending. |"
 README_START, README_END = "<!-- cool:readme -->", "<!-- /cool:readme -->"
 STATUS_START, STATUS_END = "<!-- cool:status -->", "<!-- /cool:status -->"
 STATUS_DOCS = (README, JUDGES, REPORT)
-PENDING_STATUS = ("has not run yet. The AWS Marketplace subscription to the COOL AMI is blocked on payment: "
-                  "the Marketplace does not accept the account's card (it needs a Visa or Mastercard), and an AWS "
-                  "Support case is open. Until then the demo server runs stock OpenCV 5 in rehearsal mode and says "
-                  "so. The COOL benchmark, the AWS-signed receipt and its verifier are built and run in one command "
-                  "once the subscription is active (`PHASE=cool ./infra/golive.sh`).")
+PENDING_STATUS = ("has not run yet: the AWS Marketplace subscription is blocked on payment. The demo server runs "
+                  "stock OpenCV 5 and says so; the COOL benchmark and its signed receipt run in one command once it is "
+                  "active.")
 
 
 def _load(d: Path, name: str) -> dict | None:

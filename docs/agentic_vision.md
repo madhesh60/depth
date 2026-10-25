@@ -10,7 +10,7 @@
 > and every promise is calibrated on held-out recordings and verified once on unseen ones.
 
 Code: [`src/agentic/core.py`](../src/agentic/core.py) (the core loop) and [`src/agentic/`](../src/agentic) ·
-Live demo: the web app (`webui/`, served by `src/dashboard/app.py`) · Evidence:
+Demo: the web app (`webui/`, served by `src/dashboard/app.py`; run it locally or in Codespaces — no public URL yet) · Evidence:
 [`calibration_exp003.md`](calibration_exp003.md), [`look_harder.md`](reports/look_harder.md),
 [`applicability.md`](reports/applicability.md), [`sensor_check.md`](reports/sensor_check.md),
 [`causal_trace.md`](reports/causal_trace.md).
@@ -253,7 +253,7 @@ a **missed pot** the detector never proposed — a positive label exactly where 
 set + hard negatives; where labels exist, reviewer agreement is scored.
 
 **Measuring the impact instead of claiming it (`study.py`, `effort.py`).** The Study tab runs a
-counterbalanced 2×2 Latin-square user study (manual frame review vs the agent's cards, timed, scored
+counterbalanced 2×2 Latin-square user study (built; **not yet run with participants**) (manual frame review vs the agent's cards, timed, scored
 against labels). The effort curve then reports minutes to the recall promise for manual review, a
 raw detector list and the DEPTH queue, for both perception modes, plus the **break-even card time**. The
 agent shows **one review card per object** (STUDY-23): the detector often puts two or three boxes on one pot,
@@ -267,8 +267,9 @@ names the bias — P(pot) is fit on the calibration recordings, and a card with 
 its best box alone.
 
 **Auditing the labels (`fp_audit.py`).** A blinded audit with catch trials asks whether the
-detector's most confident "false alarms" are really unlabelled objects — giving an exact audited
-precision in that confidence band, with the auditors' own reliability measured.
+detector's most confident "false alarms" are really unlabelled objects — designed to give an exact audited
+precision in that confidence band, with the auditors' own reliability measured. It is built and **has not yet been
+run with auditors**, so no audited precision exists.
 
 ---
 
@@ -290,7 +291,7 @@ and every survey exports its decision log (`mission.trace.jsonl`).
 | Orchestration & autonomy | 25% | **the core loop** (§0): an operator goal; the agent checks its promise applies, chooses its perception mode, watches its compute budget and re-plans mid-run, then plans and asks; value-of-information tool use; compute, analyst **and boat** budgets; **sensor cross-check** decides per chunk which sensor to trust, re-tracks and re-fits the range scale with no person (STUDY-16, on by default); stitching; repeat-sighting merge; routes; opposite-side re-survey planning (§3, §6) |
 | Task effectiveness | 20% | recall promises that **held on unseen test** (≥ 84% looking harder, held at 86.0%; ≥ 78% with one look, held at 81.1%; checked for correlated frames, STUDY-21); the promise withdrawn where it would fail silently (another sonar: 22 of 22); honest "no auto-confirm"; cross-check validated on a fresh 1-h recording (2 of 3 pre-registered checks passed; the failure is reported); effort study built, not yet run with people (§4, §6) |
 | Failure handling & human control | 15% | a failed tool never raises: the agent falls back to the detector score and sends the find to a person; failure drills you can run (`?simulate=tool_failed`, `tool_timeout`, `no_detection`); bounded LOW-RISK tier; budgeted REVIEW queue; **person-confirmed loop** re-plans routes from a named person's ✓ / ✕ / recovered; MCP agents can only *ask* (`approvals.py`); missed-pot labels; blinded audit (§5, §6) |
-| User experience | 10% | calm glass studio with five modes (Analyze · Survey · Study · Audit · Connect) and a guided 60-s demo: guarantee badges, evidence cards with the full trace, seabed overlay, map + routes + re-survey passes, person-confirmed recovery route, 3D twin, live effort curve, downloads |
+| User experience | 10% | calm glass studio with six modes (Analyze · Survey · Study · Audit · Connect · For judges) and a guided 60-s demo: guarantee badges, evidence cards with the full trace, seabed overlay, map + routes + re-survey passes, person-confirmed recovery route, 3D twin, live effort curve, downloads |
 
 **Reproduce:** `python -m src.agentic.calibrate` (fit + verify + report + `calibration.json`) ·
 `python -m src.agentic.pipeline --survey <dir>` · `python -m src.agentic.effort` · `pytest -q`.

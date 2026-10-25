@@ -16,8 +16,8 @@ A sonar debris detector alone is not a tool a cleanup crew can rely on: it misse
 its false alarms cost boat time. DEPTH wraps one in an **OpenCV 5 agent** that measures the sonar
 itself, proves or doubts each find with physical evidence, sorts finds into **tiers with calibrated
 statistical promises**, and turns them into routes, second-look passes and reports. A human approves
-everything that leaves the machine. It runs torch-free on CPU (OpenCV 5 `cv2.dnn`), built for **AWS
-Graviton + COOL**.
+everything that leaves the machine. It runs torch-free on CPU (OpenCV 5 `cv2.dnn`), designed for **AWS
+Graviton with COOL**; the runtime numbers below are on stock OpenCV 5, and COOL's status is given in §5.
 
 | claim | evidence |
 |---|---|
@@ -103,13 +103,14 @@ The **runtime** processes each frame through five stages, all OpenCV 5 on CPU:
    - GeoJSON / GPX / KML / CSV / JSON exports with a **provenance stamp**, an agent **decision log** (JSONL) and a **mission brief**.
 
 **Serving.** FastAPI with a background job queue, upload limits, per-client rate limits and per-stage
-metrics. A zero-build web studio has five modes:
+metrics. A zero-build web studio has six modes:
 
 - **Analyze:** one frame with its evidence and the agent's-eye view.
 - **Survey:** the shipped samples (synthetic GPS) or a **raw recording with real per-ping GPS**; map, routes, re-survey passes, the "without Stage 1" counterfactual, the person-confirmed recovery route, approvals, the mission brief, and the **3D digital twin** (three.js: seabed in true ground range, the sonar at its tracked altitude, the acoustic triangle each height is measured from).
-- **Study:** timed user study.
-- **Audit:** blinded false-alarm audit.
+- **Study:** timed user study (built; not yet run with participants).
+- **Audit:** blinded false-alarm audit (built; not yet run with auditors).
 - **Connect:** MCP, OGC API – Features, signed webhooks and the drop-in panel, with live URLs.
+- **For judges:** the evaluation guide (`JUDGES.md`, served by `GET /api/judges` and rendered in the studio) beside live facts from the running server, with shortcuts into the demonstration.
 
 A guided 60-second demo walks through the whole path.
 
@@ -303,25 +304,26 @@ CV-only workload that isolates where COOL acts.
 
 ## 5. AWS deployment
 
-The deployment is scripted, dry-run checked, and executed on the AWS day:
+The deployment is scripted and dry-run checked. It is applied in rehearsal mode (stock Ubuntu and stock OpenCV 5, no public address yet); the COOL items below are built but have not run:
 
 One CloudFormation stack (`infra/cfn/depth.yaml`):
 
-- **EC2 c8g.large** (Graviton4) launched from the **COOL Marketplace AMI**, running `depth.service` under systemd
-  with the COOL interpreter; web dependencies via `pip --target` — **the COOL venv is never modified**.
-- **CloudFront** provides HTTPS and caches the static UI; the origin accepts only CloudFront's origin-facing
+- **EC2 c8g.large** (Graviton4), designed to launch from the **COOL Marketplace AMI** and run `depth.service` under
+  systemd with the COOL interpreter, web dependencies via `pip --target` (the COOL venv is never modified). Today it
+  runs stock Ubuntu 24.04 with stock OpenCV 5.
+- **CloudFront** (not yet created: it awaits AWS account verification) is to provide HTTPS and cache the static UI; the origin accepts only CloudFront's origin-facing
   prefix list and our secret `X-Origin-Verify` header.
 - **S3** (versioned, TLS-only) holds survey results (30-day lifecycle), uploads (7-day) and benchmark results.
 - **CloudWatch**: per-stage latency from the server's JSON frame log, CPU/memory, a dashboard, and alarms
   (recover, reboot, CPU, edge 5xx) that email through SNS.
 - Access goes through **SSM** only (no SSH port, no key pair), IMDSv2, least-privilege **IAM** roles.
 - An **EventBridge Scheduler** stops the instance after judging; the account **Budget** alerts at 25/50/100% + forecast.
-- **Verified COOL:** `GET /api/cool` serves the AWS-signed instance identity (AMI, Marketplace product code,
+- **COOL verification (built, not yet run on COOL):** `GET /api/cool` serves the AWS-signed instance identity (AMI, Marketplace product code,
   arm64) and the OpenCV libraries mapped into the server process; `python -m src.bench.verify_cool <url>` checks it.
 
 `infra/deploy.sh` is a dry run by default (it prints the change set); `infra/teardown.sh` removes everything.
 
-**COOL:** <!-- cool:status -->has not run yet. The AWS Marketplace subscription to the COOL AMI is blocked on payment: the Marketplace does not accept the account's card (it needs a Visa or Mastercard), and an AWS Support case is open. Until then the demo server runs stock OpenCV 5 in rehearsal mode and says so. The COOL benchmark, the AWS-signed receipt and its verifier are built and run in one command once the subscription is active (`PHASE=cool ./infra/golive.sh`).<!-- /cool:status -->
+**COOL:** <!-- cool:status -->has not run yet: the AWS Marketplace subscription is blocked on payment. The demo server runs stock OpenCV 5 and says so; the COOL benchmark and its signed receipt run in one command once it is active.<!-- /cool:status -->
 
 **Optional, not deployed:** Amazon Bedrock (Claude) can rewrite the mission brief. It writes, never decides:
 its text is shown only if every number and ID traces back to the survey, otherwise the template is served
@@ -339,21 +341,15 @@ on Spot → S3.
 
 ---
 
-## 6. Limitations (stated in the product, not hidden)
+## 6. Limitations
 
-- **Scope.** One region's crab pots and one sonar family. On another sonar (`test_xsonar`) AP@0.5 is 0.34 and the val-tuned threshold does not transfer (recall 0.11): a new sonar needs re-calibration. The agent now detects that case and withdraws its promise (STUDY-19); the check is coarse — it catches another sonar or rendering, not subtle drift within one.
-- **Detector.** Crab-pot AP@0.5 0.48 and F1 0.41 on the official split, against GhostVision's 0.71–0.73. EXP-003 raised the recall ceiling from 0.72 to 0.85 and the promise from ≥ 63% to ≥ 78% (both after STUDY-21). EXP-004 / 005 (cleaner data) did not beat it ([`exp005_diagnosis.md`](reports/exp005_diagnosis.md)). EXP-002 failed as underfit (`optimizer=auto` built AdamW 0.00167; [`exp002_diagnosis.md`](reports/exp002_diagnosis.md)).
-- **Wreck debris** is weak (AP 0.16): most training wrecks are off-domain fish-finder screenshots.
-- **Calibration.** Calibration uses three recordings whose frames are correlated. The promise is checked for that (STUDY-21) and verified on a separate split, but it remains a pooled rate: one test recording reached 74.7% against the 78% promise.
-- **Vehicle motion.** Heave is followed by Stage 1's per-ping bottom track (within ±8 rows of the frame's seabed), so slant → ground uses each ping's own altitude. Pitch and roll are **not corrected**: the sonar's ping header carries no attitude. Data dropouts are flagged per ping (0 of 6,906 and 2 of 140,032 pings on the two real recordings), not repaired.
-- **Output.** Boxes, not pixel masks — the brief allows either; the proposal's YOLO-seg was not built because the crab-pot labels are boxes.
-- **Labels.** Labels are incomplete, so precision is a lower estimate (the audit will quantify this).
-- **GPS.** The public crab-pot frames carry no GPS, so their demo track is synthetic and labelled as such everywhere, including the counterfactual's metres. The raw-recording path has **real** per-ping GPS and a measured range scale, but that recording is a river with no known pots: it measures false alarms, not recall.
-- **Heights.** On crab-pot frames heights are relative (h/H). On raw recordings they are in metres from the sonar's measured depth. The range scale there is measured: the tracker alone made 5 false picks among the 11 first-estimate chunks, the agent's cross-check against the depth sounder resolves them (STUDY-16, [`sensor_check.md`](reports/sensor_check.md)), and the remaining uncertainty (± 10.2%) is carried into every error radius.
-- **Edge.** The on-board figure is one core of a server CPU (Graviton4: 599 ms/frame, 240 MB → a survey-hour in
-  ~168 s, ~21× real time, derived from the measured frame time and the real recording's 280 frames/hour); no
-  Raspberry Pi or Jetson was measured.
-- **Effort.** Analyst seconds per card are assumed until the study measures them; at the assumed timings DEPTH saves time only on mostly empty seabed (§4.4).
+- **Scope.** One region's crab pots, one sonar family. Another sonar needs re-calibration (`test_xsonar`: AP@0.5 0.34); the agent detects that case and withdraws its promise (STUDY-19).
+- **Detector.** Crab-pot AP@0.5 0.48, F1 0.41 on the official split (GhostVision reports 0.71–0.73); wreck debris AP 0.16. EXP-004/005 did not beat EXP-003 ([`exp005_diagnosis.md`](reports/exp005_diagnosis.md)).
+- **Promise.** A pooled rate over recordings, checked for correlated frames (STUDY-21), not a per-survey guarantee.
+- **Field data.** Pot frames carry labelled synthetic GPS; the real-GPS recording has no known pots, so it measures false alarms, not recall.
+- **Not modelled.** Pitch and roll (not recorded by the sonar); output is boxes, not masks; dropouts are flagged, not repaired.
+- **Assumed until measured.** Analyst seconds per card and audited precision (Study and Audit tabs).
+- **Edge.** Measured on one server CPU core, not on a Raspberry Pi or Jetson.
 
 ## 7. Responsible use
 

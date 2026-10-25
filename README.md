@@ -15,9 +15,10 @@ COOL** · AGPL-3.0
 
 | | |
 |---|---|
-| **For judges** | [`JUDGES.md`](JUDGES.md): try it, see the agent decide, every key number with its split |
+| **For judges** | [`JUDGES.md`](JUDGES.md): try it, see the agent decide, every key number with its split · also in the studio under **For judges** |
 | **Try it in the browser** | [Open in GitHub Codespaces](https://codespaces.new/madhesh60/depth?quickstart=1): the real studio in about 3 minutes, free with a GitHub account |
 | **Run it locally** | five commands, CPU only: [Installation and Reproduction](#installation-and-reproduction) |
+| **Docker · Compose · Kubernetes** | [`docs/containers.md`](docs/containers.md): one non-root image, read-only root, health probes |
 | **Live demo · video** | not live yet (CloudFront awaits AWS account verification) · not recorded yet |
 
 **Contents:** [Problem](#problem-statement) · [Current practice](#how-it-is-currently-handled) ·
@@ -411,7 +412,7 @@ command (`onboard_model`) and its promise is re-fit.
 
 ### COOL on Graviton
 
-- **COOL:** <!-- cool:status -->has not run yet. The AWS Marketplace subscription to the COOL AMI is blocked on payment: the Marketplace does not accept the account's card (it needs a Visa or Mastercard), and an AWS Support case is open. Until then the demo server runs stock OpenCV 5 in rehearsal mode and says so. The COOL benchmark, the AWS-signed receipt and its verifier are built and run in one command once the subscription is active (`PHASE=cool ./infra/golive.sh`).<!-- /cool:status -->
+- **COOL:** <!-- cool:status -->has not run yet: the AWS Marketplace subscription is blocked on payment. The demo server runs stock OpenCV 5 and says so; the COOL benchmark and its signed receipt run in one command once it is active.<!-- /cool:status -->
 - **Proven by provenance.** A run counts as COOL only if `cv2` loads from `/opt/cool`. `/api/cool` returns an
   AWS-signed instance-identity receipt, and `python -m src.bench.verify_cool` checks it offline.
 - **A registered benchmark (STUDY-17).** COOL, stock Graviton4 and x86 run on the same commit, frames, model and
@@ -473,6 +474,17 @@ python -m uvicorn src.dashboard.app:app --port 8000   # open http://localhost:80
 
 The 8 sample frames ship with the app. They come from the v2b **test** split, so the model never trained or
 tuned on them.
+
+### Option C: Docker, Compose or Kubernetes
+
+```bash
+docker compose up --build                             # or: docker build -t depth . && docker run -p 8000:8000 depth
+kubectl apply -k infra/k8s                            # Kubernetes: probes, non-root, read-only root, one volume
+```
+
+On every change, CI builds the image, runs it locked down, does real work in it and deploys it to a throwaway
+Kubernetes cluster ([`container.yml`](.github/workflows/container.yml); details in
+[`docs/containers.md`](docs/containers.md)). The image uses stock OpenCV 5, not COOL.
 
 ### Verify the Code
 
@@ -572,7 +584,8 @@ src/agentic/      the core loop (core.py), applicability, look harder, one card 
 src/bench/        product benchmark, provenance, comparison, COOL receipt and verifier
 src/dashboard/    FastAPI service, one router per area, jobs, rate limits, MCP server, OGC API, webhooks
 webui/            zero-build studio (+ three.js twin) · embed/ (drop-in panel) · samples/ (8 demo frames)
-infra/            one CloudFormation stack, deploy (dry run by default), teardown, fleet benchmark
+infra/            one CloudFormation stack, deploy (dry run by default), teardown, fleet benchmark; k8s/ base
+Dockerfile        the CPU-only, torch-free image (compose.yaml runs it locked down)
 models/<MODEL>/   calibration.json and its studies' outputs (weights: GitHub Release, fetch_model)
 benchmarks/ · tests/ · notebooks/ · DATASET/scripts/ · docs/ (reports in docs/reports/)
 ```

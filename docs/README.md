@@ -7,8 +7,7 @@ Every number in these documents names its split and the command that regenerates
 ## Start here
 
 | read | for |
-|---|---|
-| [`JUDGES.md`](../JUDGES.md) (repo root) | one page: try it, see the agent decide, the numbers that matter, a criteria map, what is not done, a glossary |
+| [`JUDGES.md`](../JUDGES.md) (repo root) | the evaluation guide: access, a ten-minute path, evidence by judging criterion, every number with its split, deliverables, limitations, a glossary — also in the studio under **For judges** |
 | [`technical_report.md`](technical_report.md) | the whole system, its evaluation and its limits, in one document |
 | [`agentic_vision.md`](agentic_vision.md) | the Agentic Vision entry: how perception changes the agent's next action |
 | [`agentic_loop.md`](agentic_loop.md) | the loop step by step: SEE → PROVE → DECIDE → ACT, with a person in charge |
@@ -37,7 +36,7 @@ Every number in these documents names its split and the command that regenerates
 | active vision: OpenCV evidence → belief → action (STUDY-15; validation failed, off by default) | [`evidence_model_exp003.md`](reports/evidence_model_exp003.md) *(generated)* |
 | one review card per object: 3.86 → 2.32 cards per frame looking harder, the same pots reach a person (STUDY-23) | [`card_grouping.md`](reports/card_grouping.md) *(generated)* |
 | analyst effort for both modes: DEPTH 43.2 vs manual 55.7 min (one look), 56.5 vs 57.3 (looking harder) — timings assumed until the study runs | [`effort_curve.md`](reports/effort_curve.md) *(generated)* |
-| per-stage latency, $ / survey-hour, COOL provenance | [`cool_benchmark.md`](reports/cool_benchmark.md) *(generated)*, raw JSON in [`../benchmarks/`](../benchmarks) |
+| per-stage latency, $ / survey-hour (stock OpenCV 5; COOL rows pending) | [`cool_benchmark.md`](reports/cool_benchmark.md) *(generated)*, raw JSON in [`../benchmarks/`](../benchmarks) |
 | the earlier EXP-001 baseline: deploy-faithful evaluation and its guaranteed tiers | [`eval_exp001.md`](reports/eval_exp001.md) · [`calibration_exp001.md`](calibration_exp001.md) *(generated)* |
 
 The two calibration reports stay next to this map: each model's `calibration.json` records their path,
@@ -62,7 +61,8 @@ and that file's SHA-256 is part of every provenance stamp.
 | [`release_exp003.md`](release_exp003.md) | the published weights (Release `exp003-v1`, SHA-256 checked by `fetch_model`) |
 | [`mcp.md`](mcp.md) | let any MCP agent run DEPTH (it can only *ask* a person to approve) |
 | [`integrations.md`](integrations.md) | OGC API – Features, signed webhooks, the drop-in web component |
-| [`../infra/README.md`](../infra/README.md) | Graviton + COOL deployment (dry-run by default) and the 3-way benchmark |
+| [`containers.md`](containers.md) | Docker, Compose and Kubernetes: the image, health probes, how it is tested |
+| [`../infra/README.md`](../infra/README.md) | Graviton deployment (dry-run by default; the COOL path is built, not yet run) and the 3-way benchmark |
 | [`user_study.md`](user_study.md) | the timed user study protocol (≈ 10 min per person) |
 | [`kaggle_training.md`](kaggle_training.md) | train a model on Kaggle and plug it in with one command |
 

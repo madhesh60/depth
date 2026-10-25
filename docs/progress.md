@@ -62,7 +62,7 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
   tiers (≥ 78% one look, ≥ 84% looking harder — both checked for correlated frames), **one review card per
   object** (STUDY-23), survey planning and person-approved actions — on the sample frames and on a raw
   Humminbird recording with real GPS and a per-ping dropout mask. `ruff check .` (with bugbear) and `mypy` (the
-  decision core) are clean, both in CI; the full suite passes (314, 2026-10-23; coverage 60% of `src/`).
+  decision core) are clean, both in CI; the full suite passes (315, 2026-10-24; coverage 60% of `src/`).
 - **Judges can run it:** one click in GitHub Codespaces (`.devcontainer/`), or five commands on a laptop. CI runs
   the codespace's own setup in its image on 2 CPUs and plays the guided demo to its last step
   (`.github/workflows/codespaces.yml`); one real click in a codespace is still the owner's check.
@@ -84,18 +84,78 @@ Metrics" and [`docs/technical_report.md`](technical_report.md).
 
 ## 4. Session log
 
-### 2026-10-24 — the README and the judges' page, restructured
+### 2026-10-25 (sweep 80) — Docker, Compose and Kubernetes, tested for real
 
-- **README:** the owner's new opening (problem, current practice, what DEPTH builds) tightened, plus the sections
-  a judge looks for: architecture stage table, the agentic workflow with human approval and a **failure-handling**
-  table, **model and training** (recipe, process, how EXP-003 was chosen over the other runs), **dataset sources** with licences,
-  evaluation metrics, an **experimental studies / ablations** table (STUDY-01 to 23), performance against the
-  targets, a fairer competitive table (GhostVision's stronger detector stated), AWS + OpenCV 5, installation and
-  reproduction, limitations, documentation, attribution and licence. The `cool:status` / `cool:readme` blocks
-  stay, so `cool_docs.py` still fills them.
-- **`JUDGES.md` moved to the repo root** (`git mv`): try it, see the agent decide (six runs to trigger), key
-  numbers, a criteria map for the three awards, not done, glossary. `cool_docs.py`, its test, `golive.sh`, the
-  devcontainer and the docs map follow the new path.
+- `Dockerfile` (multi-stage, torch-free, non-root uid 10001, detector fetched SHA-256 checked, `runs/` → `/data`,
+  `GIT_COMMIT` → every provenance stamp), `.dockerignore`, `compose.yaml` (read-only root, no capabilities),
+  `infra/k8s/` (Kustomize: restricted namespace, probes, PVC, NetworkPolicy, one replica because surveys are in memory).
+- New `/healthz` and `/readyz` (503 until the detector is warm). `fingerprint.git_commit` reads `DEPTH_GIT_COMMIT`.
+- Found by running the image: the server wrote to `/app/runs` and crashed as non-root; fixed with the `/data` link.
+- Checked here: image built (731 MB); `tests/container_smoke.py` PASS in Docker read-only with no capabilities and in
+  Compose (Analyze 10 boxes, Survey of the raw recording, provenance commit); `ui_smoke --full-demo` against the
+  container, no failed step; manifests pass `kubernetes-validate --strict` for 1.31. The kind deploy runs in CI
+  (`container.yml`); main publishes `ghcr.io/madhesh60/depth`. Dependabot for pip, Docker and Actions.
+- Suite: 318 passed, 1 skipped; ruff and mypy clean.
+
+### 2026-10-24 (sweep 79) — limitations: short, honest, one place each
+
+- README §2/§9, JUDGES §7 (also the For judges tab) and technical report §6 cut to one line per item; the single COOL status sentence (`cool_docs.PENDING_STATUS`) shortened everywhere. Nothing removed that is unfinished. Suite: 314 passed.
+
+### 2026-10-24 (sweep 78) — the judges' guide moves to the repository root
+
+- `docs/JUDGES.md` → `JUDGES.md`, its links rewritten and checked; README, docs map, studio tab (`/api/judges`, links now resolve against `blob/main/`), `cool_docs`, `golive.sh`, Codespaces and tests follow. Suite: 314 passed; UI smoke: no failed steps.
+
+### 2026-10-24 (sweep 77) — every document says only what is true today
+
+A sweep of every Markdown file (and the architecture diagram) for claims of work that is not done. Each one now says
+what exists and what has not run:
+
+- **COOL:** no document says or implies that COOL runs, is deployed or is proven. The README's stack row, section 8
+  (now "Deployment on AWS Graviton"), the capability row (now "a COOL check, built but not yet used"), the repository
+  structure; the judges' guide (runtime, architecture and reproducibility rows); the technical report (§5: applied in
+  rehearsal mode; the EC2 row "designed to launch from the COOL AMI"; "COOL verification (built, not yet run on COOL)";
+  CloudFront "not yet created"); the architecture doc (intro, deploy target, the cloud line, §10 with a status
+  paragraph); `infra/README.md` (title, intro, "how anyone will check it"); the docs map; the Lucidchart source; the
+  video narration; `CLAUDE.md`; and the SVG (title, subtitle and the EC2 box: "COOL AMI planned — runs stock OpenCV 5
+  today"). The automatic status lines (`cool:status`, `cool:readme`, the technical report's pending row) are unchanged.
+- **Other unfinished work:** the Study and Audit tabs are "built, not yet run" with people in the README, the technical
+  report and the Agentic Vision doc (no audited precision exists); "live demo" / "live link" wording now points to
+  Codespaces and says there is no public URL yet.
+- **When COOL truly runs:** `PHASE=cool ./infra/golive.sh` updates the status lines; these hand-written lines must then
+  be updated too: README stack row, §8 intro and table, the capability row; JUDGES §4.3 and the runtime row; technical
+  report §5; architecture intro, deploy target, cloud line and §10 status; `infra/README.md` title and intro; the SVG.
+- Checks: every relative link and anchor in the edited docs resolves; 314 passed, 1 skipped; the UI test passes every
+  step (the judges tab renders the updated guide).
+
+### 2026-10-24 (sweep 76) — a formal README and judges' guide; a For judges tab in the studio
+
+- **`README.md`** rewritten in a formal register with a table of contents and numbered sections: at a glance, project
+  status (first, so no reader has to discover what is missing), overview and capabilities, the criteria map, the agent,
+  architecture with a stage-by-module table, getting started, results (detector, promise, effort, runtime, real
+  recordings), the AWS deployment, limitations, reproducibility, repository structure, a documentation index, and
+  responsible use, development and licence. No number changed; every relative link and in-page anchor was checked.
+- **`docs/JUDGES.md`** rewritten as an evaluation guide: summary, access (with status), a ten-minute evaluation path,
+  evidence by criterion (overall, Agentic Vision, Best Use of COOL), the principal measurements with their splits, the
+  submission deliverables with status, outstanding items and limitations, verification commands, glossary and further
+  reading. The COOL line keeps its `cool:status` marker (the docs test passes).
+- **The studio's For judges tab** (after Connect; deep link `?mode=judges`): live facts from the running server (model,
+  recall promises, OpenCV build and whether it is COOL, the DNN engine, host, code commit with a link, how approvals
+  work), shortcuts (guided demo, analyze a sample, survey the real recording, connect an agent, repository), and the
+  guide itself — `GET /api/judges` serves `docs/JUDGES.md`, so the tab and the file never disagree. A small renderer in
+  `webui/js/judges.js` escapes all text, drops HTML comments and keeps only http(s), in-page and relative links
+  (relative ones resolve to the docs on GitHub); checked against script tags, `javascript:` links and injected
+  attributes with an HTML parser.
+- **Tests:** `tests/test_api.py` checks the endpoint serves the file on disk with the server's facts; `tests/ui_smoke.py`
+  opens the tab (10 sections, 7 facts, no raw Markdown) and uses a shortcut. 314 passed, 1 skipped (315); ruff and mypy
+  clean; the UI test passes every step and plays the guided demo to 7/7. Checked by hand at 1400 px and 390 px (no
+  horizontal scroll) and with the real-recording shortcut (Survey, real GPS, Agent tab, promise withdrawn).
+
+### 2026-10-24 — AWS SSM secrets, SNS notifications, Bedrock Converse, and architecture diagram
+
+- **AWS infrastructure:** CloudFormation template updated with Parameter Store secrets, EventBridge alerts, daily DLM snapshots, cost anomaly emails, saved queries, and approval SNS topic.
+- **Secrets and notifications:** `infra/secrets.sh` and `src/dashboard/sns_notify.py` to notify approvers via email without exposing PIN.
+- **Converse API:** Bedrock mission brief writer supports Converse API for models like Amazon Nova and Claude with verifiable citation checks.
+- **Architecture:** Lucidchart source diagram and documentation updated.
 
 ### 2026-10-23 (sweep 75) — the AWS items in our hands: the server updated, the engine measured, look harder on EC2
 

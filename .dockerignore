@@ -1,0 +1,21 @@
+# Only src/, webui/, models/ (+ best.onnx if present), JUDGES.md, README.md and LICENSE go into the image.
+.git
+.github
+.devcontainer
+.mypy_cache
+.pytest_cache
+.ruff_cache
+**/__pycache__
+DATASET
+EXP_FILES
+runs
+docs
+notebooks
+tests
+benchmarks
+infra
+*.pt
+*.zip
+.env
+.env.*
+*.pem

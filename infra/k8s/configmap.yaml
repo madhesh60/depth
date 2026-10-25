@@ -1,0 +1,12 @@
+# Non-secret settings (every DEPTH_* variable is read by src/; defaults are safe for a private cluster).
+# Secrets (DEPTH_MCP_TOKEN, DEPTH_ADMIN_TOKEN, DEPTH_APPROVER_PIN) go in a Secret named depth-secrets:
+#   kubectl -n depth create secret generic depth-secrets --from-literal=DEPTH_MCP_TOKEN=... ...
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: depth-config
+data:
+  DEPTH_MODEL: EXP-003
+  DEPTH_LOG_JSON: "1"
+  DEPTH_DNN_ENGINE: fastest          # time both cv2.dnn engines at load, keep the faster (same answers)
+  DEPTH_TRUST_PROXY: "0"             # "1" only behind an ingress that appends X-Forwarded-For
