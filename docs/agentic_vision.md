@@ -10,7 +10,7 @@
 > and every promise is calibrated on held-out recordings and verified once on unseen ones.
 
 Code: [`src/agentic/core.py`](../src/agentic/core.py) (the core loop) and [`src/agentic/`](../src/agentic) ·
-Demo: the web app (`webui/`, served by `src/dashboard/app.py`; run it locally or in Codespaces — no public URL yet) · Evidence:
+Demo: the web app (`webui/`, served by `src/dashboard/app.py`; live at https://13-216-140-101.sslip.io, or run it locally or in Codespaces) · Evidence:
 [`calibration_exp003.md`](calibration_exp003.md), [`look_harder.md`](reports/look_harder.md),
 [`applicability.md`](reports/applicability.md), [`sensor_check.md`](reports/sensor_check.md),
 [`causal_trace.md`](reports/causal_trace.md).

@@ -37,14 +37,14 @@ dispatched. Its contribution is not a better detector but a **dependable** one. 
 | Problem | Reviewing side-scan sonar for lost fishing gear by hand is slow, and an uncalibrated detector cannot be relied on to plan a recovery trip. |
 | Approach | OpenCV 5 sonar geometry (Stage 1) → YOLO11 detection through `cv2.dnn` → physical evidence → statistically calibrated review tiers → survey planning → human approval. |
 | Agent | A goal-driven loop ([`core.py`](src/agentic/core.py)): check applicability, choose a perception mode, monitor the compute budget, plan, and request approval. |
-| Runtime | CPU-only and torch-free, OpenCV 5.0.0.93. A server on AWS EC2 Graviton4 (c8g.large) runs it with stock OpenCV 5, in rehearsal mode, without a public address yet. |
+| Runtime | CPU-only and torch-free, OpenCV 5.0.0.93. A server on AWS EC2 Graviton4 (c8g.large) runs it with stock OpenCV 5, in rehearsal mode, at https://13-216-140-101.sslip.io. |
 | Licence | AGPL-3.0 |
 
 ## 2. Access
 
 | Route | How | Status |
 |---|---|---|
-| Public deployment | — | **Pending** (see §7.1) |
+| Public deployment | [https://13-216-140-101.sslip.io](https://13-216-140-101.sslip.io): the full studio on AWS Graviton4 (stock OpenCV 5, not COOL); approving needs the PIN from the submission form | Available |
 | GitHub Codespaces | [Open in GitHub Codespaces](https://codespaces.new/madhesh60/depth?quickstart=1): the full studio in a browser, ready in about three minutes, free with a GitHub account | Available; the setup and the guided demo run in CI on every push ([`codespaces.yml`](.github/workflows/codespaces.yml)) |
 | Local installation | The five commands below, on any laptop, CPU only | Available |
 | Docker, Compose, Kubernetes | `docker compose up --build` or `kubectl apply -k infra/k8s` ([`containers.md`](docs/containers.md)) | Available; built, run and deployed to a test cluster in CI ([`container.yml`](.github/workflows/container.yml)) |
@@ -144,7 +144,7 @@ The route below takes about ten minutes and touches every part of the system.
 | Source code | This repository | Complete |
 | Pinned dependencies, build, deployment and test instructions | `requirements*.txt`, [`README.md`](README.md), [`infra/README.md`](infra/README.md) | Complete |
 | Architecture diagram | [`architecture.md`](docs/architecture.md), `docs/img/architecture.svg` | Complete |
-| Working endpoint or live demonstration | GitHub Codespaces (available); public URL (pending) | Partial |
+| Working endpoint or live demonstration | GitHub Codespaces and the public URL https://13-216-140-101.sslip.io (both available) | Complete |
 | Demonstration video | — | Pending |
 | Evaluation evidence | [`reports/`](docs/reports), [`experiments.md`](docs/experiments.md) | Complete |
 | Limitations and responsible use | §7 below; [`responsible_use.md`](docs/responsible_use.md) | Complete |
@@ -154,7 +154,6 @@ The route below takes about ten minutes and touches every part of the system.
 **Not finished yet**
 
 - **COOL:** <!-- cool:status -->has not run yet: the AWS Marketplace subscription is blocked on payment. The demo server runs stock OpenCV 5 and says so; the COOL benchmark and its signed receipt run in one command once it is active.<!-- /cool:status -->
-- **Public URL** — waiting on AWS account verification; Codespaces runs the same studio.
 - **Demonstration video** — not yet recorded (`python tests/ui_video.py` produces the footage).
 - **Human study and blinded audit** — analyst minutes use assumed timings, labelled as such.
 - **Real language-model session** — built and tested with a stand-in model; recording it needs a Claude API key.

@@ -13,7 +13,7 @@ without CloudFront (`ENABLE_CDN=0`, AWS account verification pending) and in reh
 the COOL Marketplace subscription is blocked on payment - the Marketplace needs a Visa or Mastercard). Stock
 x86 + Graviton benchmarks (both perception modes, each on its measured `cv2.dnn` engine) and the demo-server
 load test re-ran on 2026-10-23 ([`cool_benchmark.md`](../docs/reports/cool_benchmark.md)); the server runs the
-pushed code (`update_server.sh`); the COOL runs wait on the subscription. `PUBLIC_HTTPS=1` is ready, not applied._
+pushed code (`update_server.sh`); the COOL runs wait on the subscription. `PUBLIC_HTTPS=1` applied on 2026-10-25: the demo is public at https://13-216-140-101.sslip.io (Caddy + Let's Encrypt)._
 
 ## Architecture
 

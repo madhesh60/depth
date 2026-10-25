@@ -19,7 +19,7 @@ COOL** · AGPL-3.0
 | **Try it in the browser** | [Open in GitHub Codespaces](https://codespaces.new/madhesh60/depth?quickstart=1): the real studio in about 3 minutes, free with a GitHub account |
 | **Run it locally** | five commands, CPU only: [Installation and Reproduction](#installation-and-reproduction) |
 | **Docker · Compose · Kubernetes** | [`docs/containers.md`](docs/containers.md): one non-root image, read-only root, health probes |
-| **Live demo · video** | not live yet (CloudFront awaits AWS account verification) · not recorded yet |
+| **Live demo · video** | **[13-216-140-101.sslip.io](https://13-216-140-101.sslip.io)** (AWS Graviton4 c8g.large, stock OpenCV 5 in rehearsal mode - not COOL; the approver PIN is in the submission form) · not recorded yet |
 
 **Contents:** [Problem](#problem-statement) · [Current practice](#how-it-is-currently-handled) ·
 [What DEPTH builds](#what-depth-builds) · [Architecture](#architecture) ·
@@ -555,7 +555,8 @@ python -m src.agentic.effort --real-water           # analyst effort on the raw 
   (Raspberry Pi, Jetson) has been measured.
 - **Sensing.** Stage 1 follows heave per ping; pitch and roll are not corrected, because the ping header carries
   no attitude. Data dropouts are flagged, not repaired.
-- **Deployment.** There is no public URL yet (CloudFront account verification). The recorded MCP session uses a
+- **Deployment.** The live demo (https://13-216-140-101.sslip.io) runs behind Caddy with a Let's Encrypt certificate, not CloudFront (account
+  verification pending), on stock OpenCV 5, not COOL. The recorded MCP session uses a
   scripted client; a run with a real LLM needs a Claude API key, because this account cannot accept the Claude
   Marketplace agreement on Bedrock.
 

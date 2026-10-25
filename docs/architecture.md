@@ -340,7 +340,7 @@ UI: a zero-build studio with six modes (Analyze · Survey · Study · Audit · C
 
 ## 10. Cloud and COOL (`infra/`)
 
-**Status:** applied in rehearsal mode (stock Ubuntu 24.04 and stock OpenCV 5, no CloudFront, no public address);
+**Status:** applied in rehearsal mode (stock Ubuntu 24.04 and stock OpenCV 5, no CloudFront; public at https://13-216-140-101.sslip.io through Caddy on 443);
 the COOL items below are built and tested but have not run, because the COOL subscription is blocked on payment.
 
 One CloudFormation stack (`infra/cfn/depth.yaml`, deployed by `infra/deploy.sh`, dry-run by default), designed for:

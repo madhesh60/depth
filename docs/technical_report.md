@@ -304,7 +304,7 @@ CV-only workload that isolates where COOL acts.
 
 ## 5. AWS deployment
 
-The deployment is scripted and dry-run checked. It is applied in rehearsal mode (stock Ubuntu and stock OpenCV 5, no public address yet); the COOL items below are built but have not run:
+The deployment is scripted and dry-run checked. It is applied in rehearsal mode (stock Ubuntu and stock OpenCV 5; public at https://13-216-140-101.sslip.io through Caddy + Let's Encrypt, CloudFront pending); the COOL items below are built but have not run:
 
 One CloudFormation stack (`infra/cfn/depth.yaml`):
 

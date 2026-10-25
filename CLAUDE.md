@@ -120,7 +120,8 @@ budget) → plan → one approval request per action. Every step is logged in `a
   `update_server.sh` - never edit the Instance's UserData or the launch template (that stops or replaces it).
 - Validate template changes with cfn-lint 1.58.0 and cfn-guard 3.2.1 (AWS Well-Architected rule sets, installed in
   `C:/Users/RAJ/tools/`): 0 findings; keep it under 51,200 bytes (`deploy.sh` checks).
-- State: first applied 2026-10-19. CloudFront awaits AWS account verification (`ENABLE_CDN=0`);
+- State: first applied 2026-10-19. CloudFront awaits AWS account verification (`ENABLE_CDN=0`); public since 2026-10-25
+  at https://13-216-140-101.sslip.io (`PUBLIC_HTTPS=1`: Caddy + Let's Encrypt on 443, Caddy sends the origin secret);
   the COOL Marketplace subscription is blocked on payment - it needs a Visa or Mastercard (`REHEARSAL=1`).
 - Never modify the COOL venv (install web deps with `pip --target`). A benchmark counts as COOL only
   if `cv2.__file__` is under `/opt/cool`.

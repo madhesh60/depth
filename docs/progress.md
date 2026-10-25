@@ -97,8 +97,16 @@ Metrics" and [`docs/technical_report.md`](technical_report.md).
   set, OGC links `https://`, the app still sees each visitor's own address (rate limits), the app port without the
   secret still 403. The live check now says so when the link does not answer within 10 minutes.
 - Test: `test_caddy_sends_the_origin_secret_because_uvicorn_trusts_loopback` (fails on the old script). Suite: 328 passed; ruff clean.
-- Not applied yet (needs `aws login`; the owner runs it): `PUBLIC_HTTPS=1 ROLLBACK=1 APPLY=1 ./infra/deploy.sh`, then
-  `APPLY=1 ./infra/update_server.sh` and `./infra/secrets.sh pin`.
+- **Applied the same day, with the owner's go-ahead:** the dry run added only `PublicHttpsIngress`, `DemoHealthCheck`
+  and `DemoDownAlarm` (the operations resources were already in place); `PUBLIC_HTTPS=1 ROLLBACK=1 APPLY=1
+  ./infra/deploy.sh` installed Caddy 2.6.2 (Let's Encrypt, valid to 2027-01-23); `update_server.sh` moved the server
+  to `4103b3e`. **The demo is public: https://13-216-140-101.sslip.io** (stock OpenCV 5, rehearsal - not COOL).
+  Checked from outside: studio, health, judges tab, OGC 200; HSTS; `tests/container_smoke.py --url` PASS (Analyze
+  10 boxes, a survey of the raw recording with real GPS).
+- Found on the live server: the judges tab and provenance showed no code commit - the service user cannot run git
+  in the root-owned clone ("dubious ownership"). The setup now stamps `DEPTH_GIT_COMMIT` into the unit, as the
+  container image does.
+- Docs: README, JUDGES, architecture, technical report, Agentic Vision, user study and the infra README name the link.
 
 ### 2026-10-25 (sweep 80) — Docker, Compose and Kubernetes, tested for real
 
