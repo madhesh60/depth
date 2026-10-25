@@ -84,6 +84,22 @@ Metrics" and [`docs/technical_report.md`](technical_report.md).
 
 ## 4. Session log
 
+### 2026-10-25 (sweep 81) — the public HTTPS link would have refused every visitor: fixed before the first apply
+
+- Found while preparing the owner's go-live steps: behind Caddy (`PUBLIC_HTTPS=1`) every request would have got 403
+  "direct origin access is not allowed". uvicorn trusts `X-Forwarded-For` from loopback by default, so the app sees a
+  proxied request as the visitor's, not as an on-box call; the origin guard is always on (the user data writes the
+  CloudFront secret), so it refused them. Reproduced locally with the real app (public mode, as on the server) behind
+  Caddy 2.6.2 (Ubuntu 24.04's version, SHA-512 checked): 403 on `/` and `/api/health`.
+- Fix, in `infra/deploy.sh` only (no server code or template change): Caddy sends the origin secret as CloudFront does
+  (`header_up X-Origin-Verify`), read on the box from `/etc/depth/origin.env`, never in the SSM command; the Caddyfile
+  is root:caddy 0640. Same local test: 200 on `/` and `/api/health`, a visitor's forged header is overwritten, HSTS
+  set, OGC links `https://`, the app still sees each visitor's own address (rate limits), the app port without the
+  secret still 403. The live check now says so when the link does not answer within 10 minutes.
+- Test: `test_caddy_sends_the_origin_secret_because_uvicorn_trusts_loopback` (fails on the old script). Suite: 328 passed; ruff clean.
+- Not applied yet (needs `aws login`; the owner runs it): `PUBLIC_HTTPS=1 ROLLBACK=1 APPLY=1 ./infra/deploy.sh`, then
+  `APPLY=1 ./infra/update_server.sh` and `./infra/secrets.sh pin`.
+
 ### 2026-10-25 (sweep 80) — Docker, Compose and Kubernetes, tested for real
 
 - `Dockerfile` (multi-stage, torch-free, non-root uid 10001, detector fetched SHA-256 checked, `runs/` → `/data`,
