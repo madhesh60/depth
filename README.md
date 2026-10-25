@@ -18,6 +18,7 @@ COOL** · AGPL-3.0
 | **For judges** | [`JUDGES.md`](JUDGES.md): try it, see the agent decide, every key number with its split · also in the studio under **For judges** |
 | **Try it in the browser** | [Open in GitHub Codespaces](https://codespaces.new/madhesh60/depth?quickstart=1): the real studio in about 3 minutes, free with a GitHub account |
 | **Run it locally** | five commands, CPU only: [Installation and Reproduction](#installation-and-reproduction) |
+| **Practical (deps · build · deploy · test)** | [Practical: Pinned Dependencies, Build, Deployment and Tests](#practical-pinned-dependencies-build-deployment-and-tests): exact pins, one command per step, all run in CI |
 | **Docker · Compose · Kubernetes** | [`docs/containers.md`](docs/containers.md): one non-root image, read-only root, health probes |
 | **Live demo · video** | **[13-216-140-101.sslip.io](https://13-216-140-101.sslip.io)** (AWS Graviton4 c8g.large, stock OpenCV 5 in rehearsal mode - not COOL; the approver PIN is in the submission form) · not recorded yet |
 
@@ -27,6 +28,7 @@ COOL** · AGPL-3.0
 [Data](#dataset-sources) · [Metrics](#evaluation-metrics) · [Studies](#experimental-studies-and-ablations) ·
 [Performance](#system-details-and-key-numbers) · [Comparison](#competitive-analysis) ·
 [AWS + OpenCV 5](#use-of-aws-and-opencv-5) · [Install](#installation-and-reproduction) ·
+[Practical](#practical-pinned-dependencies-build-deployment-and-tests) ·
 [Limitations](#limitations) · [Docs](#documentation) · [License](#attribution-and-license)
 
 ---
@@ -446,6 +448,54 @@ template is served.
 ## Installation and Reproduction
 
 **Requirements:** Python 3.10 and a CPU. No GPU and no PyTorch. Tested on Windows 11 and on Ubuntu 24.04 (CI).
+
+### Practical: Pinned Dependencies, Build, Deployment and Tests
+
+This section answers the judges' practical criterion in one place: every dependency is pinned, and the build,
+deployment and test steps below are the ones CI runs on every push.
+
+**Pinned dependencies.** Every package is pinned to an exact version (`==`), split by purpose so the runtime
+stays small and torch-free:
+
+| File | Purpose | Key pins |
+|---|---|---|
+| [`requirements.txt`](requirements.txt) | runtime (server, studio, MCP) | `opencv-python-headless==5.0.0.93`, `numpy==2.2.6`, `fastapi==0.127.0`, `uvicorn==0.40.0`, `mcp==1.28.1` |
+| [`requirements-dev.txt`](requirements-dev.txt) | tests, lint, type check (includes the runtime) | `pytest==9.1.0`, `ruff==0.15.17`, `mypy==2.1.0` |
+| [`requirements-train.txt`](requirements-train.txt) | training and ONNX export, Kaggle GPU only | `ultralytics==8.4.157`, `torch==2.9.1` |
+
+Python 3.10 everywhere (CI, the Docker base `python:3.10-slim-bookworm`, Codespaces). The detector weights and
+the raw recording are downloaded with SHA-256 checks, so a changed file is refused.
+
+**Build.**
+
+```bash
+pip install -r requirements.txt && python -m src.detection.fetch_model   # local
+docker build -t depth .                                                   # container (fetches the model itself)
+```
+
+**Run and deploy.**
+
+| Target | Command | Notes |
+|---|---|---|
+| Local | `python -m uvicorn src.dashboard.app:app --port 8000` | http://localhost:8000 |
+| Docker / Compose | `docker compose up --build` | non-root, read-only root, health check |
+| Kubernetes | `kubectl apply -k infra/k8s` | one replica (surveys are in memory) |
+| AWS (EC2 Graviton) | `./infra/deploy.sh` → read the change set → `APPLY=1 ./infra/deploy.sh` | dry-run by default; code updates with `APPLY=1 ./infra/update_server.sh` ([`infra/README.md`](infra/README.md)) |
+| Remove from AWS | `./infra/teardown.sh` | deletes the stack |
+
+**Test.**
+
+```bash
+pip install -r requirements-dev.txt
+pytest -q                                   # the test suite
+python -m ruff check . && python -m mypy    # lint; type check of the decision core
+python tests/ui_smoke.py --full-demo        # headless Chrome plays the guided demo
+python tests/container_smoke.py --url http://localhost:8000   # real work inside a running container
+```
+
+CI runs these on every push: [`tests.yml`](.github/workflows/tests.yml) (tests, lint, type check),
+[`container.yml`](.github/workflows/container.yml) (build, run locked down, deploy to a throwaway Kubernetes
+cluster) and [`codespaces.yml`](.github/workflows/codespaces.yml) (fresh setup, guided demo to the last step).
 
 ### Option A: GitHub Codespaces (Nothing to Install)
 

@@ -11,14 +11,15 @@ the application, under the **For judges** tab.
 
 1. [Summary](#1-summary)
 2. [Access](#2-access)
-3. [Recommended evaluation path](#3-recommended-evaluation-path)
-4. [Evidence by judging criterion](#4-evidence-by-judging-criterion)
-5. [Principal measurements](#5-principal-measurements)
-6. [Submission deliverables](#6-submission-deliverables)
-7. [Outstanding items and limitations](#7-outstanding-items-and-limitations)
-8. [Verifying the claims](#8-verifying-the-claims)
-9. [Glossary](#9-glossary)
-10. [Further reading](#10-further-reading)
+3. [Practical: pinned dependencies, build, deployment and tests](#3-practical-pinned-dependencies-build-deployment-and-tests)
+4. [Recommended evaluation path](#4-recommended-evaluation-path)
+5. [Evidence by judging criterion](#5-evidence-by-judging-criterion)
+6. [Principal measurements](#6-principal-measurements)
+7. [Submission deliverables](#7-submission-deliverables)
+8. [Outstanding items and limitations](#8-outstanding-items-and-limitations)
+9. [Verifying the claims](#9-verifying-the-claims)
+10. [Glossary](#10-glossary)
+11. [Further reading](#11-further-reading)
 
 ## 1. Summary
 
@@ -62,7 +63,55 @@ python -m uvicorn src.dashboard.app:app --port 8000   # then open http://localho
 On the deployed server, approving an action requires the **approver PIN**, which is supplied with the
 submission. Agents and API clients can only file requests; the studio states where the PIN is found.
 
-## 3. Recommended evaluation path
+## 3. Practical: pinned dependencies, build, deployment and tests
+
+This section answers the judges' practical criterion in one place: every dependency is pinned, and the build,
+deployment and test steps below are the ones CI runs on every push.
+
+**Pinned dependencies.** Every package is pinned to an exact version (`==`), split by purpose so the runtime
+stays small and torch-free:
+
+| File | Purpose | Key pins |
+|---|---|---|
+| [`requirements.txt`](requirements.txt) | runtime (server, studio, MCP) | `opencv-python-headless==5.0.0.93`, `numpy==2.2.6`, `fastapi==0.127.0`, `uvicorn==0.40.0`, `mcp==1.28.1` |
+| [`requirements-dev.txt`](requirements-dev.txt) | tests, lint, type check (includes the runtime) | `pytest==9.1.0`, `ruff==0.15.17`, `mypy==2.1.0` |
+| [`requirements-train.txt`](requirements-train.txt) | training and ONNX export, Kaggle GPU only | `ultralytics==8.4.157`, `torch==2.9.1` |
+
+Python 3.10 everywhere (CI, the Docker base `python:3.10-slim-bookworm`, Codespaces). The detector weights and
+the raw recording are downloaded with SHA-256 checks, so a changed file is refused.
+
+**Build.**
+
+```bash
+pip install -r requirements.txt && python -m src.detection.fetch_model   # local
+docker build -t depth .                                                   # container (fetches the model itself)
+```
+
+**Run and deploy.**
+
+| Target | Command | Notes |
+|---|---|---|
+| Local | `python -m uvicorn src.dashboard.app:app --port 8000` | http://localhost:8000 |
+| Docker / Compose | `docker compose up --build` | non-root, read-only root, health check |
+| Kubernetes | `kubectl apply -k infra/k8s` | one replica (surveys are in memory) |
+| AWS (EC2 Graviton) | `./infra/deploy.sh` → read the change set → `APPLY=1 ./infra/deploy.sh` | dry-run by default; code updates with `APPLY=1 ./infra/update_server.sh` ([`infra/README.md`](infra/README.md)) |
+| Remove from AWS | `./infra/teardown.sh` | deletes the stack |
+
+**Test.**
+
+```bash
+pip install -r requirements-dev.txt
+pytest -q                                   # the test suite
+python -m ruff check . && python -m mypy    # lint; type check of the decision core
+python tests/ui_smoke.py --full-demo        # headless Chrome plays the guided demo
+python tests/container_smoke.py --url http://localhost:8000   # real work inside a running container
+```
+
+CI runs these on every push: [`tests.yml`](.github/workflows/tests.yml) (tests, lint, type check),
+[`container.yml`](.github/workflows/container.yml) (build, run locked down, deploy to a throwaway Kubernetes
+cluster) and [`codespaces.yml`](.github/workflows/codespaces.yml) (fresh setup, guided demo to the last step).
+
+## 4. Recommended evaluation path
 
 The route below takes about ten minutes and touches every part of the system.
 
@@ -80,11 +129,11 @@ The route below takes about ten minutes and touches every part of the system.
 6. **Connect.** The standard interfaces: MCP for AI agents, OGC API – Features for GIS, signed webhooks, and an
    embeddable web panel.
 7. **Study** and **Audit.** The built-in instruments for measuring analyst time and genuine false alarms. They
-   have not yet been run with participants (see §7.1).
+   have not yet been run with participants (see §8).
 
-## 4. Evidence by judging criterion
+## 5. Evidence by judging criterion
 
-### 4.1 Overall criteria
+### 5.1 Overall criteria
 
 | Criterion | Where the evidence is |
 |---|---|
@@ -95,7 +144,7 @@ The route below takes about ten minutes and touches every part of the system.
 | User experience | A zero-build studio: guided demo, evidence cards with the agent's trace, approvals inbox, 3D twin, failure drills, and one-click Codespaces. |
 | Responsible cloud delivery | One CloudFormation stack, dry-run by default, budget alerts and a scheduled stop, PIN lockout, refusal to start without tokens, a non-root read-only container with health probes and a Kubernetes base ([`containers.md`](docs/containers.md)), protected wreck positions generalised ([`infra/README.md`](infra/README.md), [`responsible_use.md`](docs/responsible_use.md)). |
 
-### 4.2 Agentic Vision award
+### 5.2 Agentic Vision award
 
 | Requirement | Evidence |
 |---|---|
@@ -105,17 +154,17 @@ The route below takes about ten minutes and touches every part of the system.
 | Failure handling | A catalogue of named incidents, each with a safe fallback and an action for a person; failure drills can be triggered in the studio (`?simulate=tool_failed`, `tool_timeout`, `no_detection`). |
 | Decisions validated before they were switched on | Look harder (STUDY-18), applicability (STUDY-19), one card per object (STUDY-23), sensor cross-check (STUDY-16): each protocol was committed before the unseen data was scored ([`experiments.md`](docs/experiments.md)). |
 
-### 4.3 Best Use of COOL award
+### 5.3 Best Use of COOL award
 
 | Criterion | Evidence | Status |
 |---|---|---|
-| Verified COOL execution | `GET /api/cool` returns the AWS-signed instance identity document and the OpenCV libraries mapped into the server process; `python -m src.bench.verify_cool <url>` checks the signature offline. | **Not yet run** (§7.1) |
+| Verified COOL execution | `GET /api/cool` returns the AWS-signed instance identity document and the OpenCV libraries mapped into the server process; `python -m src.bench.verify_cool <url>` checks the signature offline. | **Not yet run** (§8) |
 | Architecture | One CloudFormation stack designed for EC2 Graviton4 from the COOL AMI, with an Elastic IP, S3, CloudWatch alarms, SSM-only access and a scheduled stop ([`infra/README.md`](infra/README.md)). | Deployed in rehearsal mode on stock Ubuntu and stock OpenCV 5; not yet on the COOL AMI |
 | Measured value against a baseline | Stock OpenCV 5, 4 vCPU: Graviton4 **138.5 ms** per frame against x86 **145.8 ms**, at a 15% lower hourly price; identical detections (31 of 31) ([`cool_benchmark.md`](docs/reports/cool_benchmark.md)). | Stock measured; COOL comparison scripted |
 | Innovation | The server times both OpenCV 5 DNN engines at start-up and keeps the faster one only if the answers match (STUDY-20); every result carries a provenance stamp naming the OpenCV build. | Shipped (on stock OpenCV 5) |
 | Reproducibility | `infra/bench_fleet.sh` measures x86, stock Graviton and COOL Graviton in one command, with pinned commit, frames and model. | x86 and stock Graviton runs done; COOL runs not yet run |
 
-## 5. Principal measurements
+## 6. Principal measurements
 
 | Measurement | Result | Source |
 |---|---|---|
@@ -136,7 +185,7 @@ The route below takes about ten minutes and touches every part of the system.
 | Analyst time (**assumed** 20 s per frame, 8 s per card) | Pot-dense test: one look **43.2 vs 55.7** minutes manual, looking harder **56.5 vs 57.3**; empty seabed 34 and 47 vs 56 minutes per survey-hour | [`effort_curve.md`](docs/reports/effort_curve.md) |
 | A real 1-hour recording (another sonar) | **48 review cards per hour** of sonar, with the promise withdrawn | same |
 
-## 6. Submission deliverables
+## 7. Submission deliverables
 
 | Deliverable | Location | Status |
 |---|---|---|
@@ -147,9 +196,9 @@ The route below takes about ten minutes and touches every part of the system.
 | Working endpoint or live demonstration | GitHub Codespaces and the public URL https://13-216-140-101.sslip.io (both available) | Complete |
 | Demonstration video | — | Pending |
 | Evaluation evidence | [`reports/`](docs/reports), [`experiments.md`](docs/experiments.md) | Complete |
-| Limitations and responsible use | §7 below; [`responsible_use.md`](docs/responsible_use.md) | Complete |
+| Limitations and responsible use | §8 below; [`responsible_use.md`](docs/responsible_use.md) | Complete |
 
-## 7. Outstanding items and limitations
+## 8. Outstanding items and limitations
 
 **Not finished yet**
 
@@ -166,7 +215,7 @@ The route below takes about ten minutes and touches every part of the system.
 
 Full detail: [`technical_report.md`](docs/technical_report.md) §6.
 
-## 8. Verifying the claims
+## 9. Verifying the claims
 
 ```bash
 pip install -r requirements-dev.txt                 # runtime, test, lint and type-check dependencies
@@ -183,7 +232,7 @@ python -m src.bench.verify_cool <url|receipt.json>  # verify a COOL receipt
 Studies marked as using `DATASET/` need the dataset, which is not redistributed; its builders are in
 `DATASET/scripts/` ([`dataset_card.md`](docs/dataset_card.md)).
 
-## 9. Glossary
+## 10. Glossary
 
 The same terms are available in the studio (**Terms**, top bar).
 
@@ -203,7 +252,7 @@ The same terms are available in the studio (**Terms**, top bar).
 | **STUDY-n** | A registered experiment in [`experiments.md`](docs/experiments.md): protocol first, then the data. |
 | **COOL** | The OpenCV-optimised AMI for AWS Graviton; a run counts as COOL only if `cv2` loads from `/opt/cool`. |
 
-## 10. Further reading
+## 11. Further reading
 
 | Document | Purpose |
 |---|---|
