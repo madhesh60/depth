@@ -10,14 +10,14 @@
 
 # Behind a TLS-inspecting proxy, pass its CA (used only while building, never stored in the image):
 #   docker build --secret id=ca,src=/path/to/ca.pem --build-arg HTTPS_PROXY=... -t depth .
-FROM python:3.10-slim-bookworm AS deps
+FROM python:3.15-slim-bookworm AS deps
 ENV PIP_NO_CACHE_DIR=1 PIP_DISABLE_PIP_VERSION_CHECK=1
 COPY requirements.txt /tmp/requirements.txt
 RUN --mount=type=secret,id=ca,required=false \
     if [ -f /run/secrets/ca ]; then export PIP_CERT=/run/secrets/ca; fi; \
     pip install --prefix=/install -r /tmp/requirements.txt
 
-FROM python:3.10-slim-bookworm AS model
+FROM python:3.15-slim-bookworm AS model
 # 1 = download the detector from the GitHub Release; 0 = use models/<MODEL>/best.onnx from the build context
 ARG FETCH_MODEL=1
 ARG DEPTH_MODEL=EXP-003
@@ -34,7 +34,7 @@ RUN --mount=type=secret,id=ca,required=false \
  && if [ "$FETCH_RECORDING" = "1" ]; then python -m src.cv_pipeline.humminbird fetch \
       || echo "recording fetch failed - the studio runs without it"; fi
 
-FROM python:3.10-slim-bookworm
+FROM python:3.15-slim-bookworm
 ARG GIT_COMMIT=""
 ARG DEPTH_MODEL=EXP-003
 LABEL org.opencontainers.image.title="DEPTH" \
