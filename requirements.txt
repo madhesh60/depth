@@ -5,7 +5,7 @@
 #   Training / ONNX export deps -> requirements-train.txt (Kaggle GPU only)
 #   Test-suite deps             -> requirements-dev.txt
 opencv-python-headless==5.0.0.93
-numpy==2.2.6            # OpenCV 5's cp310 wheel requires numpy>=2
+numpy==2.5.4            # OpenCV 5's cp310 wheel requires numpy>=2
 fastapi==0.127.0
 uvicorn==0.40.0
 python-multipart==0.0.21
