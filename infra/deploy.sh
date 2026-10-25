@@ -220,7 +220,10 @@ if { [ -z "$URL" ] || [ "$URL" = None ]; } && [ -n "$HTTPS_URL" ] && [ "$HTTPS_U
   HOST="${HTTPS_URL#https://}"
   say "HTTPS on the Elastic IP without CloudFront: Caddy + Let's Encrypt for $HOST"
   # Ubuntu's own caddy package first, Caddy's signed apt repository as the fallback; Caddy gets the certificate
-  # itself (TLS-ALPN on 443) and proxies to the app on loopback, flushing at once (MCP streams)
+  # itself (TLS-ALPN on 443) and proxies to the app on loopback, flushing at once (MCP streams). It sends the origin
+  # secret as CloudFront does: uvicorn trusts X-Forwarded-For from loopback, so the app sees every proxied request
+  # as the visitor's, and the origin guard admits only the secret or an on-box caller (without it: 403 for all).
+  # The value is read on the box, never in this command; the Caddyfile is root:caddy 0640.
   SSM_COMMENT="DEPTH HTTPS (Caddy)" ssm_run "$IID" "set -e
 export DEBIAN_FRONTEND=noninteractive
 if ! command -v caddy >/dev/null; then
@@ -230,7 +233,11 @@ if ! command -v caddy >/dev/null; then
     curl -1sLf https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt > /etc/apt/sources.list.d/caddy-stable.list
     apt-get -o DPkg::Lock::Timeout=300 update -y >/dev/null; apt-get -o DPkg::Lock::Timeout=300 install -y caddy >/dev/null; }
 fi
-printf '%s {\n\treverse_proxy 127.0.0.1:8000 {\n\t\tflush_interval -1\n\t}\n\theader Strict-Transport-Security \"max-age=31536000\"\n}\n' '$HOST' > /etc/caddy/Caddyfile
+. /etc/depth/origin.env
+[ -n \"\${DEPTH_ORIGIN_SECRET:-}\" ] || { echo 'no DEPTH_ORIGIN_SECRET in /etc/depth/origin.env' >&2; exit 1; }
+install -m 640 -o root -g caddy /dev/null /etc/caddy/Caddyfile.new
+printf '%s {\n\treverse_proxy 127.0.0.1:8000 {\n\t\theader_up X-Origin-Verify %s\n\t\tflush_interval -1\n\t}\n\theader Strict-Transport-Security \"max-age=31536000\"\n}\n' '$HOST' \"\$DEPTH_ORIGIN_SECRET\" > /etc/caddy/Caddyfile.new
+mv -f /etc/caddy/Caddyfile.new /etc/caddy/Caddyfile
 caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null
 systemctl enable caddy >/dev/null 2>&1; systemctl restart caddy
 want='DEPTH_PUBLIC_URL=$HTTPS_URL'
@@ -246,15 +253,17 @@ if [ -n "$URL" ] && [ "$URL" != None ]; then
 ( umask 022; printf '%s\n' \"\$want\" > /etc/depth/public.env ); systemctl restart depth; echo 'set; DEPTH restarted'"
 
   say "live check: $URL"
+  LIVE=0
   for i in $(seq 1 60); do
     H=$(curl -fsS "$URL/api/health" 2>/dev/null || true)
     if printf '%s' "$H" | grep -q '"model_loaded":true'; then
       printf '%s' "$H" | grep -q '"is_cool_path":true' && echo "$URL/api/health: serving on COOL" \
         || echo "$URL/api/health: serving (NOT on COOL - rehearsal?)"
-      break
+      LIVE=1; break
     fi
     sleep 10
   done
+  [ "$LIVE" = 1 ] || echo "WARNING: $URL/api/health did not answer in 10 min - last reply: $(curl -sS "$URL/api/health" 2>&1 | cut -c1-200)"
   python -m src.bench.verify_cool "$URL" || echo "(the COOL receipt did not verify - expected only in a rehearsal)"
 else
   say "on-box check over SSM (no CloudFront: the origin is closed to the internet)"

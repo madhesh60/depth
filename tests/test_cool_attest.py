@@ -170,3 +170,20 @@ def test_origin_guard_blocks_requests_without_the_cloudfront_secret(monkeypatch)
     assert c.get("/api/samples").status_code == 403
     assert c.get("/api/samples", headers={"X-Origin-Verify": "nope"}).status_code == 403
     assert c.get("/api/samples", headers={"X-Origin-Verify": "cf-only"}).status_code == 200
+
+
+def test_caddy_sends_the_origin_secret_because_uvicorn_trusts_loopback(monkeypatch):
+    """PUBLIC_HTTPS=1: Caddy proxies from loopback with X-Forwarded-For, which uvicorn trusts by default, so the
+    guard sees the visitor, not loopback. Without the secret every public request was refused (403)."""
+    from fastapi.testclient import TestClient
+    from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
+    import src.dashboard.app as app_mod
+    monkeypatch.setenv("DEPTH_ORIGIN_SECRET", "box-secret")
+    c = TestClient(ProxyHeadersMiddleware(app_mod.app, trusted_hosts="127.0.0.1"), client=("127.0.0.1", 50000))
+    assert c.get("/api/samples").status_code == 200                       # an on-box check
+    xff = {"X-Forwarded-For": "203.0.113.9"}
+    assert c.get("/api/samples", headers=xff).status_code == 403          # a proxy without the secret
+    assert c.get("/api/samples", headers={**xff, "X-Origin-Verify": "box-secret"}).status_code == 200
+    deploy = (Path(__file__).resolve().parents[1] / "infra" / "deploy.sh").read_text(encoding="utf-8")
+    caddy = deploy.split('"DEPTH HTTPS (Caddy)" ssm_run', 1)[1].split("DEPTH restarted", 1)[0]
+    assert ". /etc/depth/origin.env" in caddy and "header_up X-Origin-Verify %s" in caddy

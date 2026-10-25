@@ -204,8 +204,13 @@ Two waits a new account can hit, and how the stack keeps moving through them:
   `APPLY=1`). The stack opens **443 only** (`PublicHttpsIngress`); over SSM, `deploy.sh` installs Caddy (Ubuntu's
   package, Caddy's signed apt repository as the fallback), which gets a free Let's Encrypt certificate for
   `<elastic-ip>.sslip.io` (a DNS name that resolves to the address in it) and proxies to the app on loopback,
-  flushing at once for MCP streams. The app's tokens, the approver PIN with its lockout and the per-client rate
-  limits (Caddy sets `X-Forwarded-For`) still apply; port 8000 stays closed. The address is written to the server
+  flushing at once for MCP streams. Caddy sends the origin secret as CloudFront does (`X-Origin-Verify`, read on the
+  box from `/etc/depth/origin.env`; the Caddyfile is root:caddy 0640): uvicorn trusts `X-Forwarded-For` from
+  loopback, so the app sees each proxied request as the visitor's, and without the secret the origin guard refused
+  every one (403 - found with Caddy 2.6.2 and the real app before the first apply). The app's tokens, the approver
+  PIN with its lockout and the per-client rate limits (Caddy sets `X-Forwarded-For`) still apply; port 8000 stays
+  closed. For an existing stack use `PUBLIC_HTTPS=1 ROLLBACK=1 APPLY=1 ./infra/deploy.sh` (a failed update rolls
+  back), then `APPLY=1 ./infra/update_server.sh`. The address is written to the server
   (`DEPTH_PUBLIC_URL`) and checked like the CloudFront one. Once CloudFront is verified:
   `PUBLIC_HTTPS=0 ENABLE_CDN=1 APPLY=1 ./infra/deploy.sh` closes 443 and moves the link to CloudFront.
   Trade-offs, stated: no edge cache and no CloudFront security headers (Caddy adds HSTS); one public port.
