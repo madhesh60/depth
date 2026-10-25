@@ -396,8 +396,8 @@ sonar, so the agent withdraws its promise and requests a full review
 <sub>Raw Humminbird recording: a review card (left) placed on the real GPS track with its error circle (right).</sub></p>
 
 <p align="center"><img src="docs/img/sensor_check_fresh.jpg" width="640" alt="Sixteen sonar chunks with the OpenCV seabed track, the depth sounder and the corrected track; labels agree, corrected or recovered"><br>
-<sub>Sensor cross-check (STUDY-16): the OpenCV seabed track (blue) against the depth sounder; where they conflict, the
-track is corrected (green over red) or recovered.</sub></p>
+<sub>Sensor cross-check (STUDY-16), 16 random chunks of the 1-h recording: red = OpenCV tracker alone, blue = depth
+sounder, green = the seabed line the agent accepted (re-tracked where the two conflict).</sub></p>
 
 **Integrations.** An MCP server (stdio and HTTP `/mcp`, bearer token; 13 tools, and the only write is asking a
 person), OGC API – Features for QGIS / ArcGIS, HMAC-signed webhooks, and a drop-in `<depth-hazards>` web component

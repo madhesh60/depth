@@ -22,8 +22,9 @@ const Connect = {
     try { this.info = await fetch(`${API}/api/integrations`).then(r => r.json()); } catch (e) { return; }
     const i = this.info, base = i.base_url;
     $("#cxBase").innerHTML = `<span>Server</span><code>${escapeHtml(base)}</code><a href="${escapeHtml(i.openapi)}" target="_blank" rel="noopener">OpenAPI spec ↗</a>`;
-    const tools = ["depth_status", "analyze_frame", "run_survey", "get_review_queue", "get_hazard", "get_resurvey_plan",
-      "get_stage1_counterfactual", "get_mission_brief", "export_report", "request_human_approval", "get_approval_status"];
+    const tools = ["depth_status", "list_samples", "analyze_frame", "frame_overlay", "run_survey", "get_review_queue",
+      "get_hazard", "get_resurvey_plan", "get_stage1_counterfactual", "get_mission_brief", "export_report",
+      "request_human_approval", "get_approval_status"];
     $("#cxMcpBody").innerHTML = this.steps([
       ["Add DEPTH to Claude Code", this.code(`claude mcp add --transport http depth ${i.mcp.url}` + (i.mcp.token_required ? ` --header "Authorization: Bearer <token>"` : ""))],
       ["Or run it locally, without the server", this.code(`claude mcp add depth -e DEPTH_LAZY_MODEL=1 -- ${i.mcp.stdio}`)],
