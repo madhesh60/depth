@@ -5,6 +5,8 @@ and a partner organisation's own agent can call it locally or over the internet.
 OpenCV 5 loop as the studio, read the evidence behind every tier, and file **approval requests**. A
 person approves or declines those requests in the DEPTH studio.
 
+**Live server:** `https://13-216-140-101.sslip.io/mcp` (Streamable HTTP, bearer token required; the studio is at [https://13-216-140-101.sslip.io](https://13-216-140-101.sslip.io)).
+
 Code: [`src/dashboard/mcp_server.py`](../src/dashboard/mcp_server.py) (official MCP Python SDK,
 `mcp==1.28.1`) · tests: [`tests/test_mcp.py`](../tests/test_mcp.py). The tests use the official
 client over **stdio** and raw JSON-RPC over **HTTP**; the live server was also driven with the

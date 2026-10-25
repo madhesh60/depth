@@ -63,6 +63,12 @@ python -m uvicorn src.dashboard.app:app --port 8000   # then open http://localho
 On the deployed server, approving an action requires the **approver PIN**, which is supplied with the
 submission. Agents and API clients can only file requests; the studio states where the PIN is found.
 
+### Architecture
+
+![DEPTH on AWS: users, AI agents and GIS tools reach the HTTPS link; Caddy forwards to the DEPTH server and the agent's OpenCV 5 core loop on EC2 Graviton4; S3, SNS approvals, CloudWatch monitoring, one CloudFormation stack](docs/diagram/depth_architecture.png)
+
+Grey boxes are not live yet: CloudFront, the COOL AMI and the Bedrock brief writer (§8).
+
 ## 3. Practical: pinned dependencies, build, deployment and tests
 
 This section answers the judges' practical criterion in one place: every dependency is pinned, and the build,
@@ -192,7 +198,7 @@ The route below takes about ten minutes and touches every part of the system.
 | Technical report | [`technical_report.md`](docs/technical_report.md) | Complete |
 | Source code | This repository | Complete |
 | Pinned dependencies, build, deployment and test instructions | `requirements*.txt`, [`README.md`](README.md), [`infra/README.md`](infra/README.md) | Complete |
-| Architecture diagram | [`architecture.md`](docs/architecture.md), `docs/img/architecture.svg` | Complete |
+| Architecture diagram | [`depth_architecture.png`](docs/diagram/depth_architecture.png) (AWS deployment, drawn from the live stack; [source](docs/diagram/depth_architecture.py)); module-level design in [`architecture.md`](docs/architecture.md) | Complete |
 | Working endpoint or live demonstration | GitHub Codespaces and the public URL https://13-216-140-101.sslip.io (both available) | Complete |
 | Demonstration video | — | Pending |
 | Evaluation evidence | [`reports/`](docs/reports), [`experiments.md`](docs/experiments.md) | Complete |

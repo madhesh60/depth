@@ -1,5 +1,7 @@
 # Integrating DEPTH with your consoles (ocean institutes, cleanup organisations, port authorities)
 
+**Live server:** [https://13-216-140-101.sslip.io](https://13-216-140-101.sslip.io) (OGC API at `/ogc`, MCP at `/mcp`).
+
 DEPTH does not ask you to adopt a new application. It speaks the standards your systems already use:
 
 | your system | connect with | what you get |

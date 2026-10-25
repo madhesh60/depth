@@ -1,6 +1,6 @@
 # DEPTH in containers: Docker, Compose and Kubernetes
 
-The same server as the EC2 demo (studio, API, MCP at `/mcp`, OGC API at `/ogc`) in one CPU-only, torch-free image.
+The same server as the EC2 demo ([https://13-216-140-101.sslip.io](https://13-216-140-101.sslip.io)) (studio, API, MCP at `/mcp`, OGC API at `/ogc`) in one CPU-only, torch-free image.
 It runs **stock OpenCV 5** from PyPI. It is **not COOL**, and `/api/health` says so (`is_cool_path: false`).
 
 ## Run it

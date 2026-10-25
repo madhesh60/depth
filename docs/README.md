@@ -4,6 +4,8 @@ Every number in these documents names its split and the command that regenerates
 [`reports/`](reports) are evaluation and study reports, most of them written by a script (marked
 *generated*); do not edit those by hand.
 
+**Live demo:** [https://13-216-140-101.sslip.io](https://13-216-140-101.sslip.io) (AWS Graviton4, stock OpenCV 5, rehearsal mode; not COOL yet).
+
 ## Start here
 
 | read | for |
@@ -12,6 +14,7 @@ Every number in these documents names its split and the command that regenerates
 | [`agentic_vision.md`](agentic_vision.md) | the Agentic Vision entry: how perception changes the agent's next action |
 | [`agentic_loop.md`](agentic_loop.md) | the loop step by step: SEE → PROVE → DECIDE → ACT, with a person in charge |
 | [`architecture.md`](architecture.md) | the as-built design, module by module |
+| [`diagram/depth_architecture.png`](diagram/depth_architecture.png) | the AWS deployment diagram, drawn from the live stack ([source](diagram/depth_architecture.py) · [SVG](diagram/depth_architecture.svg)) |
 | [`model_card.md`](model_card.md) · [`dataset_card.md`](dataset_card.md) | the deployed detector (EXP-003) and the data it learned from |
 | [`responsible_use.md`](responsible_use.md) | human control, protected wrecks, honest geotags, data |
 | [`references.md`](references.md) | the published work behind specific design choices |

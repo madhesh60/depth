@@ -13,14 +13,18 @@ detector; it makes an imperfect one dependable.
 AWS Graviton + COOL · OpenCV AI Competition 2026 · Team Syndicate (solo) · **Agentic Vision** and **Best Use of
 COOL** · AGPL-3.0
 
+> ### ▶ Live demo: **[https://13-216-140-101.sslip.io](https://13-216-140-101.sslip.io)**
+> The full studio on AWS Graviton4 (c8g.large), stock OpenCV 5 in rehearsal mode (not COOL yet). Click
+> **▶ Guided demo** in the top bar. Approving an action needs the approver PIN from the submission form.
+
 | | |
 |---|---|
+| **Live demo** | **[13-216-140-101.sslip.io](https://13-216-140-101.sslip.io)** · video: not recorded yet |
 | **For judges** | [`JUDGES.md`](JUDGES.md): try it, see the agent decide, every key number with its split · also in the studio under **For judges** |
 | **Try it in the browser** | [Open in GitHub Codespaces](https://codespaces.new/madhesh60/depth?quickstart=1): the real studio in about 3 minutes, free with a GitHub account |
 | **Run it locally** | five commands, CPU only: [Installation and Reproduction](#installation-and-reproduction) |
 | **Practical (deps · build · deploy · test)** | [Practical: Pinned Dependencies, Build, Deployment and Tests](#practical-pinned-dependencies-build-deployment-and-tests): exact pins, one command per step, all run in CI |
 | **Docker · Compose · Kubernetes** | [`docs/containers.md`](docs/containers.md): one non-root image, read-only root, health probes |
-| **Live demo · video** | **[13-216-140-101.sslip.io](https://13-216-140-101.sslip.io)** (AWS Graviton4 c8g.large, stock OpenCV 5 in rehearsal mode - not COOL; the approver PIN is in the submission form) · not recorded yet |
 
 **Contents:** [Problem](#problem-statement) · [Current practice](#how-it-is-currently-handled) ·
 [What DEPTH builds](#what-depth-builds) · [Architecture](#architecture) ·
@@ -41,14 +45,13 @@ counted more than **31,000** crabs, finfish, birds and sea turtles killed by der
 modelling found that removing 43,968 derelict pots returned **38.17 million lb** of harvestable blue crab, worth
 about **$33.5 million**. Derelict gear also fouls propellers and carries invasive species.
 
-<!-- IMAGE PLACEHOLDER 1: derelict crab pots on the seafloor, or a ghost net entangling wildlife (VIMS CCRM, NOAA Marine Debris Program, Global Ghost Gear Initiative). Replace with ![Caption](docs/img/<file>.jpg) -->
-
 Side-scan sonar is how this gear is found. VIMS CCRM first mapped the problem with it in 2006, which led to
 Virginia's first derelict-trap removal programme in 2008; it recovered more than 34,000 pots in six years. In
 2023, NOAA selected VIMS CCRM to lead an **$8 million** national programme. Yet every sonar recording still
 needs an expert to review it frame by frame, which is too slow and too costly to scale.
 
-<!-- IMAGE PLACEHOLDER 2: a map of derelict-gear hotspots or a debris-category chart (VIMS CCRM Marine Debris Reduction Plan, NOAA ghost-gear GIS data). Replace with ![Caption](docs/img/<file>.jpg) -->
+<p align="center"><img src="docs/img/depth_of_problem.png" width="420" alt="Map of the Chesapeake Bay: about 6,000 lost crab pots removed from Maryland waters and about 28,000 from Virginia waters, 2008-2011"><br>
+<sub>Lost and abandoned crab pots removed from the Chesapeake Bay, 2008–2011. Source: VIMS CCRM.</sub></p>
 
 **Further reading:** [VIMS CCRM Marine Debris Programme](https://www.vims.edu/ccrm/research/marine_debris/) ·
 [Marine debris problems](https://www.vims.edu/ccrm/research/marine_debris/problems/index.php) ·
@@ -66,6 +69,12 @@ needs an expert to review it frame by frame, which is too slow and too costly to
 | **Optical and SAR satellites** (Planet, Maxar, Sentinel) | wide-area surface monitoring | light reaches 1–2 m and SAR stops at the surface, so gear at 5–50 m is invisible; revisit gaps, cloud and sun glint; area alerts, not objects a crew can recover |
 | **Side-scan sonar, reviewed by an analyst** | acoustic images of the seabed: a pot shows as a bright return with a shadow | a trained analyst must review every frame: slow, inconsistent and hard to scale |
 | **An automated detector** (for example GhostVision) | finds pots in sonar automatically | a detector alone outputs boxes and confidence scores; it does not promise coverage, check that it suits the recording, or plan a cleanup for a person to approve |
+
+Removal today is manual and depends on funding. Virginia's programme hired 58–70 watermen a season and pulled
+7,800–8,700 crab pots a year (2008–11); with 4–7 watermen it pulled 637–1,107 (2012–14).
+
+<p align="center"><img src="docs/img/handled_now.png" width="560" alt="VIMS Marine Debris Removal Counter: days worked, watermen, bycatch and pots removed per season, 2008-09 to 2013-14"><br>
+<sub>Virginia's derelict-gear removal, season by season (2008–09 to 2013–14). Source: VIMS CCRM Marine Debris Removal Counter.</sub></p>
 
 ---
 
@@ -94,10 +103,16 @@ PyTorch at runtime. Nothing is dispatched until a named, PIN-authenticated perso
 ## Architecture
 
 Five OpenCV 5 stages run inside one agentic loop: **Stage 1 Canonicalise → See → Prove → Decide → Act**. The
-system is built for EC2 Graviton + COOL. The agent sets the goal, checks applicability, chooses the perception
-mode, perceives every frame, plans, and requests human approval before anything is dispatched.
+agent checks that its promise applies, chooses how hard to look, perceives, plans, and asks a person before
+anything is dispatched. It runs as one server on EC2 Graviton4, live at **[https://13-216-140-101.sslip.io](https://13-216-140-101.sslip.io)**.
 
-![DEPTH system architecture: the agentic core loop over five OpenCV 5 stages on EC2 Graviton + COOL, with human approval gates and georeferenced outputs](docs/img/architecture.svg)
+![DEPTH on AWS: users, AI agents (MCP) and GIS tools (OGC API) reach the HTTPS link; Caddy forwards to the DEPTH server and the agent's OpenCV 5 core loop on EC2 c8g.large; results to S3, approvals by SNS email, monitoring by CloudWatch, Route 53 and EventBridge, all from one CloudFormation stack](docs/diagram/depth_architecture.png)
+
+<sub>Grey boxes are not live yet: CloudFront (account verification), the COOL AMI (Marketplace payment) and
+the Bedrock brief writer. Drawn from `infra/cfn/depth.yaml` and the live server on 2026-10-25
+([source](docs/diagram/depth_architecture.py) · [SVG](docs/diagram/depth_architecture.svg)).</sub>
+
+Inside the agent:
 
 | Stage | What it does | Module |
 |---|---|---|
@@ -107,7 +122,7 @@ mode, perceives every frame, plans, and requests human approval before anything 
 | **Decide** | calibrated tiers (the recall promise), P(pot) queue order, one card per object | `src/agentic/calibrate.py`, `cards.py` |
 | **Act** | geotags, chunk stitching, repeat-sighting merge, routes, re-survey passes, exports, provenance, mission brief | `src/agentic/mission.py`, `geo.py`, `brief.py` |
 
-The full as-built design is in [`docs/architecture.md`](docs/architecture.md).
+The full as-built design, module by module: [`docs/architecture.md`](docs/architecture.md).
 
 ---
 
@@ -287,7 +302,7 @@ Full reports with confusion matrices and PR curves: [test](docs/reports/eval_exp
 [calibration](docs/calibration_exp003.md). The detector gap is a data problem, not the recipe: most training
 wrecks are fish-finder screenshots and the wreck boxes are loose ([`exp003_diagnosis.md`](docs/reports/exp003_diagnosis.md)).
 
-<img src="docs/img/pr_exp003_test.png" width="430" alt="EXP-003 precision-recall curves on v2b test, with the validation-tuned operating points">
+<p align="center"><img src="docs/img/pr_exp003_test.png" width="430" alt="EXP-003 precision-recall curves on v2b test, with the validation-tuned operating points"></p>
 
 ---
 
@@ -342,6 +357,9 @@ ENGINE_AUTO's pick, which cut the frame time from 197 to 138.5 ms (STUDY-20).
 | One look, one core | EC2 Graviton4 · 1 thread | **435 ms**: a survey-hour (280 frames) in ≈ 122 s, ≈ 30× faster than the sonar records |
 | Peak memory | EC2 Graviton4 · 1 thread | **409 MB** with both engines loaded for the start-up measurement (240 MB with one; set `DEPTH_DNN_ENGINE`) |
 
+<p align="center"><img src="docs/img/cool_benchmark.png" width="640" alt="Mean latency per frame, stacked by operation, on x86 c8i.xlarge, Graviton4 c8g.xlarge and c8g.large, one thread, and a laptop: the cv2.dnn forward pass dominates"><br>
+<sub>Mean latency per frame, stacked by operation (stock OpenCV 5). The <code>cv2.dnn</code> forward pass is nearly all of it.</sub></p>
+
 <!-- cool:readme -->
 **Graviton + COOL:** measured automatically the moment the Marketplace subscription is active (`PHASE=cool ./infra/golive.sh`).
 <!-- /cool:readme -->
@@ -365,11 +383,21 @@ agent chose the standard look for 382 of 383 requests.
 | Looking harder (≥ 84% recall), v2b test | 56.5 min | 57.3 min |
 | Empty seabed, per survey-hour (one look · looking harder) | 34 · 47 min | 56 min |
 
+<p align="center"><img src="docs/img/effort_curve.png" width="640" alt="Share of labelled pots found against analyst minutes for 199 frames: DEPTH reaches its promises sooner than manual review or a raw detector list"><br>
+<sub>Pots found vs analyst minutes, v2b test, 199 frames. Timings are <b>assumed</b> until the user study runs.</sub></p>
+
 **Raw recordings (real GPS).** Colorado River (`Test-Small-DS`, 150.6 s): 3,453 pings per channel parsed, 0
 malformed; range scale 2.03 cm/sample ± 10.2%; the full agent runs in 3–4 s on a laptop; 24 review cards per hour
 on water with no known pots. Pearl River (`Test-Large-DS`, 1 h, Solix): 48 cards per hour. Both are another
 sonar, so the agent withdraws its promise and requests a full review
 ([`raw_recording.md`](docs/reports/raw_recording.md)).
+
+<p align="center"><img src="docs/img/raw_recording.jpg" width="640" alt="A frame of the raw Humminbird recording with a review card, next to the real GPS track and the hazard pin with its error circle"><br>
+<sub>Raw Humminbird recording: a review card (left) placed on the real GPS track with its error circle (right).</sub></p>
+
+<p align="center"><img src="docs/img/sensor_check_fresh.jpg" width="640" alt="Sixteen sonar chunks with the OpenCV seabed track, the depth sounder and the corrected track; labels agree, corrected or recovered"><br>
+<sub>Sensor cross-check (STUDY-16): the OpenCV seabed track (blue) against the depth sounder; where they conflict, the
+track is corrected (green over red) or recovered.</sub></p>
 
 **Integrations.** An MCP server (stdio and HTTP `/mcp`, bearer token; 13 tools, and the only write is asking a
 person), OGC API – Features for QGIS / ArcGIS, HMAC-signed webhooks, and a drop-in `<depth-hazards>` web component
@@ -423,6 +451,8 @@ command (`onboard_model`) and its promise is re-fit.
 
 ### AWS: One Stack, Every Service With a Job
 
+The [architecture diagram](#architecture) shows how these services connect.
+
 | Service | Job |
 |---|---|
 | EC2 c8g.large (Graviton4) + Elastic IP | the demo server (IMDSv2, no SSH) |
@@ -448,6 +478,49 @@ template is served.
 ## Installation and Reproduction
 
 **Requirements:** Python 3.10 and a CPU. No GPU and no PyTorch. Tested on Windows 11 and on Ubuntu 24.04 (CI).
+
+### Option 0: The Live Demo (Nothing to Run)
+
+Open **[https://13-216-140-101.sslip.io](https://13-216-140-101.sslip.io)** and click **▶ Guided demo**.
+
+### Option A: GitHub Codespaces (Nothing to Install)
+
+Click [Open in GitHub Codespaces](https://codespaces.new/madhesh60/depth?quickstart=1). The studio is ready in
+about 3 minutes, and the setup runs the same commands as Option B. CI runs that setup in the codespace's own image
+on 2 CPUs and plays the guided demo to its last step ([`codespaces.yml`](.github/workflows/codespaces.yml)).
+
+### Option B: Local, Five Commands
+
+```bash
+git clone https://github.com/madhesh60/depth.git
+cd depth
+pip install -r requirements.txt                       # torch-free runtime: OpenCV 5.0.0.93, FastAPI
+python -m src.detection.fetch_model                   # the detector: 38 MB, SHA-256 checked
+python -m src.cv_pipeline.humminbird fetch            # a raw sonar recording with real GPS: 11 MB
+python -m uvicorn src.dashboard.app:app --port 8000   # open http://localhost:8000 → ▶ Guided demo
+```
+
+| Studio mode | What it shows |
+|---|---|
+| **Analyze** | one frame: the tracked seabed, one evidence card per object with the agent's full trace, and "How the agent decided" |
+| **Survey** | the 8 samples (synthetic GPS, labelled) or the raw recording (real GPS) → hazard map, routes, re-survey passes, approvals inbox, exports |
+| **3D twin** | the seabed in ground-range geometry, with the sonar at its tracked altitude |
+| **Study · Audit** | the timed user study and the blinded false-alarm audit |
+| **Connect** | MCP, OGC API, signed webhooks, the drop-in panel |
+
+The 8 sample frames ship with the app. They come from the v2b **test** split, so the model never trained or
+tuned on them.
+
+### Option C: Docker, Compose or Kubernetes
+
+```bash
+docker compose up --build                             # or: docker build -t depth . && docker run -p 8000:8000 depth
+kubectl apply -k infra/k8s                            # Kubernetes: probes, non-root, read-only root, one volume
+```
+
+On every change, CI builds the image, runs it locked down, does real work in it and deploys it to a throwaway
+Kubernetes cluster ([`container.yml`](.github/workflows/container.yml); details in
+[`docs/containers.md`](docs/containers.md)). The image uses stock OpenCV 5, not COOL.
 
 ### Practical: Pinned Dependencies, Build, Deployment and Tests
 
@@ -496,55 +569,6 @@ python tests/container_smoke.py --url http://localhost:8000   # real work inside
 CI runs these on every push: [`tests.yml`](.github/workflows/tests.yml) (tests, lint, type check),
 [`container.yml`](.github/workflows/container.yml) (build, run locked down, deploy to a throwaway Kubernetes
 cluster) and [`codespaces.yml`](.github/workflows/codespaces.yml) (fresh setup, guided demo to the last step).
-
-### Option A: GitHub Codespaces (Nothing to Install)
-
-Click [Open in GitHub Codespaces](https://codespaces.new/madhesh60/depth?quickstart=1). The studio is ready in
-about 3 minutes, and the setup runs the same commands as Option B. CI runs that setup in the codespace's own image
-on 2 CPUs and plays the guided demo to its last step ([`codespaces.yml`](.github/workflows/codespaces.yml)).
-
-### Option B: Local, Five Commands
-
-```bash
-git clone https://github.com/madhesh60/depth.git
-cd depth
-pip install -r requirements.txt                       # torch-free runtime: OpenCV 5.0.0.93, FastAPI
-python -m src.detection.fetch_model                   # the detector: 38 MB, SHA-256 checked
-python -m src.cv_pipeline.humminbird fetch            # a raw sonar recording with real GPS: 11 MB
-python -m uvicorn src.dashboard.app:app --port 8000   # open http://localhost:8000 → ▶ Guided demo
-```
-
-| Studio mode | What it shows |
-|---|---|
-| **Analyze** | one frame: the tracked seabed, one evidence card per object with the agent's full trace, and "How the agent decided" |
-| **Survey** | the 8 samples (synthetic GPS, labelled) or the raw recording (real GPS) → hazard map, routes, re-survey passes, approvals inbox, exports |
-| **3D twin** | the seabed in ground-range geometry, with the sonar at its tracked altitude |
-| **Study · Audit** | the timed user study and the blinded false-alarm audit |
-| **Connect** | MCP, OGC API, signed webhooks, the drop-in panel |
-
-The 8 sample frames ship with the app. They come from the v2b **test** split, so the model never trained or
-tuned on them.
-
-### Option C: Docker, Compose or Kubernetes
-
-```bash
-docker compose up --build                             # or: docker build -t depth . && docker run -p 8000:8000 depth
-kubectl apply -k infra/k8s                            # Kubernetes: probes, non-root, read-only root, one volume
-```
-
-On every change, CI builds the image, runs it locked down, does real work in it and deploys it to a throwaway
-Kubernetes cluster ([`container.yml`](.github/workflows/container.yml); details in
-[`docs/containers.md`](docs/containers.md)). The image uses stock OpenCV 5, not COOL.
-
-### Verify the Code
-
-```bash
-pip install -r requirements-dev.txt                 # runtime + test, lint and type-check tools
-pytest -q                                           # the test suite (322 tests)
-python -m ruff check .                              # lint (configuration: pyproject.toml)
-python -m mypy                                      # type-check the agent's decision core
-python tests/ui_smoke.py --full-demo                # headless Chrome plays the guided demo
-```
 
 ### Reproduce the Results
 
@@ -605,7 +629,7 @@ python -m src.agentic.effort --real-water           # analyst effort on the raw 
   (Raspberry Pi, Jetson) has been measured.
 - **Sensing.** Stage 1 follows heave per ping; pitch and roll are not corrected, because the ping header carries
   no attitude. Data dropouts are flagged, not repaired.
-- **Deployment.** The live demo (https://13-216-140-101.sslip.io) runs behind Caddy with a Let's Encrypt certificate, not CloudFront (account
+- **Deployment.** The [live demo](https://13-216-140-101.sslip.io) runs behind Caddy with a Let's Encrypt certificate, not CloudFront (account
   verification pending), on stock OpenCV 5, not COOL. The recorded MCP session uses a
   scripted client; a run with a real LLM needs a Claude API key, because this account cannot accept the Claude
   Marketplace agreement on Bedrock.
@@ -616,6 +640,7 @@ python -m src.agentic.effort --real-water           # analyst effort on the raw 
 
 | Read | For |
 |---|---|
+| [Live demo](https://13-216-140-101.sslip.io) | the running studio on AWS Graviton4 |
 | [`JUDGES.md`](JUDGES.md) | one page for judges: try it, see the agent decide, key numbers, what is not done |
 | [`docs/technical_report.md`](docs/technical_report.md) | the whole system, its evaluation and its limits |
 | [`docs/architecture.md`](docs/architecture.md) | the as-built design, module by module |
