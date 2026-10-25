@@ -181,6 +181,7 @@ echo "== [6/6] systemd unit"
 sed -e "s#@COOL_PY@#$COOL_PY#g" -e "s#@APP@#$APP#g" -e "s#@PORT@#$PORT#g" \
     -e "s#@THREADS@#$(nproc)#g" -e "s#@S3_BUCKET@#${DEPTH_S3_BUCKET:-}#g" \
     -e "s#@CORS@#${DEPTH_CORS_ORIGINS:-}#g" -e "s#@MODEL@#$MODEL_NAME#g" \
+    -e "s#@COMMIT@#$(git -C "$APP" rev-parse HEAD)#g" \
     "$APP/infra/depth.service" > /etc/systemd/system/depth.service
 systemctl daemon-reload
 systemctl enable --now depth

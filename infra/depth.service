@@ -15,6 +15,8 @@ Environment=PYTHONPATH=@APP@:@APP@/pydeps
 Environment=PYTHONUNBUFFERED=1
 Environment=DEPTH_THREADS=@THREADS@
 Environment=DEPTH_MODEL=@MODEL@
+# the exact commit for provenance and the judges tab: the service user cannot run git in the root-owned clone
+Environment=DEPTH_GIT_COMMIT=@COMMIT@
 Environment=DEPTH_JOBS_DIR=@APP@/runs/jobs
 Environment=DEPTH_S3_BUCKET=@S3_BUCKET@
 Environment=DEPTH_CORS_ORIGINS=@CORS@
