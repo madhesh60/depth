@@ -2,7 +2,7 @@
 # (the runtime path is torch-free; it infers via cv2.dnn — see requirements.txt).
 ultralytics==8.4.157
 torch==2.9.1
-torchvision==0.24.1
+torchvision==0.29.1
 onnxruntime==1.23.2
 PyYAML==6.0.2
 Pillow==11.1.0
