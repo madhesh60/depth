@@ -24,6 +24,7 @@ budget, re-plans when its own measurements require it, and asks a person before 
 | **For judges** | [`JUDGES.md`](JUDGES.md), also in the studio under **For judges** | Available |
 | **Try it in a browser** | [Open in GitHub Codespaces](https://codespaces.new/madhesh60/depth?quickstart=1) (about three minutes, free with a GitHub account) | Available |
 | **Run it on a laptop** | [Five commands, CPU only](#61-run-it-locally) | Available |
+| **Docker · Compose · Kubernetes** | [`docs/containers.md`](docs/containers.md): one non-root image, read-only root, health probes | Available |
 | **Public deployment** | — | Pending (AWS account verification) |
 | **Demonstration video** | — | Pending |
 
@@ -57,7 +58,7 @@ Every number names the split on which it was measured.
 | **Demo server under load** | **383 of 383** requests succeeded, analyze p95 2.44 s (target 3 s) | EC2 c8g.large, 4 clients + 1 survey |
 | **Analyst minutes** (assumed timings) | DEPTH vs manual: one look **43.2 vs 55.7** · looking harder **56.5 vs 57.3** · empty seabed **34 / 47 vs 56** per hour | Test; user study pending |
 | **Crab-pot detector**, AP@0.5 | **0.482**; weaker than GhostVision (F1 0.41 vs 0.71–0.73) | v2b test, 214 frames |
-| **Quality checks** | **315** tests · ruff · mypy · a headless-Chrome UI test, all in CI; the Codespaces setup run in its own image | 2026-10-24 |
+| **Quality checks** | **319** tests · ruff · mypy · a headless-Chrome UI test, all in CI; the Codespaces setup in its own image; the container built, run and deployed to Kubernetes | 2026-10-25 |
 
 ![The DEPTH studio in Survey mode: key figures, the hazard map with the inspection route and opposite-side re-survey passes, and the Agent tab showing how the agent decided, the promise check, the perception step and the plan](docs/img/studio_survey.jpg)
 
@@ -209,7 +210,18 @@ python -m uvicorn src.dashboard.app:app --port 8000   # open http://localhost:80
 Alternatively, [open the project in GitHub Codespaces](https://codespaces.new/madhesh60/depth?quickstart=1): the same
 setup runs automatically and the studio opens in the browser.
 
-### 6.2 A tour of the studio
+### 6.2 Docker, Compose or Kubernetes
+
+```bash
+docker compose up --build                             # or: docker build -t depth . && docker run -p 8000:8000 depth
+kubectl apply -k infra/k8s                            # Kubernetes: probes, non-root, read-only root, one volume
+```
+
+On every change, CI builds the image, runs it locked down, does real work in it and deploys it to a throwaway
+Kubernetes cluster ([`container.yml`](.github/workflows/container.yml); details in
+[`docs/containers.md`](docs/containers.md)). The image uses stock OpenCV 5, not COOL.
+
+### 6.3 A tour of the studio
 
 ![Analyze: one frame, the tracked seabed, the boxes, and one evidence card per object, with the agent's trace](docs/img/studio_analyze.jpg)
 
@@ -406,11 +418,14 @@ src/bench/        benchmark tooling (product workload, provenance, comparison, t
 src/dashboard/    FastAPI service: app.py (wiring) · service.py (state) · routes/ (one router per area) ·
                   jobs, limits, rate limits, metrics · MCP server + recorded sessions · OGC API · webhooks
 webui/            zero-build studio (+ three.js twin) · embed/depth-embed.js (drop-in panel) · 8 sample frames
-infra/            Graviton deployment (dry-run by default; COOL path built, not yet run) + 3-way benchmark
+infra/            Graviton deployment (dry-run by default; COOL path built, not yet run) + 3-way benchmark;
+                  k8s/ = the Kubernetes base (kubectl apply -k infra/k8s)
+Dockerfile        the CPU-only, torch-free image (compose.yaml runs it locked down)
 models/<MODEL>/   calibration.json + effort/audit data (weights: GitHub Release, fetch_model)
 benchmarks/       measured benchmark results (JSON): laptop and EC2
 tests/            the pytest suite, run by CI on every push (.github/workflows/tests.yml); the Codespaces
-                  path in its own image, guided demo to the end (.github/workflows/codespaces.yml)
+                  path in its own image, guided demo to the end (.github/workflows/codespaces.yml); the image
+                  and a Kubernetes deploy (.github/workflows/container.yml)
 notebooks/        the Kaggle training notebook and its generator
 DATASET/scripts/  dataset builders (the data itself is git-ignored)
 docs/             judges' guide, technical report, architecture, cards, guides (MCP, integrations, training),

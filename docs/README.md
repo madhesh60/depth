@@ -62,6 +62,7 @@ and that file's SHA-256 is part of every provenance stamp.
 | [`release_exp003.md`](release_exp003.md) | the published weights (Release `exp003-v1`, SHA-256 checked by `fetch_model`) |
 | [`mcp.md`](mcp.md) | let any MCP agent run DEPTH (it can only *ask* a person to approve) |
 | [`integrations.md`](integrations.md) | OGC API – Features, signed webhooks, the drop-in web component |
+| [`containers.md`](containers.md) | Docker, Compose and Kubernetes: the image, health probes, how it is tested |
 | [`../infra/README.md`](../infra/README.md) | Graviton deployment (dry-run by default; the COOL path is built, not yet run) and the 3-way benchmark |
 | [`user_study.md`](user_study.md) | the timed user study protocol (≈ 10 min per person) |
 | [`kaggle_training.md`](kaggle_training.md) | train a model on Kaggle and plug it in with one command |

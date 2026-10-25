@@ -1,0 +1,25 @@
+# DEPTH with Docker Compose:  docker compose up --build   ->  http://localhost:8000   (docs/containers.md)
+# Secrets for a server others can reach: put DEPTH_MCP_TOKEN, DEPTH_ADMIN_TOKEN, DEPTH_APPROVER_PIN in .env
+# (git-ignored); Compose passes them through. Stock OpenCV 5: this image is not COOL, and says so.
+services:
+  depth:
+    build:
+      context: .
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-}
+    image: depth:local
+    ports:
+      - "127.0.0.1:8000:8000"     # this machine only; publish wider only with the secrets above set
+    environment:
+      DEPTH_MCP_TOKEN: ${DEPTH_MCP_TOKEN:-}
+      DEPTH_ADMIN_TOKEN: ${DEPTH_ADMIN_TOKEN:-}
+      DEPTH_APPROVER_PIN: ${DEPTH_APPROVER_PIN:-}
+    volumes:
+      - depth-data:/data          # jobs, approvals, feedback, study results, audit tags, webhooks
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    restart: unless-stopped
+volumes:
+  depth-data:

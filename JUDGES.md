@@ -47,6 +47,7 @@ dispatched. Its contribution is not a better detector but a **dependable** one. 
 | Public deployment | — | **Pending** (see §7.1) |
 | GitHub Codespaces | [Open in GitHub Codespaces](https://codespaces.new/madhesh60/depth?quickstart=1): the full studio in a browser, ready in about three minutes, free with a GitHub account | Available; the setup and the guided demo run in CI on every push ([`codespaces.yml`](.github/workflows/codespaces.yml)) |
 | Local installation | The five commands below, on any laptop, CPU only | Available |
+| Docker, Compose, Kubernetes | `docker compose up --build` or `kubectl apply -k infra/k8s` ([`containers.md`](docs/containers.md)) | Available; built, run and deployed to a test cluster in CI ([`container.yml`](.github/workflows/container.yml)) |
 | Demonstration video | — | **Pending** |
 
 ```bash
@@ -92,7 +93,7 @@ The route below takes about ten minutes and touches every part of the system.
 | Innovation | Statistical promises on an imperfect detector, checked for correlated frames and withdrawn where they do not apply ([`calibration_exp003.md`](docs/calibration_exp003.md), [`dependence.md`](docs/reports/dependence.md), [`applicability.md`](docs/reports/applicability.md)). |
 | Real-world impact | Raw Humminbird recordings with real per-ping GPS; one review card per object; GPX, KML, GeoJSON, OGC API, webhooks and MCP; analyst time reported with its assumptions ([`effort_curve.md`](docs/reports/effort_curve.md)). |
 | User experience | A zero-build studio: guided demo, evidence cards with the agent's trace, approvals inbox, 3D twin, failure drills, and one-click Codespaces. |
-| Responsible cloud delivery | One CloudFormation stack, dry-run by default, budget alerts and a scheduled stop, PIN lockout, refusal to start without tokens, protected wreck positions generalised ([`infra/README.md`](infra/README.md), [`responsible_use.md`](docs/responsible_use.md)). |
+| Responsible cloud delivery | One CloudFormation stack, dry-run by default, budget alerts and a scheduled stop, PIN lockout, refusal to start without tokens, a non-root read-only container with health probes and a Kubernetes base ([`containers.md`](docs/containers.md)), protected wreck positions generalised ([`infra/README.md`](infra/README.md), [`responsible_use.md`](docs/responsible_use.md)). |
 
 ### 4.2 Agentic Vision award
 

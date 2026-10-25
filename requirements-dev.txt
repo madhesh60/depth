@@ -7,3 +7,4 @@ httpx==0.28.1
 ruff==0.15.17
 mypy==2.1.0             # type-checks the agent's decision core (the files listed in pyproject.toml)
 websockets==15.0.1      # tests/ui_smoke.py drives headless Chrome over the DevTools protocol
+pyyaml==6.0.3           # tests/test_containers.py reads the Kubernetes manifests

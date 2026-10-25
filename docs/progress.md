@@ -84,6 +84,19 @@ Current numbers, each with its split: README "At a glance" and
 
 ## 4. Session log
 
+### 2026-10-25 (sweep 80) — Docker, Compose and Kubernetes, tested for real
+
+- `Dockerfile` (multi-stage, torch-free, non-root uid 10001, detector fetched SHA-256 checked, `runs/` → `/data`,
+  `GIT_COMMIT` → every provenance stamp), `.dockerignore`, `compose.yaml` (read-only root, no capabilities),
+  `infra/k8s/` (Kustomize: restricted namespace, probes, PVC, NetworkPolicy, one replica because surveys are in memory).
+- New `/healthz` and `/readyz` (503 until the detector is warm). `fingerprint.git_commit` reads `DEPTH_GIT_COMMIT`.
+- Found by running the image: the server wrote to `/app/runs` and crashed as non-root; fixed with the `/data` link.
+- Checked here: image built (731 MB); `tests/container_smoke.py` PASS in Docker read-only with no capabilities and in
+  Compose (Analyze 10 boxes, Survey of the raw recording, provenance commit); `ui_smoke --full-demo` against the
+  container, no failed step; manifests pass `kubernetes-validate --strict` for 1.31. The kind deploy runs in CI
+  (`container.yml`); main publishes `ghcr.io/madhesh60/depth`. Dependabot for pip, Docker and Actions.
+- Suite: 318 passed, 1 skipped; ruff and mypy clean.
+
 ### 2026-10-24 (sweep 79) — limitations: short, honest, one place each
 
 - README §2/§9, JUDGES §7 (also the For judges tab) and technical report §6 cut to one line per item; the single COOL status sentence (`cool_docs.PENDING_STATUS`) shortened everywhere. Nothing removed that is unfinished. Suite: 314 passed.

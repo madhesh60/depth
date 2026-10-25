@@ -52,6 +52,21 @@ def health():
     }
 
 
+@router.get("/healthz")
+def healthz():
+    """Liveness for containers and Kubernetes: the process answers (no model, no disk)."""
+    return {"status": "ok"}
+
+
+@router.get("/readyz")
+def readyz():
+    """Readiness: 200 once the detector is loaded and warmed, 503 before (or if loading failed)."""
+    st = S._MODEL_STATE
+    if st["loaded"]:
+        return {"status": "ready", "warmup_ms": st["warmup_ms"]}
+    raise HTTPException(503, {"status": "error" if st["error"] else "loading", "error": st["error"]})
+
+
 @router.get("/api/cool")
 def cool_receipt():
     """The COOL execution receipt (src/bench/cool_attest.py): the AWS-signed instance identity document

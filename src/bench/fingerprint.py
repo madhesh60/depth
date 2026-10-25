@@ -75,6 +75,8 @@ def ec2_identity(timeout: float = 0.3) -> dict:
 
 
 def git_commit() -> Optional[str]:
+    if os.environ.get("DEPTH_GIT_COMMIT"):                # a container image has no .git: the build stamps it
+        return os.environ["DEPTH_GIT_COMMIT"][:12]
     try:
         return subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=REPO, capture_output=True,
                               text=True, timeout=5).stdout.strip() or None

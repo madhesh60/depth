@@ -132,7 +132,10 @@ budget) → plan → one approval request per action. Every step is logged in `a
 ```bash
 # Run and check
 python -m uvicorn src.dashboard.app:app --port 8000    # the studio (Analyze/Survey/Study/Audit)
-pytest -q                                              # 315 tests; coverage 60% of src/ (85% runtime)
+pytest -q                                              # 319 tests; coverage 60% of src/ (85% runtime)
+docker compose up --build                              # the same server in a container (docs/containers.md)
+kubectl apply -k infra/k8s                             # ... on Kubernetes (one replica: surveys are in memory)
+python tests/container_smoke.py --url http://localhost:8000   # real work in a running container
 python tests/ui_smoke.py                               # headless Chrome drives every studio mode (0 JS errors)
 python tests/ui_smoke.py --full-demo                   # ... and plays the guided demo to its last step
 python tests/ui_video.py                               # a captioned walkthrough MP4 of the studio (runs/video/)
@@ -189,7 +192,8 @@ webui/            zero-build vanilla studio (index.html, js/ — 12 classic scri
                   twin3d.js) · embed/ · samples/ ·
                   audit/ · img/ · vendor/ (leaflet, three, fonts)
 infra/            cfn/depth.yaml · deploy.sh · teardown.sh · update_server.sh · setup_cool_instance.sh ·
-                  depth.service · golive.sh · bench_fleet.sh · bench_userdata.sh · bench_cool.sh · lib.sh
+                  depth.service · golive.sh · bench_fleet.sh · bench_userdata.sh · bench_cool.sh · lib.sh ·
+                  k8s/ (Kustomize base); Dockerfile + compose.yaml at the root (docs/containers.md)
 models/<MODEL>/   calibration.json (+ modes.look_harder, cards) · effort_curve.json · fp_audit_val.json (+ EXP-003:
                   evidence_model.json, model_meta.json, applicability.json)
 benchmarks/       product_bench JSON results (tracked)
