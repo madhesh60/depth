@@ -10,10 +10,9 @@ Every number in these documents names its split and the command that regenerates
 
 | read | for |
 | [`JUDGES.md`](../JUDGES.md) (repo root) | the evaluation guide: access, a ten-minute path, evidence by judging criterion, every number with its split, deliverables, limitations, a glossary — also in the studio under **For judges** |
-| [`technical_report.md`](technical_report.md) | the whole system, its evaluation and its limits, in one document |
+| [`DEPTH_paper.md`](DEPTH_paper.md) ([PDF](paper/DEPTH_paper.pdf) · [LaTeX + figures](paper/)) | the technical paper: the whole system as built, its evaluation and its limits, in one document |
 | [`agentic_vision.md`](agentic_vision.md) | the Agentic Vision entry: how perception changes the agent's next action |
 | [`agentic_loop.md`](agentic_loop.md) | the loop step by step: SEE → PROVE → DECIDE → ACT, with a person in charge |
-| [`architecture.md`](architecture.md) | the as-built design, module by module |
 | [`diagram/depth_architecture.png`](diagram/depth_architecture.png) | the AWS deployment diagram, drawn from the live stack ([source](diagram/depth_architecture.py) · [SVG](diagram/depth_architecture.svg)) |
 | [`model_card.md`](model_card.md) · [`dataset_card.md`](dataset_card.md) | the deployed detector (EXP-003) and the data it learned from |
 | [`responsible_use.md`](responsible_use.md) | human control, protected wrecks, honest geotags, data |
@@ -77,4 +76,3 @@ and that file's SHA-256 is part of every provenance stamp.
 | [`progress.md`](progress.md) | the living status and the session log |
 | [`experiments.md`](experiments.md) | the experiment register (hypothesis, config, result, next step) |
 | [`video_script.md`](video_script.md) | the demo video script (≤ 5 min) |
-| [`lucidchart_diagram.md`](lucidchart_diagram.md) | the architecture diagram as Mermaid source, for Lucidchart |

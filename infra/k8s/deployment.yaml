@@ -1,4 +1,4 @@
-# One replica on purpose: surveys live in the server's memory (docs/architecture.md), so a second replica
+# One replica on purpose: surveys live in the server's memory (docs/containers.md), so a second replica
 # would not see the first one's surveys. Recreate keeps the single-writer volume and the one survey store.
 apiVersion: apps/v1
 kind: Deployment

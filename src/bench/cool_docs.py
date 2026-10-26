@@ -7,7 +7,7 @@ the line, or GitHub would show the line as raw HTML;
 wording is left beside them.
 
 Run by `PHASE=cool ./infra/golive.sh` after the COOL benchmarks land, so switching to COOL needs no hand
-edits: it fills the technical report's pending row, the README's COOL line and every status block. Every
+edits: it fills the README's COOL line and every status block. Every
 number comes from benchmarks/*.json (product workload, survey workload, load test) of runs whose provenance
 says COOL.
 
@@ -20,16 +20,12 @@ import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-REPORT = ROOT / "docs" / "technical_report.md"
 README = ROOT / "README.md"
 JUDGES = ROOT / "JUDGES.md"
 
-PENDING_ROW = ("| **⏳ pending:** Graviton **COOL** (c8g.xlarge + c8g.large) | Marketplace subscription blocked on payment "
-               "| — | — | — |")
-PENDING_TARGET = "Graviton COOL pending. |"
 README_START, README_END = "<!-- cool:readme -->", "<!-- /cool:readme -->"
 STATUS_START, STATUS_END = "<!-- cool:status -->", "<!-- /cool:status -->"
-STATUS_DOCS = (README, JUDGES, REPORT)
+STATUS_DOCS = (README, JUDGES)
 PENDING_STATUS = ("has not run yet: the AWS Marketplace subscription is blocked on payment. The demo server runs "
                   "stock OpenCV 5 and says so; the COOL benchmark and its signed receipt run in one command once it is "
                   "active.")
@@ -127,12 +123,8 @@ def status_done(c: dict, doc: Path) -> str:
 
 
 def apply(c: dict, dry: bool = False) -> list[str]:
-    old = {p: p.read_text(encoding="utf-8") for p in (REPORT, README, *STATUS_DOCS)}
+    old = {p: p.read_text(encoding="utf-8") for p in STATUS_DOCS}
     new = dict(old)
-    if PENDING_ROW in new[REPORT]:
-        rep = new[REPORT].replace(PENDING_ROW, "\n".join(report_rows(c)))
-        cool = c["runs"]["graviton_cool"] or c["runs"]["graviton_cool_large"]
-        new[REPORT] = rep.replace(PENDING_TARGET, f"Graviton COOL: {_p50(cool):.0f} ms ({_itype(cool)}). |")
     rd = new[README]
     if README_START in rd and README_END in rd:
         a, rest = rd.split(README_START, 1)

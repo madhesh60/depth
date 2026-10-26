@@ -6,8 +6,8 @@ project by Team Syndicate for the OpenCV AI Competition 2026 (targets: **Agentic
 fishing gear and wreck debris.
 
 - Always call the product **DEPTH**. Never call it "GhostGear". The repo name stays `depth`.
-- The **as-built design is [docs/architecture.md](docs/architecture.md)**. If it disagrees with the
-  proposal ([docs/proposal.md](docs/proposal.md)), follow architecture.md.
+- The **as-built design is the technical paper, [docs/DEPTH_paper.md](docs/DEPTH_paper.md)**. If it disagrees with
+  the proposal ([docs/proposal.md](docs/proposal.md)), follow the paper.
 - Start any documentation lookup at [docs/README.md](docs/README.md) (the documentation map).
 
 ## Rules you must follow
@@ -208,7 +208,7 @@ models/<MODEL>/   calibration.json (+ modes.look_harder, cards) · effort_curve.
                   evidence_model.json, model_meta.json, applicability.json)
 benchmarks/       product_bench JSON results (tracked)
 notebooks/        exp005_kaggle.ipynb (generated) · make_kaggle_notebook.py · monitor_cell.py
-docs/             README (map) · architecture · proposal · progress · experiments · calibration_* · release_*;
+docs/             README (map) · DEPTH_paper (+ paper/) · proposal · progress · experiments · calibration_* · release_*;
                   reports/ = evaluation and study reports
 tests/            pytest suite (CI: .github/workflows/tests.yml)
 .devcontainer/    GitHub Codespaces: the studio in a browser (judges' one-click path while no live URL exists)

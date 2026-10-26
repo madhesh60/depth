@@ -5,7 +5,7 @@ each experiment states a **hypothesis**, records the exact config, reports metri
 with **error analysis** + the **next** experiment. No result is trusted without knowing the
 dataset version, model, augmentation, and hyperparameters that produced it.
 
-**Related:** [`architecture.md`](architecture.md) · [`progress.md`](progress.md)
+**Related:** [`DEPTH_paper.md`](DEPTH_paper.md) · [`progress.md`](progress.md)
 
 > **Removed one-off scripts (2026-10-20).** The EXP-001-era study scripts named in older entries —
 > `src/detection/{ablation_fp,error_analysis,fn_gallery,tiled_infer}.py` and

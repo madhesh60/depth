@@ -1,5 +1,5 @@
 > **📌 This is the original grant proposal / competition brief — a historical record, not the
-> current design.** The as-built system is in [`architecture.md`](architecture.md): the taxonomy is
+> current design.** The as-built system is in the technical paper, [`DEPTH_paper.md`](DEPTH_paper.md): the taxonomy is
 > 4 classes for EXP-001 (`rope_line` merged into `fishing_gear`) and 2 sonar-only classes from
 > EXP-002 on (EXP-003 deployed); the classical-CV ROI gate was **retired** (STUDY-01) and Stage 1 is now **sonar
 > canonicalisation** in the product path (bottom tracking, STUDY-08); the AWS design is **one EC2

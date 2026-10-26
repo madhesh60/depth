@@ -34,7 +34,7 @@ def test_rows_and_headline(tmp_path):
     assert len(rows) == 2 and all("**COOL**" in r for r in rows)
     h = cool_docs.headline(c)
     assert "1.00× stock Graviton" in h and "cool_verification.md" in h
-    assert cool_docs.apply(c, dry=True) == ["docs/technical_report.md", "README.md", "JUDGES.md"]
+    assert cool_docs.apply(c, dry=True) == ["README.md", "JUDGES.md"]
 
 
 def _story(texts: dict) -> set:
@@ -56,8 +56,6 @@ def test_every_document_tells_the_same_cool_story():
     texts = {d.name: d.read_text(encoding="utf-8") for d in cool_docs.STATUS_DOCS}
     said = _story(texts)
     assert said == {cool_docs.PENDING_STATUS} or all(s.startswith("ran - ") for s in said)
-    if said == {cool_docs.PENDING_STATUS}:
-        assert cool_docs.PENDING_ROW in texts["technical_report.md"]   # the row apply() fills
 
 
 def test_a_cool_run_replaces_every_status_block(tmp_path):
@@ -69,7 +67,7 @@ def test_a_cool_run_replaces_every_status_block(tmp_path):
             for d in cool_docs.STATUS_DOCS}
     said = _story(done)                                  # the go-live state passes the same story test
     assert all(s.startswith("ran - ") for s in said) and not any(cool_docs.PENDING_STATUS in t for t in done.values())
-    b = cool_docs.status_blocks(done["technical_report.md"])[0]    # docs/*.md: links relative to the document
+    b = cool_docs.status_done(c, cool_docs.ROOT / "docs" / "any.md")   # docs/*.md: links relative to the document
     assert "](docs/" not in b and "](reports/cool_benchmark.md)" in b
     for name in ("README.md", "JUDGES.md"):                         # root documents link into docs/
         assert "](docs/reports/cool_benchmark.md)" in cool_docs.status_blocks(done[name])[0], name

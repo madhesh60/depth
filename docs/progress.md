@@ -5,7 +5,7 @@ This is the living status of the project. Update it at the end of every working 
 what moved, what's blocked, what's next. Newest entries at the top of §4. **Judges: this is the working
 log — start at [`JUDGES.md`](../JUDGES.md) (one page) or the [README](../README.md).**
 
-**Related:** [`README.md`](../README.md) · [`architecture.md`](architecture.md) ·
+**Related:** [`README.md`](../README.md) · [`DEPTH_paper.md`](DEPTH_paper.md) ·
 [`experiments.md`](experiments.md)
 
 ---
@@ -28,7 +28,7 @@ log — start at [`JUDGES.md`](../JUDGES.md) (one page) or the [README](../READM
 | Milestone | Status | Notes |
 |---|---|---|
 | Grant awarded ($150) | ✅ Done | Secured. 2nd half unlocked at check-in. |
-| Proposal (`docs/proposal.md`) | ✅ Done | Proposal of record; the as-built design (`docs/architecture.md`) supersedes it where they differ. |
+| Proposal (`docs/proposal.md`) | ✅ Done | Proposal of record; the as-built design (`docs/DEPTH_paper.md`) supersedes it where they differ. |
 | Dataset built (v0, 32,981 imgs) | ✅ Done | 7 sources remapped to 5 classes; split 30444/1263/1274. |
 | Dataset audit | ✅ Done | Issues found by `DATASET/scripts/audit_dataset.py` (the v0 report retired 2026-10-20; the dataset card is current). |
 | Project docs | ✅ Done | README at the root; everything else in `docs/` (map: `docs/README.md`), reports in `docs/reports/`. |
@@ -79,7 +79,7 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
   profile `hackathon`, us-east-1.
 
 Current numbers, each with its split: [`JUDGES.md`](../JUDGES.md) "Key Numbers", the README's "Evaluation
-Metrics" and [`docs/technical_report.md`](technical_report.md).
+Metrics" and [`docs/DEPTH_paper.md`](DEPTH_paper.md).
 
 ---
 

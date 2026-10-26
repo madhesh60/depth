@@ -175,7 +175,7 @@ recordings with real GPS come from the PINGMapper project [11].
 
 ## 3. The DEPTH System
 
-![DEPTH system architecture: the agent's core loop over five OpenCV 5 stages, with human approval gates and map outputs](img/architecture.svg)
+![DEPTH system architecture: the agent's core loop over five OpenCV 5 stages, with human approval gates and map outputs](paper/figures/architecture.png)
 
 *Figure 2: The as-built architecture. The core loop (top) runs every survey. The five OpenCV 5 stages do the
 seeing and measuring. People approve every action.*

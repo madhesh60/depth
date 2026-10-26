@@ -196,10 +196,10 @@ The route below takes about ten minutes and touches every part of the system.
 
 | Deliverable | Location | Status |
 |---|---|---|
-| Technical report | [`technical_report.md`](docs/technical_report.md) | Complete |
+| Technical paper | [`DEPTH_paper.md`](docs/DEPTH_paper.md) ([PDF](docs/paper/DEPTH_paper.pdf)) | Complete |
 | Source code | This repository | Complete |
 | Pinned dependencies, build, deployment and test instructions | `requirements*.txt`, [`README.md`](README.md), [`infra/README.md`](infra/README.md) | Complete |
-| Architecture diagram | [`depth_architecture.png`](docs/diagram/depth_architecture.png) (AWS deployment, drawn from the live stack; [source](docs/diagram/depth_architecture.py)); module-level design in [`architecture.md`](docs/architecture.md) | Complete |
+| Architecture diagram | [`depth_architecture.png`](docs/diagram/depth_architecture.png) (AWS deployment, drawn from the live stack; [source](docs/diagram/depth_architecture.py)); module-level design in §3 of [`DEPTH_paper.md`](docs/DEPTH_paper.md) | Complete |
 | Working endpoint or live demonstration | GitHub Codespaces and the public URL https://13-216-140-101.sslip.io (both available) | Complete |
 | Demonstration video | — | Pending |
 | Evaluation evidence | [`reports/`](docs/reports), [`experiments.md`](docs/experiments.md) | Complete |
@@ -220,7 +220,7 @@ The route below takes about ten minutes and touches every part of the system.
 - The test split was used by four studies, so its figures are checked, not untouched.
 - A promise is a pooled rate, not a per-survey guarantee; no recording yet has both real pots and real GPS.
 
-Full detail: [`technical_report.md`](docs/technical_report.md) §6.
+Full detail: [`DEPTH_paper.md`](docs/DEPTH_paper.md) §8.
 
 ## 9. Verifying the claims
 
@@ -264,8 +264,7 @@ The same terms are available in the studio (**Terms**, top bar).
 | Document | Purpose |
 |---|---|
 | [`README.md`](README.md) | Project overview, results, installation and repository structure |
-| [`technical_report.md`](docs/technical_report.md) | The complete system, its evaluation and its limitations |
-| [`architecture.md`](docs/architecture.md) | The as-built design, module by module |
+| [`DEPTH_paper.md`](docs/DEPTH_paper.md) ([PDF](docs/paper/DEPTH_paper.pdf)) | The technical paper: the complete system as built, its evaluation and its limitations |
 | [`agentic_vision.md`](docs/agentic_vision.md) | The Agentic Vision entry in detail |
 | [`model_card.md`](docs/model_card.md) · [`dataset_card.md`](docs/dataset_card.md) | The deployed detector and its data |
 | [`experiments.md`](docs/experiments.md) | Every experiment in order, including negative results |

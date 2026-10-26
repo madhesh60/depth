@@ -123,7 +123,7 @@ Inside the agent:
 | **Decide** | calibrated tiers (the recall promise), P(pot) queue order, one card per object | `src/agentic/calibrate.py`, `cards.py` |
 | **Act** | geotags, chunk stitching, repeat-sighting merge, routes, re-survey passes, exports, provenance, mission brief | `src/agentic/mission.py`, `geo.py`, `brief.py` |
 
-The full as-built design, module by module: [`docs/architecture.md`](docs/architecture.md).
+The full as-built design: §3 of the technical paper, [`docs/DEPTH_paper.md`](docs/DEPTH_paper.md).
 
 ---
 
@@ -648,8 +648,7 @@ python -m src.agentic.effort --real-water           # analyst effort on the raw 
 |---|---|
 | [Live demo](https://13-216-140-101.sslip.io) | the running studio on AWS Graviton4 |
 | [`JUDGES.md`](JUDGES.md) | one page for judges: try it, see the agent decide, key numbers, what is not done |
-| [`docs/technical_report.md`](docs/technical_report.md) | the whole system, its evaluation and its limits |
-| [`docs/architecture.md`](docs/architecture.md) | the as-built design, module by module |
+| [`docs/DEPTH_paper.md`](docs/DEPTH_paper.md) ([PDF](docs/paper/DEPTH_paper.pdf)) | the technical paper: the whole system as built, its evaluation and its limits |
 | [`docs/agentic_vision.md`](docs/agentic_vision.md) · [`docs/agentic_loop.md`](docs/agentic_loop.md) | the Agentic Vision entry; the loop step by step, failure handling and the audit log |
 | [`docs/model_card.md`](docs/model_card.md) · [`docs/dataset_card.md`](docs/dataset_card.md) | the deployed detector; the data and its provenance |
 | [`docs/experiments.md`](docs/experiments.md) | every experiment and study, including the negative ones |
