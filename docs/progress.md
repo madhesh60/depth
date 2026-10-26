@@ -62,7 +62,7 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
   tiers (≥ 78% one look, ≥ 84% looking harder — both checked for correlated frames), **one review card per
   object** (STUDY-23), survey planning and person-approved actions — on the sample frames and on a raw
   Humminbird recording with real GPS and a per-ping dropout mask. `ruff check .` (with bugbear) and `mypy` (the
-  decision core) are clean, both in CI; the full suite passes (327 passed, 1 skipped, 2026-10-26; coverage 60% of `src/`).
+  decision core) are clean, both in CI; the full suite passes (328 passed, 2026-10-26; coverage 60% of `src/`).
 - **Judges can run it:** the public demo at https://13-216-140-101.sslip.io (EC2 c8g.large, Caddy + Let's Encrypt,
   stock OpenCV 5 in rehearsal mode, not COOL; live since 2026-10-25), one click in GitHub Codespaces, five commands
   on a laptop, or the container (`docker compose up --build`, `kubectl apply -k infra/k8s`). CI runs the codespace's
@@ -84,6 +84,26 @@ Metrics" and [`docs/DEPTH_paper.md`](DEPTH_paper.md).
 ---
 
 ## 4. Session log
+
+### 2026-10-26 (sweep 83) — the technical paper replaces the report and the architecture doc; 7 of 10 dependency bumps merged
+
+- **The paper is the document of record:** `docs/DEPTH_paper.md`, with `docs/paper/` (LaTeX, PDF, figures, Overleaf
+  bundle). The owner retired `architecture.md`, `technical_report.md`, `lucidchart_diagram.md`,
+  `lucid_architecture.mmd` and `img/architecture.svg`; every link now points to the paper (0 broken relative links
+  in 56 Markdown files). `cool_docs` fills README and JUDGES only (the pending COOL row lived in the report); the
+  paper's COOL wording is edited by hand if COOL runs.
+- **Dependabot, merged (7):** actions/checkout v7, actions/setup-python v7, helm/kind-action 1.15.1, mypy 2.4.0
+  (clean on the decision core), PyYAML 6.0.3, torch 2.14.1 + torchvision 0.29.1 (training only, on Kaggle; not run
+  here).
+- **Held back (3):** numpy 2.5.4 and websockets 17.3 have no Python 3.10 build, and CI, Codespaces and the container
+  run 3.10 (the newest for 3.10: 2.2.6 and 16.1.1); the container's Python 3.15 needs numpy ≥ 2.5 (2.2.6 has no
+  3.15 build). Moving everything to a newer Python unlocks all three — after judging.
+- **Local only:** `submission/` and `Claude outputs/` (the Devpost bundle and thumbnails) stay on the laptop.
+- **The live link on a filtered network:** the owner's college Wi-Fi (Fortinet FortiGuard) answers DNS for sslip.io
+  with its block page (208.91.112.55, a self-signed "Fortiguard SDNS Blocked Page" certificate), so browsers show a
+  privacy error there; from outside, SSL Labs sees the real server, a valid Let's Encrypt certificate, grade A+.
+  Left as is (owner's call).
+- Checks: ruff clean; mypy 2.4.0 clean; 328 passed (run in two halves).
 
 ### 2026-10-26 (sweep 82) — every claim checked against the code, the measurements and outside sources
 
