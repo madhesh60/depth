@@ -54,7 +54,7 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
 
 ---
 
-## 3. Current state (2026-10-23)
+## 3. Current state (2026-10-26)
 
 - **Working end to end:** the studio and the agent on CPU with OpenCV 5 — the goal-driven core loop
   (`core.py`: check the promise applies → choose how hard to look → perceive with a compute-budget watch →
@@ -62,17 +62,18 @@ Legend: ✅ done · 🟡 in progress · ⬜ not started · ⛔ blocked
   tiers (≥ 78% one look, ≥ 84% looking harder — both checked for correlated frames), **one review card per
   object** (STUDY-23), survey planning and person-approved actions — on the sample frames and on a raw
   Humminbird recording with real GPS and a per-ping dropout mask. `ruff check .` (with bugbear) and `mypy` (the
-  decision core) are clean, both in CI; the full suite passes (315, 2026-10-24; coverage 60% of `src/`).
-- **Judges can run it:** one click in GitHub Codespaces (`.devcontainer/`), or five commands on a laptop. CI runs
-  the codespace's own setup in its image on 2 CPUs and plays the guided demo to its last step
-  (`.github/workflows/codespaces.yml`); one real click in a codespace is still the owner's check.
-- **Waiting on AWS / the owner:** the Graviton + COOL runs (the Marketplace subscription needs a Visa or
-  Mastercard) and a public link: CloudFront (account verification) or `PUBLIC_HTTPS=1 APPLY=1 ./infra/deploy.sh`,
-  which the owner runs (opening port 443 is the owner's call). The stock EC2 benchmarks in both modes, the
-  measured engine choice and the load-test re-run are done (2026-10-23).
+  decision core) are clean, both in CI; the full suite passes (327 passed, 1 skipped, 2026-10-26; coverage 60% of `src/`).
+- **Judges can run it:** the public demo at https://13-216-140-101.sslip.io (EC2 c8g.large, Caddy + Let's Encrypt,
+  stock OpenCV 5 in rehearsal mode, not COOL; live since 2026-10-25), one click in GitHub Codespaces, five commands
+  on a laptop, or the container (`docker compose up --build`, `kubectl apply -k infra/k8s`). CI runs the codespace's
+  setup and the guided demo, and builds, runs and deploys the container to a throwaway Kubernetes cluster.
+- **Waiting on AWS:** the Graviton + COOL runs (the Marketplace subscription needs a Visa or Mastercard) and
+  CloudFront (account verification). The stock EC2 benchmarks in both modes, the measured engine choice and the
+  load-test re-run are done (2026-10-23).
 - **Needs people:** the timed user study and the blinded false-alarm audit.
-- **Left for submission:** the COOL numbers (or the plain "not run" line), the narrated video (footage:
-  `python tests/ui_video.py`), the Lucidchart diagram. The GitHub description and topics are set (2026-10-22).
+- **Left for submission:** the COOL numbers (or the plain "not run" line, already in every doc), the narrated
+  video (footage: `python tests/ui_video.py`), and the approver PIN in the submission form. The GitHub description
+  and topics are set (2026-10-22).
 - **Environment:** global Python 3.10 (no venv). Runtime pinned in `requirements.txt` (OpenCV 5.0.0.93);
   tests and lint in `requirements-dev.txt`; training on Kaggle (`requirements-train.txt`). AWS CLI v2,
   profile `hackathon`, us-east-1.
@@ -83,6 +84,32 @@ Metrics" and [`docs/technical_report.md`](technical_report.md).
 ---
 
 ## 4. Session log
+
+### 2026-10-26 (sweep 82) — every claim checked against the code, the measurements and outside sources
+
+Each number in README and JUDGES was traced to its report or benchmark JSON (frame times, fps, price, load test,
+promise, per-recording, applicability, cards, detector metrics: all match), and each feature claim to the code
+(PIN lockout 5 in 15 min, SNS cap 6 an hour, 409 / 422 / 503 paths, incident codes, drills, 13 MCP tools with no
+approve tool, wreck generalisation, trace never public). Corrected:
+
+- **Unfair to others:** GhostVision also georeferences its detections (PINGMapper), so the README's comparison no
+  longer says "image in, boxes out"; it now shows GhostVision's stronger detector in its own row. Satellites:
+  "light reaches 1–2 m" holds for turbid coastal water, not everywhere; now said so.
+- **Background figures:** 640,000 t named as a rough 2009 FAO/UNEP estimate; the 43,968-pot harvest estimate is
+  Chesapeake-wide (Maryland and Virginia, 2008–2014); bycatch "caught in" rather than "killed by".
+- **Overclaims:** "every study registered before scoring" → the five studies that switch on agent behaviour
+  (16, 18, 19, 21, 23, each checked); "CI runs these on every push" → what each workflow really runs, and AWS
+  deploys are manual; the load test ran on the server itself with rate limits off (now stated); the monthly Budget
+  is outside the stack; MCP "only write" → no tool can approve or decide; the CONFIRMED tier is empty for EXP-003
+  (technical report, architecture, Agentic Vision); value-of-information is a check, active vision is off.
+- **Added (honest):** looking harder holds ≥ 84% on 4 of 6 recordings (Rec9 81.5%), beside one look's 5 of 6.
+- **Stale:** the AWS diagram said 157 vs 197 ms (now 138.5 vs 145.8 ms, regenerated); the module diagram said
+  the "new engine" (now the faster one, timed at start) and STUDY-01…22; the technical report still listed the
+  live URL as pending; the infra README said "no public address"; the MCP example used a CloudFront placeholder;
+  the video script expected CloudFront, COOL and a real Claude; the proposal banner; this file's current state;
+  CLAUDE.md's test count.
+- Not checkable from this sandbox: the live server (the network blocks it) and the 31,000-animal figure.
+- Checks: relative links resolve; ruff and mypy clean; 327 passed, 1 skipped.
 
 ### 2026-10-25 (sweep 81) — the public HTTPS link would have refused every visitor: fixed before the first apply
 
@@ -96,7 +123,7 @@ Metrics" and [`docs/technical_report.md`](technical_report.md).
   is root:caddy 0640. Same local test: 200 on `/` and `/api/health`, a visitor's forged header is overwritten, HSTS
   set, OGC links `https://`, the app still sees each visitor's own address (rate limits), the app port without the
   secret still 403. The live check now says so when the link does not answer within 10 minutes.
-- Test: `test_caddy_sends_the_origin_secret_because_uvicorn_trusts_loopback` (fails on the old script). Suite: 328 passed; ruff clean.
+- Test: `test_caddy_sends_the_origin_secret_because_uvicorn_trusts_loopback` (fails on the old script). Suite: 327 passed, 1 skipped (328); ruff clean.
 - **Applied the same day, with the owner's go-ahead:** the dry run added only `PublicHttpsIngress`, `DemoHealthCheck`
   and `DemoDownAlarm` (the operations resources were already in place); `PUBLIC_HTTPS=1 ROLLBACK=1 APPLY=1
   ./infra/deploy.sh` installed Caddy 2.6.2 (Let's Encrypt, valid to 2027-01-23); `update_server.sh` moved the server

@@ -93,7 +93,7 @@ The **runtime** processes each frame through five stages, all OpenCV 5 on CPU:
    - a value-of-information re-look.
 
    Evidence goes on the human's card. It is never a silent gate (STUDY-03/04).
-4. **Decide** — **guaranteed tiers** (§4.2): CONFIRMED / REVIEW / LOW-RISK. A calibrated P(pot) orders the review queue.
+4. **Decide** — **guaranteed tiers** (§4.2): REVIEW / LOW-RISK. The code also has a CONFIRMED tier, but with EXP-003 it stays empty: no precision promise holds, so nothing is auto-confirmed. A calibrated P(pot) orders the review queue.
 5. **Act** (survey level):
    - per-ping ground-range geotags with error radii;
    - chunk-boundary stitching and repeat-sighting merging;
@@ -337,7 +337,7 @@ explicit `DEPTH_APPROVALS_OPEN=1`).
 **Scaling path (described, not built):** survey jobs → SQS → an Auto Scaling group of the same COOL AMI
 on Spot → S3.
 
-**⏳ pending:** the live endpoint URL and the 24-hour soak test.
+**⏳ pending:** a 24-hour soak test. (The live endpoint is up: https://13-216-140-101.sslip.io.)
 
 ---
 

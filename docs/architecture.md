@@ -55,7 +55,7 @@ violet = optional. The numbers are EXP-003's as of 2026-10-21. Text version:_
          │          look-harder mode: + 2×2 tiles (4 passes), merged at IoU ≥ 0.5     src/agentic/perception.py
          ─► PROVE   water_column_check · thin-line shadow · relative height (tracked altitude)
          │          · agent's-eye re-look view (display)                              src/agentic/{shadow,perception,tools}.py
-         ─► DECIDE  guaranteed tiers (CONFIRMED / REVIEW / LOW-RISK) · value-of-information tool use
+         ─► DECIDE  guaranteed tiers (REVIEW / LOW-RISK; CONFIRMED empty for EXP-003) · value-of-information check
          │          · calibrated P(pot) · full trace                                  src/agentic/{agent,policy,guarantees}.py
          │          · one card per object: same-class review boxes half inside each other  src/agentic/cards.py
          │            share a card (STUDY-23); no box dropped

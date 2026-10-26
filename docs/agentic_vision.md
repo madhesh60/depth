@@ -74,8 +74,9 @@ flowchart LR
   packed into one inference), a CLAHE "try harder" pass, the thin-line **acoustic shadow** and a
   **relative height** (orientation from a source rule — never guessed). Evidence is always shown on
   the card; the shadow is never a filter.
-- **DECIDE** — **guaranteed tiers** (§4): CONFIRMED / REVIEW / LOW-RISK, with thresholds fit by
-  Clopper–Pearson / Learn-Then-Test on held-out frames. The agent spends re-look compute only where it
+- **DECIDE** — **guaranteed tiers** (§4): REVIEW / LOW-RISK, with thresholds fit by
+  Clopper–Pearson / Learn-Then-Test on held-out frames. (A CONFIRMED tier exists in the code but stays empty with
+  EXP-003: no precision promise holds, so nothing is auto-confirmed.) The agent spends re-look compute only where it
   can change a tier or a REVIEW-queue position, and records the calls it chose *not* to make.
 - **ACT** — chunk-boundary **stitching** (one object cut by a chunk edge = one hazard), a
   nearest-neighbour **recovery route** (CONFIRMED) and **inspection route** (the budgeted REVIEW
@@ -288,7 +289,7 @@ and every survey exports its decision log (`mission.trace.jsonl`).
 | Criterion | Weight | Where it's met |
 |---|---:|---|
 | Substantive OpenCV 5 + agent | 30% | the agent's tools *are* OpenCV ops: Stage-1 bottom tracking, `cv2.remap` slant→ground, luminance; `cv2.dnn` detect; re-look + CLAHE; thin-line shadow; water-column check; sensor cross-check re-runs the OpenCV tracker on a conflict. **Proof OpenCV matters:** with Stage 1 removed, 95 of 142 pins leave their error circle (`docs/reports/causal_trace.md`) |
-| Orchestration & autonomy | 25% | **the core loop** (§0): an operator goal; the agent checks its promise applies, chooses its perception mode, watches its compute budget and re-plans mid-run, then plans and asks; value-of-information tool use; compute, analyst **and boat** budgets; **sensor cross-check** decides per chunk which sensor to trust, re-tracks and re-fits the range scale with no person (STUDY-16, on by default); stitching; repeat-sighting merge; routes; opposite-side re-survey planning (§3, §6) |
+| Orchestration & autonomy | 25% | **the core loop** (§0): an operator goal; the agent checks its promise applies, chooses its perception mode, watches its compute budget and re-plans mid-run, then plans and asks; a value-of-information check before any extra look (the fuller active-vision loop failed its gates and is off, STUDY-15); compute, analyst **and boat** budgets; **sensor cross-check** decides per chunk which sensor to trust, re-tracks and re-fits the range scale with no person (STUDY-16, on by default); stitching; repeat-sighting merge; routes; opposite-side re-survey planning (§3, §6) |
 | Task effectiveness | 20% | recall promises that **held on unseen test** (≥ 84% looking harder, held at 86.0%; ≥ 78% with one look, held at 81.1%; checked for correlated frames, STUDY-21); the promise withdrawn where it would fail silently (another sonar: 22 of 22); honest "no auto-confirm"; cross-check validated on a fresh 1-h recording (2 of 3 pre-registered checks passed; the failure is reported); effort study built, not yet run with people (§4, §6) |
 | Failure handling & human control | 15% | a failed tool never raises: the agent falls back to the detector score and sends the find to a person; failure drills you can run (`?simulate=tool_failed`, `tool_timeout`, `no_detection`); bounded LOW-RISK tier; budgeted REVIEW queue; **person-confirmed loop** re-plans routes from a named person's ✓ / ✕ / recovered; MCP agents can only *ask* (`approvals.py`); missed-pot labels; blinded audit (§5, §6) |
 | User experience | 10% | calm glass studio with six modes (Analyze · Survey · Study · Audit · Connect · For judges) and a guided 60-s demo: guarantee badges, evidence cards with the full trace, seabed overlay, map + routes + re-survey passes, person-confirmed recovery route, 3D twin, live effort curve, downloads |

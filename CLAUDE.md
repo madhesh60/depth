@@ -142,7 +142,7 @@ budget) → plan → one approval request per action. Every step is logged in `a
 ```bash
 # Run and check
 python -m uvicorn src.dashboard.app:app --port 8000    # the studio (Analyze/Survey/Study/Audit)
-pytest -q                                              # 319 tests; coverage 60% of src/ (85% runtime)
+pytest -q                                              # 328 tests; coverage 60% of src/ (85% runtime)
 docker compose up --build                              # the same server in a container (docs/containers.md)
 kubectl apply -k infra/k8s                             # ... on Kubernetes (one replica: surveys are in memory)
 python tests/container_smoke.py --url http://localhost:8000   # real work in a running container

@@ -46,7 +46,7 @@ dispatched. Its contribution is not a better detector but a **dependable** one. 
 | Route | How | Status |
 |---|---|---|
 | Public deployment | [https://13-216-140-101.sslip.io](https://13-216-140-101.sslip.io): the full studio on AWS Graviton4 (stock OpenCV 5, not COOL); approving needs the PIN from the submission form | Available |
-| GitHub Codespaces | [Open in GitHub Codespaces](https://codespaces.new/madhesh60/depth?quickstart=1): the full studio in a browser, ready in about three minutes, free with a GitHub account | Available; the setup and the guided demo run in CI on every push ([`codespaces.yml`](.github/workflows/codespaces.yml)) |
+| GitHub Codespaces | [Open in GitHub Codespaces](https://codespaces.new/madhesh60/depth?quickstart=1): the full studio in a browser, ready in about three minutes, free with a GitHub account | Available; the setup and the guided demo run in CI whenever the code changes on `main` ([`codespaces.yml`](.github/workflows/codespaces.yml)) |
 | Local installation | The five commands below, on any laptop, CPU only | Available |
 | Docker, Compose, Kubernetes | `docker compose up --build` or `kubectl apply -k infra/k8s` ([`containers.md`](docs/containers.md)) | Available; built, run and deployed to a test cluster in CI ([`container.yml`](.github/workflows/container.yml)) |
 | Demonstration video | — | **Pending** |
@@ -71,8 +71,8 @@ Grey boxes are not live yet: CloudFront, the COOL AMI and the Bedrock brief writ
 
 ## 3. Practical: pinned dependencies, build, deployment and tests
 
-This section answers the judges' practical criterion in one place: every dependency is pinned, and the build,
-deployment and test steps below are the ones CI runs on every push.
+This section answers the judges' practical criterion in one place: every dependency is pinned, and the build and
+test steps below are the ones CI runs. The AWS deployment is run by hand (dry run first), never by CI.
 
 **Pinned dependencies.** Every package is pinned to an exact version (`==`), split by purpose so the runtime
 stays small and torch-free:
@@ -113,9 +113,10 @@ python tests/ui_smoke.py --full-demo        # headless Chrome plays the guided d
 python tests/container_smoke.py --url http://localhost:8000   # real work inside a running container
 ```
 
-CI runs these on every push: [`tests.yml`](.github/workflows/tests.yml) (tests, lint, type check),
-[`container.yml`](.github/workflows/container.yml) (build, run locked down, deploy to a throwaway Kubernetes
-cluster) and [`codespaces.yml`](.github/workflows/codespaces.yml) (fresh setup, guided demo to the last step).
+CI runs [`tests.yml`](.github/workflows/tests.yml) (tests, lint, type check) on every push to `main` and every
+pull request; [`container.yml`](.github/workflows/container.yml) (build, run locked down, deploy to a throwaway
+Kubernetes cluster) and [`codespaces.yml`](.github/workflows/codespaces.yml) (fresh setup, guided demo to the last
+step) run when the code they cover changes.
 
 ## 4. Recommended evaluation path
 
@@ -177,7 +178,7 @@ The route below takes about ten minutes and touches every part of the system.
 | Recall promise, standard look (95% confidence) | **≥ 78%** of pots reach a person; held on unseen test at **81.1%** | [`calibration_exp003.md`](docs/calibration_exp003.md) |
 | Recall promise, looking harder (2×2 tile pass) | **≥ 84%**; held on unseen test at **86.0%** (lower bound 82.0%) | [`look_harder.md`](docs/reports/look_harder.md) |
 | Robustness to correlated frames | Standard: block-bootstrap bound 78.2%, so the promise was restated from 79% to **78%**; looking harder: 84.3%, unchanged | [`dependence.md`](docs/reports/dependence.md) (STUDY-21) |
-| Per recording | The standard promise held on 5 of 6 recordings (Rec9: 74.7%); a promise is a pooled rate | same |
+| Per recording | The standard promise held on 5 of 6 recordings (Rec9: 74.7%), looking harder on 4 of 6 (Rec9: 81.5%); a promise is a pooled rate | same |
 | The same calibration code, two detectors | EXP-001: ≥ 63%, held at 86.2% on its own unseen test · EXP-003: ≥ 78%, held at 81.1% | [`calibration_exp001.md`](docs/calibration_exp001.md) · [`calibration_exp003.md`](docs/calibration_exp003.md) |
 | Promise withdrawn where it does not apply | Another sonar: withdrawn in **22 of 22** surveys (one look keeps only 23.9% of pots there) | [`applicability.md`](docs/reports/applicability.md) (STUDY-19) |
 | Crab-pot detector, AP@0.5 | **0.482** (95% CI 0.43–0.55); mAP@0.5 0.319, **below the 0.70 target** | [`eval_exp003_test.md`](docs/reports/eval_exp003_test.md) |
@@ -185,7 +186,7 @@ The route below takes about ten minutes and touches every part of the system.
 | OpenCV 5's two DNN engines | Same answers (634 of 634 detections on the calibration frames; 31 of 31 on each EC2 machine). On Graviton the classic engine is **1.41–1.47×** faster at every thread count measured; on x86 it wins at 4 threads (1.11×), and the new engine wins at 1 thread (1.17×) | [`dnn_engine.md`](docs/reports/dnn_engine.md) (STUDY-20) |
 | Frame time, standard look (stock OpenCV 5, 4 vCPU) | **138.5 ms** Graviton4 (c8g.xlarge) · **145.8 ms** x86 (c8i.xlarge) | [`cool_benchmark.md`](docs/reports/cool_benchmark.md) |
 | Frame time, looking harder | **655 ms** Graviton4 · **693 ms** x86 (4 vCPU); **1.30 s** on the 2-vCPU demo server (one look: 268 ms) | same |
-| Demo server under load | c8g.large, 4 clients back to back plus 1 survey, 120 s: **383 of 383** requests succeeded, analyze p95 **2.44 s** (target 3 s) | `benchmarks/load/load_test__c8g_large_rehearsal.json` |
+| Demo server under load | c8g.large, 4 clients back to back plus 1 survey, 120 s: **383 of 383** requests succeeded, analyze p95 **2.44 s** (target 3 s); the clients ran on the server itself with rate limits off, so no network time is included | `benchmarks/load/load_test__c8g_large_rehearsal.json` |
 | One review card per object | Cards per frame **2.68 → 1.81** (one look) and **3.86 → 2.32** (looking harder); the same pots reach a person | [`card_grouping.md`](docs/reports/card_grouping.md) (STUDY-23) |
 | On one CPU core | 435 ms per frame on one Graviton4 core: an hour of sonar in about 122 s, **about 30× faster than it is recorded**; no small board was measured | `benchmarks/graviton_stock_t1__product.json` |
 | Analyst time (**assumed** 20 s per frame, 8 s per card) | Pot-dense test: one look **43.2 vs 55.7** minutes manual, looking harder **56.5 vs 57.3**; empty seabed 34 and 47 vs 56 minutes per survey-hour | [`effort_curve.md`](docs/reports/effort_curve.md) |

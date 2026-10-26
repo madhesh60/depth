@@ -3,7 +3,7 @@
 **One product, one deploy target.** The demo is designed as the FastAPI app (`src/dashboard/app.py`) running the
 full agent on **one EC2 Graviton4 instance launched from the COOL Marketplace AMI** (OpenCV 5 under
 `/opt/cool`), behind CloudFront for HTTPS. **Today** it runs in rehearsal mode on stock Ubuntu and stock OpenCV 5,
-without CloudFront and without a public address (status below). Everything is one CloudFormation stack
+without CloudFront, public at https://13-216-140-101.sslip.io through Caddy + Let's Encrypt (status below). Everything is one CloudFormation stack
 ([`cfn/depth.yaml`](cfn/depth.yaml)); the benchmark is one command that launches self-terminating machines.
 The earlier Lambda / API Gateway / DynamoDB / Amplify / SageMaker plan stays **retired**: COOL ships as an
 AMI, so only EC2 can run the product on COOL.

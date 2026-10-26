@@ -166,7 +166,7 @@ group(175, 790, 525, 250, "Benchmark component")
 svc("aws/compute/ec2.png", 265, 880, "Amazon EC2", "c8i.xlarge · x86")
 svc("aws/compute/ec2.png", 430, 880, "Amazon EC2", "c8g.xlarge · Graviton4")
 svc("aws/general/marketplace.png", 600, 880, "COOL AMI", "pending", faded=True)
-text(437, 1000, "same code, frames and model · stock OpenCV 5: 157 ms vs 197 ms per frame", 12, "#545b64")
+text(437, 1000, "same code, frames, model · stock OpenCV 5: Graviton4 138.5 vs x86 145.8 ms", 12, "#545b64")
 text(437, 1018, "self-terminating machines · results → S3", 12, "#545b64")
 
 group(730, 790, 320, 250, "Deployment component")

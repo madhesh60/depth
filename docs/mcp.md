@@ -38,7 +38,7 @@ claude mcp add depth -e DEPTH_LAZY_MODEL=1 -- python -m src.dashboard.mcp_server
 returns JSON, so it works behind CloudFront or a load balancer. Send the bearer token on every request:
 
 ```bash
-claude mcp add --transport http depth https://<cloudfront-domain>/mcp --header "Authorization: Bearer <DEPTH_MCP_TOKEN>"
+claude mcp add --transport http depth https://13-216-140-101.sslip.io/mcp --header "Authorization: Bearer <DEPTH_MCP_TOKEN>"
 ```
 
 **Inspect / debug** with any MCP client, for example the MCP Inspector

@@ -39,11 +39,12 @@ COOL** · AGPL-3.0
 
 ## Problem Statement
 
-An estimated **640,000 tonnes** of fishing gear is lost at sea every year. Lost pots and nets keep catching
-animals for years; this is **ghost fishing**. In Virginia alone, a six-year VIMS CCRM study
-counted more than **31,000** crabs, finfish, birds and sea turtles killed by derelict blue-crab traps. VIMS CCRM
-modelling found that removing 43,968 derelict pots returned **38.17 million lb** of harvestable blue crab, worth
-about **$33.5 million**. Derelict gear also fouls propellers and carries invasive species.
+An estimated **640,000 tonnes** of fishing gear is lost at sea every year (a rough 2009 FAO/UNEP estimate). Lost
+pots and nets keep catching animals for years; this is **ghost fishing**. In Virginia alone, a six-year VIMS CCRM
+study counted more than **31,000** crabs, finfish, birds and sea turtles caught in derelict blue-crab traps. VIMS
+CCRM estimates that removing 43,968 derelict pots from the Chesapeake Bay (Maryland and Virginia, 2008–2014)
+returned **38.17 million lb** of harvestable blue crab, worth about **$33.5 million**. Derelict gear also fouls
+propellers and carries invasive species.
 
 Side-scan sonar is how this gear is found. VIMS CCRM first mapped the problem with it in 2006, which led to
 Virginia's first derelict-trap removal programme in 2008; it recovered more than 34,000 pots in six years. In
@@ -66,9 +67,9 @@ needs an expert to review it frame by frame, which is too slow and too costly to
 
 | Approach | What it offers | Why it is not enough |
 |---|---|---|
-| **Optical and SAR satellites** (Planet, Maxar, Sentinel) | wide-area surface monitoring | light reaches 1–2 m and SAR stops at the surface, so gear at 5–50 m is invisible; revisit gaps, cloud and sun glint; area alerts, not objects a crew can recover |
+| **Optical and SAR satellites** (Planet, Maxar, Sentinel) | wide-area surface monitoring | in turbid coastal water such as the Chesapeake, light reaches only 1–2 m, and SAR stops at the surface, so gear at 5–50 m is out of sight; revisit gaps, cloud and sun glint; area alerts, not objects a crew can recover |
 | **Side-scan sonar, reviewed by an analyst** | acoustic images of the seabed: a pot shows as a bright return with a shadow | a trained analyst must review every frame: slow, inconsistent and hard to scale |
-| **An automated detector** (for example GhostVision) | finds pots in sonar automatically | a detector alone outputs boxes and confidence scores; it does not promise coverage, check that it suits the recording, or plan a cleanup for a person to approve |
+| **An automated detector with mapping** (for example GhostVision, built on PINGMapper) | finds pots in sonar and georeferences them automatically, with a more accurate detector than DEPTH's | detection scores are not turned into a coverage promise for the survey in hand, checked against the recording, or turned into a cleanup plan for a person to approve: that layer is what DEPTH adds |
 
 Removal today is manual and depends on funding. Virginia's programme hired 58–70 watermen a season and pulled
 7,800–8,700 crab pots a year (2008–11); with 4–7 watermen it pulled 637–1,107 (2012–14).
@@ -290,7 +291,7 @@ the v2b test split, so treat its numbers as checked, not untouched.
 | Cross-sonar crab-pot AP@0.5 | 0.34; recall 0.11 at the validation threshold | `test_xsonar` |
 | **Recall promise, one look** | **≥ 78%**; held at 81.1% (lower bound 76.7%) | fit: val (3 recordings, 186 pots) · verified once: test (3 recordings, 264 pots) |
 | **Recall promise, looking harder** | **≥ 84%**; held at 86.0% (lower bound 82.0%) | same |
-| Promise per recording | one look ≥ 78% on 5 of 6 recordings (test Rec9: 74.7%) | val + test (STUDY-21) |
+| Promise per recording | one look ≥ 78% on 5 of 6 recordings (test Rec9: 74.7%); looking harder ≥ 84% on 4 of 6 (Rec9: 81.5%) | val + test (STUDY-21) |
 | Applicability check | promise withdrawn in 22 of 22 surveys on another sonar; kept on all 3 test recordings | `test_xsonar` · v2b test (STUDY-19) |
 | One card per object | 3.86 → 2.32 cards per frame looking harder (2.68 → 1.81 with one look); the same 227 of 264 pots still reach a person | v2b test (STUDY-23) |
 | Stage 1 geometry | port and starboard altitude on the same pings agree to 1.6 px median (random pairs: 5.3 px) | 107 un-augmented frames (STUDY-08) |
@@ -308,8 +309,10 @@ wrecks are fish-finder screenshots and the wreck boxes are loose ([`exp003_diagn
 
 ## Experimental Studies and Ablations
 
-Every study is registered in [`docs/experiments.md`](docs/experiments.md) with its hypothesis, protocol and gates,
-committed before its unseen data is scored. Negative results are published. *Shipped* means on by default.
+Every study is logged in [`docs/experiments.md`](docs/experiments.md) with its hypothesis, protocol and gates. The
+later studies that switch on agent behaviour (STUDY-16, 18, 19, 21 and 23) committed their protocol before scoring
+their held-out data; where a rule came after the data, the log says so. Negative results are published. *Shipped*
+means on by default.
 
 | Study | Question | Result | Outcome |
 |---|---|---|---|
@@ -372,7 +375,8 @@ ENGINE_AUTO's pick, which cut the frame time from 197 to 138.5 ms (STUDY-20).
 
 **Load test.** The demo server (c8g.large, 2 vCPU) served 4 clients back to back plus 1 survey for 120 s:
 383 of 383 requests completed, analyze p95 2.44 s against a 3-s mark, about 190 analyses a minute. Under load the
-agent chose the standard look for 382 of 383 requests.
+agent chose the standard look for 382 of 383 requests. The clients ran on the server itself with the operator
+token, so rate limits were off and no network time is included.
 
 **Analyst effort.** These figures use *assumed* timings (20 s per frame, 8 s per card) until the timed study runs
 ([`effort_curve.md`](docs/reports/effort_curve.md)):
@@ -399,24 +403,25 @@ sonar, so the agent withdraws its promise and requests a full review
 <sub>Sensor cross-check (STUDY-16), 16 random chunks of the 1-h recording: red = OpenCV tracker alone, blue = depth
 sounder, green = the seabed line the agent accepted (re-tracked where the two conflict).</sub></p>
 
-**Integrations.** An MCP server (stdio and HTTP `/mcp`, bearer token; 13 tools, and the only write is asking a
-person), OGC API – Features for QGIS / ArcGIS, HMAC-signed webhooks, and a drop-in `<depth-hazards>` web component
+**Integrations.** An MCP server (stdio and HTTP `/mcp`, bearer token; 13 tools, none of which can approve or
+decide: an agent can only ask a person), OGC API – Features for QGIS / ArcGIS, HMAC-signed webhooks, and a drop-in `<depth-hazards>` web component
 ([`mcp.md`](docs/mcp.md) · [`integrations.md`](docs/integrations.md)).
 
 ---
 
 ## Competitive Analysis
 
-| Dimension | Optical / SAR satellites | Manual sonar review | Raw sonar detector | **DEPTH** |
+| Dimension | Optical / SAR satellites | Manual sonar review | Detector with mapping (e.g. GhostVision) | **DEPTH** |
 |---|---|---|---|---|
-| **Sees the seabed (5–50 m)** | no: light reaches < 2 m; SAR stops at the surface | yes | yes | yes |
-| **Coverage guarantee** | none | depends on the analyst | uncalibrated confidence scores | **≥ 78% / ≥ 84% of pots reach a person (95% confidence), verified on unseen recordings** |
-| **Knows when it does not apply** | — | analyst judgement | no | **applicability check withdraws the promise (22 of 22 surveys on another sonar)** |
-| **Sonar geometry** | orbital ortho-rectification | analyst judgement | none: image in, boxes out | **Stage 1: per-ping seabed track, slant → ground range, sounder cross-check** |
-| **Review load** | no seabed targets | every frame | one card per box, with duplicates on one object | **one card per object (3.86 → 2.32 cards per frame)** |
-| **Operational output** | area-level anomalies | hand-logged GPS marks | bounding boxes | **routes, re-survey passes, GeoJSON / GPX / KML** |
-| **Human control** | — | manual sign-off | no approval step | **named, PIN-gated approval of every action; agents can only ask** |
-| **Runtime** | cloud post-processing | analyst time | framework-dependent, often GPU | **CPU only, OpenCV 5 `cv2.dnn`: 138.5 ms per frame on Graviton4** |
+| **Sees the seabed (5–50 m)** | not in turbid water (light reaches 1–2 m there); SAR stops at the surface | yes | yes | yes |
+| **Detector accuracy** | — | the analyst's skill | **higher** (F1 0.71–0.73 reported on the official split) | lower (F1 0.41 on the same split) |
+| **Coverage statement** | none | depends on the analyst | precision and recall reported on a test set | **≥ 78% / ≥ 84% of pots reach a person (95% confidence, pooled over recordings), verified on unseen recordings** |
+| **Knows when it does not apply** | — | analyst judgement | not part of the published method | **applicability check withdraws the promise (22 of 22 surveys on another sonar)** |
+| **Sonar geometry** | orbital ortho-rectification | analyst judgement | georeferencing and rectification (PINGMapper) | **Stage 1: per-ping seabed track, slant → ground range, sounder cross-check** |
+| **Review load** | no seabed targets | every frame | one item per detection | **one card per object (3.86 → 2.32 cards per frame)** |
+| **Operational output** | area-level anomalies | hand-logged GPS marks | georeferenced detections | **routes, re-survey passes, GeoJSON / GPX / KML** |
+| **Human control** | — | manual sign-off | outside the tool | **named, PIN-gated approval of every action; agents can only ask** |
+| **Runtime** | cloud post-processing | analyst time | not compared here | **CPU only, OpenCV 5 `cv2.dnn`: 138.5 ms per frame on Graviton4** |
 
 Detector accuracy is not DEPTH's claim. On the official 398-frame split, GhostVision reports F1 0.71–0.73 and
 DEPTH's EXP-003 scores 0.41. DEPTH's contribution is the layer above the detector. The same calibration code
@@ -461,7 +466,7 @@ The [architecture diagram](#architecture) shows how these services connect.
 | Systems Manager | Parameter Store SecureStrings for the approver PIN and the MCP / admin tokens; Session Manager instead of SSH |
 | CloudWatch | logs, metrics, alarms, a dashboard and saved queries |
 | SNS · EventBridge | alerts and approval emails · alert rules and the scheduled stop (2026-11-10) |
-| DLM · Budgets · Cost Anomaly Detection | daily snapshots · spend alerts |
+| DLM · Budgets · Cost Anomaly Detection | daily snapshots · spend alerts (the monthly Budget is account-level, outside the stack) |
 | Route 53 health check · Resource Group | uptime while public · one view of the stack |
 
 The whole stack is one CloudFormation template (`infra/cfn/depth.yaml`). It was validated with cfn-lint 1.58.0 and
@@ -524,8 +529,8 @@ Kubernetes cluster ([`container.yml`](.github/workflows/container.yml); details 
 
 ### Practical: Pinned Dependencies, Build, Deployment and Tests
 
-This section answers the judges' practical criterion in one place: every dependency is pinned, and the build,
-deployment and test steps below are the ones CI runs on every push.
+This section answers the judges' practical criterion in one place: every dependency is pinned, and the build and
+test steps below are the ones CI runs. The AWS deployment is run by hand (dry run first), never by CI.
 
 **Pinned dependencies.** Every package is pinned to an exact version (`==`), split by purpose so the runtime
 stays small and torch-free:
@@ -566,9 +571,10 @@ python tests/ui_smoke.py --full-demo        # headless Chrome plays the guided d
 python tests/container_smoke.py --url http://localhost:8000   # real work inside a running container
 ```
 
-CI runs these on every push: [`tests.yml`](.github/workflows/tests.yml) (tests, lint, type check),
-[`container.yml`](.github/workflows/container.yml) (build, run locked down, deploy to a throwaway Kubernetes
-cluster) and [`codespaces.yml`](.github/workflows/codespaces.yml) (fresh setup, guided demo to the last step).
+CI runs [`tests.yml`](.github/workflows/tests.yml) (tests, lint, type check) on every push to `main` and every
+pull request; [`container.yml`](.github/workflows/container.yml) (build, run locked down, deploy to a throwaway
+Kubernetes cluster) and [`codespaces.yml`](.github/workflows/codespaces.yml) (fresh setup, guided demo to the last
+step) run when the code they cover changes. The UI test also runs inside `codespaces.yml`.
 
 ### Reproduce the Results
 
@@ -685,7 +691,8 @@ benchmarks/ · tests/ · notebooks/ · DATASET/scripts/ · docs/ (reports in doc
   protected-wreck coordinates are generalised ([`docs/responsible_use.md`](docs/responsible_use.md)).
 
 **How it was built:** by Madhesh (Team Syndicate, solo), with an AI coding assistant (Claude Code) writing much of
-the code under the author's direction. Every number in this repository comes from a script in it that you can
-re-run, and each study's protocol was committed before its unseen data was scored.
+the code under the author's direction. Every measured number in this repository comes from a script in it that
+you can re-run (the background figures in the problem statement come from the cited sources), and the studies
+that switch on agent behaviour committed their protocol before their held-out data was scored.
 
 *Team Syndicate · OpenCV AI Competition 2026*

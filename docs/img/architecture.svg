@@ -125,7 +125,7 @@
   <rect x="584" y="262" width="152" height="164" rx="8" class="stage"/>
   <text x="598" y="286" class="h">2 · SEE</text>
   <text x="598" y="306" class="s b">YOLO11 ONNX · cv2.dnn</text>
-  <text x="598" y="322" class="s">OpenCV 5 new engine</text>
+  <text x="598" y="322" class="s">faster engine, timed at start</text>
   <text x="598" y="338" class="s">634/634 same as classic</text>
   <text x="598" y="354" class="s">class-aware NMS</text>
   <text x="598" y="370" class="s">look harder: 2×2 tiles</text>
@@ -248,7 +248,7 @@
   <text x="44" y="588" class="s b">→ models/&lt;MODEL&gt;/calibration.json</text>
   <text x="44" y="612" class="s">same code, any detector: EXP-001 ≥ 63%,</text>
   <text x="44" y="628" class="s">EXP-003 ≥ 78% — each verified on unseen data</text>
-  <text x="44" y="652" class="s">STUDY-01…22 · negative results published</text>
+  <text x="44" y="652" class="s">STUDY-01…23 · negative results published</text>
   <text x="44" y="676" class="s">people's labels → fine-tune set → the next run</text>
   <text x="44" y="724" class="xs mono">DATASET/scripts · detection/ · agentic/</text>
   <path d="M372,584 C392,584 392,344 414,344" class="flow"/>

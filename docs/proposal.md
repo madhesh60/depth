@@ -1,10 +1,12 @@
 > **📌 This is the original grant proposal / competition brief — a historical record, not the
 > current design.** The as-built system is in [`architecture.md`](architecture.md): the taxonomy is
-> 4 classes for EXP-001 (`rope_line` merged into `fishing_gear`) and 2 sonar-only classes for
-> EXP-002; the classical-CV ROI gate was **retired** (STUDY-01) and Stage 1 is now **sonar
-> canonicalisation** in the product path (bottom tracking, STUDY-08); the AWS plan is **one EC2
-> Graviton instance on the COOL AMI behind CloudFront** — Lambda / API Gateway / DynamoDB / Amplify /
-> SageMaker below are superseded. Current state: [`README.md`](../README.md),
+> 4 classes for EXP-001 (`rope_line` merged into `fishing_gear`) and 2 sonar-only classes from
+> EXP-002 on (EXP-003 deployed); the classical-CV ROI gate was **retired** (STUDY-01) and Stage 1 is now **sonar
+> canonicalisation** in the product path (bottom tracking, STUDY-08); the AWS design is **one EC2
+> Graviton instance built for the COOL AMI behind CloudFront**, which today runs stock OpenCV 5 behind Caddy (COOL
+> and CloudFront pending) — Lambda / API Gateway / DynamoDB / Amplify / SageMaker below are superseded. Plans,
+> targets and background figures below are as written in August 2026 and were not all met or re-checked; the
+> README states what was built and measured. Current state: [`README.md`](../README.md),
 > [`experiments.md`](experiments.md), [`progress.md`](progress.md).
 
 **PS**
