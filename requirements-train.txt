@@ -1,6 +1,6 @@
 # Training + ONNX export — Kaggle GPU only. NOT installed on the live server
 # (the runtime path is torch-free; it infers via cv2.dnn — see requirements.txt).
-ultralytics==8.4.157
+ultralytics==8.4.192
 torch==2.14.1
 torchvision==0.29.1
 onnxruntime==1.23.2
