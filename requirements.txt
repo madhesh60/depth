@@ -7,7 +7,7 @@
 opencv-python-headless==5.0.0.93
 numpy==2.2.6            # OpenCV 5's cp310 wheel requires numpy>=2
 fastapi==0.127.0
-uvicorn==0.40.0
+uvicorn==0.54.0
 python-multipart==0.0.21
 boto3==1.43.98
 mcp==1.28.1             # Model Context Protocol server (stdio + Streamable HTTP at /mcp)
